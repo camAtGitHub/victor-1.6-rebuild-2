@@ -1,16 +1,16 @@
-var currentThread = -1
-var threads = []
-
-function SwitchThread(event) {
-  currentThread = this.selectedIndex
-  threads[currentThread].changed = true
-}
+/*
+ * CpuProfile WebViz module (engine :8888 / anim :8889)
+ * 2026-07: shell host scoping, safe onData, scoped Flot (#tab-cpuprofile)
+ * Globals that were outside the IIFE are now internal (avoids multi-instance bleed).
+ */
 
 (function(myMethods, sendData) {
 
-  // max width of the chart
+  var currentThread = -1;
+  var threads = [];
+
   var maxWidth_s = 60.0;
-  
+
   var chartOptions = {
     legend: {
       noColumns: 1,
@@ -20,7 +20,6 @@ function SwitchThread(event) {
     xaxis: {
       ticks: 10,
       tickLength: 10,
-
       tickDecimals: 0
     },
     yaxis: {
@@ -29,209 +28,300 @@ function SwitchThread(event) {
     grid: {
       show: true,
     }
-  }      
-  
-  var threadNameToIdxMap = {}
-  var chart = null
-  var plotData = []
+  };
+
+  var threadNameToIdxMap = {};
+  var chart = null;
+  var plotData = [];
+  var hostElem = null;
+
+  function $host() {
+    if( hostElem ) {
+      return $(hostElem);
+    }
+    try {
+      var el = document.getElementById( 'tab-cpuprofile' );
+      if( el ) { return $(el); }
+    } catch( e ) {}
+    return $();
+  }
+
+  function setHost( el ) {
+    if( !el ) { return; }
+    if( el.jquery ) {
+      hostElem = el[0] || hostElem;
+    } else if( el.nodeType ) {
+      hostElem = el;
+    }
+  }
+
+  function chartContainer() {
+    return $host().find( '#chartContainer' );
+  }
+
+  function ensurePlot() {
+    var $c = chartContainer();
+    if( !$c.length ) {
+      return null;
+    }
+    if( chart ) {
+      try {
+        var ph = (typeof chart.getPlaceholder === 'function') ? chart.getPlaceholder() : null;
+        if( ph && ph.length && ph[0] && document.documentElement.contains( ph[0] ) ) {
+          return chart;
+        }
+      } catch( e ) {
+        chart = null;
+      }
+    }
+    try {
+      chart = $.plot( $c, plotData, chartOptions );
+    } catch( ePlot ) {
+      console.warn( 'cpuprofile: $.plot failed', ePlot );
+      chart = null;
+    }
+    return chart;
+  }
 
   function DoFieldToggling(that, event, thread) {
-    var idx = thread.nameToIdxMap[event.target.id]
-    thread.show[idx] = that.checked
-    thread.changed = true
+    if( !thread || !event || !event.target ) { return; }
+    var idx = thread.nameToIdxMap[event.target.id];
+    if( idx === undefined ) { return; }
+    thread.show[idx] = that.checked;
+    thread.changed = true;
   }
 
   function DoToggling(that, event, thread) {
-    if(event.target.id == "min") {
-      thread.min = that.checked
+    if( !thread || !event || !event.target ) { return; }
+    if( event.target.id == "min" ) {
+      thread.min = that.checked;
+    } else if( event.target.id == "max" ) {
+      thread.max = that.checked;
+    } else if( event.target.id == "mean" ) {
+      thread.mean = that.checked;
     }
-    else if(event.target.id == "max") {
-      thread.max = that.checked
-    }
-    else if(event.target.id == "mean") {
-      thread.mean = that.checked
-    }
+    thread.changed = true;
+  }
 
-    thread.changed = true
+  function bindOptionClicks(thread) {
+    $host().find( "#chartOptions" ).find( "input[type='checkbox']" ).off( 'click.cpuprofile' ).on( 'click.cpuprofile', function(event) {
+      DoToggling( this, event, thread );
+    });
+    $host().find( "#chartFields" ).find( "input[type='checkbox']" ).off( 'click.cpuprofile' ).on( 'click.cpuprofile', function(event) {
+      DoFieldToggling( this, event, thread );
+    });
   }
 
   myMethods.init = function(elem) {
-    // automatically turn on cpu profiler to webviz
-    $.post('consolevarset', {key: 'ProfilerLogOutput', value: 2}, function(result){});
+    setHost( elem );
 
-    $(elem).append('<select onchange="SwitchThread.call(this, event)" id="chartSelect" name="Tick">'+
-                   '<option>No active ticks</option>')
-    $(elem).append('<div id="chartOptions">' +
-                   '<input id="mean" type="checkbox" checked="checked" />Mean</li>' +
-                   '<input id="min" type="checkbox" />Min</li>' +
-                   '<input id="max" type="checkbox" />Max</li>' +
-                   '</div>')
+    try {
+      $.post( 'consolevarset', {key: 'ProfilerLogOutput', value: 2}, function(result){} );
+    } catch( e ) {
+      console.warn( 'cpuprofile: consolevarset failed', e );
+    }
 
-    $(elem).append('<div id="chartContainer"></div>')
+    var $sel = $('<select id="chartSelect" name="Tick"><option>No active ticks</option></select>');
+    $sel.on( 'change', function() {
+      currentThread = this.selectedIndex;
+      if( currentThread >= 0 && threads[currentThread] ) {
+        threads[currentThread].changed = true;
+      }
+    });
+    $(elem).append( $sel );
 
-    $(elem).append('<div id="chartFields">' +
-                   '</div>')
-  }
+    $(elem).append(
+      '<div id="chartOptions">' +
+      '<input id="mean" type="checkbox" checked="checked" />Mean ' +
+      '<input id="min" type="checkbox" />Min ' +
+      '<input id="max" type="checkbox" />Max ' +
+      '</div>'
+    );
+
+    $(elem).append( '<div id="chartContainer"></div>' );
+    $(elem).append( '<div id="chartFields"></div>' );
+  };
 
   myMethods.onData = function(data, elem) {
-    var threadName = data.threadName
-    var thread = null
-    
-    var threadIdx = threadNameToIdxMap[threadName]
-    if (threadIdx === undefined) {
-      // unknown thread name, new thread
-      threadIdx = threads.length
-
-      thread = {"nameToIdxMap": {}, "time": 0, "changed": true, "meanData": [], "maxData": [], "minData": [], "show": [], "mean": true, "min": false, "max": false}
-      threads.push(thread)
-      threadNameToIdxMap[threadName] = threadIdx
-
-      if (threadIdx == 0) {
-        // first thread, remove "no active ticks" option and make it current
-        $('#chartSelect').html("")
-        currentThread = 0
-      }
-      $('#chartSelect').append('<option>'+threadName+'</option>')
-
-    } else {
-      thread = threads[threadIdx]
+    if( elem ) { setHost( elem ); }
+    if( !data || typeof data !== 'object' ) {
+      return;
     }
 
-    if (data.sample) {
-      thread.time = data.time
+    try {
+      var threadName = data.threadName;
+      if( typeof threadName !== 'string' || !threadName ) {
+        return;
+      }
 
-      var num_samples = data.sample.length
-      for (var i=0; i<num_samples; ++i) {
-        var sample = data.sample[i]
-        var idx = thread.nameToIdxMap[sample.name]
-        if (idx === undefined) {
-          // add new name to the plot
-          idx = thread.meanData.length
-          thread.nameToIdxMap[sample.name] = idx
-          thread.meanData[idx] = []
-          thread.minData[idx] = []
-          thread.maxData[idx] = []
+      var thread = null;
+      var threadIdx = threadNameToIdxMap[threadName];
+      if( threadIdx === undefined ) {
+        threadIdx = threads.length;
+        thread = {
+          "nameToIdxMap": {},
+          "time": 0,
+          "changed": true,
+          "meanData": [],
+          "maxData": [],
+          "minData": [],
+          "show": [],
+          "mean": true,
+          "min": false,
+          "max": false
+        };
+        threads.push( thread );
+        threadNameToIdxMap[threadName] = threadIdx;
 
-          // only the first 10 samples default to on, keeps the graph legend manageable
-          if (idx < 10) {
-            thread.show.push(true)
-          } else {
-            thread.show.push(false)
+        if( threadIdx === 0 ) {
+          $host().find( '#chartSelect' ).html( "" );
+          currentThread = 0;
+        }
+        $host().find( '#chartSelect' ).append( $('<option></option>').text( threadName ) );
+      } else {
+        thread = threads[threadIdx];
+      }
+
+      if( Array.isArray( data.sample ) ) {
+        thread.time = parseFloat( data.time );
+        if( !isFinite( thread.time ) ) {
+          thread.time = 0;
+        }
+
+        var num_samples = data.sample.length;
+        for( var i=0; i<num_samples; ++i ) {
+          var sample = data.sample[i];
+          if( !sample || typeof sample !== 'object' || typeof sample.name !== 'string' ) {
+            continue;
           }
+          var idx = thread.nameToIdxMap[sample.name];
+          if( idx === undefined ) {
+            idx = thread.meanData.length;
+            thread.nameToIdxMap[sample.name] = idx;
+            thread.meanData[idx] = [];
+            thread.minData[idx] = [];
+            thread.maxData[idx] = [];
 
-          if (currentThread == threadIdx) {
-            if (thread.show[idx]) {
-              $('#chartFields').append('<input id="'+sample.name+'" type="checkbox" checked="checked" />'+sample.name+'</li>&emsp;')
+            if( idx < 10 ) {
+              thread.show.push( true );
+            } else {
+              thread.show.push( false );
             }
 
-            $("#chartOptions").find("input[type='checkbox']").click(function (event) {
-              DoToggling(this, event, thread)
-            })
+            if( currentThread == threadIdx ) {
+              if( thread.show[idx] ) {
+                // Escape name for id/text — use text nodes for display
+                var $inp = $('<input type="checkbox" checked="checked" />');
+                $inp.attr( 'id', sample.name );
+                $host().find( '#chartFields' ).append( $inp ).append( document.createTextNode( sample.name + ' ' ) );
+              }
+              bindOptionClicks( thread );
+            }
+          }
 
-            $("#chartFields").find("input[type='checkbox']").click(function (event) {
-              DoFieldToggling(this, event, thread)
-            })
+          var mean = parseFloat( sample.mean );
+          var min = parseFloat( sample.min );
+          var max = parseFloat( sample.max );
+          if( isFinite( mean ) ) { thread.meanData[idx].push( [thread.time, mean] ); }
+          if( isFinite( min ) ) { thread.minData[idx].push( [thread.time, min] ); }
+          if( isFinite( max ) ) { thread.maxData[idx].push( [thread.time, max] ); }
+
+          var series = thread.meanData[idx];
+          if( series.length ) {
+            var num_data = series.length;
+            var dt = thread.time - series[0][0];
+            while( dt > maxWidth_s && num_data > 0 ) {
+              thread.meanData[idx].shift();
+              if( thread.minData[idx].length ) { thread.minData[idx].shift(); }
+              if( thread.maxData[idx].length ) { thread.maxData[idx].shift(); }
+              --num_data;
+              if( !thread.meanData[idx].length ) { break; }
+              dt = thread.time - thread.meanData[idx][0][0];
+            }
           }
         }
+      }
 
-        thread.meanData[idx].push([thread.time, sample.mean])
-        thread.minData[idx].push([thread.time, sample.min])
-        thread.maxData[idx].push([thread.time, sample.max])
+      if( currentThread >= 0 && threads[currentThread] && threads[currentThread].changed ) {
+        thread = threads[currentThread];
+        thread.changed = false;
 
-        // scroll window
-        var num_data = thread.meanData[idx].length
-        var dt = thread.time - thread.meanData[idx][0][0]
-        while (dt > maxWidth_s && num_data > 0) {
-          thread.meanData[idx].shift()
-          thread.minData[idx].shift()
-          thread.maxData[idx].shift()
-          --num_data
-          dt = thread.time - thread.meanData[idx][0][0]
+        var $fields = $host().find( '#chartFields' );
+        $fields.html( '' );
+        for( var field in thread.nameToIdxMap ) {
+          if( !thread.nameToIdxMap.hasOwnProperty( field ) ) { continue; }
+          var fidx = thread.nameToIdxMap[field];
+          var $cb = $('<input type="checkbox" />');
+          $cb.attr( 'id', field );
+          if( thread.show[fidx] ) {
+            $cb.prop( 'checked', true );
+          }
+          $fields.append( $cb ).append( document.createTextNode( field + ' ' ) );
+        }
+
+        bindOptionClicks( thread );
+
+        var noColumns = 0;
+        if( thread.mean ) { noColumns++; }
+        if( thread.min ) { noColumns++; }
+        if( thread.max ) { noColumns++; }
+        chartOptions.legend.noColumns = noColumns;
+
+        plotData = [];
+        var name;
+        if( thread.mean ) {
+          for( name in thread.nameToIdxMap ) {
+            if( !thread.nameToIdxMap.hasOwnProperty( name ) ) { continue; }
+            var midx = thread.nameToIdxMap[name];
+            if( thread.show[midx] ) {
+              plotData.push({label: name, data: thread.meanData[midx]});
+            }
+          }
+        }
+        if( thread.min ) {
+          for( name in thread.nameToIdxMap ) {
+            if( !thread.nameToIdxMap.hasOwnProperty( name ) ) { continue; }
+            var nidx = thread.nameToIdxMap[name];
+            if( thread.show[nidx] ) {
+              plotData.push({label: name+" [min]", data: thread.minData[nidx]});
+            }
+          }
+        }
+        if( thread.max ) {
+          for( name in thread.nameToIdxMap ) {
+            if( !thread.nameToIdxMap.hasOwnProperty( name ) ) { continue; }
+            var xidx = thread.nameToIdxMap[name];
+            if( thread.show[xidx] ) {
+              plotData.push({label: name+" [max]", data: thread.maxData[xidx]});
+            }
+          }
         }
       }
+
+      if( currentThread < 0 || !threads[currentThread] ) {
+        return;
+      }
+
+      var p = ensurePlot();
+      if( !p ) { return; }
+
+      thread = threads[currentThread];
+      var xMin = thread.time - maxWidth_s;
+      p.getAxes().xaxis.options.min = xMin;
+      p.getAxes().xaxis.options.max = xMin + maxWidth_s + 0.1;
+
+      p.setData( plotData );
+      p.setupGrid();
+      p.draw();
+    } catch( e ) {
+      console.warn( 'cpuprofile: onData failed', e );
     }
-
-    if (currentThread >= 0 && threads[currentThread].changed) {
-      thread = threads[currentThread]
-      thread.changed = false
-
-      $('#chartFields').html('')
-      for (field in thread.nameToIdxMap) {
-        var idx = thread.nameToIdxMap[field]
-        if (thread.show[idx]) {
-          $('#chartFields').append('<input id="'+field+'" type="checkbox" checked="checked" />'+field+'</li>&emsp;')
-        } else {
-          $('#chartFields').append('<input id="'+field+'" type="checkbox"/>'+field+'</li>&emsp;')
-        }
-      }
-
-      $("#chartOptions").find("input[type='checkbox']").click(function (event) {
-         DoToggling(this, event, thread)
-      })
-
-      $("#chartFields").find("input[type='checkbox']").click(function (event) {
-         DoFieldToggling(this, event, thread)
-      })
-
-      var noColumns = 0
-      if (thread.mean) {
-        noColumns++
-      }
-      if (thread.min) {
-        noColumns++
-      }
-      if (thread.max) {
-        noColumns++
-      }
-      chartOptions.legend.noColumns = noColumns
-
-      plotData = []
-      var t = {}
-      var name
-      if (thread.mean) {
-        for (name in thread.nameToIdxMap) {
-          var idx = thread.nameToIdxMap[name]
-          if (thread.show[idx]) {
-              plotData.push({label: name, data: thread.meanData[idx]})
-          }
-        }
-      }
-      if (thread.min) {
-        for (name in thread.nameToIdxMap) {
-          var idx = thread.nameToIdxMap[name]
-          if (thread.show[idx]) {
-              plotData.push({label: name+" [min]", data: thread.minData[idx]})
-          }
-        }
-      }
-      if (thread.max) {
-        for (name in thread.nameToIdxMap) {
-          var idx = thread.nameToIdxMap[name]
-          if (thread.show[idx]) {
-              plotData.push({label: name+" [max]", data: thread.maxData[idx]})
-          }
-        }
-      }
-    }
-
-    if(chart == null) {
-      chart = $.plot("#chartContainer", plotData, chartOptions)
-    }
-
-    // fixed width data
-    thread = threads[currentThread]
-    var xMin = thread.time - maxWidth_s
-    chart.getAxes().xaxis.options.min = xMin
-    chart.getAxes().xaxis.options.max = xMin + maxWidth_s + 0.1
-
-    chart.setData(plotData)
-    chart.setupGrid()
-    chart.draw()
-  }
+  };
 
   myMethods.update = function(dt, elem) {
-  }
-  
+    if( elem ) { setHost( elem ); }
+  };
+
   myMethods.getStyles = function() {
     return `
       #chartContainer {
@@ -239,13 +329,13 @@ function SwitchThread(event) {
         width: 100%;
       }
 
-      .verticalLabel {        
+      .verticalLabel {
         text-align: left;
         transform: rotate(-90deg);
         transform-origin: left;
         color: #606060
       }
-      `
-  }
+      `;
+  };
 
-})(moduleMethods, moduleSendDataFunc)
+})(moduleMethods, moduleSendDataFunc);
