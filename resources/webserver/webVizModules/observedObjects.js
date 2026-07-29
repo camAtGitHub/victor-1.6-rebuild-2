@@ -1,16 +1,28 @@
-/*  
+/*
  * Lists observed objects
+ * 2026-07: safe onData guard (#tab-observedobjects)
  */
 
 (function(myMethods, sendData) {
 
-  var kFace = '&#x1F468'
+  var kFace = '&#x1F468';
   var kCube = '&#x25A6;';
 
   var faceList;
   var cubeList;
+  var hostElem = null;
+
+  function setHost( el ) {
+    if( !el ) { return; }
+    if( el.jquery ) {
+      hostElem = el[0] || hostElem;
+    } else if( el.nodeType ) {
+      hostElem = el;
+    }
+  }
 
   function sortListById(list) {
+    if( !list || !list.length ) { return; }
     var elems = list.children('div');
 
     elems.sort( function(a,b){
@@ -30,11 +42,10 @@
   }
 
   myMethods.init = function(elem) {
+    setHost( elem );
     var bigStyle = {class: 'bigUnicode'};
-    // needs containers for margin style, and needs different containers so that
-    // cell widths can differ
     var faceContainer = $('<div class="tableContainer"></div>').appendTo(elem);
-    var cubeContainer = $('<div class="tableContainer"></div>').appendTo(elem)
+    var cubeContainer = $('<div class="tableContainer"></div>').appendTo(elem);
 
     $('<div></div>', bigStyle).appendTo(faceContainer).html(kFace + "'s");
     faceList = $('<div id="faceList"></div>').appendTo(faceContainer);
@@ -44,59 +55,78 @@
   };
 
   myMethods.onData = function(data, elem) {
-    if( data["type"] == "RobotObservedFace" ) {
-      var shouldSort = false;
-      var faceElem = faceList.find('div[data-id="' + data["faceID"] + '"]');
-      if( faceElem.length == 0 ) {
-        faceElem = $('<div></div>', {class:'faceBlock'}).appendTo(faceList);
-        faceElem.attr('data-id', data["faceID"]);
-        shouldSort = true;
-      } else {
-        faceElem.empty();
-      }
-      faceElem.append('<p>id: ' + data["faceID"] + '</p>')
-              .append('<p>t: ' + data["timestamp"] + '</p>')
-              .append('<p>origin: ' + data["originID"] + '</p>')
-      if( typeof data.name !== 'undefined' ) {
-        faceElem.append('<p>name: ' + data["name"] + '</p>');
-      }
-      if( shouldSort ) {
-        sortListById( faceList );
-      }
-    } 
-    else if( data["type"] == "RobotDeletedFace" ) {
-      var faceElem = faceList.find('div[data-id="' + data["faceID"] + '"]');
-      if( faceElem.length != 0 ) {
-        faceElem.remove();
-      }
+    if( elem ) { setHost( elem ); }
+    if( !data || typeof data !== 'object' ) {
+      return;
     }
-    else if( data["type"] == "RobotObservedObject" ) {
-      var shouldSort = false;
-      var cubeElem = cubeList.find('div[data-id="' + data["objectID"] + '"]');
-      if( cubeElem.length == 0 ) {
-        cubeElem = $('<div></div>', {class:'objectBlock'}).appendTo(cubeList);
-        cubeElem.attr('data-id', data["objectID"]);
-        shouldSort = true;
-      } else {
-        cubeElem.empty();
+
+    try {
+      if( data["type"] == "RobotObservedFace" ) {
+        if( !faceList || !faceList.length ) { return; }
+        var shouldSort = false;
+        var faceId = data["faceID"];
+        if( faceId == null ) { return; }
+        var faceElem = faceList.find('div[data-id="' + faceId + '"]');
+        if( faceElem.length == 0 ) {
+          faceElem = $('<div></div>', {class:'faceBlock'}).appendTo(faceList);
+          faceElem.attr('data-id', faceId);
+          shouldSort = true;
+        } else {
+          faceElem.empty();
+        }
+        faceElem.append('<p>id: ' + faceId + '</p>')
+                .append('<p>t: ' + (data["timestamp"] != null ? data["timestamp"] : '') + '</p>')
+                .append('<p>origin: ' + (data["originID"] != null ? data["originID"] : '') + '</p>');
+        if( typeof data.name !== 'undefined' ) {
+          faceElem.append($('<p></p>').text( 'name: ' + data["name"] ));
+        }
+        if( shouldSort ) {
+          sortListById( faceList );
+        }
       }
-      cubeElem.append('<p>id: ' + data["objectID"] + '</p>')
-              .append('<p>t: ' + data["timestamp"] + '</p>')
-              .append('<p>type: ' + data["objectType"] + '</p>')
-              .append('<p>active: ' + data["isActive"] + '</p>');
-      if( shouldSort ) {
-        sortListById( cubeList );
+      else if( data["type"] == "RobotDeletedFace" ) {
+        if( !faceList || !faceList.length ) { return; }
+        var delFace = faceList.find('div[data-id="' + data["faceID"] + '"]');
+        if( delFace.length != 0 ) {
+          delFace.remove();
+        }
       }
-    }
-    else if( data["type"] == "RobotDeletedLocatedObject" ) {
-      var cubeElem = cubeList.find('div[data-id="' + data["objectID"] + '"]');
-      if( cubeElem.length != 0 ) {
-        cubeElem.remove();
+      else if( data["type"] == "RobotObservedObject" ) {
+        if( !cubeList || !cubeList.length ) { return; }
+        var shouldSortObj = false;
+        var objectID = data["objectID"];
+        if( objectID == null ) { return; }
+        var cubeElem = cubeList.find('div[data-id="' + objectID + '"]');
+        if( cubeElem.length == 0 ) {
+          cubeElem = $('<div></div>', {class:'objectBlock'}).appendTo(cubeList);
+          cubeElem.attr('data-id', objectID);
+          shouldSortObj = true;
+        } else {
+          cubeElem.empty();
+        }
+        cubeElem.append('<p>id: ' + objectID + '</p>')
+                .append('<p>t: ' + (data["timestamp"] != null ? data["timestamp"] : '') + '</p>')
+                .append('<p>type: ' + (data["objectType"] != null ? data["objectType"] : '') + '</p>')
+                .append('<p>active: ' + (data["isActive"] != null ? data["isActive"] : '') + '</p>');
+        if( shouldSortObj ) {
+          sortListById( cubeList );
+        }
       }
+      else if( data["type"] == "RobotDeletedLocatedObject" ) {
+        if( !cubeList || !cubeList.length ) { return; }
+        var delCube = cubeList.find('div[data-id="' + data["objectID"] + '"]');
+        if( delCube.length != 0 ) {
+          delCube.remove();
+        }
+      }
+    } catch( e ) {
+      console.warn( 'observedObjects: onData failed', e );
     }
   };
 
-  myMethods.update = function(dt, elem) {};
+  myMethods.update = function(dt, elem) {
+    if( elem ) { setHost( elem ); }
+  };
 
   myMethods.getStyles = function() {
     return `
