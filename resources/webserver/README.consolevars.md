@@ -1,15 +1,18 @@
 # Console vars UI (`/consolevars`)
 
 **Paths:** engine `:8888/consolevars`, anim `:8889/consolevars`  
-**Template:** `consolevarsui.html` (filled by `WebService::GenerateConsoleVarsUI`)  
-**Catalog:** `consolevars-catalog.json` + `consolevars-app.js`
+**Classic (default):** `consolevarsui.html` → `GET /consolevars`  
+**Explorer (new):** `consolevars-explorer.html` → `GET /consolevars-explorer`  
+**Catalog:** `consolevars-catalog.json` + `consolevars-app.js` (explorer only)
+
+Classic stays the stock jQuery UI page. A link at the top points to the Explorer.
 
 ## How it works
 
 1. C++ registers thousands of `CONSOLE_VAR` / `CONSOLE_FUNC` at runtime.
-2. `GET /consolevars` builds HTML tabs from those registrations (ids = var names, categories = tab/fieldset).
-3. Browser loads the template, then `consolevars-app.js` fetches the **curated catalog** and:
-   - Shows **recipes** (e.g. MirrorMode face boxes) with **Apply** / **Highlight**
+2. `GET /consolevars` or `/consolevars-explorer` builds HTML tabs from those registrations (ids = var names, categories = tab/fieldset) into the chosen template.
+3. **Explorer only:** `consolevars-app.js` fetches the **curated catalog** and:
+   - Shows **recipes** (e.g. MirrorMode face boxes, custom eyes) with **Apply** / **Highlight**
    - Attaches **blurbs**, **requires**, **related** links on known vars
    - Provides **filter** search across labels
 

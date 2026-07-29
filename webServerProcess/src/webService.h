@@ -84,6 +84,7 @@ public:
   OnAppToEngineRequestDataType& OnAppToEngineRequestData() { return _appToEngineRequestData; }
   
   const std::string& getConsoleVarsTemplate();
+  const std::string& getConsoleVarsExplorerTemplate();
 
   enum class WhichWebServer
   {
@@ -95,6 +96,7 @@ public:
   enum RequestType
   {
     RT_ConsoleVarsUI,
+    RT_ConsoleVarsExplorerUI,
     RT_ConsoleVarGet,
     RT_ConsoleVarSet,
     RT_ConsoleVarList,
@@ -146,7 +148,8 @@ public:
 
 private:
 
-  void GenerateConsoleVarsUI(std::string& page, const std::string& category);
+  void GenerateConsoleVarsUI(std::string& page, const std::string& category,
+                             bool useExplorerTemplate = false);
 
   struct WebSocketConnectionData {
     struct mg_connection* conn = nullptr;
@@ -174,6 +177,7 @@ private:
   mutable std::mutex s_wsConnectionsMutex;
 
   std::string _consoleVarsUIHTMLTemplate;
+  std::string _consoleVarsExplorerHTMLTemplate;
 
   std::vector<Request*> _requests;
 

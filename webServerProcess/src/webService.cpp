@@ -331,6 +331,17 @@ ConsoleVarsUI(struct mg_connection *conn, void *cbdata)
 }
 
 static int
+ConsoleVarsExplorerUI(struct mg_connection *conn, void *cbdata)
+{
+  const mg_request_info* info = mg_get_request_info(conn);
+  std::string category = ((info->query_string) ? info->query_string : "");
+
+  const int returnCode = ProcessRequest(conn, WebService::WebService::RequestType::RT_ConsoleVarsExplorerUI, category, "");
+
+  return returnCode;
+}
+
+static int
 ConsoleVarSet(struct mg_connection *conn, void *cbdata)
 {
   const mg_request_info* info = mg_get_request_info(conn);
@@ -1009,6 +1020,7 @@ void WebService::Start(Anki::Util::Data::DataPlatform* platform, const Json::Val
 
   mg_set_request_handler(_ctx, "/daslog", LogHandler, 0);
   mg_set_request_handler(_ctx, "/consolevars", ConsoleVarsUI, 0);
+  mg_set_request_handler(_ctx, "/consolevars-explorer", ConsoleVarsExplorerUI, 0);
 
   mg_set_request_handler(_ctx, "/consolevarset", ConsoleVarSet, 0);
   mg_set_request_handler(_ctx, "/consolevarget", ConsoleVarGet, 0);
@@ -1036,6 +1048,8 @@ void WebService::Start(Anki::Util::Data::DataPlatform* platform, const Json::Val
 
   const std::string& consoleVarsTemplate = platform->pathToResource(Util::Data::Scope::Resources, "webserver/consolevarsui.html");
   _consoleVarsUIHTMLTemplate = Anki::Util::StringFromContentsOfFile(consoleVarsTemplate);
+  const std::string& consoleVarsExplorerTemplate = platform->pathToResource(Util::Data::Scope::Resources, "webserver/consolevars-explorer.html");
+  _consoleVarsExplorerHTMLTemplate = Anki::Util::StringFromContentsOfFile(consoleVarsExplorerTemplate);
 
   _requests.clear();
 
@@ -1079,7 +1093,12 @@ void WebService::Update()
       {
         case RT_ConsoleVarsUI:
           {
-            GenerateConsoleVarsUI(requestPtr->_result, requestPtr->_param1);
+            GenerateConsoleVarsUI(requestPtr->_result, requestPtr->_param1, false);
+          }
+          break;
+        case RT_ConsoleVarsExplorerUI:
+          {
+            GenerateConsoleVarsUI(requestPtr->_result, requestPtr->_param1, true);
           }
           break;
         case RT_ConsoleVarGet:
@@ -1349,7 +1368,7 @@ static std::string sanitize_tag(const std::string& tag)
   return sanitizedTag;
 }
 
-void WebService::GenerateConsoleVarsUI(std::string& page, const std::string& category)
+void WebService::GenerateConsoleVarsUI(std::string& page, const std::string& category, bool useExplorerTemplate)
 {
   std::string style;
   std::string script;
@@ -1524,7 +1543,11 @@ void WebService::GenerateConsoleVarsUI(std::string& page, const std::string& cat
   }
   html += "</div>\n";
 
-  page = getConsoleVarsTemplate();
+  page = useExplorerTemplate ? getConsoleVarsExplorerTemplate() : getConsoleVarsTemplate();
+  if (page.empty()) {
+    // Explorer template missing on older installs — fall back so the route still works
+    page = getConsoleVarsTemplate();
+  }
 
   std::string tmp;
   size_t pos;
@@ -1659,6 +1682,11 @@ void WebService::SendToWebSocket(struct mg_connection* conn, const Json::Value& 
 const std::string& WebService::getConsoleVarsTemplate()
 {
   return _consoleVarsUIHTMLTemplate;
+}
+
+const std::string& WebService::getConsoleVarsExplorerTemplate()
+{
+  return _consoleVarsExplorerHTMLTemplate;
 }
 
 void WebService::OnOpenWebSocket(struct mg_connection* conn)
