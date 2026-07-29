@@ -195,50 +195,69 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 
 | Path | Files | Status | What it is |
 |---|---:|---|---|
-| `docs/` | 63 | upstream docs — index only | Anki's own architecture and development docs |
-| `engine/` | 1109 | unmapped | Main process: actions, behaviors, vision, world state, planning |
-| `animProcess/` | 145 | unmapped | Animation process: animation/audio playback, face, mic processing |
-| `robot/` | 2516 | unmapped | Low-level robot: HAL, supervisor, syscon, cube firmware, fixture |
-| `coretech/` | 797 | unmapped | Anki robotics library: `common`, `messaging`, `neuralnets`, `planning`, `vision` |
-| `clad/` | 81 | unmapped | CLAD message definitions + C++/viz emitters |
-| `victor-clad/` | 168 | unmapped | Victor-specific CLAD definitions, emitters, generator tooling |
-| `lib/` | 2825 | unmapped | Vendored/shared libs: `anki-ble`, `audio`, `das-client`, `micData`, `signalEssence`, `util`, `crash-reporting-vicos` |
-| `platform/` | 311 | unmapped | OS services: `switchboard`, `update-engine`, `camera`, `gpio`, logging, crash reports, `whiskeyToF` |
-| `cloud/` | 187 | unmapped | Go — `vic-cloud` service, protobuf, systemd unit |
-| `resources/` | 2625 | unmapped | Assets, config, webserver, speech-recognition data, shipping/beta variants |
-| `tools/` | 2550 | unmapped | Dev tooling: sdk, build, audio, animation scripts, perfmetric, protobuf, smartling, etc. |
-| `project/` | 168 | unmapped | Build scripts, build server, doxygen, `victor/` project config |
-| `simulator/` | 480 | unmapped | Webots simulation: controllers, worlds, plugins, protos |
-| `test/` | 76 | unmapped | Tests for `engine`, `animProcess`, `switchboard` |
-| `matlab/` | 186 | unmapped | [UNVERIFIED] MATLAB research/vision tooling — likely legacy |
-| `okaoVision/` | 41 | unmapped | Omron OKAO face/vision SDK integration |
-| `cmake/` | 38 | unmapped | CMake modules and toolchain files |
-| `python/` | 34 | unmapped | [UNVERIFIED] Python helpers |
-| `cannedAnimLib/` | 27 | unmapped | Pre-authored ("canned") animation library |
-| `crypto/` | 14 | unmapped | [UNVERIFIED] crypto helpers |
-| `install-images/` | 11 | unmapped | [UNVERIFIED] installer / OTA images |
+| `docs/` | 63 | mapped-L1 | Upstream arch/dev docs + mapping hub — `docs/README.md`, `docs/mapping/` |
+| `engine/` | 1109 | mapped-L2 | `vic-engine` — L2 subsystems + freeplay/path/intents maps; see `engine/README.md` |
+| `animProcess/` | 145 | mapped-L2 | `vic-anim`: streamer, face, mic/Picovoice, eng↔robot relay — `animProcess/README.md` + child READMEs |
+| `robot/` | 2516 | mapped-L2 | `vic-robot` 200 Hz: supervisor+HAL+spine; syscon/cube/fixture shallow — `robot/README.mapping.md` |
+| `coretech/` | 797 | mapped-L1 | CTI: common, messaging, neuralnets, planning, vision — `coretech/README.md` |
+| `clad/` | 80 | mapped-L1 | Engine-facing CLAD defs + multi-lang gen — `clad/README.md` |
+| `victor-clad/` | 168 | mapped-L1 | CLAD toolchain + SDK-external clad — `victor-clad/README.mapping.md` |
+| `lib/` | 2824 | mapped-L1 | Shared/vendored libs (util, audio, DAS, BLE, mic, SE) — top-only `lib/README.md` |
+| `platform/` | 311 | mapped-L1 | switchboard, OTA, camera, ToF, GPIO, logs/crash — `platform/README.md` |
+| `cloud/` | 187 | mapped-L1 | Go `vic-cloud` gateway+cloudproc — `cloud/README.mapping.md` |
+| `resources/` | 2624 | mapped-L1 | Config/assets/WebViz; behavior JSON home — top-only `resources/README.md` |
+| `tools/` | 2550 | mapped-L1 | Host tooling (build, SDK, protobuf, gyp bulk) — top-only `tools/README.md` |
+| `project/` | 166 | mapped-L1 | `build-victor.sh`, stage/deploy, CI, doxygen — `project/README.md` |
+| `simulator/` | 480 | mapped-L1 | Webots (MACOSX) controllers/worlds — `simulator/README.mapping.md` |
+| `test/` | 76 | mapped-L1 | Unit tests: engine, animProcess, switchboard — `test/README.md` |
+| `matlab/` | 186 | mapped-L1 | Legacy MATLAB vision/research (not in runtime CMake) — `matlab/README.md` |
+| `okaoVision/` | 41 | mapped-L1 | Omron OKAO SDK headers/libs for face tracking — `okaoVision/README.md` |
+| `cmake/` | 38 | mapped-L1 | Root CMake modules/toolchains — `cmake/README.md` |
+| `python/` | 34 | mapped-L1 | Host helpers; live: `anki_build_copy_assets.py` — `python/README.md` |
+| `cannedAnimLib/` | 27 | mapped-L1 | Canned-anim + procedural-face lib — `cannedAnimLib/README.md` |
+| `crypto/` | 14 | mapped-L1 | Standalone AES/HMAC for Keil rsync (not CMake) — `crypto/README.md` |
+| `install-images/` | 11 | mapped-L1 | Screenshots for `ABOUT.md` install guide — `install-images/README.md` |
 | `licenses/` | 39 | skipped (license text) | Third-party license texts |
-| `templates/` | 9 | unmapped | [UNVERIFIED] |
-| `cubeBleClient/` | 8 | unmapped | Cube BLE client |
-| `webServerProcess/` | 7 | unmapped | On-robot web server process |
-| `osState/` | 7 | unmapped | OS state reporting |
-| `dasmgr/` | 7 | unmapped | DAS (analytics/event) manager |
-| `build/` | 4 | unmapped | Build helper files |
-| `testCrash/` | 3 | unmapped | Crash-reporting test harness |
-| `.github/` | 2 | unmapped | CI / repo config |
+| `templates/` | 9 | mapped-L1 | CMake version `.in` + VS Code bootstrap — `templates/README.mapping.md` |
+| `cubeBleClient/` | 8 | mapped-L1 | Cube BLE/sim client — `cubeBleClient/README.md` |
+| `webServerProcess/` | 7 | mapped-L1 | Civetweb WebViz lib — `webServerProcess/README.md` |
+| `osState/` | 7 | mapped-L1 | OS state + wall-time — `osState/README.md` |
+| `dasmgr/` | 7 | mapped-L1 | `vic-dasmgr` DAS collector — `dasmgr/README.md` |
+| `build/` | 4 | mapped-L1 | Docker builder helpers — `build/README.md` |
+| `testCrash/` | 3 | mapped-L1 | Dev Breakpad harness — `testCrash/README.md` |
+| `.github/` | 2 | mapped-L1 | Issue templates only (no CI workflows) — `.github/README.md` |
 | `EXTERNALS/` | submodule | ⚠️ out of scope | Separate repo — do not clone or descend |
 
 ### Known second-level landmarks (seeded — expand as mapped)
 
 | Path | What it is |
 |---|---|
-| `engine/aiComponent/behaviorComponent/` | Behavior tree / behavior definitions |
-| `engine/aiComponent/beiConditions/` | Behavior External Interface conditions |
-| `engine/components/` | `backpackLights`, `battery`, `cubes`, `mics`, `sensors`, `textToSpeech`, `variableSnapshot`, `visionScheduleMediator` |
-| `engine/actions/`, `engine/animations/`, `engine/audio/`, `engine/blockWorld/`, `engine/navMap/`, `engine/moodSystem/`, `engine/vision/`, `engine/viz/` | Engine subsystems |
-| `engine/cozmoEngine.cpp/.h`, `engine/cozmoContext.cpp/.h`, `engine/cozmoAPI/` | Engine entry points |
-| `robot/core/`, `robot/hal/`, `robot/supervisor/`, `robot/syscon/`, `robot/cube_firmware/`, `robot/fixture/` | Robot-process and firmware layers |
-| `coretech/vision/`, `coretech/planning/`, `coretech/messaging/`, `coretech/common/`, `coretech/neuralnets/` | Coretech subsystems |
+| `docs/mapping/HIGH-LEVEL.md` | Cross-cutting process + control hierarchy |
+| `docs/mapping/PROCESS-IPC.md` | Eng/anim/robot/cloud/switchboard sockets + CLAD families |
+| `docs/mapping/ENGINE-ROBOT-TICK.md` | 60 ms tick: R2E → Robot → AI → actions; vision async |
+| `docs/mapping/ENGINE-BEHAVIOR-TREE.md` | Production freeplay spine: InitNormalOperation → … → HighLevelAI |
+| `docs/mapping/ENGINE-OBSERVING-AND-INTENTS.md` | Observing freeplay branch + voice/user-intent claim path |
+| `docs/mapping/ENGINE-PATH-PLANNING.md` | Drive-to-pose: PathComponent planner selection |
+| `docs/mapping/WEBVIZ-BEHAVIORS-REVIEW.md` | WebViz Behaviors/BehaviorConds review notes |
+| `docs/mapping/GLOSSARY.md` | ~130 repo terms |
+| `engine/components/cubes/` | L2 cube BLE/coordinator/lights stack |
+| `animProcess/src/cozmoAnim/{animation,faceDisplay,micData,speechRecognizer,audio,…}/` | L2 anim subsystems |
+| `robot/supervisor/`, `robot/hal/`, `robot/clad/` | L2 control path; `robot/syscon/` L1 shallow |
+| `engine/aiComponent/` | L2 README — nested AI entity |
+| `engine/aiComponent/behaviorComponent/` | L2 — stack, factory, intents, BEI (decision core) |
+| `engine/aiComponent/beiConditions/` | L2 — ~60 activation predicates |
+| `engine/components/` | L2 — most RobotComponentID impls |
+| `engine/actions/`, `engine/vision/` | L2 — action queues; VisionSystem detectors |
+| `engine/cozmoAPI/`, `externalInterface/`, `comms/` | L2 — external + robot I/O |
+| `engine/blockWorld/`, `navMap/`, `moodSystem/` | L2 — worlds / map / mood |
+| `engine/cozmoEngine.cpp/.h`, `cozmoContext.*`, `robot.*` | Lifecycle + component entity |
+| `engine/tools/engined/cozmoEngineMain.cpp` | `vic-engine` main |
+| `animProcess/src/cozmoAnim/cozmoAnimMain.cpp` | Process main for `vic-anim` |
+| `platform/switchboard/`, `platform/update-engine/`, `platform/camera/`, `platform/whiskeyToF/`, `platform/config/` | Platform services |
+| `cloud/cloud/main.go`, `cloud/cloud/message_handler.go`, `cloud/vic-cloud.service` | Cloud process entry + systemd unit |
+| `robot/hal/src/main.cpp`, `robot/supervisor/`, `robot/syscon/`, `robot/clad/` | `vic-robot` entry; 5 ms tick; spine↔syscon |
+| `robot/core/`, `robot/cube_firmware/`, `robot/fixture/` | Shared core; cube FW; factory fixture (not expanded) |
+| `coretech/common/`, `messaging/`, `neuralnets/`, `planning/`, `vision/` | CTI targets `cti_*`; clad_src in common + vision |
 | `resources/assets/` | `LocalizedStrings`, `RewardedActions`, `cladToFileMaps`, `cubeFirmware`, `faceOverlays` |
 
 ### Upstream documentation index
@@ -262,14 +281,44 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 
 *(Populate as they become known — this is the "find it fast" layer.)*
 
-- **Where does the engine start?** — `engine/cozmoEngine.cpp` [INFERRED, confirm]
-- **Where are behaviors defined?** — `engine/aiComponent/behaviorComponent/` + behavior JSON under
-  `resources/` [INFERRED, confirm]
-- **Where are animations stored vs. played?** —
+- **Where does the engine start?** — Process main: `engine/tools/engined/cozmoEngineMain.cpp`
+  (`LOG_PROCNAME = "vic-engine"`). Library: `CozmoAPI` → `Anki::Vector::CozmoEngine`
+  (`engine/cozmoEngine.cpp` `Init` ~L248, `Update` ~L352). Tick **60 ms**
+  (`BS_TIME_STEP_MS` in shared config). CMake: `import(cozmo_engine "engine")`. See `engine/README.md`.
+- **Where are behaviors defined?** — Framework: `engine/aiComponent/behaviorComponent/`.
+  **Production tree:** `docs/mapping/ENGINE-BEHAVIOR-TREE.md` — boot
+  `victor_behavior_config.json` → `InitNormalOperation` → … → `GlobalInterruptions` →
+  `HighLevelAI` (JSON under `resources/config/.../victorBehaviorTree/`). Factory:
+  `BehaviorFactory`. Intents: `UserIntentComponent` + `user_intent_map.json`.
+  **Tick:** AI before ActionList (`ENGINE-ROBOT-TICK.md`).
+- **Where are animations stored vs. played?** — **Played** by `vic-anim` `AnimationStreamer`
+  (`animProcess/src/cozmoAnim/animation/`). Engine `PlayAnim` → anim process. Tick default
+  **16 ms** (rebuild 60 fps); **33 ms** if `/data/data/rebuild/using-30-fps`. Face:
+  streamer → `faceDisplay` → LCD. **Assets:** DEPS animation-assets + `cannedAnimLib/`.
+  See `animProcess/README.md` L2.
 - **Where are CLAD messages defined, and what generates the C++/Go/Python?** —
-- **Where does the build begin, and what does `vbuild` actually run?** —
-- **What runs on the robot vs. off it (simulator, tools, cloud)?** —
-- **Which parts are rebuild-specific vs. stock Anki 1.6?** — start from `CHANGES.md`
+  **Defs:** `clad/src/`, `robot/clad/src/`, `coretech/*/clad_src/`, `victor-clad/clad/`.
+  **Toolchain:** `victor-clad/tools/message-buffers/emitters/` + `victorEmitters/`.
+  **Outputs:** `generated/clad*`. IPC map: `docs/mapping/PROCESS-IPC.md`.
+- **How do processes talk?** — Eng↔anim↔robot over Unix domain sockets; **anim relays** E2R/R2E
+  (engine connects to anim, not robot). Cloud proto socket preferred; switchboard separate.
+  Details: `PROCESS-IPC.md`.
+- **Where does the build begin, and what does `vbuild` actually run?** — `source setenv.sh` →
+  `vbuild` → `project/victor/scripts/victor_build_release.sh` → `project/victor/build-victor.sh`
+  (VICOS/Release/Ninja). Modules: `cmake/`. Docker: `build/`. See `project/README.md`.
+- **What runs on the robot vs. off it?** — **On robot:** `vic-engine` (60 ms), `vic-anim`
+  (~16 ms), `vic-robot` (5 ms/200 Hz + spine to syscon STM32), `vic-switchboard`,
+  `update-engine`, `vic-cloud`, `vic-dasmgr`. **Off robot:** Webots `simulator/` (MACOSX),
+  host `tools/`, `test/`. Low-level path: `robot/supervisor/` + `robot/hal/`.
+- **How does freeplay / voice work?** — `ENGINE-BEHAVIOR-TREE.md` +
+  `ENGINE-OBSERVING-AND-INTENTS.md`. Wake word in anim: **Picovoice** (rebuild; stock docs
+  said Sensory). Cloud intent → pending UserIntent → claim or unclaimed.
+- **How does drive-to-pose work?** — `ENGINE-PATH-PLANNING.md`: ≥40 mm → `XYPlanner` (threaded);
+  short moves → FaceAndApproach / MinimalAngle. Robot path follower runs on `vic-robot`.
+- **Which parts are rebuild-specific vs. stock Anki 1.6?** — `CHANGES.md`. Observed: wirepod
+  cloud, anim 16 ms, platform OTA/diagnostics notes. Upstream `docs/` = stock 1.6.
+- **Version pins** — `VERSION` = `1.6.1`; `VICTOR_COMPAT_VERSION` = `210`.
+- **Glossary / indexes** — `docs/mapping/GLOSSARY.md`, `UPSTREAM-DOCS-INDEX.md`, `HIGH-LEVEL.md`.
 
 ---
 
@@ -280,7 +329,14 @@ if you ran out of context mid-folder, say so here.
 
 | Date | Agent | Did | Next |
 |---|---|---|---|
-| | | | |
+| 2026-07-28 | Grok (orchestrator + 6 subagents) | Pass 0 index + glossary. Pass 1 root + Quick answers. Wave1 L1: `clad`, `victor-clad`, `engine`, `animProcess`, `cloud`, `platform`. | Wave2. |
+| 2026-07-28 | Grok (+ 3 subagents) | Wave2 L1: `robot`, `coretech`, six small dirs. | High-level + engine L2. |
+| 2026-07-28 | Grok (+ 5 subagents) | High-level + engine L2 subsystem READMEs. `engine/` → mapped-L2. | L3 freeplay tree. |
+| 2026-07-28 | Grok (+ 1 subagent) | **L3 vertical chosen:** production freeplay / HighLevelAI (not cubes, not planner). Wrote `docs/mapping/ENGINE-BEHAVIOR-TREE.md`; linked from HIGH-LEVEL + Quick answers. Boot spine: InitNormalOperation → ModeSelector → SleepCycle → coordinators → GlobalInterruptions → HighLevelAI. | Next if needed: one HLAI state (e.g. Observing/Exploring) deeper, or voice-intent claim path; not more menus. |
+| 2026-07-28 | Grok | Captured product idea: **selectable personality packs** (JSON freeplay policy; user choose + possible voice “activate X mode”) → `docs/mapping/IDEA-personality-packs.md`. | Idea only until feature phase; design then implement. |
+| 2026-07-28 | Grok | Reviewed WebViz Behaviors + BehaviorConds (no code changes). Wrote `docs/mapping/WEBVIZ-BEHAVIORS-REVIEW.md`. | Continue mapping. |
+| 2026-07-28 | Grok (+ 7 subagents) | Top-level L1 closeout + engine L3 (observing/intents/path/cubes). Glossary ~134. | High-value L2: anim + robot. |
+| 2026-07-28 | Grok (+ 3 subagents) | **High-value finish:** `animProcess/` → mapped-L2 (8 child READMEs: animation, face, mic, speechRecognizer, audio, TTS, backpack, alexa; Picovoice wake word). `robot/` → mapped-L2 (supervisor, HAL/spine, clad, core; syscon L1 shallow). `docs/mapping/PROCESS-IPC.md` (sockets + anim relay). Quick answers updated. | Mapping phase complete for high-value paths. Remaining optional: intent-graph 1.8 diff, deep asset trees, syscon firmware internals. |
 
 ---
 
@@ -296,11 +352,15 @@ if you ran out of context mid-folder, say so here.
 
 ## 9. Exit Criteria for This Phase
 
-- [ ] `docs/mapping/UPSTREAM-DOCS-INDEX.md` exists and covers every file in `docs/`.
-- [ ] Every top-level directory has a README and a current ToC row.
-- [ ] Every substantial second-level directory is documented or explicitly `skipped` with a reason.
-- [ ] `docs/mapping/GLOSSARY.md` covers the terms used across the READMEs.
-- [ ] §6 "Quick answers" is fully populated.
-- [ ] `git status` shows **only added documentation files** — no modified source.
+- [x] `docs/mapping/UPSTREAM-DOCS-INDEX.md` exists and covers every file in `docs/`.
+- [x] Every top-level directory has a README (or `README.mapping.md` / skipped with reason) and a current ToC row.
+- [x] Substantial second-level dirs documented or explicitly not expanded: engine L2+; `lib`/`tools`/`resources` L1 top-only; `robot` syscon/firmware bulk named not expanded; `licenses` skipped.
+- [x] `docs/mapping/GLOSSARY.md` covers terms used across READMEs (~134 entries).
+- [x] §6 "Quick answers" populated (engine, behaviors, anim, CLAD, build, on/off robot, freeplay/voice, path, rebuild, versions).
+- [~] `git status` shows **added documentation** + modified `AGENTS.md` only for mapping — verify before commit. (Root may also have unrelated untracked HTML demos; do not treat as mapping deliverables.)
+
+**Satisfactory for navigation (2026-07-28):** A reader can open `AGENTS.md` §6 / `docs/mapping/HIGH-LEVEL.md` and reach process entry points, freeplay tree, tick order, IPC, anim L2, robot control path L2, and any top-level folder in one or two hops.
+
+**High-value process paths (finished):** engine L2+L3 freeplay/path/intents · anim L2 · robot supervisor/HAL L2 · `PROCESS-IPC.md`.
 
 Do not propose refactors, fixes, or feature work until the user says this phase is over.
