@@ -5,6 +5,7 @@
  *  Copyright Anki, Inc. 2018
  *
  *  2026: orbit camera, 3D rendering fixes, data-path bugfixes
+ *  2026-07: shell host scoping, safe onData, canvas size-to-host
  */
 
 (function(myMethods, sendData) {
@@ -93,9 +94,20 @@
     return $(el);                             // HTMLElement / Document
   }
 
+  function domNode( el ) {
+    if( !el ) { return null; }
+    if( el.jquery ) { return el[0] || null; }
+    if( typeof el === 'string' ) {
+      try { return document.querySelector( el ); } catch( e ) { return null; }
+    }
+    return el.nodeType ? el : null;
+  }
+
 
   // ---------- DOM / session state ----------
 
+  /** Module host element (#tab-navmap). Prefer over document-global selectors. */
+  var hostElem = null;
   var updateBtn;
   var canvasContainer;
   var legendContainer;
@@ -110,20 +122,127 @@
   // -90° was the correct direction; another -90° squares it up (−180° total).
   var kMapYaw3D = -Math.PI;
 
+  // Canvas pixel size — sized from host, not a hard-coded document layout.
+  // Defaults match the pre-shell 700×600; measureCanvasSize() updates them.
+  var kCanvasWidth = 700;
+  var kCanvasHeight = 600;
+  var viewFitPending = false; // re-fit 2D after resize
+  var hostResizeObserver = null;
+  var resizeRaf = 0;
+
+  function $host() {
+    if( hostElem ) { return asJq( hostElem ); }
+    // Fallback: stock/shell id only (never throw)
+    try {
+      var el = document.getElementById( 'tab-navmap' );
+      if( el ) { return $(el); }
+    } catch( e ) {}
+    return $();
+  }
+
+  function setHost( el ) {
+    var node = domNode( el );
+    if( node ) { hostElem = node; }
+  }
+
+  /**
+   * Size canvas from host client box. Avoids layout that depends on document
+   * width and keeps the viewport-locked shell from growing without bound.
+   */
+  function measureCanvasSize() {
+    var el = hostElem;
+    if( !el || !el.clientWidth || el.clientWidth < 40 ) {
+      // Host hidden / not laid out yet — keep last good size
+      return { w: kCanvasWidth, h: kCanvasHeight };
+    }
+    var pad = 24;
+    var w = Math.max( 280, Math.floor( el.clientWidth - pad ) );
+    var top = 0;
+    try { top = el.getBoundingClientRect().top; } catch( e ) {}
+    var winH = (typeof window !== 'undefined' && window.innerHeight) ? window.innerHeight : 800;
+    // Leave room for toolbar checkboxes + legend under the canvas
+    var h = Math.max( 220, Math.floor( winH - top - 200 ) );
+    w = Math.min( w, 1600 );
+    h = Math.min( h, 1000 );
+    return { w: w, h: h };
+  }
+
+  function applyMeasuredCanvasSize( p ) {
+    var size = measureCanvasSize();
+    var changed = ( size.w !== kCanvasWidth ) || ( size.h !== kCanvasHeight );
+    kCanvasWidth = size.w;
+    kCanvasHeight = size.h;
+    if( p && typeof p.resizeCanvas === 'function' &&
+        ( typeof p.width === 'undefined' || p.width !== size.w || p.height !== size.h ) ) {
+      try { p.resizeCanvas( size.w, size.h ); } catch( e ) {}
+      changed = true;
+    }
+    if( changed ) {
+      viewFitPending = true;
+      cameraResetPending = true;
+      mapBakeDirty = true;
+      kickRedraw();
+    }
+    return changed;
+  }
+
+  function attachHostResizeObserver() {
+    if( typeof ResizeObserver === 'undefined' || !hostElem ) { return; }
+    if( hostResizeObserver ) {
+      try { hostResizeObserver.disconnect(); } catch( e ) {}
+      hostResizeObserver = null;
+    }
+    hostResizeObserver = new ResizeObserver( function() {
+      if( resizeRaf ) { return; }
+      resizeRaf = (typeof requestAnimationFrame === 'function')
+        ? requestAnimationFrame( function() {
+            resizeRaf = 0;
+            applyMeasuredCanvasSize( myp5 );
+          } )
+        : (setTimeout( function() {
+            resizeRaf = 0;
+            applyMeasuredCanvasSize( myp5 );
+          }, 50 ), 1);
+    });
+    try { hostResizeObserver.observe( hostElem ); } catch( e2 ) {}
+  }
+
+  function detachHostResizeObserver() {
+    if( hostResizeObserver ) {
+      try { hostResizeObserver.disconnect(); } catch( e ) {}
+      hostResizeObserver = null;
+    }
+    if( resizeRaf && typeof cancelAnimationFrame === 'function' ) {
+      try { cancelAnimationFrame( resizeRaf ); } catch( e2 ) {}
+    }
+    resizeRaf = 0;
+  }
+
   function callUpdate() {
     waitingOnData = true;
     if( updateBtn ) {
       updateBtn.prop( 'disabled', true );
     }
-    sendData( { 'update': true } );
-    if( $('#status').length &&
-        ($('#status').text() != "Connected") &&
-        showFakeDataUponDisconnect &&
-        (typeof noteDiv !== 'undefined') )
-    {
-      noteDiv.text( 'DISCONNECTED: DISPLAYING FAKE DATA' );
-      fakeData();
+    try {
+      sendData( { 'update': true } );
+    } catch( e ) {
+      console.warn( 'navMap: sendData failed', e );
+      waitingOnData = false;
+      if( updateBtn ) { updateBtn.prop( 'disabled', autoUpdate ); }
     }
+    // Legacy shell only: #status lives outside the module host. Never throw.
+    try {
+      var $status = $('#status');
+      if( $status.length &&
+          ($status.text() != "Connected") &&
+          showFakeDataUponDisconnect )
+      {
+        if( noteDiv ) {
+          noteDiv.text( 'DISCONNECTED: DISPLAYING FAKE DATA' );
+        }
+        fakeData();
+      }
+    } catch( e2 ) {}
   }
 
   // ---------- quadtree / robot / objects ----------
@@ -282,8 +401,6 @@
   }
 
   var sketch = function( p ) {
-    var kCanvasWidth = 700;  // note: container is ~800
-    var kCanvasHeight = 600;
     var kInitialMargin = 50; // padding on either side for initial draw
     // World units in 3D are millimeters (robot/cube data are mm; quads converted)
     var kMmPerMeter = 1000;
@@ -312,14 +429,20 @@
       console.warn( 'navMap: ' + reason );
       is3D = false;
       webglLive = false;
-      var $chk = $('#chk3D');
+      var $h = $host();
+      var $chk = $h.find( '#navMap-chk3D' );
       if( $chk.length ) { $chk.prop( 'checked', false ); }
-      $('#chkFaces, label[for="chkFaces"]').hide();
-      showWebGLError( $('#tab-navmap') );
+      $h.find( '#navMap-chkFaces, label[for="navMap-chkFaces"]' ).hide();
+      showWebGLError( hostElem || $h );
     }
 
     p.setup = function() {
       var markReady = function() { kickRedraw(); };
+
+      // Size from host before createCanvas (shell module-host, not fixed 800px tab)
+      var measured = measureCanvasSize();
+      kCanvasWidth = measured.w;
+      kCanvasHeight = measured.h;
 
       // IMPORTANT: createCanvas must be the first renderer touch.
       // Do not call p.color / p.fill / etc. before this, or p5 leaves defaultCanvas0 100x100.
@@ -360,7 +483,7 @@
 
       // If something still left us at the p5 default size, force a proper canvas
       if( p.width < 200 || p.height < 200 ) {
-        console.warn( 'navMap: canvas was ' + p.width + 'x' + p.height + '; recreating 700x600 P2D' );
+        console.warn( 'navMap: canvas was ' + p.width + 'x' + p.height + '; recreating sized P2D' );
         forceIs2D( 'canvas too small after setup' );
         use3D = false;
         webglLive = false;
@@ -746,7 +869,13 @@
 
     
     p.draw = function() {
-      if( quadTreeQuads.length === 0 ) {
+      // Empty / cleared map: wipe stale frame (never leave previous draw)
+      if( !quadTreeQuads || quadTreeQuads.length === 0 ) {
+        try {
+          p.clear();
+          p.background( is3D && webglLive ? 24 : 0 );
+        } catch( e ) {}
+        vizDirty = false;
         return;
       }
 
@@ -789,8 +918,9 @@
       }
 
       // ---- 2D (only runs when kickRedraw/redraw was requested) ----
-      if( typeof scaleFactor2D === 'undefined' ) {
+      if( typeof scaleFactor2D === 'undefined' || viewFitPending ) {
         fitView2D();
+        viewFitPending = false;
       }
 
       p.clear();
@@ -798,6 +928,7 @@
 
       for( var q2 = 0; q2 < quadTreeQuads.length; ++q2 ) {
         var q = quadTreeQuads[q2];
+        if( !q || !q.center || !q.color ) { continue; }
         var col = rgbaColor( q.color );
         var x2 = scaleFactor2D * (q.center.x - 0.5 * q.sideSize - xOffset2D);
         var y2 = scaleFactor2D * (q.center.y - 0.5 * q.sideSize - yOffset2D);
@@ -927,26 +1058,41 @@
   // ---------- webviz methods ----------
 
   function destroySketch() {
+    detachHostResizeObserver();
     if( typeof myp5 !== 'undefined' && myp5 ) {
-      myp5.remove();
+      try { myp5.remove(); } catch( e ) {}
       myp5 = undefined;
     }
     if( typeof canvasContainer !== 'undefined' && canvasContainer ) {
-      canvasContainer.remove();
+      try { canvasContainer.remove(); } catch( e2 ) {}
       canvasContainer = undefined;
     }
     if( typeof legendContainer !== 'undefined' && legendContainer ) {
-      legendContainer.remove();
+      try { legendContainer.remove(); } catch( e3 ) {}
       legendContainer = undefined;
     }
   }
 
   function initializeSketch( elem ) {
     var $elem = asJq( elem );
+    setHost( $elem );
+    // Avoid duplicate containers if called twice
+    if( canvasContainer && canvasContainer.length ) {
+      try { canvasContainer.remove(); } catch( e ) {}
+    }
+    if( legendContainer && legendContainer.length ) {
+      try { legendContainer.remove(); } catch( e2 ) {}
+    }
     canvasContainer = $('<div></div>', { id: 'navMapContainer' }).appendTo( $elem );
     // p5 instance mode: prefer DOM node (works on 0.5–1.x); id string also ok
     var host = canvasContainer[0] || 'navMapContainer';
-    myp5 = new p5( sketch, host );
+    try {
+      myp5 = new p5( sketch, host );
+    } catch( err ) {
+      console.warn( 'navMap: p5 sketch failed', err );
+      myp5 = undefined;
+      return;
+    }
 
     legendContainer = $('<div></div>', { id: 'legendContainer' }).appendTo( $elem );
     for( var idx = 0; idx < kKnownTypes.length; ++idx ) {
@@ -956,40 +1102,62 @@
       );
     }
     if( dumpInput ) {
-      $('<div id="pastebin"></div>').appendTo( $elem );
+      $elem.find( '#navMap-pastebin' ).remove();
+      $('<div id="navMap-pastebin"></div>').appendTo( $elem );
     }
+    attachHostResizeObserver();
+  }
+
+  /** Clear live map geometry (keeps controls). Used for empty / failed rebuilds. */
+  function clearMapDrawing() {
+    quadTreeQuads = [];
+    dataExtentsInfo = {};
+    robotPosition = undefined;
+    cubeData = undefined;
+    mapBakeDirty = true;
+    viewFitPending = true;
+    kickRedraw();
   }
 
   myMethods.init = function( elem ) {
     elem = asJq( elem ); // 2018 webviz often passes a raw HTMLElement
+    setHost( elem );
+
+    // Toolbar row — keep controls grouped so layout stays stable under shell host
+    var $toolbar = $('<div class="navMapToolbar"></div>').appendTo( elem );
+
     updateBtn = $('<input type="button" value="Update"/>');
     updateBtn.click( function() {
       if( dumpInput ) {
-        $('#pastebin').html( '' );
+        $host().find( '#navMap-pastebin' ).html( '' );
       }
       callUpdate();
     });
-    updateBtn.appendTo( elem ).prop( 'disabled', autoUpdate );
+    updateBtn.appendTo( $toolbar ).prop( 'disabled', autoUpdate );
 
-    var chkAuto  = $('<input />', { type: 'checkbox', id: 'chkAuto'  }).appendTo( elem ).prop( 'checked', autoUpdate );
-    $('<label />', { for: 'chkAuto',  text: 'Auto-update' }).appendTo( elem );
-    var chk3D    = $('<input />', { type: 'checkbox', id: 'chk3D'    }).appendTo( elem ).prop( 'checked', is3D );
-    $('<label />', { for: 'chk3D',    text: '3D' }).appendTo( elem );
-    var chkInvH  = $('<input />', { type: 'checkbox', id: 'chkInvH'  }).appendTo( elem ).prop( 'checked', invertHeight );
-    $('<label />', { for: 'chkInvH',  text: 'Flip view' }).appendTo( elem );
-    var chkRobot = $('<input />', { type: 'checkbox', id: 'chkRobot' }).appendTo( elem ).prop( 'checked', shouldDrawRobot );
-    $('<label />', { for: 'chkRobot', text: 'Show robot' }).appendTo( elem );
-    var chkCubes = $('<input />', { type: 'checkbox', id: 'chkCubes' }).appendTo( elem ).prop( 'checked', shouldDrawCubes );
-    $('<label />', { for: 'chkCubes', text: 'Show cubes' }).appendTo( elem );
-    var chkFaces = $('<input />', { type: 'checkbox', id: 'chkFaces' }).appendTo( elem ).prop( 'checked', shouldDrawFaces );
-    $('<label />', { for: 'chkFaces', text: 'Show faces' }).appendTo( elem );
+    // Prefixed ids: unique under #tab-navmap; labels scoped to host (not document)
+    var chkAuto  = $('<input />', { type: 'checkbox', id: 'navMap-chkAuto'  }).appendTo( $toolbar ).prop( 'checked', autoUpdate );
+    $('<label />', { 'for': 'navMap-chkAuto',  text: 'Auto-update' }).appendTo( $toolbar );
+    var chk3D    = $('<input />', { type: 'checkbox', id: 'navMap-chk3D'    }).appendTo( $toolbar ).prop( 'checked', is3D );
+    $('<label />', { 'for': 'navMap-chk3D',    text: '3D' }).appendTo( $toolbar );
+    var chkInvH  = $('<input />', { type: 'checkbox', id: 'navMap-chkInvH'  }).appendTo( $toolbar ).prop( 'checked', invertHeight );
+    $('<label />', { 'for': 'navMap-chkInvH',  text: 'Flip view' }).appendTo( $toolbar );
+    var chkRobot = $('<input />', { type: 'checkbox', id: 'navMap-chkRobot' }).appendTo( $toolbar ).prop( 'checked', shouldDrawRobot );
+    $('<label />', { 'for': 'navMap-chkRobot', text: 'Show robot' }).appendTo( $toolbar );
+    var chkCubes = $('<input />', { type: 'checkbox', id: 'navMap-chkCubes' }).appendTo( $toolbar ).prop( 'checked', shouldDrawCubes );
+    $('<label />', { 'for': 'navMap-chkCubes', text: 'Show cubes' }).appendTo( $toolbar );
+    var chkFaces = $('<input />', { type: 'checkbox', id: 'navMap-chkFaces' }).appendTo( $toolbar ).prop( 'checked', shouldDrawFaces );
+    $('<label />', { 'for': 'navMap-chkFaces', text: 'Show faces' }).appendTo( $toolbar );
+
+    var $lblFaces = $toolbar.find( 'label[for="navMap-chkFaces"]' );
+    var $lblInvH  = $toolbar.find( 'label[for="navMap-chkInvH"]' );
 
     // Faces / invert-height only in 3D
     if( !is3D ) {
       chkFaces.hide();
-      $('label[for="chkFaces"]').hide();
+      $lblFaces.hide();
       chkInvH.hide();
-      $('label[for="chkInvH"]').hide();
+      $lblInvH.hide();
     }
 
     chkInvH.change( function() {
@@ -1034,21 +1202,21 @@
 
       if( is3D ) {
         chkFaces.show();
-        $('label[for="chkFaces"]').show();
+        $lblFaces.show();
         chkInvH.show();
-        $('label[for="chkInvH"]').show();
+        $lblInvH.show();
         elem.find( '.navMapWebGLError' ).remove();
       } else {
         chkFaces.hide();
-        $('label[for="chkFaces"]').hide();
+        $lblFaces.hide();
         chkInvH.hide();
-        $('label[for="chkInvH"]').hide();
+        $lblInvH.hide();
       }
 
       // Tear down canvas; rebuild on next data (or immediately if we already have quads)
       destroySketch();
 
-      if( quadTreeQuads.length > 0 ) {
+      if( quadTreeQuads && quadTreeQuads.length > 0 ) {
         // Rebuild immediately from cached map so toggle is snappy
         initializeSketch( elem );
         mapBakeDirty = true;
@@ -1065,116 +1233,194 @@
   };
 
   myMethods.onData = function( data, elem ) {
-    elem = asJq( elem );
-    if( typeof canvasContainer === 'undefined' || !canvasContainer ) {
-      initializeSketch( elem );
-    }
+    // Never throw on null / unexpected payload shapes (shell surfaces module errors as toasts).
+    try {
+      if( elem ) { setHost( elem ); }
+      elem = asJq( elem || hostElem );
 
-    if( dumpInput ) {
-      $('#pastebin').html(
-        $('#pastebin').html() + '\n\n************************************\n\n' + JSON.stringify( data )
-      );
-    }
-
-    var type = data["type"];
-    var originId = data["originId"];
-
-    if( type == 'MemoryMapMessageVizBegin' ) {
-      memoryMapQuadInfoVectorMapIncoming[originId] = {};
-      memoryMapInfo[originId] = data["mapInfo"];
-    }
-    else if( type == "MemoryMapMessageViz" ) {
-      var dest = memoryMapQuadInfoVectorMapIncoming[originId];
-      if( !dest ) {
-        console.warn( 'navMap: MemoryMapMessageViz for unknown originId', originId );
-        return;
-      }
-      dest[data["seqNum"]] = data["quadInfos"];
-    }
-    else if( type == "MemoryMapMessageVizEnd" ) {
-      if( !memoryMapInfo[originId] ) {
-        console.warn( 'navMap: MemoryMapMessageVizEnd for unknown originId', originId );
-        waitingOnData = false;
-        if( updateBtn ) { updateBtn.prop( 'disabled', autoUpdate ); }
+      if( data == null || typeof data !== 'object' ) {
         return;
       }
 
-      quadTreeQuads = [];
-      dataExtentsInfo = {
-        minX:  Number.MAX_VALUE,
-        maxX: -Number.MAX_VALUE,
-        minY:  Number.MAX_VALUE,
-        maxY: -Number.MAX_VALUE
-      };
-
-      var centerX_m = 0.001 * memoryMapInfo[originId].rootCenterX;
-      var centerY_m = 0.001 * memoryMapInfo[originId].rootCenterY;
-      var depth     = memoryMapInfo[originId].rootDepth;
-      var rootSize  = 0.001 * memoryMapInfo[originId].rootSize_mm;
-
-      var root = new MemoryMapNode( depth, rootSize, new Point( centerX_m, centerY_m ) );
-      var expectedSeqNum = 0;
-      var srcQuadInfos = memoryMapQuadInfoVectorMapIncoming[originId] || {};
-
-      // Seq nums may arrive as string keys; walk in numeric order
-      var seqKeys = Object.keys( srcQuadInfos ).map( Number ).sort( function( a, b ) { return a - b; } );
-      for( var s = 0; s < seqKeys.length; ++s ) {
-        var seqNum = seqKeys[s];
-        if( seqNum !== expectedSeqNum ) {
-          console.log( 'DROPPED VIZ MESSAGE. map will be incorrect (expected seq ' +
-                       expectedSeqNum + ', got ' + seqNum + ')' );
-          break;
+      if( typeof canvasContainer === 'undefined' || !canvasContainer || !canvasContainer.length ) {
+        if( elem && elem.length ) {
+          initializeSketch( elem );
         }
-        var quadInfo = srcQuadInfos[seqNum] || srcQuadInfos[String(seqNum)];
-        for( var idx = 0; idx < quadInfo.length; ++idx ) {
-          var quad = quadInfo[idx];
-          root.AddChild( quadTreeQuads, dataExtentsInfo, quad["content"], quad["depth"] );
-        }
-        ++expectedSeqNum;
       }
 
-      delete memoryMapQuadInfoVectorMapIncoming[originId];
-      delete memoryMapInfo[originId];
-
-      robotPosition = data["robot"];
-
-      // Flip Y (quads are in meters; robot is mm)
-      quadTreeQuads.forEach( function( q ) {
-        q.center.y = flipY_m( q.center.y );
-      });
-      var tmpMaxY = dataExtentsInfo.maxY;
-      dataExtentsInfo.maxY = flipY_m( dataExtentsInfo.minY );
-      dataExtentsInfo.minY = flipY_m( tmpMaxY );
-      if( robotPosition ) {
-        robotPosition.y = flipY_mm( robotPosition.y );
+      if( dumpInput ) {
+        var $pb = $host().find( '#navMap-pastebin' );
+        if( $pb.length ) {
+          try {
+            $pb.html(
+              $pb.html() + '\n\n************************************\n\n' + JSON.stringify( data )
+            );
+          } catch( eDump ) {}
+        }
       }
 
-      mapBakeDirty = true;
-      cameraResetPending = true;
-      kickRedraw();
-      if( updateBtn ) { updateBtn.prop( 'disabled', autoUpdate ); }
-      waitingOnData = false;
-    }
-    else if( type == "MemoryMapCubes" ) {
-      var newCubeData = data["cubes"];
-      if( typeof newCubeData === 'undefined' ) { return; }
-      cubeData = newCubeData;
-      cubeData.forEach( function( cube ) {
-        cube.y = flipY_mm( cube.y );
-      });
-      kickRedraw();
-    }
-    else if( type == "MemoryMapFace" ) {
-      var id = data["faceID"];
-      data["pose"].y = flipY_mm( data["pose"].y );
-      faceData[id] = data;
-      kickRedraw();
-    }
-    else if( type == "RobotDeletedFace" ) {
-      var faceId = data["faceID"];
-      if( typeof faceData[faceId] !== 'undefined' ) {
-        delete faceData[faceId];
+      var type = data.type;
+      if( typeof type !== 'string' ) {
+        return;
+      }
+      var originId = data.originId;
+
+      if( type === 'MemoryMapMessageVizBegin' ) {
+        if( originId === undefined || originId === null ) { return; }
+        memoryMapQuadInfoVectorMapIncoming[originId] = {};
+        // mapInfo may be missing/malformed — store as object so End can reject cleanly
+        memoryMapInfo[originId] = ( data.mapInfo && typeof data.mapInfo === 'object' )
+          ? data.mapInfo
+          : {};
+      }
+      else if( type === 'MemoryMapMessageViz' ) {
+        if( originId === undefined || originId === null ) { return; }
+        var dest = memoryMapQuadInfoVectorMapIncoming[originId];
+        if( !dest ) {
+          console.warn( 'navMap: MemoryMapMessageViz for unknown originId', originId );
+          return;
+        }
+        var seqNumIn = data.seqNum;
+        if( seqNumIn === undefined || seqNumIn === null ) { return; }
+        // Accept array or missing; non-array becomes empty so End does not throw
+        dest[seqNumIn] = Array.isArray( data.quadInfos ) ? data.quadInfos : [];
+      }
+      else if( type === 'MemoryMapMessageVizEnd' ) {
+        if( originId === undefined || originId === null || !memoryMapInfo[originId] ) {
+          console.warn( 'navMap: MemoryMapMessageVizEnd for unknown originId', originId );
+          waitingOnData = false;
+          if( updateBtn ) { updateBtn.prop( 'disabled', autoUpdate ); }
+          return;
+        }
+
+        var mapInfo = memoryMapInfo[originId];
+        var hasRoot =
+          typeof mapInfo.rootCenterX === 'number' &&
+          typeof mapInfo.rootCenterY === 'number' &&
+          typeof mapInfo.rootDepth === 'number' &&
+          typeof mapInfo.rootSize_mm === 'number';
+        if( !hasRoot ) {
+          console.warn( 'navMap: MemoryMapMessageVizEnd missing mapInfo fields', mapInfo );
+          delete memoryMapQuadInfoVectorMapIncoming[originId];
+          delete memoryMapInfo[originId];
+          clearMapDrawing();
+          waitingOnData = false;
+          if( updateBtn ) { updateBtn.prop( 'disabled', autoUpdate ); }
+          return;
+        }
+
+        quadTreeQuads = [];
+        dataExtentsInfo = {
+          minX:  Number.MAX_VALUE,
+          maxX: -Number.MAX_VALUE,
+          minY:  Number.MAX_VALUE,
+          maxY: -Number.MAX_VALUE
+        };
+
+        var centerX_m = 0.001 * mapInfo.rootCenterX;
+        var centerY_m = 0.001 * mapInfo.rootCenterY;
+        var depth     = mapInfo.rootDepth;
+        var rootSize  = 0.001 * mapInfo.rootSize_mm;
+
+        var root = new MemoryMapNode( depth, rootSize, new Point( centerX_m, centerY_m ) );
+        var expectedSeqNum = 0;
+        var srcQuadInfos = memoryMapQuadInfoVectorMapIncoming[originId] || {};
+
+        // Seq nums may arrive as string keys; walk in numeric order
+        var seqKeys = Object.keys( srcQuadInfos ).map( Number ).sort( function( a, b ) { return a - b; } );
+        for( var s = 0; s < seqKeys.length; ++s ) {
+          var seqNum = seqKeys[s];
+          if( seqNum !== expectedSeqNum ) {
+            console.log( 'DROPPED VIZ MESSAGE. map will be incorrect (expected seq ' +
+                         expectedSeqNum + ', got ' + seqNum + ')' );
+            break;
+          }
+          var quadInfo = srcQuadInfos[seqNum] || srcQuadInfos[String(seqNum)];
+          if( !Array.isArray( quadInfo ) ) {
+            ++expectedSeqNum;
+            continue;
+          }
+          for( var idx = 0; idx < quadInfo.length; ++idx ) {
+            var quad = quadInfo[idx];
+            if( !quad || typeof quad !== 'object' ) { continue; }
+            root.AddChild( quadTreeQuads, dataExtentsInfo, quad.content, quad.depth );
+          }
+          ++expectedSeqNum;
+        }
+
+        delete memoryMapQuadInfoVectorMapIncoming[originId];
+        delete memoryMapInfo[originId];
+
+        // No cells → clear stale drawing rather than keep previous map
+        if( !quadTreeQuads.length ||
+            typeof dataExtentsInfo.minX === 'undefined' ||
+            dataExtentsInfo.minX === Number.MAX_VALUE ) {
+          clearMapDrawing();
+          if( updateBtn ) { updateBtn.prop( 'disabled', autoUpdate ); }
+          waitingOnData = false;
+          return;
+        }
+
+        robotPosition = ( data.robot && typeof data.robot === 'object' ) ? data.robot : undefined;
+
+        // Flip Y (quads are in meters; robot is mm)
+        for( var qi = 0; qi < quadTreeQuads.length; ++qi ) {
+          var qq = quadTreeQuads[qi];
+          if( qq && qq.center && typeof qq.center.y === 'number' ) {
+            qq.center.y = flipY_m( qq.center.y );
+          }
+        }
+        var tmpMaxY = dataExtentsInfo.maxY;
+        dataExtentsInfo.maxY = flipY_m( dataExtentsInfo.minY );
+        dataExtentsInfo.minY = flipY_m( tmpMaxY );
+        if( robotPosition && typeof robotPosition.y === 'number' ) {
+          robotPosition.y = flipY_mm( robotPosition.y );
+        }
+
+        mapBakeDirty = true;
+        cameraResetPending = true;
+        viewFitPending = true;
         kickRedraw();
+        if( updateBtn ) { updateBtn.prop( 'disabled', autoUpdate ); }
+        waitingOnData = false;
+      }
+      else if( type === 'MemoryMapCubes' ) {
+        var newCubeData = data.cubes;
+        if( !Array.isArray( newCubeData ) ) { return; }
+        cubeData = newCubeData;
+        for( var ci = 0; ci < cubeData.length; ++ci ) {
+          var cube = cubeData[ci];
+          if( cube && typeof cube.y === 'number' ) {
+            cube.y = flipY_mm( cube.y );
+          }
+        }
+        kickRedraw();
+      }
+      else if( type === 'MemoryMapFace' ) {
+        var id = data.faceID;
+        var pose = data.pose;
+        if( id === undefined || id === null || !pose || typeof pose !== 'object' ) {
+          return;
+        }
+        if( typeof pose.y === 'number' ) {
+          pose.y = flipY_mm( pose.y );
+        }
+        faceData[id] = data;
+        kickRedraw();
+      }
+      else if( type === 'RobotDeletedFace' ) {
+        var faceId = data.faceID;
+        if( faceId !== undefined && typeof faceData[faceId] !== 'undefined' ) {
+          delete faceData[faceId];
+          kickRedraw();
+        }
+      }
+      // Unknown types: ignore (no throw)
+    } catch( err ) {
+      console.warn( 'navMap: onData error', err );
+      waitingOnData = false;
+      if( updateBtn ) {
+        try { updateBtn.prop( 'disabled', autoUpdate ); } catch( e2 ) {}
       }
     }
   };
@@ -1182,6 +1428,8 @@
   var kAutoUpdatePeriod_s = 5.0;
   var timeTilAutoUpdate = kAutoUpdatePeriod_s;
   myMethods.update = function( dt, elem ) {
+    if( elem ) { setHost( elem ); }
+    if( typeof dt !== 'number' || !isFinite( dt ) ) { return; }
     timeTilAutoUpdate -= dt;
     if( (timeTilAutoUpdate < 0) && autoUpdate && !waitingOnData ) {
       callUpdate();
@@ -1191,6 +1439,14 @@
 
   myMethods.getStyles = function() {
     var styles = `
+      .navMapToolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 2px 0;
+        margin-bottom: 6px;
+        max-width: 100%;
+      }
       span.navMapLegendEntry {
         display: block;
         margin: 1px 3px 0px 0px;
@@ -1209,6 +1465,21 @@
       }
       #navMapContainer {
         background: #000;
+        max-width: 100%;
+        line-height: 0;
+        overflow: hidden;
+      }
+      #navMapContainer canvas {
+        display: block;
+        max-width: 100%;
+      }
+      #legendContainer {
+        max-width: 100%;
+        margin-top: 6px;
+      }
+      .navMapWebGLError {
+        max-width: 100%;
+        box-sizing: border-box;
       }
     `;
     for( var idx = 0; idx < kKnownTypes.length; ++idx ) {
@@ -1228,9 +1499,14 @@
     msgs.push( '{"originId":1,"type":"MemoryMapMessageVizEnd","robot": {"x": 0, "y": 0, "z": 0, "qW":1.0,"qX":0.0,"qY":0.0,"qZ":0.0}}' );
     msgs.push( '{"faceID":1,"pose":{"qW":0.7038945423784015,"qX":-0.06860959401309058,"qY":0.06858566274866171,"qZ":-0.7036484944093795,"x":768.1229248046875,"y":-10.172940254211426,"z":174.9200439453125},"timestamp":35655,"type":"MemoryMapFace"}' );
     msgs.push( '{"cubes":[{"angle":0.049684006720781326,"x":99.4178695678711,"y":0.0902092456817627,"z":29.857250213623047}],"type":"MemoryMapCubes"}' );
-    
+
+    var host = hostElem || document.getElementById( 'tab-navmap' );
     for( var idx=0; idx<msgs.length; ++idx ) {
-      myMethods.onData( JSON.parse( msgs[idx] ), $('#tab-navmap') );
+      try {
+        myMethods.onData( JSON.parse( msgs[idx] ), host );
+      } catch( e ) {
+        console.warn( 'navMap: fakeData message failed', e );
+      }
     }
   }
 
