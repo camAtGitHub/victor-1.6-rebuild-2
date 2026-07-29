@@ -1,0 +1,183 @@
+{
+  "$schema_note": "Curated human docs for console vars. Not exhaustive. Keys match CONSOLE_VAR ids as shown in /consolevars UI. process: engine|anim|both",
+  "version": 1,
+  "recipes": [
+    {
+      "id": "mirror-face-boxes",
+      "title": "Face boxes on the face LCD (MirrorMode)",
+      "process": "engine",
+      "blurb": "Camera feed on Vector’s screen with OpenCV-style face (and related) overlays. The mode must be scheduled AND the mirror display flags enabled.",
+      "where": "Engine :8888 → Vision tab → General.VisionModes + Vision.General / Vision.MirrorMode",
+      "steps": [
+        {
+          "var": "Faces",
+          "value": true,
+          "note": "Vision mode: run face detection so there is something to draw."
+        },
+        {
+          "var": "MirrorMode",
+          "value": true,
+          "note": "Vision mode: render camera to the face display (mirror screen)."
+        },
+        {
+          "var": "kDisplayDetectionsInMirrorMode",
+          "value": true,
+          "note": "Draw detections (objects/faces/markers) into the mirror image."
+        },
+        {
+          "var": "kDisplayEyeContactInMirrorMode",
+          "value": true,
+          "note": "Extra face/eye-contact debug drawing in mirror (what many people mean by ‘boundary boxes’)."
+        }
+      ],
+      "tips": [
+        "All of these are engine consolevars (port 8888), not anim 8889.",
+        "Faces + MirrorMode are under Vision.General.VisionModes (enum-named toggles).",
+        "If the face screen stays dark, confirm image capture is running and the robot is not in a screen that overrides MirrorMode."
+      ]
+    },
+    {
+      "id": "mirror-markers",
+      "title": "Marker / charger detections in MirrorMode",
+      "process": "engine",
+      "blurb": "See fiducial / marker overlays on the face camera feed.",
+      "steps": [
+        { "var": "Markers", "value": true, "note": "Vision mode for marker detection." },
+        { "var": "MirrorMode", "value": true, "note": "Show camera on face LCD." },
+        { "var": "kDisplayDetectionsInMirrorMode", "value": true, "note": "Draw detections into mirror frame." },
+        { "var": "kDisplayMarkerNamesScale", "value": 0.5, "note": "If > 0, also labels marker names (0–1 scale)." }
+      ],
+      "tips": [
+        "kDisplayMarkerNamesScale is under Vision.MirrorMode; 0 hides names."
+      ]
+    },
+    {
+      "id": "webviz-mood-stream",
+      "title": "Stream mood into WebViz",
+      "process": "engine",
+      "blurb": "Ensure mood samples reach the Mood WebViz tab at a useful rate.",
+      "steps": [
+        {
+          "var": "MoodManager_WebVizPeriod_s",
+          "value": 0.25,
+          "note": "Seconds between mood pushes to WebViz (smaller = more traffic)."
+        }
+      ],
+      "tips": [
+        "Open WebViz → Mood and Subscribe; period is also adjustable from that tab."
+      ]
+    }
+  ],
+  "categories": {
+    "Vision": {
+      "blurb": "Camera pipeline, vision modes, mirror display, and face/marker debug. Engine process only.",
+      "process": "engine"
+    },
+    "Vision.General.VisionModes": {
+      "blurb": "Per-VisionMode force-enable toggles (Faces, MirrorMode, Markers, …). Enabling also Dev-subscribes the mode so it is scheduled.",
+      "process": "engine"
+    },
+    "Vision.MirrorMode": {
+      "blurb": "Drawing options for the on-face camera mirror image (detections, exposure text, gamma).",
+      "process": "engine"
+    },
+    "Vision.General": {
+      "blurb": "Cross-cutting vision debug flags (e.g. eye-contact drawing in mirror).",
+      "process": "engine"
+    },
+    "MicData": {
+      "blurb": "Microphone capture / clip recording (mostly anim :8889).",
+      "process": "anim"
+    },
+    "ProceduralFace": {
+      "blurb": "Procedural face drawing knobs (anim :8889).",
+      "process": "anim"
+    }
+  },
+  "vars": {
+    "Faces": {
+      "process": "engine",
+      "blurb": "Force-enable VisionMode::Faces (face detection). Needed before face overlays have data.",
+      "category": "Vision.General.VisionModes",
+      "related": ["MirrorMode", "kDisplayEyeContactInMirrorMode", "kDisplayDetectionsInMirrorMode"],
+      "tags": ["vision", "faces", "highlight"]
+    },
+    "MirrorMode": {
+      "process": "engine",
+      "blurb": "Force-enable VisionMode::MirrorMode — camera feed composited onto the face LCD.",
+      "category": "Vision.General.VisionModes",
+      "related": ["Faces", "kDisplayDetectionsInMirrorMode", "kDisplayEyeContactInMirrorMode"],
+      "tags": ["vision", "mirror", "highlight"]
+    },
+    "Markers": {
+      "process": "engine",
+      "blurb": "Force-enable marker / fiducial detection vision mode.",
+      "category": "Vision.General.VisionModes",
+      "related": ["MirrorMode", "kDisplayDetectionsInMirrorMode", "kDisplayMarkerNamesScale"],
+      "tags": ["vision", "markers"]
+    },
+    "kDisplayEyeContactInMirrorMode": {
+      "process": "engine",
+      "blurb": "When MirrorMode is active, draw eye-contact / face debug (often the ‘boxes’ people notice).",
+      "category": "Vision.General",
+      "requires": ["MirrorMode"],
+      "related": ["Faces", "kDisplayDetectionsInMirrorMode"],
+      "tags": ["vision", "mirror", "faces", "highlight"]
+    },
+    "kDisplayDetectionsInMirrorMode": {
+      "process": "engine",
+      "blurb": "Draw detected objects, faces, and markers into the MirrorMode image.",
+      "category": "Vision.MirrorMode",
+      "requires": ["MirrorMode"],
+      "related": ["Faces", "Markers", "kDisplayEyeContactInMirrorMode"],
+      "tags": ["vision", "mirror", "highlight"]
+    },
+    "kDisplayExposureInMirrorMode": {
+      "process": "engine",
+      "blurb": "Overlay exposure / AE info on the mirror image.",
+      "category": "Vision.MirrorMode",
+      "requires": ["MirrorMode"],
+      "tags": ["vision", "mirror"]
+    },
+    "kDisplayMarkerNamesScale": {
+      "process": "engine",
+      "blurb": "Scale for marker name labels in mirror (0 = off).",
+      "category": "Vision.MirrorMode",
+      "requires": ["MirrorMode", "Markers"],
+      "tags": ["vision", "mirror", "markers"]
+    },
+    "kMirrorModeGamma": {
+      "process": "engine",
+      "blurb": "Gamma adjustment for the mirrored camera image.",
+      "category": "Vision.MirrorMode",
+      "tags": ["vision", "mirror"]
+    },
+    "kMirrorModeFaceDebugFontScale": {
+      "process": "engine",
+      "blurb": "Font scale for face debug text in mirror mode.",
+      "category": "Vision.MirrorMode",
+      "tags": ["vision", "mirror", "faces"]
+    },
+    "kSendDebugImages": {
+      "process": "engine",
+      "blurb": "Send debug image streams from the vision system (bandwidth heavy).",
+      "category": "Vision.General",
+      "tags": ["vision", "debug"]
+    },
+    "MoodManager_WebVizPeriod_s": {
+      "process": "engine",
+      "blurb": "How often mood state is pushed to WebViz Mood tab.",
+      "tags": ["webviz", "mood"]
+    },
+    "WebvizUpdatePeriod": {
+      "process": "engine",
+      "blurb": "Period used by some WebViz CPU-related updates.",
+      "tags": ["webviz"]
+    },
+    "ProfilerLogOutput": {
+      "process": "both",
+      "blurb": "Profiler logging level (WebViz CpuProfile may set this).",
+      "tags": ["perf"]
+    }
+  }
+}
