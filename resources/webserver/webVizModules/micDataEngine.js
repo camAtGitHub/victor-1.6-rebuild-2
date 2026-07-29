@@ -1,17 +1,18 @@
 /*
- * This module draws the directional mic information on a clock face,
- * along with confidence values and other debug information.
- * Only useful on a Victor robot as Webots has no direction information from
- * the mic.
+ * SoundReactions / micDataEngine WebViz module (engine :8888)
+ * Directional mic clock + loudness chart.
+ * 2026-07: shell host scoping, safe onData, scoped Flot (#tab-soundreactions)
  */
 
 (function(myMethods, sendData) {
 
-  var ClockData = {}
-  ClockData.center = [125, 125]
+  var ClockData = {};
+  ClockData.center = [125, 125];
   ClockData.radius = 100;
-   // max width of the chart
+
   var maxWidth_s = 60.0;
+  var MAX_POINTS = 4000;
+
   var chartOptions = {
     legend: {
       show: true,
@@ -26,12 +27,12 @@
     xaxis: {
       ticks: 10,
       tickLength: 10,
-       tickDecimals: 0
+      tickDecimals: 0
     },
     grid: {
       show: true,
     }
-  }
+  };
 
   var first = true;
   var plotData = [];
@@ -41,9 +42,64 @@
   var micDataPeakMinThreshold = [];
   var chart;
 
+  /** Module host (#tab-soundreactions). Prefer over document-global selectors. */
+  var hostElem = null;
+
+  function $host() {
+    if( hostElem ) {
+      return $(hostElem);
+    }
+    try {
+      var el = document.getElementById( 'tab-soundreactions' );
+      if( el ) { return $(el); }
+    } catch( e ) {}
+    return $();
+  }
+
+  function setHost( el ) {
+    if( !el ) { return; }
+    if( el.jquery ) {
+      hostElem = el[0] || hostElem;
+    } else if( el.nodeType ) {
+      hostElem = el;
+    }
+  }
+
+  function chartContainer() {
+    return $host().find( '#chartContainer' );
+  }
+
+  function canvasEl() {
+    var c = $host().find( '#myCanvas' )[0];
+    return c || null;
+  }
+
+  function ensurePlot() {
+    var $c = chartContainer();
+    if( !$c.length ) {
+      return null;
+    }
+    if( chart ) {
+      try {
+        var ph = (typeof chart.getPlaceholder === 'function') ? chart.getPlaceholder() : null;
+        if( ph && ph.length && ph[0] && document.documentElement.contains( ph[0] ) ) {
+          return chart;
+        }
+      } catch( e ) {
+        chart = null;
+      }
+    }
+    try {
+      chart = $.plot( $c, plotData, chartOptions );
+    } catch( ePlot ) {
+      console.warn( 'micDataEngine: $.plot failed', ePlot );
+      chart = null;
+    }
+    return chart;
+  }
 
   function GetLegendLabel(label, series) {
-    if( series.lines.show ) {
+    if( series.lines && series.lines.show ) {
       return `<div class="legendLabelBox">
                 <div class="legendLabelBoxFill" style="background-color:` + series.color + `"></div>
               </div>`
@@ -56,11 +112,12 @@
     }
   }
 
-
   function drawClockFace() {
-    var context = $('#myCanvas')[0].getContext("2d");
-     // draw our clock face ...
-     // larger filled circle
+    var canvas = canvasEl();
+    if( !canvas ) { return; }
+    var context = canvas.getContext( "2d" );
+    if( !context ) { return; }
+
     context.beginPath();
     context.arc( ClockData.center[0], ClockData.center[1], ClockData.radius, 0, 2*Math.PI );
     context.lineWidth = 5;
@@ -68,228 +125,227 @@
     context.stroke();
     context.fillStyle = '#FFFFFF';
     context.fill();
-     // center dot
+
     context.beginPath();
     context.arc( ClockData.center[0], ClockData.center[1], 2, 0, 2*Math.PI );
     context.fillStyle = '#000000';
     context.fill();
   }
 
+  function pruneSeries( series, tNow ) {
+    if( !Array.isArray( series ) || series.length === 0 ) { return; }
+    var dt = tNow - series[0][0];
+    while( dt > maxWidth_s && series.length > 0 ) {
+      series.shift();
+      if( series.length === 0 ) { break; }
+      dt = tNow - series[0][0];
+    }
+    while( series.length > MAX_POINTS ) {
+      series.shift();
+    }
+  }
+
   myMethods.init = function(elem) {
-    // Called once when the module is loaded.
-    if ( location.port != "8888" )
-    {
+    setHost( elem );
+
+    if( location.port != "8888" ) {
       $('<h3>You must use this tab with the engine process (port 8888)</h3>').appendTo(elem);
     }
 
-    var angleFactorA = 0.866; // cos(30 degrees)
-    var angleFactorB = 0.5; // sin(30 degrees)
+    var angleFactorA = 0.866;
+    var angleFactorB = 0.5;
 
-    // Multiplying factors (cos/sin) for the clock directions.
-    // NOTE: Needs to have the 13th value so the unknown direction dot can display properly
     ClockData.offsets =
     [
-      [-0.0, -1.0], // 12 o'clock - in front of robot so point down
-      [angleFactorB, -angleFactorA], // 1 o'clock
-      [angleFactorA, -angleFactorB], // 2 o'clock
-      [1.0, -0.0], // 3 o'clock
-      [angleFactorA, angleFactorB], // 4 o'clock
-      [angleFactorB, angleFactorA], // 5 o'clock
-      [-0.0, 1.0], // 6 o'clock - behind robot so point up
-      [-angleFactorB, angleFactorA], // 7 o'clock
-      [-angleFactorA, angleFactorB], // 8 o'clock
-      [-1.0, -0.0], // 9 o'clock
-      [-angleFactorA, -angleFactorB], // 10 o'clock
-      [-angleFactorB, -angleFactorA], // 11 o'clock
-      [-0.0, -0.0] // Unknown direction
+      [-0.0, -1.0],
+      [angleFactorB, -angleFactorA],
+      [angleFactorA, -angleFactorB],
+      [1.0, -0.0],
+      [angleFactorA, angleFactorB],
+      [angleFactorB, angleFactorA],
+      [-0.0, 1.0],
+      [-angleFactorB, angleFactorA],
+      [-angleFactorA, angleFactorB],
+      [-1.0, -0.0],
+      [-angleFactorA, -angleFactorB],
+      [-angleFactorB, -angleFactorA],
+      [-0.0, -0.0]
     ];
 
-    // create our canvas
     $('<canvas></canvas>', {id: 'myCanvas'}).appendTo(elem);
 
-    // set our canvas size to fit all of our stuff
-    var canvas = $('#myCanvas')[0];
-    canvas.height = 250;
-    canvas.width = 700;
+    var canvas = canvasEl();
+    if( canvas ) {
+      canvas.height = 250;
+      canvas.width = 700;
+    }
 
-    // default to an empty clock face
     drawClockFace();
 
-    // Add in the chart for displaying loudness
     $(elem).append('<div id="chartContainer"></div>');
-    $('body').on('click', '.legendLabel', function () {
+
+    $host().on( 'click', '.legendLabel', function() {
       var labelName = this.innerText;
       var labelIdx = -1;
-      for (i=0; i < plotData.length; i++)
-      {
-        if (plotData[i].label == labelName)
-        {
+      for( var i = 0; i < plotData.length; i++ ) {
+        if( plotData[i].label == labelName ) {
           labelIdx = i;
           break;
         }
       }
-       if (labelIdx != -1)
-      {
+      if( labelIdx != -1 && plotData[labelIdx].lines ) {
         plotData[labelIdx].lines.show = !plotData[labelIdx].lines.show;
-        chart.setData(plotData);
-        chart.setupGrid();
-        chart.draw();
+        var p = ensurePlot();
+        if( p ) {
+          try {
+            p.setData( plotData );
+            p.setupGrid();
+            p.draw();
+          } catch( e ) {
+            console.warn( 'micDataEngine: legend toggle draw failed', e );
+          }
+        }
       }
     });
 
     $(elem).append('<p>NOTE: trigger values are for display purposes only (true values live in instance jsons)</p>');
   };
 
-
   myMethods.onData = function(data, elem) {
-
-    // The engine has sent a new json blob.
-    var canvas = $('#myCanvas')[0];
-    var context = canvas.getContext("2d");
-
-    // clear our canvas so we can paint!
-    context.clearRect(0, 0, canvas.width, canvas.height);
-
-    // need to redraw this each time
-    drawClockFace();
-
-    // Audio strongest direction
-    var dotRadius = 8;
-    var dotX = ClockData.center[0] + ( ClockData.offsets[data.direction][0] * ClockData.radius );
-    var dotY = ClockData.center[1] + ( ClockData.offsets[data.direction][1] * ClockData.radius );
-    context.beginPath();
-    context.arc( dotX, dotY, dotRadius, 0, 2*Math.PI );
-    context.fillStyle = '#FF0000';
-    context.fill();
-
-    // Audio beamforming selected direction
-    var dotRadius = 5;
-    var dotX = ClockData.center[0] + ( ClockData.offsets[data.selectedDirection][0] * ClockData.radius );
-    var dotY = ClockData.center[1] + ( ClockData.offsets[data.selectedDirection][1] * ClockData.radius );
-    context.beginPath();
-    context.arc( dotX, dotY, dotRadius, 0, 2*Math.PI );
-    context.fillStyle = '#00FF00';
-    context.fill();
-
-    // Update data used in the chart
-    var micPowerValue = parseFloat(data["latestPowerValue"]);
-    var micNoiseFloor = parseFloat(data["latestNoiseFloor"]);
-    var micPeakValue = parseFloat(data["powerScore"]);
-    var micPeakAverage = parseFloat(data["powerScoreAvg"]);
-    var micPeakThreshold = parseFloat(data["powerScoreThreshold"]);
-    var micPeakMinThreshold = parseFloat(data["powerScoreMinThreshold"])
-
-    micDataPower.push( [data["time"], micPowerValue] );
-    micDataPeakAverage.push( [data["time"], micNoiseFloor+micPeakAverage] );
-    micDataPeakThreshold.push( [data["time"], micNoiseFloor+micPeakAverage+micPeakThreshold] );
-    micDataPeakMinThreshold.push( [data["time"], micNoiseFloor+micPeakAverage+micPeakMinThreshold] );
-
-    // add in our confidence values ...
-    var labelX = 250, valueX = 400;
-    var textY = 25, textHeight = 25;
-
-    context.font="normal 18px Arial";
-    context.textBaseline="top";
-    context.fillStyle = '#000000';
-    context.textAlign = "start";
-
-    context.fillText( "Confidence : ", labelX, textY );
-    context.fillText( data.confidence, valueX, textY );
-
-    textY += textHeight;
-    context.fillText( "Scoring Level : ", labelX, textY );
-    context.fillText( micPeakValue.toFixed(3), valueX, textY );
-
-    textY += textHeight;
-    context.fillText( "Scoring Avg : ", labelX, textY );
-    context.fillText( micPeakAverage.toFixed(3), valueX, textY );
-
-    // VAD active
-    textY += textHeight;
-    context.fillText( "Voice Detected :", labelX, textY );
-    dotRadius = 8;
-    context.beginPath();
-    context.arc( valueX + 10, textY + 11, dotRadius, 0, 2*Math.PI );
-    context.fillStyle = '#FF0000';
-    if (data.activeState) {
-      context.fillStyle = '#00FF00';
-    }
-    context.fill();
-    context.fillStyle = '#000000';
-
-    valueX = 450;
-    if ( data.isTriggered )
-    {
-      textY += textHeight*2;
-      context.fillText( "Reaction Score : ", labelX, textY );
-      context.fillText( data.triggerScore.toFixed(3), valueX, textY );
-       textY += textHeight;
-      context.fillText( "Reaction Confidence : ", labelX, textY );
-      context.fillText( data.triggerConfidence, valueX, textY );
-       textY += textHeight;
-      context.fillText( "Reaction Direction : ", labelX, textY );
-      context.fillText( data.triggerDirection, valueX, textY );
+    if( elem ) { setHost( elem ); }
+    if( !data || typeof data !== 'object' ) {
+      return;
     }
 
-    // Set up chart the first time
-    if( first ) {
-      var newData = { label: "Mic Power",
-                      data: micDataPower,
-                      lines: {show: true} };
-      plotData.push( newData );
-       newData = { label: "Mic Peak Avg",
-                      data: micDataPeakAverage,
-                      lines: {show: true} };
-      plotData.push( newData );
-       newData = { label: "Mic Power Trigger",
-                      data: micDataPeakThreshold,
-                      lines: {show: true} };
-      plotData.push( newData );
-       newData = { label: "Mic Conf Trigger",
-                      data: micDataPeakMinThreshold,
-                      lines: {show: true} };
-      plotData.push( newData );
-       chart = $.plot("#chartContainer", plotData, chartOptions);
-      first = false;
+    try {
+      var canvas = canvasEl();
+      if( !canvas ) { return; }
+      var context = canvas.getContext( "2d" );
+      if( !context ) { return; }
+
+      context.clearRect( 0, 0, canvas.width, canvas.height );
+      drawClockFace();
+
+      var dirIdx = parseInt( data.direction, 10 );
+      if( isFinite( dirIdx ) && ClockData.offsets && ClockData.offsets[dirIdx] ) {
+        var dotRadius = 8;
+        var dotX = ClockData.center[0] + ( ClockData.offsets[dirIdx][0] * ClockData.radius );
+        var dotY = ClockData.center[1] + ( ClockData.offsets[dirIdx][1] * ClockData.radius );
+        context.beginPath();
+        context.arc( dotX, dotY, dotRadius, 0, 2*Math.PI );
+        context.fillStyle = '#FF0000';
+        context.fill();
+      }
+
+      var selIdx = parseInt( data.selectedDirection, 10 );
+      if( isFinite( selIdx ) && ClockData.offsets && ClockData.offsets[selIdx] ) {
+        var selRadius = 5;
+        var selX = ClockData.center[0] + ( ClockData.offsets[selIdx][0] * ClockData.radius );
+        var selY = ClockData.center[1] + ( ClockData.offsets[selIdx][1] * ClockData.radius );
+        context.beginPath();
+        context.arc( selX, selY, selRadius, 0, 2*Math.PI );
+        context.fillStyle = '#00FF00';
+        context.fill();
+      }
+
+      var micPowerValue = parseFloat( data["latestPowerValue"] );
+      var micNoiseFloor = parseFloat( data["latestNoiseFloor"] );
+      var micPeakValue = parseFloat( data["powerScore"] );
+      var micPeakAverage = parseFloat( data["powerScoreAvg"] );
+      var micPeakThreshold = parseFloat( data["powerScoreThreshold"] );
+      var micPeakMinThreshold = parseFloat( data["powerScoreMinThreshold"] );
+
+      var tNow = parseFloat( data["time"] );
+
+      var labelX = 250, valueX = 400;
+      var textY = 25, textHeight = 25;
+
+      context.font = "normal 18px Arial";
+      context.textBaseline = "top";
+      context.fillStyle = '#000000';
+      context.textAlign = "start";
+
+      context.fillText( "Confidence : ", labelX, textY );
+      context.fillText( data.confidence != null ? data.confidence : '', valueX, textY );
+
+      textY += textHeight;
+      context.fillText( "Scoring Level : ", labelX, textY );
+      context.fillText( isFinite( micPeakValue ) ? micPeakValue.toFixed(3) : '', valueX, textY );
+
+      textY += textHeight;
+      context.fillText( "Scoring Avg : ", labelX, textY );
+      context.fillText( isFinite( micPeakAverage ) ? micPeakAverage.toFixed(3) : '', valueX, textY );
+
+      textY += textHeight;
+      context.fillText( "Voice Detected :", labelX, textY );
+      context.beginPath();
+      context.arc( valueX + 10, textY + 11, 8, 0, 2*Math.PI );
+      context.fillStyle = data.activeState ? '#00FF00' : '#FF0000';
+      context.fill();
+      context.fillStyle = '#000000';
+
+      valueX = 450;
+      if( data.isTriggered ) {
+        textY += textHeight*2;
+        context.fillText( "Reaction Score : ", labelX, textY );
+        var tScore = parseFloat( data.triggerScore );
+        context.fillText( isFinite( tScore ) ? tScore.toFixed(3) : '', valueX, textY );
+        textY += textHeight;
+        context.fillText( "Reaction Confidence : ", labelX, textY );
+        context.fillText( data.triggerConfidence != null ? data.triggerConfidence : '', valueX, textY );
+        textY += textHeight;
+        context.fillText( "Reaction Direction : ", labelX, textY );
+        context.fillText( data.triggerDirection != null ? data.triggerDirection : '', valueX, textY );
+      }
+
+      if( first ) {
+        plotData = [];
+        plotData.push({ label: "Mic Power", data: micDataPower, lines: {show: true} });
+        plotData.push({ label: "Mic Peak Avg", data: micDataPeakAverage, lines: {show: true} });
+        plotData.push({ label: "Mic Power Trigger", data: micDataPeakThreshold, lines: {show: true} });
+        plotData.push({ label: "Mic Conf Trigger", data: micDataPeakMinThreshold, lines: {show: true} });
+        first = false;
+      }
+
+      if( !isFinite( tNow ) ) {
+        return;
+      }
+
+      if( isFinite( micPowerValue ) ) {
+        micDataPower.push( [tNow, micPowerValue] );
+      }
+      if( isFinite( micNoiseFloor ) && isFinite( micPeakAverage ) ) {
+        micDataPeakAverage.push( [tNow, micNoiseFloor + micPeakAverage] );
+        if( isFinite( micPeakThreshold ) ) {
+          micDataPeakThreshold.push( [tNow, micNoiseFloor + micPeakAverage + micPeakThreshold] );
+        }
+        if( isFinite( micPeakMinThreshold ) ) {
+          micDataPeakMinThreshold.push( [tNow, micNoiseFloor + micPeakAverage + micPeakMinThreshold] );
+        }
+      }
+
+      pruneSeries( micDataPower, tNow );
+      pruneSeries( micDataPeakAverage, tNow );
+      pruneSeries( micDataPeakThreshold, tNow );
+      pruneSeries( micDataPeakMinThreshold, tNow );
+
+      var p = ensurePlot();
+      if( !p ) { return; }
+
+      var xMin = tNow - maxWidth_s;
+      p.getAxes().xaxis.options.min = xMin;
+      p.getAxes().xaxis.options.max = xMin + maxWidth_s + 0.1;
+      p.setData( plotData );
+      p.setupGrid();
+      p.draw();
+    } catch( e ) {
+      console.warn( 'micDataEngine: onData failed', e );
     }
-
-    // Remove old data
-    var dt = data["time"] - micDataPower[0][0];
-    while( dt > maxWidth_s && micDataPower.length > 0 ) {
-      micDataPower.shift();
-      dt = data["time"] - micDataPower[0][0];
-    }
-
-    dt = data["time"] - micDataPeakAverage[0][0];
-    while( dt > maxWidth_s && micDataPeakAverage.length > 0 ) {
-      micDataPeakAverage.shift();
-      dt = data["time"] - micDataPeakAverage[0][0];
-    }
-
-    dt = data["time"] - micDataPeakThreshold[0][0];
-    while( dt > maxWidth_s && micDataPeakThreshold.length > 0 ) {
-      micDataPeakThreshold.shift();
-      dt = data["time"] - micDataPeakThreshold[0][0];
-    }
-
-    dt = data["time"] - micDataPeakMinThreshold[0][0];
-    while( dt > maxWidth_s && micDataPeakMinThreshold.length > 0 ) {
-      micDataPeakMinThreshold.shift();
-      dt = data["time"] - micDataPeakMinThreshold[0][0];
-    }
-
-    // fixed width data
-    var xMin = data["time"] - maxWidth_s;
-    chart.getAxes().xaxis.options.min = xMin;
-    chart.getAxes().xaxis.options.max = xMin + maxWidth_s + 0.1;
-
-    chart.setData(plotData);
-    chart.setupGrid();
-    chart.draw();
   };
 
-
-  myMethods.update = function(dt, elem) {};
+  myMethods.update = function(dt, elem) {
+    if( elem ) { setHost( elem ); }
+  };
 
   myMethods.getStyles = function() {
     return `
@@ -299,7 +355,6 @@
       }
 
       .legendColorBox {
-        /* we manually create the boxes below */
         display:none;
       }
       .legendLabel {
