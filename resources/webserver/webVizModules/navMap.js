@@ -1114,6 +1114,7 @@
     dataExtentsInfo = {};
     robotPosition = undefined;
     cubeData = undefined;
+    faceData = {};
     mapBakeDirty = true;
     viewFitPending = true;
     kickRedraw();
