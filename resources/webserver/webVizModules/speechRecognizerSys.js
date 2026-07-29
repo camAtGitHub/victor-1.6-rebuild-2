@@ -1,5 +1,6 @@
-/*  
+/*
  * Speech Recognition System
+ * 2026-07: shell host scoping, safe onData, row cap, scoped DataTables (#tab-speechrecognizersys)
  */
 
 (function(myMethods, sendData) {
@@ -9,27 +10,54 @@
   var userScrolling = false;
   var tableDirty = true;
   var entryCount = 0;
+  var hostElem = null;
+  var MAX_ROWS = 2000;
 
   var dataColumns = ['result', 'score', 'startTime_ms', 'endTime_ms', 'startSampleIndex', 'endSampleIndex', 'notch', 'playback'];
-  // pretty versions of that
   var prettyColumns = ["TriggerCount", 'Result', 'Score', 'StartTime ms', 'EndTime ms', 'StartSampleIdx', 'EndSampleIdx', 'Notch', 'PlaybackRecog'];
-  // should it be displayed by default
   var enabledColumns = [true, true, true, true, true, true, true, true, true];
 
-  function CreateTable( elem ) {
-    // create the DataTable with prettyColumns as headers
+  function $host() {
+    if( hostElem ) {
+      return $(hostElem);
+    }
+    try {
+      var el = document.getElementById( 'tab-speechrecognizersys' );
+      if( el ) { return $(el); }
+    } catch( e ) {}
+    return $();
+  }
 
+  function setHost( el ) {
+    if( !el ) { return; }
+    if( el.jquery ) {
+      hostElem = el[0] || hostElem;
+    } else if( el.nodeType ) {
+      hostElem = el;
+    }
+  }
+
+  function scrollBody() {
+    return $host().find( '.dataTables_scrollBody' );
+  }
+
+  function CreateTable( elem ) {
     var tableElem = $( '<table class="display" style="width:100%"></table>' ).appendTo( elem );
     var thead = $( '<thead></thead>' ).appendTo( tableElem );
-    $( '<tbody id="list"></tbody>' ).appendTo( tableElem );
+    $( '<tbody class="speech-recog-list"></tbody>' ).appendTo( tableElem );
 
     var colsToCreate = '<tr>';
-    prettyColumns.forEach( function( col ){ 
+    prettyColumns.forEach( function( col ){
       colsToCreate += '<th>' + col + '</th>';
     });
     colsToCreate += '</tr>';
     $( colsToCreate ).appendTo( thead );
-    
+
+    if( table ) {
+      try { table.destroy( true ); } catch( e ) {}
+      table = null;
+    }
+
     table = tableElem.DataTable({
       "scrollY":           "600px",
       "scrollX":           false,
@@ -39,21 +67,17 @@
         "caseInsensitive": true
       },
       "order": [[0, 'asc']]
-
     });
     enabledColumns.forEach( function( isVisible, idx ){
       table.column( idx ).visible( isVisible );
     });
-    // todo: if this gets slow for long runs, consider the Scroller plugin for DataTables 
   }
 
   function AddTableEntry( data ) {
-    // add a row but don't draw
+    if( !table || !data || typeof data !== 'object' ) { return; }
     var columnValues = [];
-    // Add sort order
     ++entryCount;
     columnValues.push( entryCount );
-    // Add data
     for( var i=0; i<dataColumns.length; ++i ) {
       if( data.hasOwnProperty( dataColumns[i] ) ) {
         columnValues.push( data[dataColumns[i]] );
@@ -61,78 +85,98 @@
         columnValues.push( '' );
       }
     }
-    
-    table.row.add( columnValues ); // don't draw now, or it's slow. wait for the update() tick to draw it
+
+    table.row.add( columnValues );
+    try {
+      while( table.rows().count() > MAX_ROWS ) {
+        table.row( 0 ).remove();
+      }
+    } catch( eCap ) {}
   }
 
   function DrawTable() {
-
-    // disable the effect of scrolling the table setting autoscroll because it wasn't the user scolling
-    userScrolling = false;
-    // draw with no paging
-    table.draw( false );
-    if( autoScroll ) {
-      // scroll to bottom
-      $( '.dataTables_scrollBody' ).scrollTop( $( '.dataTables_scrollBody' )[0].scrollHeight );
+    if( !table ) { return; }
+    try {
+      userScrolling = false;
+      table.draw( false );
+      if( autoScroll ) {
+        var $sb = scrollBody();
+        if( $sb.length && $sb[0] ) {
+          $sb.scrollTop( $sb[0].scrollHeight );
+        }
+      }
+    } catch( e ) {
+      console.warn( 'speechRecognizerSys: DrawTable failed', e );
     }
   }
 
-
   function UserScrolling() {
-    userScrolling = true;  // user is scrolling instead of a dynamic page updates
-  }  
+    userScrolling = true;
+  }
 
-  
   myMethods.init = function( elem ) {
+    setHost( elem );
 
-    // add column toggles
     $( '<b>Column toggles:</b>' ).appendTo( elem );
     var ul = $( '<ul class="colToggles"></ul>' ).appendTo( elem );
     prettyColumns.forEach( function( col, idx ){
       var shouldDisplay = enabledColumns[idx] ? 'colEnabled' : '';
-      ul.append( '<li class="toggleViz ' + shouldDisplay + '" data-column="' + idx + '">' + col + '</div>' );
-    })
-    $( '.toggleViz' ).on( 'click', function( e ) {
-        e.preventDefault();
+      ul.append( '<li class="toggleViz ' + shouldDisplay + '" data-column="' + idx + '">' + col + '</li>' );
+    });
+    $host().find( '.toggleViz' ).on( 'click', function( e ) {
+      e.preventDefault();
+      if( !table ) { return; }
+      try {
         var column = table.column( $( this ).attr( 'data-column' ) );
         column.visible( !column.visible() );
         $( this ).toggleClass( 'colEnabled' );
+      } catch( eToggle ) {
+        console.warn( 'speechRecognizerSys: column toggle failed', eToggle );
+      }
     });
 
-    // create table
     CreateTable( elem );
 
-    // toggle autoscroll based on user scroll actions
-    $( '.dataTables_scrollBody' ).on( 'scroll', function() {
+    scrollBody().on( 'scroll', function() {
       if( !userScrolling ) {
         return;
       }
-      // enable autoscroll when the user scrolls to the bottom, and disable when scrolling elsewhere
-      autoScroll = ($( this ).scrollTop() + $( this ).innerHeight() >= $( this )[0].scrollHeight)
+      autoScroll = ($( this ).scrollTop() + $( this ).innerHeight() >= $( this )[0].scrollHeight);
     });
 
-    // call UserScrolling on any mouse scroll, which enable the effect of scrolling the table to set autoscroll
     if( document.addEventListener ) {
       document.addEventListener( 'mousewheel', UserScrolling, false );
       document.addEventListener( 'DOMMouseScroll', UserScrolling, false );
     } else {
       document.attachEvent( 'onmousewheel', UserScrolling );
-    } 
+    }
   };
-
 
   myMethods.onData = function( data, elem ) {
-    if( Array.isArray(data) ) {
-      data.forEach(function(entry) {
-        AddTableEntry( entry );
-      });
-    } else {
-      AddTableEntry( data );
+    if( elem ) { setHost( elem ); }
+    if( data == null ) {
+      return;
     }
-    tableDirty = true;
+    try {
+      if( Array.isArray(data) ) {
+        data.forEach(function(entry) {
+          if( entry && typeof entry === 'object' ) {
+            AddTableEntry( entry );
+          }
+        });
+      } else if( typeof data === 'object' ) {
+        AddTableEntry( data );
+      } else {
+        return;
+      }
+      tableDirty = true;
+    } catch( e ) {
+      console.warn( 'speechRecognizerSys: onData failed', e );
+    }
   };
 
-  myMethods.update = function( dt, elem ) { 
+  myMethods.update = function( dt, elem ) {
+    if( elem ) { setHost( elem ); }
     if( tableDirty ) {
       tableDirty = false;
       DrawTable();
@@ -162,12 +206,12 @@
         content:'\\2713';
       }
 
-      th { 
-        font-size: 11px; 
+      th {
+        font-size: 11px;
       }
 
-      td { 
-        font-size: 10px; 
+      td {
+        font-size: 10px;
       }
     `;
   };
