@@ -179,7 +179,7 @@
     }
     if( changed ) {
       viewFitPending = true;
-      cameraResetPending = true;
+      // Do not reset 3D orbit on every resize — only re-fit 2D view / map bake
       mapBakeDirty = true;
       kickRedraw();
     }
@@ -364,7 +364,10 @@
   var myp5;
   var vizDirty = false;
   var mapBakeDirty = true; // rebuild top-down map texture when quads change
-  var cameraResetPending = false; // one-shot 3D camera fit after data / mode change
+  // One-shot 3D camera fit ONLY — must not follow vizDirty or every redraw
+  // snaps orbitControl back to the default (robot/cube/face streams + auto-update).
+  var cameraResetPending = false;
+  var cameraEverFitted3D = false; // after first fit, map refreshes keep user orbit
 
   /** Schedule a paint without spinning requestAnimationFrame forever. */
   function kickRedraw() {
@@ -372,6 +375,11 @@
     if( myp5 && typeof myp5.redraw === 'function' ) {
       try { myp5.redraw(); } catch( e ) {}
     }
+  }
+
+  /** Request a one-shot default 3D camera (mode toggle, double-click, first map). */
+  function requestCameraFit3D() {
+    cameraResetPending = true;
   }
   var shouldDrawRobot = true;
   var shouldDrawCubes = true;
@@ -821,6 +829,7 @@
       // Camera sits on +Z looking at origin; world is then yawed by kMapYaw3D
       // so the map matches 2D (X right, map-Y toward bottom of the view).
       p.camera( 0, dist * 0.55, dist * 0.85,  0, 0, 0,  0, upY, 0 );
+      cameraEverFitted3D = true;
     }
 
     function drawRobot2D() {
@@ -921,20 +930,22 @@
 
       if( is3D && webglLive ) {
         // When draw() runs (redraw or loop while dragging), always paint + orbitControl.
-        // Skipping frames broke orbit/zoom (camera never updated).
         if( mapBakeDirty ) {
           rebuildMapBake();
         }
 
         p.background( 24, 24, 28 );
 
-        if( typeof p.orbitControl === 'function' ) {
-          p.orbitControl( 2, 1, 1.5 );
-        }
-
-        if( cameraResetPending || vizDirty ) {
+        // Fit camera ONLY when requested — never on every vizDirty/kickRedraw
+        // (that was wiping orbitControl on robot/cube/face/map updates).
+        if( cameraResetPending || !cameraEverFitted3D ) {
           resetOrbitView();
           cameraResetPending = false;
+        }
+
+        // Apply user orbit/zoom after any one-shot fit so this frame can still drag
+        if( typeof p.orbitControl === 'function' ) {
+          p.orbitControl( 2, 1, 1.5 );
         }
 
         p.rotateY( kMapYaw3D );
@@ -1084,7 +1095,7 @@
     p.doubleClicked = function() {
       if( !mouseWithinCanvas() || quadTreeQuads.length === 0 ) { return true; }
       if( is3D && webglLive ) {
-        cameraResetPending = true;
+        requestCameraFit3D();
         kickRedraw();
         return false;
       }
@@ -1112,6 +1123,9 @@
       try { legendContainer.remove(); } catch( e3 ) {}
       legendContainer = undefined;
     }
+    // Next 3D sketch should get one default fit, then leave orbit alone
+    cameraEverFitted3D = false;
+    cameraResetPending = false;
   }
 
   function initializeSketch( elem ) {
@@ -1205,7 +1219,7 @@
 
     chkInvH.change( function() {
       invertHeight = $(this).is( ':checked' );
-      cameraResetPending = true;
+      requestCameraFit3D(); // up-vector changed
       kickRedraw();
     });
 
@@ -1244,17 +1258,16 @@
       is3D = want3D;
 
       if( is3D ) {
-        chkFaces.show();
-        $lblFaces.show();
         chkInvH.show();
         $lblInvH.show();
         elem.find( '.navMapWebGLError' ).remove();
       } else {
-        chkFaces.hide();
-        $lblFaces.hide();
         chkInvH.hide();
         $lblInvH.hide();
       }
+      // Faces checkbox stays available in both modes
+      chkFaces.show();
+      $lblFaces.show();
 
       // Tear down canvas; rebuild on next data (or immediately if we already have quads)
       destroySketch();
@@ -1263,7 +1276,7 @@
         // Rebuild immediately from cached map so toggle is snappy
         initializeSketch( elem );
         mapBakeDirty = true;
-        cameraResetPending = true;
+        requestCameraFit3D(); // new WEBGL context needs a default view once
         kickRedraw();
       } else if( !waitingOnData ) {
         timeTilAutoUpdate = kAutoUpdatePeriod_s;
@@ -1421,8 +1434,12 @@
         }
 
         mapBakeDirty = true;
-        cameraResetPending = true;
-        viewFitPending = true;
+        viewFitPending = true; // 2D re-fit extents only
+        // 3D: fit camera once per sketch / first map — not on every auto-update
+        // (resetting here made orbitControl snap back while rotating).
+        if( !cameraEverFitted3D ) {
+          requestCameraFit3D();
+        }
         kickRedraw();
         if( updateBtn ) { updateBtn.prop( 'disabled', autoUpdate ); }
         waitingOnData = false;
