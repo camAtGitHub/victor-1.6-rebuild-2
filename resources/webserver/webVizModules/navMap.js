@@ -432,7 +432,8 @@
       var $h = $host();
       var $chk = $h.find( '#navMap-chk3D' );
       if( $chk.length ) { $chk.prop( 'checked', false ); }
-      $h.find( '#navMap-chkFaces, label[for="navMap-chkFaces"]' ).hide();
+      // Faces stay available in 2D; only Flip view is 3D-only
+      $h.find( '#navMap-chkInvH, label[for="navMap-chkInvH"]' ).hide();
       showWebGLError( hostElem || $h );
     }
 
@@ -519,14 +520,14 @@
         tryAt( 0 );
       };
 
-      if( use3D && webglLive ) {
-        faceImg = null;
-        loadBitmap( 'face01.png', function( img ) { faceImg = img; } );
-      } else {
+      // Faces bitmap used in both modes; robot/cube sprites are 2D-only
+      faceImg = null;
+      loadBitmap( 'face01.png', function( img ) { faceImg = img; kickRedraw(); } );
+      if( !( use3D && webglLive ) ) {
         robotImg = null;
         cubeImg = null;
-        loadBitmap( 'robot.png', function( img ) { robotImg = img; } );
-        loadBitmap( 'cube.png',  function( img ) { cubeImg = img; } );
+        loadBitmap( 'robot.png', function( img ) { robotImg = img; kickRedraw(); } );
+        loadBitmap( 'cube.png',  function( img ) { cubeImg = img; kickRedraw(); } );
       }
 
       // Idle = no rAF spam (was causing Violation on 2D). Redraw on demand.
@@ -854,6 +855,45 @@
       }
     }
 
+    /** Top-down face markers (map XY only; z ignored in 2D). */
+    function drawFaces2D() {
+      if( !faceData ) { return; }
+      var faceSide = 18.0 * scaleFactor2D / scaleFactor2D0;
+      if( !isFinite( faceSide ) || faceSide < 4 ) { faceSide = 12; }
+      var hasTex = faceImg && faceImg.width > 1;
+
+      for( var faceId in faceData ) {
+        if( !faceData.hasOwnProperty( faceId ) ) { continue; }
+        var entry = faceData[faceId];
+        if( !entry || !entry.pose ) { continue; }
+        var facePose = entry.pose;
+        if( typeof facePose.x !== 'number' || typeof facePose.y !== 'number' ) { continue; }
+
+        p.push();
+        var x = scaleFactor2D * (0.001 * facePose.x - xOffset2D);
+        var y = scaleFactor2D * (0.001 * facePose.y - yOffset2D);
+        p.translate( x, y );
+        if( hasTex ) {
+          p.imageMode( p.CENTER );
+          try {
+            var euler = calcEuler( facePose.qW, facePose.qX, facePose.qY, facePose.qZ );
+            if( euler && isFinite( euler.z ) ) {
+              p.rotate( -euler.z );
+            }
+          } catch( e ) { /* ignore */ }
+          p.image( faceImg, 0, 0, faceSide, faceSide );
+        } else {
+          // Fallback marker if face01.png not loaded yet
+          p.noStroke();
+          p.fill( 120, 200, 255, 220 );
+          p.ellipse( 0, 0, faceSide, faceSide );
+          p.fill( 20, 30, 40 );
+          p.ellipse( 0, 0, faceSide * 0.35, faceSide * 0.35 );
+        }
+        p.pop();
+      }
+    }
+
     function fitView2D() {
       var scaleX = (dataExtentsInfo.maxX - dataExtentsInfo.minX) / (kCanvasWidth  - 2 * kInitialMargin);
       var scaleY = (dataExtentsInfo.maxY - dataExtentsInfo.minY) / (kCanvasHeight - 2 * kInitialMargin);
@@ -938,6 +978,7 @@
 
       if( shouldDrawRobot ) { drawRobot2D(); }
       if( shouldDrawCubes ) { drawCubes2D(); }
+      if( shouldDrawFaces ) { drawFaces2D(); }
       vizDirty = false;
     };
 
@@ -1153,13 +1194,14 @@
     var $lblFaces = $toolbar.find( 'label[for="navMap-chkFaces"]' );
     var $lblInvH  = $toolbar.find( 'label[for="navMap-chkInvH"]' );
 
-    // Faces / invert-height only in 3D
+    // Faces work in 2D and 3D; Flip view is 3D-only
     if( !is3D ) {
-      chkFaces.hide();
-      $lblFaces.hide();
       chkInvH.hide();
       $lblInvH.hide();
     }
+    // Ensure faces control is visible (re-show if a prior forceIs2D hid it)
+    chkFaces.show();
+    $lblFaces.show();
 
     chkInvH.change( function() {
       invertHeight = $(this).is( ':checked' );
