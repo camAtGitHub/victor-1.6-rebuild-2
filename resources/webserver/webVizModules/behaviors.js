@@ -99,13 +99,28 @@
     document.body.removeChild(elem);
   };
 
+  // Unique key for a flat tree row. Must match merge + stratify identity so the same
+  // behaviorID under different parents never collides (d3.stratify requires unique ids).
+  function flatNodeKey(d) {
+    var parentPart = (d.parent == null) ? '' : String(d.parent);
+    return String(d.behaviorID) + '\x1f' + parentPart;
+  }
+
   function clearDisplay() {
     flatData = undefined;
     treeData = undefined;
+    cachedTreeData = undefined;
+    hasPendingUpdates = false;
+    if( typeof svgGroups.rowGroup === 'undefined' ) {
+      return;
+    }
     svgGroups.rowGroup.selectAll('*').remove();
     svgGroups.labelGroup.selectAll('*').remove();
     svgGroups.timeBarsGroup.selectAll('.timeBar').remove();
     svgGroups.zoomGroup.selectAll('.miniTimeBar').remove();
+    if( hostSvg ) {
+      hostSvg.attr('height', 0);
+    }
   }
 
   function sendBehavior(behaviorName, presetConditions) {
@@ -115,10 +130,14 @@
   }
 
   function addControls(data, container) {
+    if( !Array.isArray(data) ) {
+      return;
+    }
+    data = data.slice().map(function(item) { return String(item); });
     data.sort();
     // create if needed, then populate a dropdown with behaviorIDs,
     // and when the user selects one, tell the engine to start that behavior
-    var dropDown = $('#behaviorDropdown');
+    var dropDown = $(container).find('#behaviorDropdown');
     if( dropDown.length == 0 ) {
       dropDown = $('<select></select>', {id: 'behaviorDropdown'}).appendTo(container);
       dropDown.change(function() {
@@ -126,8 +145,12 @@
           sendBehavior(this.value, false); // just default to false so they try it normally
         }
       });
-      $('<button type"button" id="resend">Resend</button>').click( function() {
-        sendBehavior($('#behaviorDropdown')[0].value, $('#presetConditions').is(':checked'));
+      $('<button type="button" id="resend">Resend</button>').click( function() {
+        var sel = $(container).find('#behaviorDropdown')[0];
+        var preset = $(container).find('#presetConditions').is(':checked');
+        if( sel && sel.value ) {
+          sendBehavior(sel.value, preset);
+        }
       }).appendTo(container);
       $('<input type="checkbox" id="presetConditions" />').appendTo(container);
       $('<label for="presetConditions">Force</label>').appendTo(container);
@@ -393,6 +416,8 @@
   var tree = d3.tree().nodeSize([0, 30]) //Invokes tree
   var params = {};
   var svgGroups = {};
+  var hostElem = null;  // module host (#tab-behaviors)
+  var hostSvg = null;   // d3 selection of this module's <svg>
   var activeFeatureDiv;
   var currentBehaviorDiv;
   var currentBehaviorStateDiv;
@@ -408,11 +433,16 @@
     
 
   function update(source) {
+    // Guard: empty stack / clearDisplay leaves no hierarchy; never touch global D3.
+    if( !source || typeof svgGroups.rowGroup === 'undefined' || !hostSvg ) {
+      return;
+    }
+
     // Compute the flattened node list. TODO use d3.layout.hierarchy.
     nodes = tree(source); //returns a single node with the properties of d3.tree()
     nodesSort = [];
 
-    d3.select('svg')
+    hostSvg
       .transition()
       .duration(params.duration); //transition to make svg looks smoother
 
@@ -515,7 +545,8 @@
     });
 
     maxLabelWidth = 190;
-    d3.selectAll('.labelGroup text')
+    // Scope to this module's label group (not document-global .labelGroup text)
+    svgGroups.labelGroup.selectAll('text')
       .each(function(d) {
         maxLabelWidth = Math.max(maxLabelWidth, 10+ d.y + this.getComputedTextLength());
       });
@@ -641,7 +672,7 @@
 
     // calc and set parent svg height
     layerOffset += miniBarSpacing*nodesSort.length + 50;
-    d3.select('svg')
+    hostSvg
       .attr('height', layerOffset);
 
   }
@@ -685,15 +716,18 @@
     params.pathOffset = 10;
     params.barHeight = 30;
 
-    $('<h4>Usage: Move your mouse around the main window to see active behaviors and the times they were active. You may also drag your cursor in the bottom window to zoom in on a particular period of time. Click in the same box to zoom out. Zooming will pause live updates, so you should toggle the switch on the left when you\'re done.</h3>').appendTo( elem );
+    hostElem = elem;
+
+    $('<h4>Usage: Move your mouse around the main window to see active behaviors and the times they were active. You may also drag your cursor in the bottom window to zoom in on a particular period of time. Click in the same box to zoom out. Zooming will pause live updates, so you should toggle the switch on the left when you\'re done.</h4>').appendTo( elem );
     
     activeFeatureDiv = $('<h3 id="activeFeature"></h3>').appendTo( elem );
     currentBehaviorDiv = $('<h3 id="currentBehavior"></h3>').appendTo( elem );
     currentBehaviorStateDiv = $('<h3 id="currentBehaviorDebugState"></h3>').appendTo( elem );
 
-    var svg = d3.select(elem)
+    hostSvg = d3.select(elem)
                 .append('svg')
-                .attr('width', params.frameWidth + params.margin.right + params.margin.left)
+                .attr('width', params.frameWidth + params.margin.right + params.margin.left);
+    var svg = hostSvg
                 .append('g')
                 .attr('transform', 'translate(' + params.margin.left + ',' + params.margin.top + ')');
 
@@ -810,64 +844,173 @@
   }; // end init
 
   myMethods.onData = function(allData, elem) {
+    // Never throw on null / unexpected payload shapes (shell surfaces module errors as toasts).
+    if( allData == null ) {
+      return;
+    }
 
-    if( (typeof allData.tree === 'undefined') &&
-        (typeof allData.debugState === 'undefined') &&
-        (typeof allData.activeFeature === 'undefined') ) {
-      // currently the only other option a list of behaviors
+    // Force-run list: array of behavior name strings
+    if( Array.isArray(allData) ) {
       addControls( allData, elem );
       return;
     }
-    else if( typeof allData.debugState !== 'undefined' &&
-             typeof currentBehaviorStateDiv !== 'undefined' ) {
-      currentBehaviorStateDiv.text('Latest state: ' + allData.debugState);
-      return;
-    }
-    else if( typeof allData.activeFeature !== 'undefined' &&
-             typeof activeFeatureDiv !== 'undefined' ) {
-      activeFeatureDiv.text('Active feature: ' + allData.activeFeature);
+
+    if( typeof allData !== 'object' ) {
       return;
     }
 
-    if( !allData.stack || allData.stack.length == 0 ) {
-      currentBehaviorDiv.text( 'No running behavior' )
-      flatData = undefined;
-      treeData = undefined;
+    if( typeof allData.debugState !== 'undefined' ) {
+      if( typeof currentBehaviorStateDiv !== 'undefined' ) {
+        currentBehaviorStateDiv.text('Latest state: ' + allData.debugState);
+      }
       return;
     }
 
-    cachedTime = allData.time;
-    var stack = allData.stack;
+    if( typeof allData.activeFeature !== 'undefined' ) {
+      if( typeof activeFeatureDiv !== 'undefined' ) {
+        activeFeatureDiv.text('Active feature: ' + allData.activeFeature);
+      }
+      return;
+    }
 
+    // Tree/stack snapshot (or unknown non-array object without tree/stack — ignore)
+    var hasTree = Array.isArray(allData.tree);
+    var hasStack = Array.isArray(allData.stack);
+    if( !hasTree && !hasStack ) {
+      // Legacy: some producers may still send a bare object that isn't a known shape.
+      // Only treat plain string lists via Array.isArray above; ignore anything else.
+      return;
+    }
+
+    var stack = hasStack ? allData.stack : [];
+
+    if( !stack.length ) {
+      if( typeof currentBehaviorDiv !== 'undefined' ) {
+        currentBehaviorDiv.text( 'No running behavior' );
+      }
+      // Clear stale SVG (previously only nulled data and left bars on screen)
+      clearDisplay();
+      return;
+    }
+
+    if( !hasTree ) {
+      // Stack without tree: still update leaf label; skip hierarchy rebuild
+      if( typeof currentBehaviorDiv !== 'undefined' ) {
+        currentBehaviorDiv.text( 'Current behavior: ' + stack[stack.length - 1] );
+      }
+      return;
+    }
+
+    if( typeof allData.time === 'number' && isFinite(allData.time) ) {
+      cachedTime = allData.time;
+    }
+
+    // Merge incoming tree rows into flatData using the same unique key as stratify
     if( typeof cachedTreeData === 'undefined'
         || typeof flatData === 'undefined' ) {
-      flatData = allData.tree;
+      flatData = allData.tree.slice();
     } else {
       for( var i=0; i<allData.tree.length; ++i ) {
-        var elem = allData.tree[i];
+        var row = allData.tree[i];
+        if( !row || typeof row.behaviorID === 'undefined' ) {
+          continue;
+        }
+        var key = flatNodeKey(row);
         var idx = flatData.findIndex(function(d) {
-          return ((d.behaviorID+d.parent) == (elem.behaviorID+elem.parent));
+          return flatNodeKey(d) === key;
         });
         if( idx < 0 ) {
-          flatData.push( elem );
+          flatData.push( row );
         }
       }
     }
 
-    cachedTreeData = d3.stratify()
-                       .id(function(d) { return d.behaviorID; })
-                       .parentId(function(d) { return d.parent; })
-                       (flatData);
+    // Map behaviorID → unique stratify id so parentId can resolve when the same
+    // behaviorID appears under multiple parents (last write wins — recent merge).
+    var idByBehaviorID = {};
+    for( var j=0; j<flatData.length; ++j ) {
+      var fd = flatData[j];
+      if( fd && typeof fd.behaviorID !== 'undefined' ) {
+        idByBehaviorID[fd.behaviorID] = flatNodeKey(fd);
+      }
+    }
+
+    // Drop orphan rows whose parentId would not resolve (stratify throws otherwise).
+    // Prefer the current stack root when history has accumulated multiple roots
+    // (e.g. after stack front changes without a force-run clear).
+    var stackRoot = stack[0];
+    var stratifyInput = flatData.filter(function(d) {
+      if( !d || typeof d.behaviorID === 'undefined' ) {
+        return false;
+      }
+      if( d.parent == null ) {
+        return d.behaviorID === stackRoot;
+      }
+      return typeof idByBehaviorID[d.parent] !== 'undefined';
+    });
+
+    // If stack root row is missing from history, fall back to any single null-parent row
+    var hasRoot = stratifyInput.some(function(d) { return d.parent == null; });
+    if( !hasRoot ) {
+      for( var ri = flatData.length - 1; ri >= 0; --ri ) {
+        if( flatData[ri] && flatData[ri].parent == null && typeof flatData[ri].behaviorID !== 'undefined' ) {
+          stratifyInput.push( flatData[ri] );
+          idByBehaviorID[flatData[ri].behaviorID] = flatNodeKey(flatData[ri]);
+          hasRoot = true;
+          break;
+        }
+      }
+    }
+
+    // Rebuild parent map from the filtered set, then drop rows whose parent was filtered out
+    if( hasRoot ) {
+      idByBehaviorID = {};
+      for( var k = 0; k < stratifyInput.length; ++k ) {
+        var sd = stratifyInput[k];
+        idByBehaviorID[sd.behaviorID] = flatNodeKey(sd);
+      }
+      stratifyInput = stratifyInput.filter(function(d) {
+        if( d.parent == null ) {
+          return true;
+        }
+        return typeof idByBehaviorID[d.parent] !== 'undefined';
+      });
+    }
+
+    if( !stratifyInput.length || !hasRoot ) {
+      return;
+    }
+
+    var newTree;
+    try {
+      newTree = d3.stratify()
+                  .id(function(d) { return flatNodeKey(d); })
+                  .parentId(function(d) {
+                    if( d.parent == null ) {
+                      return null;
+                    }
+                    return idByBehaviorID[d.parent];
+                  })
+                  (stratifyInput);
+    } catch( err ) {
+      // Keep prior viz; do not rethrow (shell would toast/alert)
+      if( typeof console !== 'undefined' && console.warn ) {
+        console.warn('behaviors: stratify failed', err);
+      }
+      return;
+    }
+    cachedTreeData = newTree;
     
     // always update the current behavior, even if the toggle for live updates is off
-    if( stack.length && (typeof currentBehaviorDiv !== 'undefined') ) {
+    if( typeof currentBehaviorDiv !== 'undefined' ) {
       var newText = 'Current behavior: ' + stack[stack.length - 1];
       if( newText != currentBehaviorDiv.text() ) {
-        currentBehaviorStateDiv.text();
+        // Clear debug-state line on behavior change (previously text() with no args was a no-op read)
+        if( typeof currentBehaviorStateDiv !== 'undefined' ) {
+          currentBehaviorStateDiv.text('');
+        }
       }
-      currentBehaviorDiv.text( newText )
-    } else if( typeof currentBehaviorDiv !== 'undefined' ) {
-      currentBehaviorDiv.text( 'No running behavior' )
+      currentBehaviorDiv.text( newText );
     }
 
     // always set the minTime if it hasnt been yet
