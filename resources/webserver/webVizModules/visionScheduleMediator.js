@@ -42,6 +42,39 @@
     return $host().find( '#vsmCanvas' )[0] || null;
   }
 
+  /**
+   * Engine vs anim is the *data feed* port, not location.port.
+   * Dev PC often serves HTML on :9876 while WebSocket targets robot :8888
+   * (WebViz.connect / ?host=&port=). location.port alone is wrong there.
+   */
+  function isEngineFeed() {
+    try {
+      if( window.WebVizConfig && typeof window.WebVizConfig.resolveFeed === 'function' ) {
+        var feed = window.WebVizConfig.resolveFeed();
+        if( feed && feed.port != null && String( feed.port ) !== '' ) {
+          return String( feed.port ) === '8888';
+        }
+      }
+    } catch( e ) {}
+    // Query ?port=8888 when shell helpers unavailable
+    try {
+      var q = ( window.location.search || '' ).match( /(?:^|[?&])port=([^&]*)/ );
+      if( q && q[1] ) {
+        return decodeURIComponent( q[1] ) === '8888';
+      }
+    } catch( e2 ) {}
+    // Classic: page served by engine process itself
+    if( String( window.location.port ) === '8888' ) {
+      return true;
+    }
+    // Module is only registered on the engine set in the new shell — if we
+    // got here without a clear anim port, allow init rather than false-block.
+    if( String( window.location.port ) === '8889' ) {
+      return false;
+    }
+    return true;
+  }
+
   function drawVisionScheduleGrid(rows, cols) {
     var canvas = canvasEl();
     if( !canvas ) { return; }
@@ -69,8 +102,10 @@
   myMethods.init = function(elem) {
     setHost( elem );
 
-    if( location.port != '8888' ) {
-      $('<h3>You must use this tab with the engine process (port 8888)</h3>').appendTo(elem);
+    if( !isEngineFeed() ) {
+      $('<h3>You must use this tab with the engine process (feed port 8888). ' +
+        'If this page is on your PC, set Robot feed / WebViz.connect to the robot engine, ' +
+        'or open <code>?port=8888</code>.</h3>').appendTo(elem);
       return;
     }
 
