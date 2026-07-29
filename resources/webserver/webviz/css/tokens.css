@@ -1,0 +1,80 @@
+/* WebViz design tokens — dense developer-ops host shell.
+   Content area stays neutral so module-owned UI (Flot/D3/DataTables)
+   can render without fighting freeplay-demo chrome. */
+
+:root {
+  /* Surfaces */
+  --wv-bg: #0c0f14;
+  --wv-bg-elev: #12161e;
+  --wv-bg-panel: #161b24;
+  --wv-bg-hover: #1c2330;
+  --wv-bg-active: #222a3a;
+  --wv-bg-input: #0e1218;
+
+  /* Lines */
+  --wv-line: #2a3344;
+  --wv-line-soft: #1e2533;
+  --wv-line-strong: #3a465c;
+
+  /* Text */
+  --wv-text: #e8edf5;
+  --wv-text-dim: #8b95a8;
+  --wv-text-faint: #5c667a;
+  --wv-text-inv: #0a0c10;
+
+  /* Accents / status */
+  --wv-accent: #5b9fd4;
+  --wv-accent-dim: rgba(91, 159, 212, 0.14);
+  --wv-accent-strong: #7ab8e8;
+  --wv-good: #3ecf8e;
+  --wv-good-dim: rgba(62, 207, 142, 0.12);
+  --wv-warn: #e6b450;
+  --wv-warn-dim: rgba(230, 180, 80, 0.12);
+  --wv-bad: #f07178;
+  --wv-bad-dim: rgba(240, 113, 120, 0.12);
+  --wv-violet: #c792ea;
+  --wv-violet-dim: rgba(199, 146, 234, 0.12);
+
+  /* Module content surface (slightly lifted so charts read cleanly) */
+  --wv-content-bg: #ededed;
+  --wv-content-text: #1a1d24;
+  --wv-content-line: #c5cad3;
+
+  /* Type */
+  --wv-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --wv-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+
+  /* Geometry */
+  --wv-radius: 8px;
+  --wv-radius-sm: 6px;
+  --wv-radius-pill: 999px;
+  --wv-top-h: 48px;
+  --wv-status-h: 28px;
+  --wv-nav-w: 220px;
+  --wv-nav-w-collapsed: 52px;
+  --wv-space-1: 4px;
+  --wv-space-2: 8px;
+  --wv-space-3: 12px;
+  --wv-space-4: 16px;
+  --wv-space-5: 24px;
+
+  /* Motion */
+  --wv-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --wv-dur: 180ms;
+  --wv-dur-fast: 120ms;
+
+  /* Elevation */
+  --wv-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --wv-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --wv-z-nav: 20;
+  --wv-z-top: 30;
+  --wv-z-toast: 100;
+  --wv-z-modal: 90;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --wv-dur: 0ms;
+    --wv-dur-fast: 0ms;
+  }
+}
