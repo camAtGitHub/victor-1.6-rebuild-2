@@ -131,11 +131,12 @@
       }
       if( !tableBody.length ) { return; }
 
-      tableBody.empty();
       if( !Array.isArray(data) ) {
         console.warn( 'features: expected array payload' );
         return;
       }
+
+      tableBody.empty();
 
       var rows = data.slice();
       rows.sort(function(a, b){
