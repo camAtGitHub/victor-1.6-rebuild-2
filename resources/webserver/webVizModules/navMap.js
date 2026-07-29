@@ -3,86 +3,98 @@
  *  ross
  *  april 13 2018
  *  Copyright Anki, Inc. 2018
+ *
+ *  2026: orbit camera, 3D rendering fixes, data-path bugfixes
  */
 
 (function(myMethods, sendData) {
 
   // for debugging:
   var dumpInput = false; // print all input the engine sends
-  var showFakeDataUponDisconnect = false; 
+  var showFakeDataUponDisconnect = false;
 
+  // Y-flip origin used so screen left/right matches robot left/right
   var kArbitraryXAxis = 5000; // mm
+  var kArbitraryXAxis_m = kArbitraryXAxis * 0.001; // meters
 
-  // helper classes
+  // ---------- math helpers ----------
+
   function Vector( x, y, z ) {
-    this.x = 1.0*x;
-    this.y = 1.0*y;
-    this.z = 1.0*z;
-    this.clone = function() {
-      return new Vector( this.x, this.y, this.z );
-    }
-    this.getLength = function() {
-      return Math.sqrt( this.x*this.x + this.y*this.y + this.z*this.z );
-    }
-    this.makeUnitLength = function() {
-      var length = this.getLength();
-      this.x = length == 0.0 ? 0.0 : this.x/length;
-      this.y = length == 0.0 ? 0.0 : this.y/length;
-      this.z = length == 0.0 ? 0.0 : this.z/length;
-      return this;
-    }
-    this.cross = function( v ) {
-      return new Vector( this.y*v.z - this.z*v.y, this.z*v.x - this.x*v.z, this.x*v.y - this.y*v.x  );
-    }
-    this.dot = function( v ) {
-      return this.x*v.x + this.y*v.y + this.z*v.z;
-    }
-    this.getScaled = function(a) {
-      return this.clone().scale(a);
-    }
-    this.getAfterAdd = function(v) {
-      return this.clone().add(v);
-    }
-    this.scale = function(a) {
-      this.x *= a;
-      this.y *= a;
-      this.z *= a;
-      return this;
-    }
-    this.add = function(v) {
-      this.x += v.x;
-      this.y += v.y;
-      this.z += v.z;
-      return this;
-    }
-    this.getRotatedAbout = function(u, theta) {
-      var unitThis = this.clone().makeUnitLength();
-      var length = this.getLength();
-      var cosTheta = Math.cos( theta );
-      var sinTheta = Math.sin( theta );
-      var c1 = unitThis.getScaled( cosTheta );
-      var c2 = u.getScaled( u.dot( unitThis )*(1.0-cosTheta) );
-      var c3 = u.cross( unitThis ).scale( sinTheta );
-      return c1.add( c2.add( c3 ) ).scale( length );
-    }
+    this.x = 1.0 * x;
+    this.y = 1.0 * y;
+    this.z = 1.0 * z;
   }
-  function Point(x,y) {
+  Vector.prototype.clone = function() {
+    return new Vector( this.x, this.y, this.z );
+  };
+  Vector.prototype.getLength = function() {
+    return Math.sqrt( this.x*this.x + this.y*this.y + this.z*this.z );
+  };
+  Vector.prototype.makeUnitLength = function() {
+    var length = this.getLength();
+    if( length === 0.0 ) {
+      this.x = 0.0; this.y = 0.0; this.z = 0.0;
+    } else {
+      this.x /= length; this.y /= length; this.z /= length;
+    }
+    return this;
+  };
+  Vector.prototype.cross = function( v ) {
+    return new Vector(
+      this.y*v.z - this.z*v.y,
+      this.z*v.x - this.x*v.z,
+      this.x*v.y - this.y*v.x
+    );
+  };
+  Vector.prototype.dot = function( v ) {
+    return this.x*v.x + this.y*v.y + this.z*v.z;
+  };
+  Vector.prototype.getScaled = function( a ) {
+    return this.clone().scale( a );
+  };
+  Vector.prototype.getAfterAdd = function( v ) {
+    return this.clone().add( v );
+  };
+  Vector.prototype.scale = function( a ) {
+    this.x *= a; this.y *= a; this.z *= a;
+    return this;
+  };
+  Vector.prototype.add = function( v ) {
+    this.x += v.x; this.y += v.y; this.z += v.z;
+    return this;
+  };
+  Vector.prototype.sub = function( v ) {
+    this.x -= v.x; this.y -= v.y; this.z -= v.z;
+    return this;
+  };
+
+  function Point( x, y ) {
     this.x = x;
     this.y = y;
   }
-  function Color(r,g,b,a) {
+
+  function Color( r, g, b, a ) {
     this.r = r;
     this.g = g;
     this.b = b;
-    if( typeof a === 'undefined' ) {
-      this.a = 255;
-    }
-    else {
-      this.a = a;
-    }
+    this.a = (typeof a === 'undefined') ? 255 : a;
   }
 
-  // dom vars and methods
+  // Flip world Y so viz left/right matches robot left/right (consistent mm/m).
+  function flipY_mm( yMm ) { return kArbitraryXAxis - yMm; }
+  function flipY_m( yM )   { return kArbitraryXAxis_m - yM; }
+
+
+  // webviz (2018) may pass a raw DOM node or a jQuery object
+  function asJq( el ) {
+    if( !el ) { return $(); }
+    if( el.jquery ) { return el; }           // already jQuery
+    if( typeof el === 'string' ) { return $(el); }
+    return $(el);                             // HTMLElement / Document
+  }
+
+
+  // ---------- DOM / session state ----------
 
   var updateBtn;
   var canvasContainer;
@@ -91,26 +103,33 @@
   var autoUpdate = false;
   var waitingOnData = false;
   var is3D = false;
+  // p5 WEBGL needs the camera up-vector flipped for a correct tabletop view.
+  // "Flip view" checkbox; default on (confirmed correct for this stack).
+  var invertHeight = true;
+  // Fixed yaw so default 3D view matches 2D orientation.
+  // -90° was the correct direction; another -90° squares it up (−180° total).
+  var kMapYaw3D = -Math.PI;
 
   function callUpdate() {
     waitingOnData = true;
-    updateBtn.prop( 'disabled', true );
-    var payload = { 'update' : true };
-    sendData( payload );
-    if( $('#status').length && 
+    if( updateBtn ) {
+      updateBtn.prop( 'disabled', true );
+    }
+    sendData( { 'update': true } );
+    if( $('#status').length &&
         ($('#status').text() != "Connected") &&
-        showFakeDataUponDisconnect && 
-        (typeof noteDiv !== 'undefined') ) 
+        showFakeDataUponDisconnect &&
+        (typeof noteDiv !== 'undefined') )
     {
-        noteDiv.text('DISCONNECTED: DISPLAYING FAKE DATA');
-        fakeData();
+      noteDiv.text( 'DISCONNECTED: DISPLAYING FAKE DATA' );
+      fakeData();
     }
   }
 
-  // quadtree/robot/objects data and methods
+  // ---------- quadtree / robot / objects ----------
 
-  var memoryMapQuadInfoVectorMapIncoming = {}; // map from {origin => map of {sequence # => list of quads}}
-  var memoryMapInfo = {}; // map from {origin => map info}
+  var memoryMapQuadInfoVectorMapIncoming = {}; // origin => { seqNum => quads }
+  var memoryMapInfo = {}; // origin => map info
   var quadTreeQuads = [];
   var dataExtentsInfo = {};
   var cubeData;
@@ -122,6 +141,7 @@
     this.sideSize = sideSize;
     this.color = color;
   }
+
   function getQuadColor( content ) {
     var color = new Color( 0, 0, 0 );
     switch( content )
@@ -137,9 +157,10 @@
       case 'Cliff'                  : { color = new Color(   0,   0,   0, 204 ); break; } // BLACK     alpha=0.8
       case 'InterestingEdge'        : { color = new Color( 255,   0, 255, 127 ); break; } // MAGENTA   alpha=0.5
       case 'NotInterestingEdge'     : { color = new Color( 255,  20, 148, 204 ); break; } // PINK      alpha=0.8
-    };
+    }
     return color;
   }
+
   // duplicates the code in physVizController
   function MemoryMapNode( depth, size_m, center ) {
     this.depth = depth;
@@ -150,685 +171,1019 @@
 
     this.AddChild = function( destSimpleQuads, extentsInfo, content, depth ) {
       if( this.depth == depth ) {
+        var half = 0.5 * this.size_m;
         var color = getQuadColor( content );
-        if( this.center.x - 0.5*size_m < extentsInfo.minX ) {
-          extentsInfo.minX = this.center.x - 0.5*size_m;
-        }
-        if( this.center.x + 0.5*size_m > extentsInfo.maxX ) {
-          extentsInfo.maxX = this.center.x + 0.5*size_m;
-        }
-        if( this.center.y - 0.5*size_m < extentsInfo.minY ) {
-          extentsInfo.minY = this.center.y - 0.5*size_m;
-        }
-        if( this.center.y + 0.5*size_m > extentsInfo.maxY ) {
-          extentsInfo.maxY = this.center.y + 0.5*size_m;
-        }
+        if( this.center.x - half < extentsInfo.minX ) { extentsInfo.minX = this.center.x - half; }
+        if( this.center.x + half > extentsInfo.maxX ) { extentsInfo.maxX = this.center.x + half; }
+        if( this.center.y - half < extentsInfo.minY ) { extentsInfo.minY = this.center.y - half; }
+        if( this.center.y + half > extentsInfo.maxY ) { extentsInfo.maxY = this.center.y + half; }
         destSimpleQuads.push( new SimpleQuad( this.center, this.size_m, color ) );
         return true;
       }
-      
-      if( this.children.length == 0 ) {
+
+      if( this.children.length === 0 ) {
         var nextDepth = this.depth - 1;
         var nextSize = this.size_m * 0.5;
         var offset = nextSize * 0.5;
 
-        var center1 = new Point( this.center.x + offset, this.center.y + offset );
-        var center2 = new Point( this.center.x + offset, this.center.y - offset );
-        var center3 = new Point( this.center.x - offset, this.center.y + offset );
-        var center4 = new Point( this.center.x - offset, this.center.y - offset );
-        
-        this.children.push( new MemoryMapNode( nextDepth, nextSize, center1 ) );
-        this.children.push( new MemoryMapNode( nextDepth, nextSize, center2 ) );
-        this.children.push( new MemoryMapNode( nextDepth, nextSize, center3 ) );
-        this.children.push( new MemoryMapNode( nextDepth, nextSize, center4 ) );
+        this.children.push( new MemoryMapNode( nextDepth, nextSize, new Point( this.center.x + offset, this.center.y + offset ) ) );
+        this.children.push( new MemoryMapNode( nextDepth, nextSize, new Point( this.center.x + offset, this.center.y - offset ) ) );
+        this.children.push( new MemoryMapNode( nextDepth, nextSize, new Point( this.center.x - offset, this.center.y + offset ) ) );
+        this.children.push( new MemoryMapNode( nextDepth, nextSize, new Point( this.center.x - offset, this.center.y - offset ) ) );
       }
-      
-      if( this.children[this.nextChild].AddChild( destSimpleQuads, extentsInfo, content, depth) ) {
-        // All children below this child have been processed
+
+      if( this.children[this.nextChild].AddChild( destSimpleQuads, extentsInfo, content, depth ) ) {
         ++this.nextChild;
       }
-      
+
       return (this.nextChild > 3);
+    };
+  }
+
+
+  /** True if this browser can create a WebGL context (software OK). */
+  function webglAvailable() {
+    try {
+      var canvas = document.createElement( 'canvas' );
+      var attrs = { alpha: true, failIfMajorPerformanceCaveat: false };
+      var gl = canvas.getContext( 'webgl', attrs ) ||
+               canvas.getContext( 'experimental-webgl', attrs );
+      if( !gl ) { return false; }
+      // Free the test context so we don't exhaust driver slots
+      var lose = gl.getExtension && gl.getExtension( 'WEBGL_lose_context' );
+      if( lose ) { lose.loseContext(); }
+      return true;
+    } catch( e ) {
+      return false;
     }
   }
 
-  // viz vars and methods
+  function showWebGLError( parentElem ) {
+    var msg = '3D unavailable: this browser could not create a WebGL context ' +
+              '(no GPU / driver, remote session, or WebGL disabled). Staying in 2D.';
+    console.warn( 'navMap: ' + msg );
+    var $parent = asJq( parentElem );
+    if( $parent.length ) {
+      $parent.find( '.navMapWebGLError' ).remove();
+      $('<div class="navMapWebGLError"></div>')
+        .text( msg )
+        .css({
+          color: '#f66',
+          background: '#2a1515',
+          border: '1px solid #633',
+          padding: '8px 10px',
+          margin: '8px 0',
+          fontSize: '12px',
+          maxWidth: '700px'
+        })
+        .prependTo( $parent );
+    }
+  }
+
+  // ---------- viz ----------
+
   var myp5;
   var vizDirty = false;
+  var mapBakeDirty = true; // rebuild top-down map texture when quads change
+  var cameraResetPending = false; // one-shot 3D camera fit after data / mode change
+
+  /** Schedule a paint without spinning requestAnimationFrame forever. */
+  function kickRedraw() {
+    vizDirty = true;
+    if( myp5 && typeof myp5.redraw === 'function' ) {
+      try { myp5.redraw(); } catch( e ) {}
+    }
+  }
   var shouldDrawRobot = true;
   var shouldDrawCubes = true;
   var shouldDrawFaces = false;
-  var kKnownTypes = ['Unknown','ClearOfObstacle','ClearOfCliff','ObstacleCube','ObstacleCharger','ObstacleProx','ObstacleProxExplored','ObstacleUnrecognized','Cliff','InterestingEdge','NotInterestingEdge'];
-  
+  var kKnownTypes = [
+    'Unknown','ClearOfObstacle','ClearOfCliff','ObstacleCube','ObstacleCharger',
+    'ObstacleProx','ObstacleProxExplored','ObstacleUnrecognized','Cliff',
+    'InterestingEdge','NotInterestingEdge'
+  ];
+
+  /**
+   * 3D uses p5's native Y-up space + orbitControl (no custom camera()).
+   * Custom camera() with a near-vertical lookAt was flipping the view into a "ceiling".
+   *
+   *   p5X = mapX - originX
+   *   p5Y = mapZ  (height, +Y = up / sky)
+   *   p5Z = mapY - originY
+   */
+  function mapOriginMm() {
+    if( typeof dataExtentsInfo.minX === 'undefined' ) {
+      return { x: 0, y: 0 };
+    }
+    return {
+      x: 0.5 * (dataExtentsInfo.minX + dataExtentsInfo.maxX) * 1000,
+      y: 0.5 * (dataExtentsInfo.minY + dataExtentsInfo.maxY) * 1000
+    };
+  }
+
   var sketch = function( p ) {
-    var kCanvasWidth = 700; // note: container is ~800
+    var kCanvasWidth = 700;  // note: container is ~800
     var kCanvasHeight = 600;
     var kInitialMargin = 50; // padding on either side for initial draw
-    var kDataScaleFactor = 1000; // 1 mm resolution in 3d (this is auto calculated in 2d)
-    var kFovAngle = Math.PI / 3; // the default for p5, but repeated here bc it's used in calculations
-    // needs different colors in 2d and 3d bc of transparency rendering
-    var kQuadBorderColor3D = p.color('rgba(255,255,255,0.5)');
-    var kQuadBorderColor2D = p.color('rgba(255,255,255,0.1)');
-
-    function Camera(x,y,z,a,b,c,p,q,r) {
-      // camera pos
-      this.x=x;
-      this.y=y;
-      this.z=z;
-      // subject pos
-      this.a=a;
-      this.b=b;
-      this.c=c;
-      // components of up vector
-      this.p=p;
-      this.q=q;
-      this.r=r;
-      this.clone = function() {
-        return new Camera( this.x, this.y, this.z, this.a, this.b, this.c, this.p, this.q, this.r );
-      }
-      this.getLookVector = function() {
-        return new Vector( this.a - this.x, this.b - this.y, this.c - this.z );
-      }
-      this.getUpVector = function() {
-        return new Vector( this.p, this.q, this.r );
-      }
-      // translate the camera position and subject position by v
-      this.move = function( v ) {
-        this.x += v.x;
-        this.y += v.y;
-        this.z += v.z;
-        this.a += v.x;
-        this.b += v.y;
-        this.c += v.z;
-      }
-      // rotate the camera around vector (p,q,r) originating from (x,y,z) by amount a
-      this.rotateAbout = function( x, y, z, rotAxis, a ) {
-        var upVec = new Vector( this.p, this.q, this.r );
-        var cameraVec = new Vector( this.x - x, this.y - y, this.z - z );
-        var lookVec = this.getLookVector();
-        // rotate
-        lookVec = lookVec.getRotatedAbout( rotAxis, a );
-        cameraVec = cameraVec.getRotatedAbout( rotAxis, a );
-        upVec = upVec.getRotatedAbout( rotAxis, a );
-        // set the new params
-        this.x = x + cameraVec.x;
-        this.y = y + cameraVec.y;
-        this.z = z + cameraVec.z;
-        this.a = this.x + lookVec.x;
-        this.b = this.y + lookVec.y;
-        this.c = this.z + lookVec.z;
-        this.p = upVec.x;
-        this.q = upVec.y;
-        this.r = upVec.z;
-      }
-      // rotate by some right/left amount, up/down amount, keeping the camera center in place
-      this.rotate = function( x, y ) {
-        var up = new Vector( this.p, this.q, this.r );
-        var to = this.getLookVector().makeUnitLength();
-        var upHat = up.clone().makeUnitLength();
-        var toHat = to.clone().makeUnitLength();
-        var rightHat = toHat.cross( upHat );
-        var rotAxis = rightHat.getScaled( y ).getAfterAdd( upHat.getScaled( x ) );
-        rotAxis.makeUnitLength();
-        // rotate the vector looking outward from the camera 
-        var theta = Math.sqrt( x*x + y*y ) * Math.PI / 10;
-        var newTo = to.getRotatedAbout( rotAxis, theta );
-        this.a = this.x + newTo.x;
-        this.b = this.y + newTo.y;
-        this.c = this.z + newTo.z;
-        // rotate the up vector
-        var newUp = up.getRotatedAbout( rotAxis, theta );
-        this.p = newUp.x;
-        this.q = newUp.y;
-        this.r = newUp.z;
-      }
-    }
-    var camera;
+    // World units in 3D are millimeters (robot/cube data are mm; quads converted)
+    var kMmPerMeter = 1000;
+    var kFovAngle = Math.PI / 3;
+    // (no mesh scale — .obj assets are not used)
+    // Created AFTER createCanvas — calling p.color() earlier can force p5's 100x100 defaultCanvas
+    var kQuadBorderColor3D;
+    var kQuadBorderColor2D;
 
     var dragging = false;
     var draggingInfo = {};
-    
+    var webglLive = false; // true only if WEBGL canvas actually created
 
     var scaleFactor2D;
-    var scaleFactor2D0; // initial
+    var scaleFactor2D0;
     var xOffset2D;
     var yOffset2D;
 
+    // No .obj meshes ship with this viz (cozmo.obj / cube.obj are absent).
+    // 3D uses solid primitives; 2D uses optional PNGs if present.
+    var faceImg;
+    var robotImg;
+    var cubeImg;
+
+    function forceIs2D( reason ) {
+      console.warn( 'navMap: ' + reason );
+      is3D = false;
+      webglLive = false;
+      var $chk = $('#chk3D');
+      if( $chk.length ) { $chk.prop( 'checked', false ); }
+      $('#chkFaces, label[for="chkFaces"]').hide();
+      showWebGLError( $('#tab-navmap') );
+    }
+
     p.setup = function() {
-      p.createCanvas( kCanvasWidth, kCanvasHeight, (is3D ? p.WEBGL : p.P2D) );
-      var loadCallback = function() {
-        if( (typeof camera !== 'undefined') || (typeof scaleFactor2D !== 'undefined') ) {
-          // scene was loaded at least once. need to redraw
-          vizDirty = true;
+      var markReady = function() { kickRedraw(); };
+
+      // IMPORTANT: createCanvas must be the first renderer touch.
+      // Do not call p.color / p.fill / etc. before this, or p5 leaves defaultCanvas0 100x100.
+      var use3D = !!is3D;
+      webglLive = false;
+
+      if( use3D && !webglAvailable() ) {
+        forceIs2D( 'WebGL probe failed; using 2D' );
+        use3D = false;
+      }
+
+      if( use3D ) {
+        try {
+          // Do NOT call setAttributes here: p5 0.5–0.7 (2018 webviz) throws
+          // "_resetContext is not a function" and aborts WEBGL entirely.
+          p.createCanvas( kCanvasWidth, kCanvasHeight, p.WEBGL );
+          // Confirm we actually got a GL context (some browsers create a 2d fallback canvas)
+          var gl = p._renderer && p._renderer.GL;
+          if( !gl ) {
+            throw new Error( 'createCanvas(WEBGL) returned no GL context' );
+          }
+          webglLive = true;
+        } catch( err ) {
+          console.warn( 'navMap: WEBGL createCanvas failed, falling back to 2D', err );
+          forceIs2D( 'WEBGL createCanvas failed' );
+          use3D = false;
+          // Remove any half-built canvas, then make a real 2D one
+          try {
+            if( p.canvas && p.canvas.parentNode ) {
+              p.canvas.parentNode.removeChild( p.canvas );
+            }
+          } catch( e2 ) {}
+          p.createCanvas( kCanvasWidth, kCanvasHeight, p.P2D );
         }
-      };
-      if( is3D ) {
-        robot = p.loadModel( 'webVizModules/cozmo.obj', loadCallback );
-        cube = p.loadModel( 'webVizModules/cube.obj', loadCallback );
-        faceImg = p.loadImage( 'webVizModules/face01.png',loadCallback );
       } else {
-        robotImg = p.loadImage( 'webVizModules/robot.png', loadCallback );
-        cubeImg = p.loadImage( 'webVizModules/cube.png', loadCallback );
+        p.createCanvas( kCanvasWidth, kCanvasHeight, p.P2D );
+      }
+
+      // If something still left us at the p5 default size, force a proper canvas
+      if( p.width < 200 || p.height < 200 ) {
+        console.warn( 'navMap: canvas was ' + p.width + 'x' + p.height + '; recreating 700x600 P2D' );
+        forceIs2D( 'canvas too small after setup' );
+        use3D = false;
+        webglLive = false;
+        p.createCanvas( kCanvasWidth, kCanvasHeight, p.P2D );
+      }
+
+      p.pixelDensity( 1 );
+      kQuadBorderColor3D = p.color( 'rgba(255,255,255,0.35)' );
+      kQuadBorderColor2D = p.color( 'rgba(255,255,255,0.1)' );
+
+      // Optional bitmaps only (no .obj meshes). Try webVizModules/ then same-dir.
+      var loadBitmap = function( name, assign ) {
+        var paths = [ 'webVizModules/' + name, name ];
+        var tryAt = function( i ) {
+          if( i >= paths.length ) {
+            assign( null );
+            markReady();
+            return;
+          }
+          p.loadImage(
+            paths[i],
+            function( img ) {
+              if( img && img.width > 1 ) {
+                assign( img );
+                markReady();
+              } else {
+                tryAt( i + 1 );
+              }
+            },
+            function() { tryAt( i + 1 ); }
+          );
+        };
+        tryAt( 0 );
+      };
+
+      if( use3D && webglLive ) {
+        faceImg = null;
+        loadBitmap( 'face01.png', function( img ) { faceImg = img; } );
+      } else {
+        robotImg = null;
+        cubeImg = null;
+        loadBitmap( 'robot.png', function( img ) { robotImg = img; } );
+        loadBitmap( 'cube.png',  function( img ) { cubeImg = img; } );
+      }
+
+      // Idle = no rAF spam (was causing Violation on 2D). Redraw on demand.
+      if( typeof p.noLoop === 'function' ) {
+        p.noLoop();
+      }
+      // First paint once setup finishes (and again when data arrives via kickRedraw)
+      if( typeof p.redraw === 'function' ) {
+        p.redraw();
       }
     };
 
-    function drawRect2D( centerX, centerY, width, height, fillColor, borderColor ) {
-      centerX = Math.round( centerX );
-      centerY = Math.round( centerY );
-      width = Math.round( width );
-      height = Math.round( height );
-      p.push();
-      p.translate( centerX, centerY, 0 );
-      p.stroke( borderColor );
-      p.fill( fillColor );
-      p.rect( 0, 0, width, height );
-      p.pop();
+    function rgbaColor( c ) {
+      return p.color( 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',' + (c.a / 255.0) + ')' );
     }
-    function drawRect3D( centerX, centerY, width, height, fillColor, borderColor ) {
-      centerX = Math.round( centerX );
-      centerY = Math.round( centerY );
-      width = Math.round( width );
-      height = Math.round( height );
-      p.push();
-      p.rectMode( p.CENTER );
-      p.translate( centerX, centerY, 0 );
 
-      // a transparent rect will show its triangulation in the stroke color, so there 
-      // has to be no stroke, so we have to draw the lines manually
+    function drawRect2D( centerX, centerY, width, height, fillColor, borderColor ) {
+      // Inputs are top-left corner style (matching prior behavior)
+      p.push();
+      p.translate( Math.round( centerX ), Math.round( centerY ) );
       p.stroke( borderColor );
-      p.line( -width/2, -height/2, width/2, -height/2 );
-      p.line( -width/2, height/2, width/2, height/2 );
-      p.line( -width/2, -height/2, -width/2, height/2 );
-      p.line( width/2, -height/2, width/2, height/2 );
-      
       p.fill( fillColor );
-      p.noStroke();
-      
-      p.rect( 0, 0, width, height );
+      p.rect( 0, 0, Math.round( width ), Math.round( height ) );
       p.pop();
     }
-    function drawRobot3D() {
-      p.push()
-      var scaleFactor = kDataScaleFactor*1.0/1000;
-      p.translate( scaleFactor*robotPosition.x, scaleFactor*robotPosition.y, scaleFactor*robotPosition.z );
-      var euler = calcEuler( robotPosition.qW, robotPosition.qX, robotPosition.qY, robotPosition.qZ );
-      p.rotateZ( euler.z );
-      p.rotateX( euler.x );
-      p.rotateY( euler.y );
-      p.scale( 7.0 ) // arbitrary til it looks right
-      p.normalMaterial();
-      p.model( robot );
-      p.pop();
-    }
-    function drawCubes3D() {
-      if( typeof cubeData === 'undefined' ) {
-        return;
-      }
-      for( var idx=0; idx<cubeData.length; ++idx ) {
-        var cubePos = cubeData[idx];
-        p.push()
-        var scaleFactor = kDataScaleFactor*1.0/1000;
-        p.translate( scaleFactor*cubePos.x, scaleFactor*cubePos.y, scaleFactor*cubePos.z );
-        p.rotateZ( cubePos.angle );
-        p.scale( 7.0 ); // arbitrary til it looks right
-        p.normalMaterial();
-        p.model( cube );
-        p.pop();
-      }
-    }
-    function drawFaces3D() {
-      for( var faceId in faceData ) {
-        var facePose = faceData[faceId]["pose"]
-        p.push()
-        var scaleFactor = kDataScaleFactor*1.0/1000;
-        var imageHeight = 100;
-        var imageWidth = 100;
-        p.translate( scaleFactor*facePose.x, scaleFactor*facePose.y - imageHeight/2, scaleFactor*facePose.z + imageHeight/2 );
-        var euler = calcEuler( facePose.qW, facePose.qX, facePose.qY, facePose.qZ );
-        p.rotateZ( euler.z );
-        p.rotateX( euler.x );
-        p.rotateY( euler.y );
-        p.scale( 2.0 ); // arbitrary til it looks right
-        p.texture( faceImg );
-        p.rect( 0, 0, imageHeight, imageWidth );
-        p.pop();
-      }
-    }
-    function drawRobot2D() {
-      p.push()
-      var x = scaleFactor2D*(0.001*robotPosition.x - xOffset2D);
-      var y = scaleFactor2D*(0.001*robotPosition.y - yOffset2D);
-      var euler = calcEuler( robotPosition.qW, robotPosition.qX, robotPosition.qY, robotPosition.qZ );
-      var robotLength = 50.0*scaleFactor2D0/780;
-      var robotWidth = 26.0*scaleFactor2D0/780;
-      p.translate( x, y );
-      p.imageMode( p.CENTER ); // todo: this should be on drive center
-      p.rotate( -euler.z );
-      p.scale( scaleFactor2D/scaleFactor2D0 );
-      p.image(robotImg, 0, 0, robotLength, robotWidth);
-      p.pop();
-    }
-    function drawCubes2D() {
-      if( typeof cubeData === 'undefined' ) {
-        return;
-      }
-      // todo: this need to match how faces are done
-      for( var idx=0; idx<cubeData.length; ++idx ) {
-        var cubePos = cubeData[idx];
-        p.push();
-        var x = scaleFactor2D*(0.001*cubePos.x - xOffset2D);
-        var y = scaleFactor2D*(0.001*cubePos.y - yOffset2D);
-        var cubeSide = 15.0*scaleFactor2D/scaleFactor2D0; // in pixels
-        p.translate( x - 0.5*cubeSide, y - 0.5*cubeSide );
-        p.rotate( -cubePos.angle );
-        p.image( cubeImg, 0, 0, cubeSide, cubeSide, 0, 0 );
-        p.pop();
-      }
-    }
-    // transforms from (imageX, imageY) to (worldX, worldY, 0)
-    function imageToWorld( imageX, imageY ) {
-      var lookVec = camera.getLookVector().makeUnitLength();
-      var upVec = camera.getUpVector().makeUnitLength();
-      var rightVec = lookVec.cross( upVec );
-      var size = p.width > p.height ? p.width : p.height;
-      var imageZ = 0.5 * size / Math.tan( 0.5*kFovAngle );
-      var imageVec = rightVec.getScaled( imageX - 0.5*p.width )
-                       .add( upVec.getScaled( imageY - 0.5*p.height ) )
-                       .add( lookVec.getScaled( imageZ ) );
-      imageVec = imageVec.makeUnitLength();
-      var plane = new Vector( 0, 0, 1 );
-      if( Math.abs( plane.dot( imageVec ) ) < 0.001 ) { 
-        // nearly perpendicular, never intersect or fully contained
-        return;
-      } else {
-        var t = -camera.z / imageVec.z;
-        imageVec.scale( t );
-        var z = camera.z + imageVec.z; // should be 0
-        return new Vector( camera.x + imageVec.x, camera.y + imageVec.y, 0.0 );
-      }
-    }
-    // quaternion to euler Z-X-Y
+
+    /**
+     * Ground-plane quad in p5 Y-up space (floor = XZ, height = Y).
+     * centerX/centerY are map-floor coords in mm; yLift is height above floor.
+     */
+    /**
+     * Floor tile. Map floor (centerX, centerY) mm -> p5 XZ at height yLift.
+     * p5(x,y,z) = (mapX, height, mapY)
+     */
+    // quaternion -> euler for p5 rotateZ/X/Y (Z-X-Y). Same as before.
     function calcEuler( w, x, y, z ) {
       var threeaxisrot = function( r11, r12, r21, r31, r32 ) {
-        return new Vector( Math.atan2( r31, r32 ), Math.asin ( r21 ), Math.atan2( r11, r12 ) );
+        return new Vector(
+          Math.atan2( r31, r32 ),
+          Math.asin( Math.max( -1, Math.min( 1, r21 ) ) ),
+          Math.atan2( r11, r12 )
+        );
       };
-      return threeaxisrot( -2*(x*y - w*z),
-                           w*w - x*x + y*y - z*z,
-                           2*(y*z + w*x),
-                           -2*(x*z - w*y),
-                           w*w - x*x - y*y + z*z );
+      return threeaxisrot(
+        -2*(x*y - w*z),
+         w*w - x*x + y*y - z*z,
+         2*(y*z + w*x),
+        -2*(x*z - w*y),
+         w*w - x*x - y*y + z*z
+      );
     }
 
-    var robot;
-    var cube;
+    // ---- 3D drawing (fast path: bake map → one textured plane) ----
 
+    var mapBakeG = null;       // p5.Graphics top-down cache
+    var mapBakeMinX = 0;
+    var mapBakeMinY = 0;
+    var mapBakeMaxX = 1;
+    var mapBakeMaxY = 1;
+    var mapBakeRes = 512;
+    var interact3D = false;    // true while dragging / short zoom burst
+    var wheelFramesLeft = 0;
+    var originCache = { x: 0, y: 0, valid: false };
+
+    function toScene( mapX, mapY, mapZ ) {
+      if( !originCache.valid ) {
+        var o = mapOriginMm();
+        originCache.x = o.x;
+        originCache.y = o.y;
+        originCache.valid = true;
+      }
+      // Map-Y → p5 Z is negated so 3D matches 2D screen layout:
+      // 2D canvas has y-down, so larger mapY draws toward the BOTTOM of the view.
+      // Without the minus, 3D put that same point toward the TOP (~1,3 vs 2D ~1,1).
+      // Robot, cubes, faces, and map bake all use toScene — they stay locked together.
+      return {
+        x: mapX - originCache.x,
+        y: mapZ,
+        z: originCache.y - mapY
+      };
+    }
+
+    function invalidateOriginCache() {
+      originCache.valid = false;
+    }
+
+    /**
+     * Rasterize all map cells once into a 2D texture. Drawing hundreds of
+     * beginShape quads every orbit frame was the main 3D cost.
+     */
+    function rebuildMapBake() {
+      if( typeof dataExtentsInfo.minX === 'undefined' || quadTreeQuads.length === 0 ) {
+        return;
+      }
+      invalidateOriginCache();
+
+      mapBakeMinX = dataExtentsInfo.minX * kMmPerMeter;
+      mapBakeMaxX = dataExtentsInfo.maxX * kMmPerMeter;
+      mapBakeMinY = dataExtentsInfo.minY * kMmPerMeter;
+      mapBakeMaxY = dataExtentsInfo.maxY * kMmPerMeter;
+      var worldW = Math.max( 1, mapBakeMaxX - mapBakeMinX );
+      var worldD = Math.max( 1, mapBakeMaxY - mapBakeMinY );
+
+      // Aspect-correct bake so texture cells stay aligned with world mm
+      var base = 512;
+      if( quadTreeQuads.length > 800 ) { base = 384; }
+      if( quadTreeQuads.length > 2000 ) { base = 256; }
+      var resX, resY;
+      if( worldW >= worldD ) {
+        resX = base;
+        resY = Math.max( 64, Math.round( base * worldD / worldW ) );
+      } else {
+        resY = base;
+        resX = Math.max( 64, Math.round( base * worldW / worldD ) );
+      }
+      mapBakeRes = resX;
+
+      if( !mapBakeG || mapBakeG.width !== resX || mapBakeG.height !== resY ) {
+        if( mapBakeG && mapBakeG.remove ) {
+          try { mapBakeG.remove(); } catch( e ) {}
+        }
+        mapBakeG = p.createGraphics( resX, resY );
+        mapBakeG.pixelDensity( 1 );
+      }
+
+      var g = mapBakeG;
+      g.pixelDensity( 1 );
+      g.background( 30, 32, 38 );
+      g.noStroke();
+
+      var sx = resX / worldW;
+      var sy = resY / worldD;
+      var n = quadTreeQuads.length;
+      for( var i = 0; i < n; ++i ) {
+        var q = quadTreeQuads[i];
+        var c = q.color;
+        if( c.a < 8 ) { continue; }
+        var cx = q.center.x * kMmPerMeter;
+        var cy = q.center.y * kMmPerMeter;
+        var side = q.sideSize * kMmPerMeter;
+        var half = 0.5 * side;
+        var x0 = (cx - half - mapBakeMinX) * sx;
+        var y0 = (cy - half - mapBakeMinY) * sy;
+        var sw = Math.max( 1, side * sx );
+        var sh = Math.max( 1, side * sy );
+        // Boost alpha so the texture reads clearly under WEBGL lighting/modulation
+        var a = Math.max( c.a, 180 );
+        g.fill( c.r, c.g, c.b, a );
+        g.rect( x0, y0, sw, sh );
+      }
+
+      mapBakeDirty = false;
+    }
+
+    function drawMapBake3D() {
+      if( !mapBakeG ) { return; }
+      // Same mm space as robot/cube (toScene). Bake (0,0)=top-left=(minX,minY).
+      var s00 = toScene( mapBakeMinX, mapBakeMinY, 1 );
+      var s10 = toScene( mapBakeMaxX, mapBakeMinY, 1 );
+      var s11 = toScene( mapBakeMaxX, mapBakeMaxY, 1 );
+      var s01 = toScene( mapBakeMinX, mapBakeMaxY, 1 );
+
+      var gl = p._renderer && p._renderer.GL;
+      if( gl ) { gl.disable( gl.CULL_FACE ); }
+
+      p.push();
+      p.fill( 255 ); // required: WEBGL multiplies texture by fill
+      p.noStroke();
+      p.textureMode( p.NORMAL );
+      p.texture( mapBakeG );
+      // u: minX→0 maxX→1   v: minY→0 maxY→1  (matches g.rect bake)
+      p.beginShape();
+      p.vertex( s00.x, s00.y, s00.z, 0, 0 );
+      p.vertex( s10.x, s10.y, s10.z, 1, 0 );
+      p.vertex( s11.x, s11.y, s11.z, 1, 1 );
+      p.vertex( s01.x, s01.y, s01.z, 0, 1 );
+      p.endShape( p.CLOSE );
+      p.pop();
+    }
+
+    function drawSupportFloor() {
+      if( typeof dataExtentsInfo.minX === 'undefined' ) { return; }
+      var minX = dataExtentsInfo.minX * kMmPerMeter;
+      var maxX = dataExtentsInfo.maxX * kMmPerMeter;
+      var minY = dataExtentsInfo.minY * kMmPerMeter;
+      var maxY = dataExtentsInfo.maxY * kMmPerMeter;
+      var c = toScene( 0.5*(minX+maxX), 0.5*(minY+maxY), 0 );
+      c.y = -8;
+      var w = (maxX - minX) + 240;
+      var d = (maxY - minY) + 240;
+      p.push();
+      p.translate( c.x, c.y, c.z );
+      p.noStroke();
+      p.fill( 36, 38, 44 );
+      p.box( w, 16, d );
+      p.pop();
+    }
+
+    function drawGroundGrid() {
+      var axis = 200;
+      p.push();
+      p.strokeWeight( 2 );
+      p.stroke( 220, 60, 60 );
+      p.line( 0, 2, 0, axis, 2, 0 );
+      p.stroke( 60, 200, 60 );
+      // +mapY after toScene flip is -p5Z
+      p.line( 0, 2, 0, 0, 2, -axis );
+      p.stroke( 80, 140, 255 );
+      p.line( 0, 2, 0, 0, 2 + axis, 0 );
+      p.pop();
+    }
+
+    function drawRobot3D() {
+      if( typeof robotPosition === 'undefined' ) { return; }
+      var h = robotPosition.z || 15;
+      var s = toScene( robotPosition.x, robotPosition.y, h );
+      p.push();
+      p.translate( s.x, s.y, s.z );
+      var euler = calcEuler( robotPosition.qW, robotPosition.qX, robotPosition.qY, robotPosition.qZ );
+      p.rotateY( euler.z );
+      p.noStroke();
+      p.fill( 240, 220, 60 );
+      p.box( 60, 30, 40 );
+      p.push();
+      p.translate( 40, 0, 0 );
+      p.fill( 255, 120, 40 );
+      p.box( 18 );
+      p.pop();
+      p.pop();
+    }
+
+    function drawCubes3D() {
+      if( typeof cubeData === 'undefined' ) { return; }
+      p.noStroke();
+      for( var idx = 0; idx < cubeData.length; ++idx ) {
+        var cubePos = cubeData[idx];
+        var h = (typeof cubePos.z === 'number') ? cubePos.z : 22;
+        var s = toScene( cubePos.x, cubePos.y, h );
+        p.push();
+        p.translate( s.x, s.y, s.z );
+        p.rotateY( cubePos.angle || 0 );
+        p.fill( 220, 70, 70 );
+        p.box( 44 );
+        p.pop();
+      }
+    }
+
+    function drawFaces3D() {
+      var hasTex = faceImg && faceImg.width > 1;
+      for( var faceId in faceData ) {
+        if( !faceData.hasOwnProperty( faceId ) ) { continue; }
+        var facePose = faceData[faceId].pose;
+        var s = toScene( facePose.x, facePose.y, facePose.z || 100 );
+        p.push();
+        p.translate( s.x, s.y, s.z );
+        var euler = calcEuler( facePose.qW, facePose.qX, facePose.qY, facePose.qZ );
+        p.rotateY( euler.z );
+        // Stand in XZ-facing card: rotate so local plane faces camera-ish (XY → vertical)
+        // Flip vertical so PNG is right-side-up with default Flip view
+        p.scale( 1, -1, 1 );
+        p.noStroke();
+        p.fill( 255 );
+        if( hasTex ) {
+          p.textureMode( p.NORMAL );
+          p.texture( faceImg );
+          // Explicit textured quad (more reliable than rect+texture in some p5 builds)
+          var h = 40;
+          p.beginShape();
+          p.vertex( -h, -h, 0, 0, 0 );
+          p.vertex(  h, -h, 0, 1, 0 );
+          p.vertex(  h,  h, 0, 1, 1 );
+          p.vertex( -h,  h, 0, 0, 1 );
+          p.endShape( p.CLOSE );
+        } else {
+          p.fill( 180, 160, 220 );
+          p.rectMode( p.CENTER );
+          p.rect( 0, 0, 80, 80 );
+        }
+        p.pop();
+      }
+    }
+
+    function resetOrbitView() {
+      var dist = 1200;
+      if( typeof dataExtentsInfo.minX !== 'undefined' ) {
+        var dx = (dataExtentsInfo.maxX - dataExtentsInfo.minX) * kMmPerMeter;
+        var dy = (dataExtentsInfo.maxY - dataExtentsInfo.minY) * kMmPerMeter;
+        dist = Math.max( 800, 1.2 * Math.sqrt( dx*dx + dy*dy ) );
+      }
+      var upY = invertHeight ? -1 : 1;
+      // Camera sits on +Z looking at origin; world is then yawed by kMapYaw3D
+      // so the map matches 2D (X right, map-Y toward bottom of the view).
+      p.camera( 0, dist * 0.55, dist * 0.85,  0, 0, 0,  0, upY, 0 );
+    }
+
+    function drawRobot2D() {
+      if( typeof robotPosition === 'undefined' || !robotImg ) { return; }
+      p.push();
+      var x = scaleFactor2D * (0.001 * robotPosition.x - xOffset2D);
+      var y = scaleFactor2D * (0.001 * robotPosition.y - yOffset2D);
+      var euler = calcEuler( robotPosition.qW, robotPosition.qX, robotPosition.qY, robotPosition.qZ );
+      var robotLength = 50.0 * scaleFactor2D0 / 780;
+      var robotWidth  = 26.0 * scaleFactor2D0 / 780;
+      p.translate( x, y );
+      p.imageMode( p.CENTER );
+      p.rotate( -euler.z );
+      p.scale( scaleFactor2D / scaleFactor2D0 );
+      p.image( robotImg, 0, 0, robotLength, robotWidth );
+      p.pop();
+    }
+
+    function drawCubes2D() {
+      if( typeof cubeData === 'undefined' || !cubeImg ) { return; }
+      for( var idx = 0; idx < cubeData.length; ++idx ) {
+        var cubePos = cubeData[idx];
+        p.push();
+        var x = scaleFactor2D * (0.001 * cubePos.x - xOffset2D);
+        var y = scaleFactor2D * (0.001 * cubePos.y - yOffset2D);
+        var cubeSide = 15.0 * scaleFactor2D / scaleFactor2D0;
+        p.imageMode( p.CENTER );
+        p.translate( x, y );
+        p.rotate( -cubePos.angle );
+        p.image( cubeImg, 0, 0, cubeSide, cubeSide );
+        p.pop();
+      }
+    }
+
+    function fitView2D() {
+      var scaleX = (dataExtentsInfo.maxX - dataExtentsInfo.minX) / (kCanvasWidth  - 2 * kInitialMargin);
+      var scaleY = (dataExtentsInfo.maxY - dataExtentsInfo.minY) / (kCanvasHeight - 2 * kInitialMargin);
+      if( scaleX > 0 || scaleY > 0 ) {
+        scaleFactor2D = (scaleX > scaleY) ? 1.0 / scaleX : 1.0 / scaleY;
+      } else {
+        scaleFactor2D = 500;
+      }
+      scaleFactor2D0 = scaleFactor2D;
+      xOffset2D = dataExtentsInfo.minX - (1.0 * kInitialMargin) / scaleFactor2D;
+      yOffset2D = dataExtentsInfo.minY - (1.0 * kInitialMargin) / scaleFactor2D;
+    }
+
+    
     p.draw = function() {
-      
-      if( (quadTreeQuads.length == 0) || !vizDirty ) {
+      if( quadTreeQuads.length === 0 ) {
         return;
       }
 
-      if( is3D && (typeof camera === 'undefined') ) {
-        var camX = 0.5*kDataScaleFactor*(dataExtentsInfo.maxX + dataExtentsInfo.minX);
-        var camY = 0.5*kDataScaleFactor*(dataExtentsInfo.maxY + dataExtentsInfo.minY);
-        // find a z so that it fits with a margin
-        var camZa = (0.5*kDataScaleFactor*(dataExtentsInfo.maxX - dataExtentsInfo.minX) + kInitialMargin) / Math.tan( kFovAngle / 2 );
-        var camZb = (0.5*kDataScaleFactor*(dataExtentsInfo.maxY - dataExtentsInfo.minY) + kInitialMargin) / Math.tan( kFovAngle / 2 );
-        var camZ = camZa > camZb ? camZa : camZb;
-        camera = new Camera( camX, camY, camZ, camX, camY, 0, 0, 1, 0 );
-      }
-      if( !is3D && (typeof scaleFactor2D === 'undefined') ) {
-        var scaleX = (dataExtentsInfo.maxX-dataExtentsInfo.minX) / (kCanvasWidth - 2*kInitialMargin);
-        var scaleY = (dataExtentsInfo.maxY-dataExtentsInfo.minY) / (kCanvasHeight - 2*kInitialMargin);
-        if( scaleX > 0 || scaleY > 0 ) {
-          scaleFactor2D = (scaleX > scaleY) ? 1.0/scaleX : 1.0/scaleY;
-        } else {
-          scaleFactor2D = 500;
+      if( is3D && webglLive ) {
+        // When draw() runs (redraw or loop while dragging), always paint + orbitControl.
+        // Skipping frames broke orbit/zoom (camera never updated).
+        if( mapBakeDirty ) {
+          rebuildMapBake();
         }
-        scaleFactor2D0 = scaleFactor2D;
-        xOffset2D = dataExtentsInfo.minX - (1.0*kInitialMargin)/scaleFactor2D;
-        yOffset2D = dataExtentsInfo.minY - (1.0*kInitialMargin)/scaleFactor2D;
+
+        p.background( 24, 24, 28 );
+
+        if( typeof p.orbitControl === 'function' ) {
+          p.orbitControl( 2, 1, 1.5 );
+        }
+
+        if( cameraResetPending || vizDirty ) {
+          resetOrbitView();
+          cameraResetPending = false;
+        }
+
+        p.rotateY( kMapYaw3D );
+
+        if( typeof p.noLights === 'function' ) {
+          p.noLights();
+        }
+        drawSupportFloor();
+        drawMapBake3D();
+        drawGroundGrid();
+
+        p.ambientLight( 110 );
+        p.directionalLight( 230, 230, 230, 0.35, -1.0, 0.25 );
+
+        if( shouldDrawRobot ) { drawRobot3D(); }
+        if( shouldDrawCubes ) { drawCubes3D(); }
+        if( shouldDrawFaces ) { drawFaces3D(); }
+
+        vizDirty = false;
+        return;
       }
 
+      // ---- 2D (only runs when kickRedraw/redraw was requested) ----
+      if( typeof scaleFactor2D === 'undefined' ) {
+        fitView2D();
+      }
 
       p.clear();
-      
-      if( is3D ) {
-        p.camera( camera.x, camera.y, camera.z, camera.a, camera.b, camera.c, camera.p, camera.q, camera.r );
+      p.background( 0 );
+
+      for( var q2 = 0; q2 < quadTreeQuads.length; ++q2 ) {
+        var q = quadTreeQuads[q2];
+        var col = rgbaColor( q.color );
+        var x2 = scaleFactor2D * (q.center.x - 0.5 * q.sideSize - xOffset2D);
+        var y2 = scaleFactor2D * (q.center.y - 0.5 * q.sideSize - yOffset2D);
+        var side2 = scaleFactor2D * q.sideSize;
+        drawRect2D( x2, y2, side2, side2, col, kQuadBorderColor2D );
       }
 
-      for( var quadIdx = 0; quadIdx < quadTreeQuads.length; ++ quadIdx ) {
-        var quad = quadTreeQuads[quadIdx];
-        var colorStr = 'rgba(' + quad.color.r + ',' + quad.color.g + ',' + quad.color.b + ',' + ((quad.color.a*1.0)/255) + ')';
-        var color = p.color( colorStr );
-        if( is3D ) {
-          var x = kDataScaleFactor*quad.center.x;
-          var y = kDataScaleFactor*quad.center.y;
-          var side = kDataScaleFactor * quad.sideSize;
-          drawRect3D( x, y, side, side, color, kQuadBorderColor3D );
-        } else {
-          var x = scaleFactor2D*(quad.center.x - 0.5*quad.sideSize - xOffset2D);
-          var y = scaleFactor2D*(quad.center.y - 0.5*quad.sideSize - yOffset2D);
-          var side = scaleFactor2D * quad.sideSize;
-          drawRect2D( x, y, side, side, color, kQuadBorderColor2D );
-        }
-      }
-      if( is3D ) {
-        if( shouldDrawRobot ) {
-         drawRobot3D();
-        }
-        if( shouldDrawCubes ) {
-          drawCubes3D();
-        }
-        if( shouldDrawFaces ) {
-          drawFaces3D();
-        }
-      } else {
-        if( shouldDrawRobot ) {
-          drawRobot2D();
-        }
-        if( shouldDrawCubes ) {
-          drawCubes2D();
-        }
-      }
+      if( shouldDrawRobot ) { drawRobot2D(); }
+      if( shouldDrawCubes ) { drawCubes2D(); }
       vizDirty = false;
-      
     };
 
     var mouseWithinCanvas = function() {
-      return (p.mouseX >= 0) && (p.mouseX < kCanvasWidth) && (p.mouseY >= 0) && (p.mouseY < kCanvasHeight);
+      return (p.mouseX >= 0) && (p.mouseX < kCanvasWidth) &&
+             (p.mouseY >= 0) && (p.mouseY < kCanvasHeight);
     };
-    p.mousePressed = function( event ) {
-      if( quadTreeQuads.length == 0 ) {
-        return true;
-      }
-      if( mouseWithinCanvas() ) {
-        dragging = true;
-        draggingInfo = {};
-        draggingInfo.startX = p.mouseX;
-        draggingInfo.startY = p.mouseY;
-        if( is3D ) {
-          var clickedWorld = imageToWorld( draggingInfo.startX, draggingInfo.startY );
-          draggingInfo.clickedData = false;
-          if( typeof clickedWorld !== 'undefined' ) {
-            if( (clickedWorld.x >= dataExtentsInfo.minX*kDataScaleFactor) &&
-                (clickedWorld.x <= dataExtentsInfo.maxX*kDataScaleFactor) &&
-                (clickedWorld.y >= dataExtentsInfo.minY*kDataScaleFactor) &&
-                (clickedWorld.y <= dataExtentsInfo.maxY*kDataScaleFactor) ) 
-            {
-              draggingInfo.clickedData = true;
-              draggingInfo.startDataX = clickedWorld.x;
-              draggingInfo.startDataY = clickedWorld.y;
-            }
-          }
-          draggingInfo.startCamera = camera.clone();
-        } else { 
-          draggingInfo.startXOffset = xOffset2D;
-          draggingInfo.startYOffset = yOffset2D;
-        }
-      } else {
-        dragging = false;
-      }
-      return !dragging; // consume the click if within canvas
-    };
-    p.mouseReleased = function( event ) {
-      if( quadTreeQuads.length == 0 ) {
-        return true;
-      }
-      var oldDragging = dragging;
-      dragging = false;
-      return !oldDragging; 
-    }
-    p.mouseDragged = function( event ) {
-      if( quadTreeQuads.length == 0 ) {
-        return true;
-      }
-      if( dragging ) {
-        var dx = p.mouseX - draggingInfo.startX;
-        var dy = p.mouseY - draggingInfo.startY;
-        if( is3D ) {
-          dx *= 0.01;
-          dy *= 0.01;
-          camera = draggingInfo.startCamera.clone();
-          if( !draggingInfo.clickedData ) {
-            camera.rotate( dx, -dy );
-          } else {
-            // mouse movement left/right rotates about z, and up/down about the camera right direction
-            var rotAxisX = new Vector( 0, 0, -1.0 );
-            var rotAxisY = camera.getLookVector().cross( camera.getUpVector() ).makeUnitLength();
-            camera.rotateAbout( draggingInfo.startDataX, draggingInfo.startDataY, 0.0, rotAxisY, dy );
-            camera.rotateAbout( draggingInfo.startDataX, draggingInfo.startDataY, 0.0, rotAxisX, -dx );
-          }
-        } else {
-          xOffset2D = draggingInfo.startXOffset - dx/scaleFactor2D;
-          yOffset2D = draggingInfo.startYOffset - dy/scaleFactor2D;
-        }
-        vizDirty = true;
-      }
-      return !dragging; // consume the drag if started in canvas
-    }
-    
-    p.mouseWheel = function( event ) {
-      if( !dragging && event.isTrusted && mouseWithinCanvas() && (quadTreeQuads.length != 0) ) {
-        if( is3D ) {
-          var delta = -5*event.delta; // this is max(deltaX,deltaY)
-          delta = Math.min( Math.max( delta, -100 ), 100 );
-          var v = camera.getLookVector().makeUnitLength();
-          camera.move( v.scale( delta ) );
-          vizDirty = true;
-        } else {
-          var delta = 0.5*event.delta; // this is max(deltaX,deltaY)
-          var prevScaleFactor = scaleFactor2D;
-          var newFactor = scaleFactor2D*(100 - delta)/100; // todo: exponential?
-          if( newFactor/scaleFactor2D0 > .05 && newFactor/scaleFactor2D0 < 50 ) {
-            scaleFactor2D = newFactor;
 
-            // change offset so it keep the point under the mouse stationary
-            xOffset2D += p.mouseX * (1.0/prevScaleFactor - 1.0/scaleFactor2D);
-            yOffset2D += p.mouseY * (1.0/prevScaleFactor - 1.0/scaleFactor2D);
-            vizDirty = true;
-          }
+    function start3DInteract() {
+      interact3D = true;
+      // Continuous frames only while dragging so orbitControl gets deltas
+      if( typeof p.loop === 'function' ) {
+        p.loop();
+      }
+    }
+    function stop3DInteract() {
+      interact3D = false;
+      if( typeof p.noLoop === 'function' ) {
+        p.noLoop();
+      }
+      // Final frame to settle
+      if( typeof p.redraw === 'function' ) {
+        p.redraw();
+      }
+    }
+
+    p.mousePressed = function( event ) {
+      if( is3D && webglLive ) {
+        if( mouseWithinCanvas() ) {
+          start3DInteract();
         }
-        return false;
-      } else {
-        // forward the mouse wheel call
+        return true; // let orbitControl see the event
+      }
+      if( quadTreeQuads.length === 0 ) { return true; }
+      if( !mouseWithinCanvas() ) {
+        dragging = false;
         return true;
       }
-      
+      dragging = true;
+      draggingInfo = {
+        startX: p.mouseX,
+        startY: p.mouseY,
+        startXOffset: xOffset2D,
+        startYOffset: yOffset2D
+      };
+      return false;
     };
+
+    p.mouseReleased = function( event ) {
+      if( is3D && webglLive ) {
+        stop3DInteract();
+        return true;
+      }
+      if( quadTreeQuads.length === 0 ) { return true; }
+      var was = dragging;
+      dragging = false;
+      if( was ) {
+        kickRedraw();
+      }
+      return !was;
+    };
+
+    p.mouseDragged = function( event ) {
+      if( is3D && webglLive ) {
+        // loop() already running from mousePressed
+        return true;
+      }
+      if( quadTreeQuads.length === 0 || !dragging ) { return true; }
+      var dx = p.mouseX - draggingInfo.startX;
+      var dy = p.mouseY - draggingInfo.startY;
+      xOffset2D = draggingInfo.startXOffset - dx / scaleFactor2D;
+      yOffset2D = draggingInfo.startYOffset - dy / scaleFactor2D;
+      kickRedraw();
+      return false;
+    };
+
+    p.mouseWheel = function( event ) {
+      if( is3D && webglLive ) {
+        if( mouseWithinCanvas() ) {
+          // One (or few) paints so orbitControl can apply zoom delta
+          if( typeof p.redraw === 'function' ) {
+            p.redraw();
+          }
+          return false;
+        }
+        return true;
+      }
+      if( dragging || !event.isTrusted || !mouseWithinCanvas() || quadTreeQuads.length === 0 ) {
+        return true;
+      }
+      var delta = 0.5 * event.delta;
+      var prevScaleFactor = scaleFactor2D;
+      var newFactor = scaleFactor2D * (100 - delta) / 100;
+      if( newFactor / scaleFactor2D0 > 0.05 && newFactor / scaleFactor2D0 < 50 ) {
+        scaleFactor2D = newFactor;
+        xOffset2D += p.mouseX * (1.0 / prevScaleFactor - 1.0 / scaleFactor2D);
+        yOffset2D += p.mouseY * (1.0 / prevScaleFactor - 1.0 / scaleFactor2D);
+        kickRedraw();
+      }
+      return false;
+    };
+
+    p.doubleClicked = function() {
+      if( !mouseWithinCanvas() || quadTreeQuads.length === 0 ) { return true; }
+      if( is3D && webglLive ) {
+        cameraResetPending = true;
+        kickRedraw();
+        return false;
+      }
+      fitView2D();
+      kickRedraw();
+      return false;
+    };
+
+
   };
 
-  // webviz methods
+  // ---------- webviz methods ----------
 
-  myMethods.init = function(elem) {
+  function destroySketch() {
+    if( typeof myp5 !== 'undefined' && myp5 ) {
+      myp5.remove();
+      myp5 = undefined;
+    }
+    if( typeof canvasContainer !== 'undefined' && canvasContainer ) {
+      canvasContainer.remove();
+      canvasContainer = undefined;
+    }
+    if( typeof legendContainer !== 'undefined' && legendContainer ) {
+      legendContainer.remove();
+      legendContainer = undefined;
+    }
+  }
+
+  function initializeSketch( elem ) {
+    var $elem = asJq( elem );
+    canvasContainer = $('<div></div>', { id: 'navMapContainer' }).appendTo( $elem );
+    // p5 instance mode: prefer DOM node (works on 0.5–1.x); id string also ok
+    var host = canvasContainer[0] || 'navMapContainer';
+    myp5 = new p5( sketch, host );
+
+    legendContainer = $('<div></div>', { id: 'legendContainer' }).appendTo( $elem );
+    for( var idx = 0; idx < kKnownTypes.length; ++idx ) {
+      legendContainer.append(
+        '<span class="navMapLegendEntry" data-quadtype="' + kKnownTypes[idx] + '">' +
+        kKnownTypes[idx] + '</span>'
+      );
+    }
+    if( dumpInput ) {
+      $('<div id="pastebin"></div>').appendTo( $elem );
+    }
+  }
+
+  myMethods.init = function( elem ) {
+    elem = asJq( elem ); // 2018 webviz often passes a raw HTMLElement
     updateBtn = $('<input type="button" value="Update"/>');
-    updateBtn.click( function(){
+    updateBtn.click( function() {
       if( dumpInput ) {
-        $('#pastebin').html();
+        $('#pastebin').html( '' );
       }
       callUpdate();
     });
-    updateBtn.appendTo( elem ).prop('disabled', autoUpdate);
+    updateBtn.appendTo( elem ).prop( 'disabled', autoUpdate );
 
-    var chkAuto = $('<input />', { type: 'checkbox', id: 'chkAuto'}).appendTo( elem ).prop('checked', autoUpdate);
-    $('<label />', { for: 'chkAuto', text: 'Auto-update' }).appendTo( elem );
-    var chk3D = $('<input />', { type: 'checkbox', id: 'chk3D'}).appendTo(elem).prop('checked', is3D);
-    $('<label />', { for: 'chk3D', text: '3D' }).appendTo( elem );
-    var chkRobot = $('<input />', { type: 'checkbox', id: 'chkRobot'}).appendTo(elem).prop('checked', shouldDrawRobot);
+    var chkAuto  = $('<input />', { type: 'checkbox', id: 'chkAuto'  }).appendTo( elem ).prop( 'checked', autoUpdate );
+    $('<label />', { for: 'chkAuto',  text: 'Auto-update' }).appendTo( elem );
+    var chk3D    = $('<input />', { type: 'checkbox', id: 'chk3D'    }).appendTo( elem ).prop( 'checked', is3D );
+    $('<label />', { for: 'chk3D',    text: '3D' }).appendTo( elem );
+    var chkInvH  = $('<input />', { type: 'checkbox', id: 'chkInvH'  }).appendTo( elem ).prop( 'checked', invertHeight );
+    $('<label />', { for: 'chkInvH',  text: 'Flip view' }).appendTo( elem );
+    var chkRobot = $('<input />', { type: 'checkbox', id: 'chkRobot' }).appendTo( elem ).prop( 'checked', shouldDrawRobot );
     $('<label />', { for: 'chkRobot', text: 'Show robot' }).appendTo( elem );
-    var chkCubes = $('<input />', { type: 'checkbox', id: 'chkCubes'}).appendTo(elem).prop('checked', shouldDrawCubes);
+    var chkCubes = $('<input />', { type: 'checkbox', id: 'chkCubes' }).appendTo( elem ).prop( 'checked', shouldDrawCubes );
     $('<label />', { for: 'chkCubes', text: 'Show cubes' }).appendTo( elem );
-    var chkFaces = $('<input />', { type: 'checkbox', id: 'chkFaces'}).appendTo(elem).prop('checked', shouldDrawFaces);
+    var chkFaces = $('<input />', { type: 'checkbox', id: 'chkFaces' }).appendTo( elem ).prop( 'checked', shouldDrawFaces );
     $('<label />', { for: 'chkFaces', text: 'Show faces' }).appendTo( elem );
+
+    // Faces / invert-height only in 3D
+    if( !is3D ) {
+      chkFaces.hide();
+      $('label[for="chkFaces"]').hide();
+      chkInvH.hide();
+      $('label[for="chkInvH"]').hide();
+    }
+
+    chkInvH.change( function() {
+      invertHeight = $(this).is( ':checked' );
+      cameraResetPending = true;
+      kickRedraw();
+    });
+
     chkAuto.change( function() {
-      autoUpdate = $(this).is(':checked');
-      updateBtn.prop('disabled', autoUpdate);
+      autoUpdate = $(this).is( ':checked' );
+      updateBtn.prop( 'disabled', autoUpdate );
     });
     chkRobot.change( function() {
       var old = shouldDrawRobot;
-      shouldDrawRobot = $(this).is(':checked');
-      vizDirty = vizDirty || (old != shouldDrawRobot);
+      shouldDrawRobot = $(this).is( ':checked' );
+      if( old != shouldDrawRobot ) { kickRedraw(); }
     });
     chkCubes.change( function() {
       var old = shouldDrawCubes;
-      shouldDrawCubes = $(this).is(':checked');
-      vizDirty = vizDirty || (old != shouldDrawCubes);
+      shouldDrawCubes = $(this).is( ':checked' );
+      if( old != shouldDrawCubes ) { kickRedraw(); }
     });
     chkFaces.change( function() {
       var old = shouldDrawFaces;
-      shouldDrawFaces = $(this).is(':checked');
-      vizDirty = vizDirty || (old != shouldDrawFaces);
+      shouldDrawFaces = $(this).is( ':checked' );
+      if( old != shouldDrawFaces ) { kickRedraw(); }
     });
     chk3D.change( function() {
       var old = is3D;
-      is3D = $(this).is(':checked');
-      if( old != is3D ) {
-        // 2d faces not supported yet
-        if( is3D ) {
-          chkFaces.show(); 
-          $('label[for="chkFaces"]').show()
-        } else { 
-          chkFaces.hide(); 
-          $('label[for="chkFaces"]').hide()
-        }
-        if( typeof myp5 !== 'undefined' ) {
-          // destroy canvas and start again
-          myp5.remove();
-          myp5 = undefined;
-          if( typeof canvasContainer !== 'undefined' ) {
-            canvasContainer.remove();
-          }
-          canvasContainer = undefined;
-          legendContainer.remove();
-          scaleFactor2D = undefined;
-        }
-        if( !waitingOnData ) {
-          timeTilAutoUpdate = kAutoUpdatePeriod_s;
-          callUpdate();
+      var want3D = $(this).is( ':checked' );
+      if( old == want3D ) { return; }
 
-        }
+      if( want3D && !webglAvailable() ) {
+        // Don't tear down a working 2D view just to crash
+        $(this).prop( 'checked', false );
+        is3D = false;
+        showWebGLError( elem );
+        return;
       }
-    })
-    // this is fixed in 2D for the robot, but I haven't checked cubes or faces, or anything in 3D. Leaving as a comment until PR demo is done.
-    // // todo: remove when fixed
-    // noteDiv = $('<div>NOTE: the y axis is flipped (e.g., when the robot turns right it will look like it turned left here), and face poses aren\'t correct yet</div>').appendTo( elem );
+
+      is3D = want3D;
+
+      if( is3D ) {
+        chkFaces.show();
+        $('label[for="chkFaces"]').show();
+        chkInvH.show();
+        $('label[for="chkInvH"]').show();
+        elem.find( '.navMapWebGLError' ).remove();
+      } else {
+        chkFaces.hide();
+        $('label[for="chkFaces"]').hide();
+        chkInvH.hide();
+        $('label[for="chkInvH"]').hide();
+      }
+
+      // Tear down canvas; rebuild on next data (or immediately if we already have quads)
+      destroySketch();
+
+      if( quadTreeQuads.length > 0 ) {
+        // Rebuild immediately from cached map so toggle is snappy
+        initializeSketch( elem );
+        mapBakeDirty = true;
+        cameraResetPending = true;
+        kickRedraw();
+      } else if( !waitingOnData ) {
+        timeTilAutoUpdate = kAutoUpdatePeriod_s;
+        callUpdate();
+      }
+      // if waitingOnData: sketch rebuilds when the in-flight response arrives
+    });
 
     callUpdate();
   };
 
-  function initializeSketch(elem) {
-    canvasContainer = $('<div></div>', {id: 'navMapContainer'}).appendTo( elem );
-    myp5 = new p5(sketch, 'navMapContainer');
-
-    legendContainer = $('<div></div>', {id: 'legendContainer'}).appendTo( elem );
-    for( var idx=0; idx<kKnownTypes.length; ++idx ) {
-      legendContainer.append( '<span class="navMapLegendEntry" data-quadtype="' + kKnownTypes[idx] + '">' + kKnownTypes[idx] + '</span');
-    }
-    if( dumpInput ) {
-      $('<div id="pastebin"></div>').appendTo( elem );
-    }
-  }
   myMethods.onData = function( data, elem ) {
-    
-    if( typeof canvasContainer === 'undefined' ) {
+    elem = asJq( elem );
+    if( typeof canvasContainer === 'undefined' || !canvasContainer ) {
       initializeSketch( elem );
     }
-    
+
     if( dumpInput ) {
-      $('#pastebin').html( $('#pastebin').html() + '\n\n************************************\n\n' + JSON.stringify(data) );
+      $('#pastebin').html(
+        $('#pastebin').html() + '\n\n************************************\n\n' + JSON.stringify( data )
+      );
     }
 
     var type = data["type"];
     var originId = data["originId"];
+
     if( type == 'MemoryMapMessageVizBegin' ) {
-      // clear for the incoming origin
       memoryMapQuadInfoVectorMapIncoming[originId] = {};
       memoryMapInfo[originId] = data["mapInfo"];
     }
     else if( type == "MemoryMapMessageViz" ) {
       var dest = memoryMapQuadInfoVectorMapIncoming[originId];
+      if( !dest ) {
+        console.warn( 'navMap: MemoryMapMessageViz for unknown originId', originId );
+        return;
+      }
       dest[data["seqNum"]] = data["quadInfos"];
     }
     else if( type == "MemoryMapMessageVizEnd" ) {
-
-      quadTreeQuads = [];
-      dataExtentsInfo = {minX: Number.MAX_VALUE, maxX: -Number.MAX_VALUE, minY: Number.MAX_VALUE, maxY: -Number.MAX_VALUE};
-
-      centerX_m = 0.001 * memoryMapInfo[originId].rootCenterX;
-      centerY_m = 0.001 * memoryMapInfo[originId].rootCenterY;
-      depth = memoryMapInfo[originId].rootDepth;
-      rootSize = 0.001 * memoryMapInfo[originId].rootSize_mm;
-      
-      var root = new MemoryMapNode( depth, rootSize, new Point( centerX_m, centerY_m ) );
-      var expectedSeqNum = 0; // u32
-      var srcQuadInfos = memoryMapQuadInfoVectorMapIncoming[originId];
-      for( var seqNum in srcQuadInfos ){
-        if( seqNum != expectedSeqNum ) {
-          console.log('DROPPED VIZ MESSAGE. map will be incorrect');
-          break;
-        } else {  
-          if( srcQuadInfos.hasOwnProperty( seqNum ) ) {
-            var quadInfo = srcQuadInfos[seqNum];
-            for( var idx=0; idx<quadInfo.length; ++idx ) {
-              var quad = quadInfo[idx];
-              root.AddChild( quadTreeQuads, dataExtentsInfo, quad["content"], quad["depth"] );
-            }
-            ++expectedSeqNum;
-          }
-        }
+      if( !memoryMapInfo[originId] ) {
+        console.warn( 'navMap: MemoryMapMessageVizEnd for unknown originId', originId );
+        waitingOnData = false;
+        if( updateBtn ) { updateBtn.prop( 'disabled', autoUpdate ); }
+        return;
       }
 
-      delete memoryMapQuadInfoVectorMapIncoming[ originId ];
-      delete memoryMapInfo[ originId ];
+      quadTreeQuads = [];
+      dataExtentsInfo = {
+        minX:  Number.MAX_VALUE,
+        maxX: -Number.MAX_VALUE,
+        minY:  Number.MAX_VALUE,
+        maxY: -Number.MAX_VALUE
+      };
+
+      var centerX_m = 0.001 * memoryMapInfo[originId].rootCenterX;
+      var centerY_m = 0.001 * memoryMapInfo[originId].rootCenterY;
+      var depth     = memoryMapInfo[originId].rootDepth;
+      var rootSize  = 0.001 * memoryMapInfo[originId].rootSize_mm;
+
+      var root = new MemoryMapNode( depth, rootSize, new Point( centerX_m, centerY_m ) );
+      var expectedSeqNum = 0;
+      var srcQuadInfos = memoryMapQuadInfoVectorMapIncoming[originId] || {};
+
+      // Seq nums may arrive as string keys; walk in numeric order
+      var seqKeys = Object.keys( srcQuadInfos ).map( Number ).sort( function( a, b ) { return a - b; } );
+      for( var s = 0; s < seqKeys.length; ++s ) {
+        var seqNum = seqKeys[s];
+        if( seqNum !== expectedSeqNum ) {
+          console.log( 'DROPPED VIZ MESSAGE. map will be incorrect (expected seq ' +
+                       expectedSeqNum + ', got ' + seqNum + ')' );
+          break;
+        }
+        var quadInfo = srcQuadInfos[seqNum] || srcQuadInfos[String(seqNum)];
+        for( var idx = 0; idx < quadInfo.length; ++idx ) {
+          var quad = quadInfo[idx];
+          root.AddChild( quadTreeQuads, dataExtentsInfo, quad["content"], quad["depth"] );
+        }
+        ++expectedSeqNum;
+      }
+
+      delete memoryMapQuadInfoVectorMapIncoming[originId];
+      delete memoryMapInfo[originId];
 
       robotPosition = data["robot"];
 
-      // flip (quads are in mm already)
-      quadTreeQuads.forEach(function(quad){
-        quad.center.y = 0.001*kArbitraryXAxis - quad.center.y;
+      // Flip Y (quads are in meters; robot is mm)
+      quadTreeQuads.forEach( function( q ) {
+        q.center.y = flipY_m( q.center.y );
       });
       var tmpMaxY = dataExtentsInfo.maxY;
-      dataExtentsInfo.maxY = 0.001*kArbitraryXAxis - dataExtentsInfo.minY;
-      dataExtentsInfo.minY = 0.001*kArbitraryXAxis - tmpMaxY;
-      robotPosition.y = kArbitraryXAxis - robotPosition.y;
+      dataExtentsInfo.maxY = flipY_m( dataExtentsInfo.minY );
+      dataExtentsInfo.minY = flipY_m( tmpMaxY );
+      if( robotPosition ) {
+        robotPosition.y = flipY_mm( robotPosition.y );
+      }
 
-      vizDirty = true;
-      updateBtn.prop('disabled', autoUpdate);
+      mapBakeDirty = true;
+      cameraResetPending = true;
+      kickRedraw();
+      if( updateBtn ) { updateBtn.prop( 'disabled', autoUpdate ); }
       waitingOnData = false;
-    } 
+    }
     else if( type == "MemoryMapCubes" ) {
       var newCubeData = data["cubes"];
-      if( typeof newCubeData === 'undefined' ) {
-        return;
-      }
-      // todo: only update if position changed, instead of timestamp
+      if( typeof newCubeData === 'undefined' ) { return; }
       cubeData = newCubeData;
-      cubeData.forEach(function(cube) {
-        cube.y = kArbitraryXAxis - cube.y;
+      cubeData.forEach( function( cube ) {
+        cube.y = flipY_mm( cube.y );
       });
-    } 
+      kickRedraw();
+    }
     else if( type == "MemoryMapFace" ) {
       var id = data["faceID"];
-      data["pose"].y = kArbitraryXAxis - data["pose"].y;
-      // todo: only update if position changed, instead of timestamp
+      data["pose"].y = flipY_mm( data["pose"].y );
       faceData[id] = data;
+      kickRedraw();
     }
     else if( type == "RobotDeletedFace" ) {
-      var id = data["faceID"];
-      if( typeof faceData[id] !== 'undefined' ) {
-        delete faceData[id];
+      var faceId = data["faceID"];
+      if( typeof faceData[faceId] !== 'undefined' ) {
+        delete faceData[faceId];
+        kickRedraw();
       }
     }
   };
 
-  var kAutoUpdatePeriod_s = 5.0; 
+  var kAutoUpdatePeriod_s = 5.0;
   var timeTilAutoUpdate = kAutoUpdatePeriod_s;
   myMethods.update = function( dt, elem ) {
     timeTilAutoUpdate -= dt;
-    if( (timeTilAutoUpdate < 0) 
-        && autoUpdate 
-        && !waitingOnData ) 
-    {
+    if( (timeTilAutoUpdate < 0) && autoUpdate && !waitingOnData ) {
       callUpdate();
       timeTilAutoUpdate = kAutoUpdatePeriod_s;
     }
@@ -852,8 +1207,11 @@
         margin-left:20px;
         margin-right:5px;
       }
+      #navMapContainer {
+        background: #000;
+      }
     `;
-    for( var idx=0; idx<kKnownTypes.length; ++idx ) {
+    for( var idx = 0; idx < kKnownTypes.length; ++idx ) {
       var color = getQuadColor( kKnownTypes[idx] );
       styles += 'span.navMapLegendEntry[data-quadtype="' + kKnownTypes[idx] + '"]:before {';
       styles +=    'background: rgba(' + color.r + ',' + color.g + ',' + color.b + ',' + ((1.0*color.a)/255) + ')';
