@@ -220,13 +220,27 @@
       var ol = card.querySelector(".cv-steps");
       (recipe.steps || []).forEach(function (step) {
         var li = document.createElement("li");
-        li.innerHTML =
-          "<code>" +
-          escapeHtml(step.var) +
-          "</code> → <strong>" +
-          escapeHtml(String(step.value)) +
-          "</strong>" +
-          (step.note ? '<span class="cv-step-note">' + escapeHtml(step.note) + "</span>" : "");
+        if (step.func) {
+          li.innerHTML =
+            "Call <code>" +
+            escapeHtml(step.func) +
+            "</code>" +
+            (step.args != null && step.args !== ""
+              ? " args=<strong>" + escapeHtml(String(step.args)) + "</strong>"
+              : "") +
+            (step.note ? '<span class="cv-step-note">' + escapeHtml(step.note) + "</span>" : "");
+        } else {
+          li.innerHTML =
+            "<code>" +
+            escapeHtml(step.var) +
+            "</code> → <strong>" +
+            escapeHtml(String(step.value)) +
+            "</strong>" +
+            (step.enumLabel
+              ? ' <span class="cv-step-note">(' + escapeHtml(step.enumLabel) + ")</span>"
+              : "") +
+            (step.note ? '<span class="cv-step-note">' + escapeHtml(step.note) + "</span>" : "");
+        }
         ol.appendChild(li);
       });
       root.appendChild(card);
@@ -241,6 +255,54 @@
     }).then(function (r) {
       return r.text();
     });
+  }
+
+  function postFunc(func, args) {
+    // Same as stock UI: string body so commas in args are not encoded oddly
+    var body =
+      "func=" + encodeURIComponent(func) + "&args=" + encodeURIComponent(args == null ? "" : args);
+    return fetch("consolefunccall", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body,
+    }).then(function (r) {
+      return r.text();
+    });
+  }
+
+  function syncControlFromStep(step) {
+    if (!step.var) return;
+    var el = findControlByVarName(step.var);
+    if (!el) return;
+    if (el.type === "checkbox") {
+      el.checked = !!step.value;
+      return;
+    }
+    if (el.classList && el.classList.contains("amount")) {
+      el.value = step.value;
+      return;
+    }
+    if (el.classList && el.classList.contains("slider") && window.jQuery) {
+      try {
+        var scale = window.jQuery(el).data("scale") || 1;
+        window.jQuery(el).slider("value", Number(step.value) * scale);
+      } catch (e) {}
+      return;
+    }
+    // Enum listbox: stock posts item.index; update select if present
+    if (el.tagName === "SELECT" || (el.classList && el.classList.contains("listbox"))) {
+      var idx = Number(step.value);
+      if (window.jQuery && window.jQuery(el).data("ui-selectmenu")) {
+        try {
+          window.jQuery(el).val(window.jQuery(el).children().eq(idx).val());
+          window.jQuery(el).selectmenu("refresh");
+        } catch (e2) {
+          el.selectedIndex = idx;
+        }
+      } else {
+        el.selectedIndex = idx;
+      }
+    }
   }
 
   function applyRecipe(id) {
@@ -259,27 +321,25 @@
         return;
       }
       var step = steps[i++];
-      if (status) status.textContent = "Setting " + step.var + " …";
-      // Update UI control if present
-      var el = findControlByVarName(step.var);
-      if (el) {
-        if (el.type === "checkbox") {
-          el.checked = !!step.value;
-        } else if (el.classList && el.classList.contains("amount")) {
-          el.value = step.value;
-        } else if (el.classList && el.classList.contains("slider") && window.jQuery) {
-          try {
-            window.jQuery(el).slider("value", Number(step.value));
-          } catch (e) {}
-        }
-      }
-      postVar(step.var, step.value)
-        .catch(function (e) {
-          console.warn(e);
-        })
-        .then(function () {
-          setTimeout(next, 80);
+      var p;
+      if (step.func) {
+        if (status) status.textContent = "Calling " + step.func + " …";
+        p = postFunc(step.func, step.args || "").then(function (text) {
+          var out = $("#id_consolefunc_result");
+          if (out && text) out.innerHTML = String(text).replace(/\n/g, "<br>");
         });
+      } else if (step.var != null) {
+        if (status) status.textContent = "Setting " + step.var + " …";
+        syncControlFromStep(step);
+        p = postVar(step.var, step.value);
+      } else {
+        p = Promise.resolve();
+      }
+      p.catch(function (e) {
+        console.warn(e);
+      }).then(function () {
+        setTimeout(next, 100);
+      });
     }
     next();
   }
@@ -292,7 +352,9 @@
     });
     if (!recipe) return;
     (recipe.steps || []).forEach(function (step) {
-      var el = findControlByVarName(step.var);
+      var name = step.var || step.func;
+      if (!name) return;
+      var el = findControlByVarName(name) || document.getElementById(name + "_function");
       var row = rowForControl(el);
       if (row) {
         row.classList.add("cv-flash");

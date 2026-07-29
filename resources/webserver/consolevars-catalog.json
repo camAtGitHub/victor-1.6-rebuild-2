@@ -1,80 +1,164 @@
 {
-  "$schema_note": "Curated human docs for console vars. Not exhaustive. Keys match CONSOLE_VAR ids as shown in /consolevars UI. process: engine|anim|both",
-  "version": 1,
+  "$schema_note": "Curated human docs for console vars. Not exhaustive. Keys match CONSOLE_VAR / CONSOLE_FUNC ids as shown in /consolevars UI. process: engine|anim|both. Recipe steps: {var,value} or {func,args}. Enum values are 0-based indices (same as stock listbox posts).",
+  "version": 2,
   "recipes": [
     {
       "id": "mirror-face-boxes",
       "title": "Face boxes on the face LCD (MirrorMode)",
       "process": "engine",
-      "blurb": "Camera feed on Vector’s screen with OpenCV-style face (and related) overlays. The mode must be scheduled AND the mirror display flags enabled.",
-      "where": "Engine :8888 → Vision tab → General.VisionModes + Vision.General / Vision.MirrorMode",
+      "blurb": "Camera feed on Vector’s screen with face (and related) overlays. Mode must be scheduled AND the mirror display flags enabled.",
+      "where": "Engine :8888 → Vision → General.VisionModes + Vision.General / Vision.MirrorMode",
       "steps": [
-        {
-          "var": "Faces",
-          "value": true,
-          "note": "Vision mode: run face detection so there is something to draw."
-        },
-        {
-          "var": "MirrorMode",
-          "value": true,
-          "note": "Vision mode: render camera to the face display (mirror screen)."
-        },
-        {
-          "var": "kDisplayDetectionsInMirrorMode",
-          "value": true,
-          "note": "Draw detections (objects/faces/markers) into the mirror image."
-        },
-        {
-          "var": "kDisplayEyeContactInMirrorMode",
-          "value": true,
-          "note": "Extra face/eye-contact debug drawing in mirror (what many people mean by ‘boundary boxes’)."
-        }
+        { "var": "Faces", "value": true, "note": "Vision mode: run face detection so there is something to draw." },
+        { "var": "MirrorMode", "value": true, "note": "Vision mode: render camera to the face display (mirror screen)." },
+        { "var": "kDisplayDetectionsInMirrorMode", "value": true, "note": "Draw detections (objects/faces/markers) into the mirror image." },
+        { "var": "kDisplayEyeContactInMirrorMode", "value": true, "note": "Extra face/eye-contact debug drawing (often the ‘boxes’ people notice)." }
       ],
       "tips": [
-        "All of these are engine consolevars (port 8888), not anim 8889.",
-        "Faces + MirrorMode are under Vision.General.VisionModes (enum-named toggles).",
-        "If the face screen stays dark, confirm image capture is running and the robot is not in a screen that overrides MirrorMode."
+        "Engine only (port 8888), not anim 8889.",
+        "Faces + MirrorMode live under Vision.General.VisionModes (enum-named toggles)."
       ]
     },
     {
       "id": "mirror-markers",
       "title": "Marker / charger detections in MirrorMode",
       "process": "engine",
-      "blurb": "See fiducial / marker overlays on the face camera feed.",
+      "blurb": "Fiducial / marker overlays on the face camera feed.",
+      "where": "Engine :8888 → Vision",
       "steps": [
         { "var": "Markers", "value": true, "note": "Vision mode for marker detection." },
         { "var": "MirrorMode", "value": true, "note": "Show camera on face LCD." },
         { "var": "kDisplayDetectionsInMirrorMode", "value": true, "note": "Draw detections into mirror frame." },
         { "var": "kDisplayMarkerNamesScale", "value": 0.5, "note": "If > 0, also labels marker names (0–1 scale)." }
       ],
+      "tips": ["kDisplayMarkerNamesScale is under Vision.MirrorMode; 0 hides names."]
+    },
+    {
+      "id": "procface-custom-eyes-builtin",
+      "title": "Custom eye overlay (built-in pattern)",
+      "process": "anim",
+      "blurb": "Tint/overlay procedural eyes with a built-in faceOverlays asset (pride flags, frog, galaxy, …).",
+      "where": "Anim :8889 → Face → ParameterizedFace",
+      "steps": [
+        {
+          "var": "kProcFace_CustomEyeOverlay",
+          "value": 0,
+          "enumLabel": "Trans (index 0)",
+          "note": "List: Trans,Lesbian,Gay,Bi,Pan,Frog,All,Galaxy,Custom. Pick any built-in 0–7."
+        },
+        {
+          "func": "LoadFaceOverlay",
+          "args": "",
+          "note": "Loads the selected overlay PNG/JPG into memory (required after changing the list)."
+        },
+        {
+          "var": "kProcFace_CustomEyes",
+          "value": true,
+          "note": "Master switch: composite the loaded overlay onto procedural eyes."
+        },
+        {
+          "var": "kProcFace_CustomEyeOpacity",
+          "value": 0.8,
+          "note": "Optional blend strength (0–1)."
+        }
+      ],
       "tips": [
-        "kDisplayMarkerNamesScale is under Vision.MirrorMode; 0 hides names."
+        "Anim process only (port 8889).",
+        "Order matters: choose list → LoadFaceOverlay → tick CustomEyes.",
+        "Built-in assets live under cozmo_resources/assets/faceOverlays/."
+      ]
+    },
+    {
+      "id": "procface-custom-eyes-file",
+      "title": "Custom eye overlay from /data/data/customFaceOverlay.jpg",
+      "process": "anim",
+      "blurb": "Same as built-in overlay, but uses your file on the robot after picking Custom in the list.",
+      "where": "Anim :8889 → Face → ParameterizedFace",
+      "steps": [
+        {
+          "var": "kProcFace_CustomEyeOverlay",
+          "value": 8,
+          "enumLabel": "Custom (index 8)",
+          "note": "Selects path /data/data/customFaceOverlay.jpg (see LoadCustomEyePNG)."
+        },
+        {
+          "func": "LoadFaceOverlay",
+          "args": "",
+          "note": "Reads that file; fails silently if missing/empty — scp/curl the jpg first."
+        },
+        { "var": "kProcFace_CustomEyes", "value": true, "note": "Enable overlay composite." },
+        { "var": "kProcFace_CustomEyeOpacity", "value": 0.8, "note": "Blend opacity." }
+      ],
+      "tips": [
+        "Push an image first, e.g. curl -T my.jpg http://ROBOT:8889/… or scp to /data/data/customFaceOverlay.jpg",
+        "Image is resized to face display resolution if needed.",
+        "Re-press LoadFaceOverlay after replacing the file."
+      ]
+    },
+    {
+      "id": "mic-record-clip",
+      "title": "Record a mic data clip",
+      "process": "anim",
+      "blurb": "Capture raw + processed mic audio for a few seconds (debug / ear pull).",
+      "where": "Anim :8889 → MicData → RecordMicDataClip",
+      "steps": [
+        {
+          "var": "kMicData_ClipRecordTime_ms",
+          "value": 4000,
+          "note": "Clip length in ms (default 4000; range ~500–15000)."
+        },
+        {
+          "func": "RecordMicDataClip",
+          "args": "",
+          "note": "Starts the recording job (console function button)."
+        }
+      ],
+      "tips": [
+        "Clips land under cache micdata — see docs/development/mic-systems-overview.md and tools/ear_puller.py.",
+        "Web: http://ROBOT:8889/cache/micdata/"
       ]
     },
     {
       "id": "webviz-mood-stream",
       "title": "Stream mood into WebViz",
       "process": "engine",
-      "blurb": "Ensure mood samples reach the Mood WebViz tab at a useful rate.",
+      "blurb": "Mood samples to the Mood WebViz tab at a useful rate.",
+      "where": "Engine :8888",
       "steps": [
         {
           "var": "MoodManager_WebVizPeriod_s",
           "value": 0.25,
-          "note": "Seconds between mood pushes to WebViz (smaller = more traffic)."
+          "note": "Seconds between mood pushes (smaller = more traffic)."
+        }
+      ],
+      "tips": ["Open WebViz → Mood and Subscribe."]
+    },
+    {
+      "id": "play-anim-once",
+      "title": "Play a canned animation (anim process)",
+      "process": "anim",
+      "blurb": "Fire a named animation from console (useful smoke test of anim stack).",
+      "where": "Anim :8889 → Animations → PlayAnimation",
+      "steps": [
+        {
+          "func": "PlayAnimation",
+          "args": "anim_idle_01 1",
+          "note": "Args: name numLoops — change name to any known anim; ListAnimations dumps names."
         }
       ],
       "tips": [
-        "Open WebViz → Mood and Subscribe; period is also adjustable from that tab."
+        "Use ListAnimations (no args) to print available names into the console-func result box.",
+        "AbortCurrentAnimation cancels playback."
       ]
     }
   ],
   "categories": {
     "Vision": {
-      "blurb": "Camera pipeline, vision modes, mirror display, and face/marker debug. Engine process only.",
+      "blurb": "Camera pipeline, vision modes, mirror display, face/marker debug. Engine only.",
       "process": "engine"
     },
     "Vision.General.VisionModes": {
-      "blurb": "Per-VisionMode force-enable toggles (Faces, MirrorMode, Markers, …). Enabling also Dev-subscribes the mode so it is scheduled.",
+      "blurb": "Per-VisionMode force-enable toggles (Faces, MirrorMode, Markers, …). Enabling also Dev-subscribes so the mode is scheduled.",
       "process": "engine"
     },
     "Vision.MirrorMode": {
@@ -86,39 +170,43 @@
       "process": "engine"
     },
     "MicData": {
-      "blurb": "Microphone capture / clip recording (mostly anim :8889).",
+      "blurb": "Microphone capture / clip recording. Anim process (:8889).",
       "process": "anim"
     },
-    "ProceduralFace": {
-      "blurb": "Procedural face drawing knobs (anim :8889).",
+    "Face.ParameterizedFace": {
+      "blurb": "Procedural face drawing, AA, glow, custom eye overlays. Anim process (:8889). UI path often Face → ParameterizedFace.",
+      "process": "anim"
+    },
+    "Animations": {
+      "blurb": "List/play/abort canned animations on the anim process.",
       "process": "anim"
     }
   },
   "vars": {
     "Faces": {
       "process": "engine",
-      "blurb": "Force-enable VisionMode::Faces (face detection). Needed before face overlays have data.",
+      "blurb": "Force-enable VisionMode::Faces (face detection).",
       "category": "Vision.General.VisionModes",
       "related": ["MirrorMode", "kDisplayEyeContactInMirrorMode", "kDisplayDetectionsInMirrorMode"],
       "tags": ["vision", "faces", "highlight"]
     },
     "MirrorMode": {
       "process": "engine",
-      "blurb": "Force-enable VisionMode::MirrorMode — camera feed composited onto the face LCD.",
+      "blurb": "Force-enable VisionMode::MirrorMode — camera on the face LCD.",
       "category": "Vision.General.VisionModes",
       "related": ["Faces", "kDisplayDetectionsInMirrorMode", "kDisplayEyeContactInMirrorMode"],
       "tags": ["vision", "mirror", "highlight"]
     },
     "Markers": {
       "process": "engine",
-      "blurb": "Force-enable marker / fiducial detection vision mode.",
+      "blurb": "Force-enable marker / fiducial detection.",
       "category": "Vision.General.VisionModes",
       "related": ["MirrorMode", "kDisplayDetectionsInMirrorMode", "kDisplayMarkerNamesScale"],
       "tags": ["vision", "markers"]
     },
     "kDisplayEyeContactInMirrorMode": {
       "process": "engine",
-      "blurb": "When MirrorMode is active, draw eye-contact / face debug (often the ‘boxes’ people notice).",
+      "blurb": "With MirrorMode, draw eye-contact / face debug (often the ‘boxes’).",
       "category": "Vision.General",
       "requires": ["MirrorMode"],
       "related": ["Faces", "kDisplayDetectionsInMirrorMode"],
@@ -148,7 +236,7 @@
     },
     "kMirrorModeGamma": {
       "process": "engine",
-      "blurb": "Gamma adjustment for the mirrored camera image.",
+      "blurb": "Gamma for the mirrored camera image.",
       "category": "Vision.MirrorMode",
       "tags": ["vision", "mirror"]
     },
@@ -160,9 +248,83 @@
     },
     "kSendDebugImages": {
       "process": "engine",
-      "blurb": "Send debug image streams from the vision system (bandwidth heavy).",
+      "blurb": "Send debug image streams from vision (bandwidth heavy).",
       "category": "Vision.General",
       "tags": ["vision", "debug"]
+    },
+    "kProcFace_CustomEyes": {
+      "process": "anim",
+      "blurb": "Composite a loaded eye overlay image onto procedural eyes. Requires LoadFaceOverlay first (and a valid overlay selection).",
+      "category": "Face.ParameterizedFace",
+      "requires": ["kProcFace_CustomEyeOverlay"],
+      "related": ["kProcFace_CustomEyeOpacity", "LoadFaceOverlay"],
+      "tags": ["face", "procedural", "highlight"]
+    },
+    "kProcFace_CustomEyeOverlay": {
+      "process": "anim",
+      "blurb": "Which overlay asset to load: 0–7 built-ins under faceOverlays/, 8 = Custom → /data/data/customFaceOverlay.jpg.",
+      "category": "Face.ParameterizedFace",
+      "related": ["kProcFace_CustomEyes", "LoadFaceOverlay", "kProcFace_CustomEyeOpacity"],
+      "tags": ["face", "procedural", "highlight"]
+    },
+    "kProcFace_CustomEyeOpacity": {
+      "process": "anim",
+      "blurb": "Opacity when blending the custom eye overlay (0–1).",
+      "category": "Face.ParameterizedFace",
+      "related": ["kProcFace_CustomEyes"],
+      "tags": ["face", "procedural"]
+    },
+    "LoadFaceOverlay": {
+      "process": "anim",
+      "blurb": "Console function: load the file selected by kProcFace_CustomEyeOverlay into the procedural face drawer.",
+      "category": "Face.ParameterizedFace",
+      "related": ["kProcFace_CustomEyes", "kProcFace_CustomEyeOverlay"],
+      "tags": ["face", "procedural", "func", "highlight"]
+    },
+    "kProcFace_HotspotRender": {
+      "process": "anim",
+      "blurb": "Render eye glow / hotspot on procedural face.",
+      "category": "Face.ParameterizedFace",
+      "tags": ["face", "procedural"]
+    },
+    "kProcFace_EnableAntiAliasing": {
+      "process": "anim",
+      "blurb": "Full-image antialiasing on procedural face.",
+      "category": "Face.ParameterizedFace",
+      "tags": ["face", "procedural"]
+    },
+    "kMicData_ClipRecordTime_ms": {
+      "process": "anim",
+      "blurb": "Duration of RecordMicDataClip (ms).",
+      "category": "MicData",
+      "related": ["RecordMicDataClip"],
+      "tags": ["mic", "highlight"]
+    },
+    "RecordMicDataClip": {
+      "process": "anim",
+      "blurb": "Console function: record raw + processed mic for kMicData_ClipRecordTime_ms.",
+      "category": "MicData",
+      "related": ["kMicData_ClipRecordTime_ms"],
+      "tags": ["mic", "func", "highlight"]
+    },
+    "PlayAnimation": {
+      "process": "anim",
+      "blurb": "Console function: play animation by name (args: name [numLoops]).",
+      "category": "Animations",
+      "related": ["ListAnimations", "AbortCurrentAnimation"],
+      "tags": ["anim", "func"]
+    },
+    "ListAnimations": {
+      "process": "anim",
+      "blurb": "Console function: dump animation names to the result box.",
+      "category": "Animations",
+      "tags": ["anim", "func"]
+    },
+    "AbortCurrentAnimation": {
+      "process": "anim",
+      "blurb": "Console function: stop current animation.",
+      "category": "Animations",
+      "tags": ["anim", "func"]
     },
     "MoodManager_WebVizPeriod_s": {
       "process": "engine",
