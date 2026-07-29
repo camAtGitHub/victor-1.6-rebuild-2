@@ -148,8 +148,12 @@
   myMethods.init = function(elem) {
     setHost( elem );
 
-    if( location.port != "8888" ) {
-      $('<h3>You must use this tab with the engine process (port 8888)</h3>').appendTo(elem);
+    // Feed port, not location.port (dev PC static server + remote robot :8888)
+    var engineOk = window.WebVizConfig && typeof window.WebVizConfig.isFeedPort === 'function'
+      ? window.WebVizConfig.isFeedPort( '8888' )
+      : String( location.port ) !== '8889';
+    if( !engineOk ) {
+      $('<h3>You must use this tab with the engine process (feed port 8888)</h3>').appendTo(elem);
     }
 
     var angleFactorA = 0.866;

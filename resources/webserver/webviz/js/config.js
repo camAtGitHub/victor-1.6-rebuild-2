@@ -308,6 +308,16 @@
     };
   }
 
+  /**
+   * True when the WebSocket *feed* targets this process port.
+   * Prefer this over location.port — page may be on a dev static server
+   * while data comes from robot :8888 / :8889.
+   */
+  function isFeedPort(port) {
+    var f = resolveFeed();
+    return String(f.port) === String(port);
+  }
+
   global.WebVizConfig = {
     MODULES_ENGINE: MODULES_ENGINE,
     MODULES_ANIM: MODULES_ANIM,
@@ -326,5 +336,6 @@
     readStoredFeedPort: readStoredFeedPort,
     writeStoredFeed: writeStoredFeed,
     resolveFeed: resolveFeed,
+    isFeedPort: isFeedPort,
   };
 })(window);

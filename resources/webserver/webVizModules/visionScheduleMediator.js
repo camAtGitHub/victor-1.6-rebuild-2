@@ -42,37 +42,12 @@
     return $host().find( '#vsmCanvas' )[0] || null;
   }
 
-  /**
-   * Engine vs anim is the *data feed* port, not location.port.
-   * Dev PC often serves HTML on :9876 while WebSocket targets robot :8888
-   * (WebViz.connect / ?host=&port=). location.port alone is wrong there.
-   */
   function isEngineFeed() {
-    try {
-      if( window.WebVizConfig && typeof window.WebVizConfig.resolveFeed === 'function' ) {
-        var feed = window.WebVizConfig.resolveFeed();
-        if( feed && feed.port != null && String( feed.port ) !== '' ) {
-          return String( feed.port ) === '8888';
-        }
-      }
-    } catch( e ) {}
-    // Query ?port=8888 when shell helpers unavailable
-    try {
-      var q = ( window.location.search || '' ).match( /(?:^|[?&])port=([^&]*)/ );
-      if( q && q[1] ) {
-        return decodeURIComponent( q[1] ) === '8888';
-      }
-    } catch( e2 ) {}
-    // Classic: page served by engine process itself
-    if( String( window.location.port ) === '8888' ) {
-      return true;
+    if( window.WebVizConfig && typeof window.WebVizConfig.isFeedPort === 'function' ) {
+      return window.WebVizConfig.isFeedPort( '8888' );
     }
-    // Module is only registered on the engine set in the new shell — if we
-    // got here without a clear anim port, allow init rather than false-block.
-    if( String( window.location.port ) === '8889' ) {
-      return false;
-    }
-    return true;
+    // Fallback without shell config: only block clear anim-page case
+    return String( window.location.port ) !== '8889';
   }
 
   function drawVisionScheduleGrid(rows, cols) {

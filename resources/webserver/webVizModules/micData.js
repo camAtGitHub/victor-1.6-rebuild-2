@@ -146,8 +146,12 @@
   myMethods.init = function(elem) {
     setHost( elem );
 
-    if( location.port != "8889" ) {
-      $('<h3>You must use this tab with the anim process (port 8889)</h3>').appendTo(elem);
+    // Feed port, not location.port (dev PC static server + remote robot :8889)
+    var animOk = window.WebVizConfig && typeof window.WebVizConfig.isFeedPort === 'function'
+      ? window.WebVizConfig.isFeedPort( '8889' )
+      : String( location.port ) === '8889';
+    if( !animOk ) {
+      $('<h3>You must use this tab with the anim process (feed port 8889)</h3>').appendTo(elem);
     }
 
     var angleFactorA = 0.866; // cos(30 degrees)
