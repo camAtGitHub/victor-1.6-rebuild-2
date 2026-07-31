@@ -44,7 +44,10 @@
     "vars/engine-calib.json",
     "vars/anim-dump-orphans.json",
     "vars/engine-face-tracking.json",
-    "vars/engine-face-directed.json"
+    "vars/engine-face-directed.json",
+    "vars/engine-cube-pose.json",
+    "vars/engine-dock-charger.json",
+    "vars/engine-vision-save-display.json"
   ],
   "categories": [
     "categories/vision.json",
