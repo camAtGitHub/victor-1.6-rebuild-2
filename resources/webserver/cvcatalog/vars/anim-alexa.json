@@ -1,0 +1,217 @@
+{
+  "vars": {
+    "Alexa": {
+      "process": "anim",
+      "blurb": "Not a settable console variable. The inventory dump lists bare “Alexa” next to other category tab names (Actions, Audio, Behaviors, …). Real Alexa knobs live under the console categories “Alexa”, “Alexa.Init”, “Alexa.Messaging”, “SpeechRecognizer.Alexa”, and “FaceInfoScreenManager”.",
+      "detail": "No CONSOLE_VAR or CONSOLE_FUNC registers with id kAlexa / Alexa. Hungarian strip would only produce id “Alexa” from a symbol named kAlexa or gAlexa — neither exists in this tree. The same dump block also contains “*” and many engine-style category labels, so treat this line as inventory noise (category label leakage), not a control you can flip. Product Alexa is gated by features.json feature “Alexa”, opt-in (app or engine ForceAlexaOptIn), and the anim Alexa stack under animProcess/src/cozmoAnim/alexa/.",
+      "related": [
+        "AlexaEnabledInUK",
+        "AlexaEnabledInAU",
+        "AlexaIdleDelay_s",
+        "LogAlexaDirectives",
+        "SaveAlexaAudio"
+      ],
+      "evidence": "resources/webserver/.docs/consolevarlist_8889:156 (peer category-like lines 154–172 + '*'); no kAlexa registration (rg); docs/development/alexa.md; resources/config/features.json feature Alexa",
+      "category": "Alexa",
+      "status": "dead",
+      "statusNote": "Dump id only — not registered as a console var. Category string for many real Alexa vars; do not expect consolevarset key=Alexa to do anything useful.",
+      "tags": ["alexa", "orphan", "dump-artifact"]
+    },
+    "AlexaEnabledInAU": {
+      "process": "anim",
+      "blurb": "When true (default), Alexa is allowed for robots whose country locale is Australia (AU). When false, the anim process treats AU as an unsupported Alexa locale: locale updates are ignored for Alexa, and AU-specific wake-word / AVS locale paths do not enable.",
+      "detail": "Read by AlexaLocaleEnabled helpers in alexa.cpp, alexaImpl.cpp, and speechRecognizerSystem.cpp (US always allowed; GB/AU gated by these flags). Also used in MicDataSystem when Alexa is active so AU can enable the speaker-notch detector (self-barge-in protection). Ticket VIC-13319 notes these should eventually go away. features.json Alexa_AU comments say it must match this console default (true).",
+      "howTo": "Set false only if you need to force-disable Alexa for AU robots without changing product features. Restart / re-opt-in may be needed if Alexa already initialized for that locale.",
+      "related": ["AlexaEnabledInUK"],
+      "evidence": "animProcess/src/cozmoAnim/alexa/alexa.cpp:47-76,840-842; alexaImpl.cpp:85-86,219-229; speechRecognizerSystem.cpp:40-41,162-176,407-416; micDataSystem.cpp:844-847; resources/config/features.json Alexa_AU",
+      "category": "Alexa",
+      "status": "live",
+      "tags": ["alexa", "locale", "feature-gate"]
+    },
+    "AlexaEnabledInUK": {
+      "process": "anim",
+      "blurb": "When true (default), Alexa is allowed for robots whose country locale is United Kingdom (GB). When false, GB is treated as unsupported for Alexa the same way as other non-US locales.",
+      "detail": "Same AlexaLocaleEnabled path as AlexaEnabledInAU: US always on; GB checks this flag; AU checks AlexaEnabledInAU. Speech recognizer locale updates for Alexa mic + playback models only run when the locale is enabled. MicDataSystem enables the notch detector while Alexa is active on GB/AU when the matching flag is true. features.json Alexa_UK is documented to match this default (true).",
+      "related": ["AlexaEnabledInAU"],
+      "evidence": "animProcess/src/cozmoAnim/alexa/alexa.cpp:47-76,840-842; alexaImpl.cpp:219-229; speechRecognizerSystem.cpp:162-176,407-416; micDataSystem.cpp:844-847; resources/config/features.json Alexa_UK",
+      "category": "Alexa",
+      "status": "live",
+      "tags": ["alexa", "locale", "feature-gate"]
+    },
+    "AlexaHackCheckForSystemClockSyncPeriod_s": {
+      "process": "anim",
+      "blurb": "How often (seconds of basestation time) the Alexa impl samples wall-clock time to detect NTP/time jumps. Default 5 s. Set to 0 to disable the check. If wall time jumps by more than about 5 s relative to that period, Alexa timers are reinitialized so alarms/timers still fire.",
+      "detail": "Workaround for unreliable OSState::IsWallTimeSynced (JIRA VIC-4527). On each period, compares WallTime delta to the basestation period; if |delta − period| > 5 s, logs a warning and calls _client->ReinitializeAllTimers(). Only runs after Alexa impl init has completed. Does not fix the system clock itself — only refreshes AVS client timers after a jump.",
+      "howTo": "Leave at 5 for production-like behavior. Set 0 while debugging clock/timer issues if the refresh is noisy. After a large time change, watch logs for AlexaImpl.Update.TimeJumpDetected.ResetTimers.",
+      "evidence": "animProcess/src/cozmoAnim/alexa/alexaImpl.cpp:132-134,665-687",
+      "category": "Alexa",
+      "status": "live",
+      "tags": ["alexa", "timer", "ntp", "hack"]
+    },
+    "AlexaIdleDelay_s": {
+      "process": "anim",
+      "blurb": "Seconds to wait after a recent Play/Speak/SetAlert/DeleteAlert directive before Vector’s Alexa UX state is allowed to go Idle when nothing is actually playing. Default 2 s; console range 0–10. Bridges short gaps so the robot does not flash “normal” freeplay between sequential Alexa audio clips.",
+      "detail": "In CheckForUXStateChange, when dialog UX is FINISHED/IDLE and no sources/alerts/audio are active: if the last Play-like directive is older than AlexaMaxIdleDelay_s, go Idle immediately; else if this delay > 0, schedule _timeToSetIdle_s = lastPlay + AlexaIdleDelay_s. Update() later forces dialog IDLE and rechecks UX when that timer elapses and nothing is playing. Watchdog fail time (5 s) is expected to stay larger than both idle delays (TODO in code).",
+      "related": ["AlexaMaxIdleDelay_s"],
+      "evidence": "animProcess/src/cozmoAnim/alexa/alexaImpl.cpp:118-123,691-697,960-965,1091-1115",
+      "category": "Alexa",
+      "status": "live",
+      "tags": ["alexa", "ux", "timing"]
+    },
+    "AlexaMaxIdleDelay_s": {
+      "process": "anim",
+      "blurb": "Maximum age (seconds) of the last Play/Speak/alert directive that still counts as “about to speak.” If the last such directive is older than this (default 3 s) and nothing is playing, UX goes Idle immediately without waiting for AlexaIdleDelay_s.",
+      "detail": "Companion to AlexaIdleDelay_s. Without a recent Play-family directive (or after this max age), the robot does not hold the speaking UX. If a directive is still recent, Idle is deferred by AlexaIdleDelay_s instead. Tunable 0–10 s.",
+      "related": ["AlexaIdleDelay_s"],
+      "evidence": "animProcess/src/cozmoAnim/alexa/alexaImpl.cpp:121-123,1105-1115",
+      "category": "Alexa",
+      "status": "live",
+      "tags": ["alexa", "ux", "timing"]
+    },
+    "AlexaNotificationTimeout_s": {
+      "process": "anim",
+      "blurb": "How long (seconds) the full-face “Alexa has a notification” screen stays up before auto-returning to the normal face. Default 2 s; range about 0.001–3.",
+      "detail": "FaceInfoScreenManager ScreenName::AlexaNotification: enter runs DrawAlexaNotification (plays anim_avs_notification_loop_01 once via AnimationStreamer), and SET_TIMEOUT uses this duration then leaves to None. Separate from Alexa pairing success/fail timeouts (fixed 5 s). StartAlexaNotification() sets this screen when product code requests it.",
+      "evidence": "animProcess/src/cozmoAnim/faceDisplay/faceInfoScreenManager.cpp:179,756-761,2142-2153,2396-2398",
+      "category": "FaceInfoScreenManager",
+      "status": "live",
+      "tags": ["alexa", "face", "ui", "timeout"]
+    },
+    "AlexaPlaybackRecognizerModel": {
+      "process": "anim",
+      "blurb": "Dev enum selecting which Pryon “Alexa” locale model the playback (speaker self-trigger) recognizer should load: enUS, enUK, enAU, frFR, deDE. Default enUS. Changing the list alone does nothing until you run the console function “Update Alexa Playback Recognizer”.",
+      "detail": "Registered only under ANKI_DEV_CHEATS. Playback recognizer runs on audio engine master out so Vector can ignore “Alexa” that it just spoke (barge-in / self-loop). UpdateRecognizerHelper copies the enum into the active model index and reloads trigger paths for that locale. Needs an already-active Alexa playback trigger; otherwise the func logs that the trigger is not active.",
+      "howTo": "1) Opt into Alexa so the playback recognizer is running. 2) Set this enum. 3) Call console function “Update Alexa Playback Recognizer”. Confirm log “Update Alexa Playback Recognizer …”.",
+      "requires": ["Update Alexa Playback Recognizer"],
+      "related": ["AlexaRecognizerModel", "PlaybackRecognizerSampleCountThreshold"],
+      "enumLabels": ["enUS", "enUK", "enAU", "frFR", "deDE"],
+      "evidence": "animProcess/src/cozmoAnim/speechRecognizer/speechRecognizerSystem.cpp:135-150,223-241,246-276; SetupConsoleFuncs",
+      "category": "SpeechRecognizer.AlexaPlayback",
+      "status": "partial",
+      "statusNote": "ANKI_DEV_CHEATS only. Enum is applied only when “Update Alexa Playback Recognizer” runs successfully with an active playback trigger.",
+      "tags": ["alexa", "speech", "locale", "dev-cheats"]
+    },
+    "AlexaRecognizerModel": {
+      "process": "anim",
+      "blurb": "Dev enum selecting which Pryon “Alexa” wake-word model the mic recognizer should load: enUS, enUK, enAU, frFR, deDE. Default enUS. Does not switch models until you call “Update Alexa Recognizer”.",
+      "detail": "ANKI_DEV_CHEATS only. Normal product path loads the model from robot locale via UpdateTriggerForLocale (default paths), not from this enum. The console enum + Update Alexa Recognizer helper force a specific locale’s Pryon assets for testing. Requires _alexaTrigger already created (Alexa activated).",
+      "howTo": "1) Enable/opt-in Alexa so the mic “Alexa” trigger is active. 2) Set this enum. 3) Call “Update Alexa Recognizer”. 4) Say “Alexa” and check recognition for that locale.",
+      "requires": ["Update Alexa Recognizer"],
+      "related": ["AlexaPlaybackRecognizerModel", "AlexaEnabledInUK", "AlexaEnabledInAU"],
+      "enumLabels": ["enUS", "enUK", "enAU", "frFR", "deDE"],
+      "evidence": "animProcess/src/cozmoAnim/speechRecognizer/speechRecognizerSystem.cpp:135-146,210-221,246-276,407-416,505-515",
+      "category": "SpeechRecognizer.Alexa",
+      "status": "partial",
+      "statusNote": "ANKI_DEV_CHEATS only. Applied only via “Update Alexa Recognizer”; product locale updates ignore this enum.",
+      "tags": ["alexa", "speech", "wake-word", "dev-cheats"]
+    },
+    "DEV_ONLY_EnableAlexaTemplateRendererStub": {
+      "process": "anim",
+      "blurb": "When true at Alexa client construction, registers a stub TemplateRuntime capability so the robot advertises screen/template support to AVS and can receive RenderTemplate / RenderPlayerInfo directives. Default false. Stub does not draw UI — handlers are empty; useful only with directive logging.",
+      "detail": "Under ANKI_DEV_CHEATS. Read three times during AlexaClient::Init: create AlexaTemplateRuntimeStub, add directive handler for TemplateRuntime, register capability. Must be true before the AVS client is built (Alexa opt-in / impl init). Pair with LogAlexaDirectives (and optionally SendAlexaDirective) to inspect payloads. See alexaTemplateRuntimeStub.h header: “results only show up in the directives file for now.”",
+      "howTo": "1) Set true and persist console vars if needed. 2) Re-init Alexa (opt out/in or restart anim so client is recreated). 3) Enable LogAlexaDirectives. 4) Trigger content that would render a card on a screen device.",
+      "requires": ["LogAlexaDirectives"],
+      "related": ["LogAlexaDirectives"],
+      "evidence": "animProcess/src/cozmoAnim/alexa/alexaClient.cpp:83-85,524-527,622-630,717-725; alexaTemplateRuntimeStub.h:7-9,49-55",
+      "category": "Alexa",
+      "status": "partial",
+      "statusNote": "ANKI_DEV_CHEATS only; only read during client Init — toggling later without recreating the client has no effect. Stub does not render to the face.",
+      "tags": ["alexa", "dev-cheats", "avs", "template"]
+    },
+    "DumpAlexaTriggerAudio": {
+      "process": "anim",
+      "blurb": "When true during Alexa SDK init, opens a second mic stream that dumps wake-word audio to PCM files under the Alexa cache folder each time “Alexa” is detected. Default false. Must be on before init (save console var or edit default); toggling after init does not create the debug microphone.",
+      "detail": "Category Alexa.Init. On init (ANKI_DEV_CHEATS), creates _debugMicrophone sharing a ring buffer; NotifyOfWakeWord writes audioInput_<n>.pcm and logs sample indices for the trigger range. Prefer this over StealAlexaWakewordAudio (which consumes the outbound attachment and breaks upload). Non-destructive parallel capture.",
+      "howTo": "1) Set true and save console vars (or hardcode). 2) Restart anim / re-init Alexa so InitThread sees the flag. 3) Say “Alexa”. 4) Pull PCM from the cache path.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/alexa/audioInput_*.pcm"
+        ],
+        "notes": "Folder is dataPlatform Scope::Cache + \"alexa\". Hardcoded peer path in messaging code uses /data/data/com.anki.victor/cache/alexa/."
+      },
+      "related": ["StealAlexaWakewordAudio", "SaveAlexaAudio", "LogAlexaMessages"],
+      "evidence": "animProcess/src/cozmoAnim/alexa/alexaImpl.cpp:128-130,569-576,914-915,1443-1483; alexaMessageRouter.cpp:54-57",
+      "category": "Alexa.Init",
+      "status": "partial",
+      "statusNote": "Only consulted at Alexa impl init under ANKI_DEV_CHEATS. Runtime toggle after init is a no-op until re-init.",
+      "tags": ["alexa", "debug", "audio", "paths", "dev-cheats"]
+    },
+    "LogAlexaDirectives": {
+      "process": "anim",
+      "blurb": "When true, every Alexa directive received by the impl is logged and appended (pretty JSON) to directives.txt in the Alexa cache folder, and also pushed to WebViz module “alexa” if a client is subscribed. Default false.",
+      "detail": "OnDirective always tracks last Play/Speak/SetAlert/DeleteAlert time for idle UX; logging is gated by this flag. Writes basestation timestamp + directive name + styled payload. Useful with DEV_ONLY_EnableAlexaTemplateRendererStub and SendAlexaDirective (replay from logs).",
+      "howTo": "Set true → use Alexa → inspect directives.txt or WebViz alexa tab. File is deleted at next Alexa Init under ANKI_DEV_CHEATS if it already exists.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/alexa/directives.txt"
+        ],
+        "notes": "Path = Scope::Cache / alexa / directives.txt."
+      },
+      "related": [
+        "DEV_ONLY_EnableAlexaTemplateRendererStub",
+        "LogAlexaMessages",
+        "AlexaIdleDelay_s"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/alexa/alexaImpl.cpp:108-109,125-126,303-307,961-991",
+      "category": "Alexa",
+      "status": "live",
+      "tags": ["alexa", "debug", "logging", "paths", "webviz"]
+    },
+    "LogAlexaMessages": {
+      "process": "anim",
+      "blurb": "When true, logs outbound and inbound AVS messages to messages.txt under the Alexa cache (SEND/RECV with basestation time). Default false. Required if you use StealAlexaWakewordAudio (steal only runs inside the send path when this is on).",
+      "detail": "AlexaMessageRouter::sendMessage and consumeMessage. First use of the log path hardcodes /data/data/com.anki.victor/cache/alexa/ on robot and deletes any existing messages.txt once when the folder helper initializes. Floods disk if left on during long sessions.",
+      "howTo": "Set true before exercising Alexa cloud traffic. Pull messages.txt for AVS protocol debugging.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/alexa/messages.txt"
+        ],
+        "notes": "Hardcoded robot path in GetAlexaCacheFolder()."
+      },
+      "related": ["StealAlexaWakewordAudio", "LogAlexaDirectives"],
+      "evidence": "animProcess/src/cozmoAnim/alexa/alexaMessageRouter.cpp:50-52,60-103,124-130,183-192",
+      "category": "Alexa.Messaging",
+      "status": "live",
+      "statusNote": "Can grow messages.txt quickly — disable when done.",
+      "tags": ["alexa", "debug", "logging", "paths", "avs"]
+    },
+    "SaveAlexaAudio": {
+      "process": "anim",
+      "blurb": "When true (dev cheats), each Alexa media player writes decoded PCM and source MP3 for the current source to the Alexa cache as speaker_<type><sourceId>.pcm/.mp3. Default false. Lets you capture TTS, alerts, and content audio Alexa is playing.",
+      "detail": "ANKI_DEV_CHEATS only. SavePCM/SaveMP3 no-op if false. Init deletes stale speaker_* files for that player type. Files open on first write and close when size 0 / null buffer is passed (end of stream). Multiple player types (TTS, alerts, audio, notifications) each write their own name prefix.",
+      "howTo": "1) Set true. 2) Trigger Alexa speech or media. 3) Pull speaker_*.pcm / .mp3 from cache/alexa/.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/alexa/speaker_*.pcm",
+          "/data/data/com.anki.victor/cache/alexa/speaker_*.mp3"
+        ],
+        "notes": "Scope::Cache / alexa / speaker_<AudioInfo.name><sourceId>.*"
+      },
+      "related": ["DumpAlexaTriggerAudio", "LogAlexaDirectives"],
+      "evidence": "animProcess/src/cozmoAnim/alexa/media/alexaMediaPlayer.cpp:203-205,267-283,1206-1246",
+      "category": "Alexa",
+      "status": "live",
+      "statusNote": "Registration and save path gated by ANKI_DEV_CHEATS.",
+      "tags": ["alexa", "debug", "audio", "paths", "dev-cheats"]
+    },
+    "StealAlexaWakewordAudio": {
+      "process": "anim",
+      "blurb": "When true (and LogAlexaMessages is also true), reads outbound AVS message attachments to attachment_<n>.pcm under the Alexa cache — but consumes the attachment so it is not uploaded correctly. Default false. Prefer DumpAlexaTriggerAudio for non-destructive wake-word capture.",
+      "detail": "Author comment: lazy debug path; “won't get sent up, and won't actually work.” Nested under sendMessage after WriteMessageDebugFile. Does not seek the reader back to 0 after drain. Only useful to inspect exact bytes that would have been sent; breaks live Alexa recognition for that utterance.",
+      "howTo": "Prefer DumpAlexaTriggerAudio. If you must use this: enable LogAlexaMessages + this flag, say Alexa, pull attachment_*.pcm, then turn both off.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/alexa/attachment_*.pcm"
+        ],
+        "notes": "Same hardcoded cache folder as LogAlexaMessages."
+      },
+      "requires": ["LogAlexaMessages"],
+      "related": ["DumpAlexaTriggerAudio", "LogAlexaMessages"],
+      "evidence": "animProcess/src/cozmoAnim/alexa/alexaMessageRouter.cpp:54-58,124-177",
+      "category": "Alexa.Messaging",
+      "status": "danger",
+      "statusNote": "Destructively drains wake-word attachments so AVS may not receive audio. Code marks it inferior to DumpAlexaTriggerAudio.",
+      "tags": ["alexa", "debug", "audio", "paths", "danger"]
+    }
+  }
+}
