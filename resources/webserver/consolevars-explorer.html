@@ -122,7 +122,7 @@
     }
     .cv-btn:hover { color: var(--cv-text); border-color: #3a465c; }
     .cv-btn-primary { background: var(--cv-accent-dim); border-color: var(--cv-accent); color: var(--cv-accent); }
-    /* Compact Path A marks (shared consolevars-app.js) */
+    /* Compact Path A marks (shared /cv-app.js) */
     .cv-marks {
       display: inline-flex; align-items: center; gap: 4px;
       position: relative; vertical-align: middle; margin: 0 4px 0 2px;
@@ -293,11 +293,11 @@
       <h2>Recipes (curated)</h2>
       <p class="cv-muted" style="margin-top:0">
         Not every var is documented — only high-signal paths. Add entries in
-        <code>consolevars-catalog.json</code>. Apply posts <code>consolevarset</code> for each step.
+        <code>cvcatalog/</code> shards (or <code>cv-catalog.json</code>). Apply posts <code>consolevarset</code> for each step.
       </p>
       <div id="cvRecipes"></div>
     </aside>
   </div>
-  <script src="/consolevars-app.js"></script>
+  <script src="/cv-app.js"></script>
 </body>
 </html>

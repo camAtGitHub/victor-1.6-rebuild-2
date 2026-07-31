@@ -3,8 +3,8 @@
  * Runs after C++ injects category HTML into consolevarsui.html (classic) or
  * consolevars-explorer.html. Explorer chrome (#cvRecipes, #cvSearch, #cvProcessBadge)
  * is optional — missing nodes are skipped; catalog load + row decoration always run.
- * Catalog: prefer /cvcatalog/index.json shards; fall back to /consolevars-catalog.json.
- * Never use /consolevars/* for static catalog (handler steals those URLs).
+ * Catalog: /cvcatalog/index.json shards; fall back to /cv-catalog.json.
+ * Never use URLs that start with /consolevars (handler steals them → HTML 200).
  */
 (function () {
   "use strict";
@@ -12,11 +12,11 @@
   var catalog = null;
   var processHint = guessProcess();
   var DEAD_STATUSES = { dead: 1, orphan: 1, noop: 1 };
-  // IMPORTANT: must NOT live under /consolevars/ — CivetWeb registers a
-  // prefix handler for "/consolevars" that also steals "/consolevars/*"
-  // (e.g. /consolevars/index.json returns the HTML page, not JSON).
+  // IMPORTANT: nothing static may start with the string "/consolevars".
+  // CivetWeb handler "/consolevars" prefix-matches that URI, so
+  // /consolevars-app.js and /consolevars/index.json both returned HTML.
   var CATALOG_INDEX = "/cvcatalog/index.json";
-  var CATALOG_FALLBACK = "/consolevars-catalog.json";
+  var CATALOG_FALLBACK = "/cv-catalog.json";
 
   function guessProcess() {
     var p = String(window.location.port || "");

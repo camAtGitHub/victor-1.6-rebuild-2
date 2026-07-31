@@ -42,8 +42,9 @@ Upstream notes: `docs/development/web-server.md`.
 ## 3. Visual theme (canonical)
 
 **Source of truth:** `webviz/css/tokens.css` (`--wv-*` variables).  
-**Path A consolevars deploy copy:** `consolevars-tokens.css` (same values, lives next to `consolevarsui.html` so robots without the `webviz/` tree do not 404). Keep both in sync when palette changes.  
-New chrome **must use these tokens** (or alias them). Do not invent a second palette.
+**Path A tokens file:** `cv-tokens.css` (same values as WebViz tokens; self-contained deploy). Keep in sync with `webviz/css/tokens.css` when palette changes.  
+Static asset names must **not** begin with `consolevars` (CivetWeb steals those URLs).  
+New chrome **must use `--wv-*` tokens**. Do not invent a second palette.
 
 ### Surfaces
 
@@ -183,7 +184,7 @@ resources/webserver/cvcatalog/   # URL /cvcatalog/*  — NOT under /consolevars/
 ⚠️ **CivetWeb:** handler `/consolevars` also matches `/consolevars/*`. Catalog JSON must **not** live at `/consolevars/...` or fetches return the HTML UI.
 
 - Browser loads `/cvcatalog/index.json`, merges shards.
-- Fallback: `/consolevars-catalog.json` (OK — no slash after `consolevars`).
+- Fallback: `/cv-catalog.json` (must not start with `/consolevars`).
 
 Entry sketch:
 
@@ -251,8 +252,9 @@ Module JS should keep working if the shell is absent; do not break stock module 
 | `AGENTS.md` | This file |
 | `consolevarsui.html` | Path A template for `/consolevars` |
 | `consolevars-explorer.html` | Explorer template; needs C++ route to inject |
-| `consolevars-app.js` | Decorator / recipes (wire into classic for Path A) |
-| `consolevars-catalog.json` | Legacy monolithic catalog |
+| `cv-app.js` | Decorator / recipes |
+| `cv-tokens.css` / `cv-chrome.css` | Theme |
+| `cv-catalog.json` | Monolithic catalog fallback |
 | `cvcatalog/` | Multi-file catalog (URL `/cvcatalog/`) |
 | `README.consolevars.md` | Human consolevars notes |
 | `webViz.html`, `webviz/` | Modern WebViz |

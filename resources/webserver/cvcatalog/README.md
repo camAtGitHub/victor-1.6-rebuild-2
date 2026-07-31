@@ -21,7 +21,9 @@ cvcatalog/
 
 Browser: load `/cvcatalog/index.json` → fetch each shard → merge (`vars` Object.assign, `recipes` concat).
 
-Fallback if index fails: `/consolevars-catalog.json` (name is OK — no slash after `consolevars`).
+Fallback if index fails: `/cv-catalog.json`.
+
+Any static path starting with `/consolevars` is stolen by the UI handler (including `/consolevars-app.js`).
 
 ## Rules for agents
 

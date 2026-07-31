@@ -3,10 +3,11 @@
 **Path A (guaranteed on robot):** classic themed page only.  
 **Ports:** engine `:8888/consolevars`, anim `:8889/consolevars`  
 **Template:** `consolevarsui.html` → C++ injects tabs/controls at three markers  
-**Chrome:** `consolevars-tokens.css` + `consolevars-chrome.css` (self-contained; same `--wv-*` as WebViz)  
-**Decorator:** `consolevars-app.js` — curated `?` help + `⌀` dead marks; raw controls always work  
-**Catalog (preferred):** sharded under **`cvcatalog/`** (URL `/cvcatalog/…`) — **not** under `/consolevars/` (that route’s handler steals subpaths)  
-**Catalog fallback:** root `consolevars-catalog.json` if the shard index fails  
+**Chrome:** `/cv-tokens.css` + `/cv-chrome.css` (self-contained; same `--wv-*` as WebViz)  
+**Decorator:** `/cv-app.js` — curated `?` help + `⌀` dead marks  
+**Catalog:** `/cvcatalog/…` shards; fallback `/cv-catalog.json`  
+
+⚠️ **Never name a static URL that starts with `/consolevars`** (except the HTML routes themselves). CivetWeb’s `/consolevars` handler prefix-matches, so `/consolevars-app.js` was returning the HTML page with HTTP 200.  
 **Dumps:** `resources/webserver/.docs/consolevarlist_8888|8889`, `consolefunclist_*`  
 **Agent rules:** `resources/webserver/AGENTS.md` · shard how-to: `cvcatalog/README.md`
 
@@ -16,7 +17,7 @@ Explorer (`consolevars-explorer.html` / `/consolevars-explorer`) is **optional**
 
 1. C++ registers `CONSOLE_VAR` / `CONSOLE_FUNC` at runtime.
 2. `GET /consolevars` loads `consolevarsui.html` and injects category HTML (ids = dump/UI names).
-3. `consolevars-app.js` fetches `/cvcatalog/index.json`, merges shards, and decorates matching rows.
+3. `cv-app.js` fetches `/cvcatalog/index.json`, merges shards, and decorates matching rows.
 4. Catalog is **progressive / incomplete** — grow shards when you verify useful or confusing controls.
 
 UI ids strip Hungarian `k`/`g` (`kRenderZOffset` → `RenderZOffset`); catalog keys must match dump/UI ids.
@@ -64,9 +65,12 @@ Recipe steps: `{ "var", "value" }` or `{ "func", "args" }`. Enum values are 0-ba
 | `consolevarsui.html` (template) | `scp` + **restart** eng/anim webserver (template cached at process start) |
 
 **Minimum scp set for themed Path A:**  
-`consolevarsui.html`, `consolevars-tokens.css`, `consolevars-chrome.css`, `consolevars-app.js`, **`cvcatalog/`** (shards), optional `consolevars-catalog.json` fallback.
+`consolevarsui.html`, `cv-tokens.css`, `cv-chrome.css`, `cv-app.js`, **`cvcatalog/`**, optional `cv-catalog.json`.
 
-**Sanity check in browser:** open `http://<robot>:8888/cvcatalog/index.json` — must be JSON, not the consolevars HTML page.
+**Sanity checks:**
+- `http://<robot>:8888/cv-app.js` → starts with `/**` or `(function`, **not** `<!doctype`
+- `http://<robot>:8888/cvcatalog/index.json` → JSON
+- `http://<robot>:8888/consolevars-app.js` → **wrong name** (will be HTML if old)
 
 No new HTTP routes. Stock APIs only: `consolevarset`, `consolevarget`, `consolevarlist`, `consolefunclist`, `consolefunccall`.
 

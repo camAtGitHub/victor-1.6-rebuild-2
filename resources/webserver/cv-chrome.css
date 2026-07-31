@@ -530,7 +530,7 @@ a:hover {
   margin-top: var(--wv-space-3);
 }
 
-/* ── Path A decorator: compact help + dead marks (consolevars-app.js) ── */
+/* ── Path A decorator: compact help + dead marks (cv-app.js) ── */
 .cv-marks {
   display: inline-flex;
   align-items: center;
