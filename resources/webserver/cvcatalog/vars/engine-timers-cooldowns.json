@@ -1,0 +1,316 @@
+{
+  "vars": {
+    "AdvanceAnticSeconds": {
+      "process": "engine",
+      "blurb": "How many seconds (default 10) the dev console function AdvanceAntic jumps the kitchen-timer “antic” schedule forward. Antics are the small idle animations Vector plays while a user-facing timer is running; advancing them lets you test near-ringing or inter-antic spacing without waiting real time.",
+      "detail": "Only used when you call the AdvanceAntic console function (ANKI_DEV_CHEATS). That function passes this value into BehaviorTimerUtilityCoordinator::DevAdvanceAnticBySeconds → AnticTracker. Changing the number alone does nothing until you run AdvanceAntic. Companion vars AdvanceTimerSeconds / AdvanceTimerAndAnticSeconds live on TimerUtility for the countdown itself.",
+      "howTo": "1) Set AdvanceAnticSeconds. 2) Start a user timer so antics are active. 3) Call console function AdvanceAntic.",
+      "requires": ["AdvanceAntic"],
+      "related": ["AdvanceTimerSeconds", "AdvanceTimerAndAnticSeconds"],
+      "category": "TimerUtility.AdvanceAnticSeconds",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/timer/behaviorTimerUtilityCoordinator.cpp:63-86,242-244",
+      "status": "live",
+      "tags": ["timer", "antic", "dev", "console-func-param"]
+    },
+    "AdvanceTimerAndAnticSeconds": {
+      "process": "engine",
+      "blurb": "Seconds (default 60) used by the AdvanceTimerAndAntic console function to jump both the user-facing countdown timer and its antic schedule in one shot. Useful to fast-forward a set timer toward ringing while also advancing idle antics.",
+      "detail": "Under ANKI_DEV_CHEATS, AdvanceTimerAndAntic calls AdvanceTimerBySeconds and AdvanceAnticBySeconds with this same u32. Timer path: TimerUtility::AdvanceTimeBySeconds subtracts from the active timer’s end time. Antic path: BehaviorTimerUtilityCoordinator::DevAdvanceAnticBySeconds. No effect until the console function is invoked.",
+      "howTo": "1) Set this value. 2) Start a kitchen timer on the robot. 3) Call AdvanceTimerAndAntic.",
+      "requires": ["AdvanceTimerAndAntic"],
+      "related": ["AdvanceTimerSeconds", "AdvanceAnticSeconds"],
+      "category": "TimerUtility.AdvanceTimerAndAnticSeconds",
+      "evidence": "engine/aiComponent/timerUtility.cpp:33-45,49-54; engine/aiComponent/timerUtility.h:62,94",
+      "status": "live",
+      "tags": ["timer", "antic", "dev", "console-func-param"]
+    },
+    "AdvanceTimerSeconds": {
+      "process": "engine",
+      "blurb": "Seconds (default 60) the AdvanceTimer console function subtracts from the active user-facing kitchen timer. Speeds up testing of timer-almost-done and timer-ring behaviors without waiting a full countdown.",
+      "detail": "ANKI_DEV_CHEATS only. AdvanceTimer → AdvanceTimerBySeconds(kAdvanceTimerSeconds) → TimerUtility::AdvanceTimeBySeconds, which reduces the active TimerHandle end time. Does nothing if no timer is active. Does not touch antics (use AdvanceTimerAndAntic or AdvanceAntic for those).",
+      "howTo": "1) Set AdvanceTimerSeconds. 2) Start a timer. 3) Call AdvanceTimer.",
+      "requires": ["AdvanceTimer"],
+      "related": ["AdvanceTimerAndAnticSeconds", "AdvanceAnticSeconds"],
+      "category": "TimerUtility.AdvanceTimerSeconds",
+      "evidence": "engine/aiComponent/timerUtility.cpp:32-38,49-54; engine/aiComponent/timerUtility.h:62,94",
+      "status": "live",
+      "tags": ["timer", "dev", "console-func-param"]
+    },
+    "CFARTSP_CooldownOverride_sec": {
+      "process": "engine",
+      "blurb": "Global override (seconds) for how long CheckForAndReactToSalientPoint waits before reacting again to the same kind of vision salient point (hand, pet, etc.). Default 0 means “use each behavior instance’s JSON cooldown_sec.” Set > 0 to force that cooldown on every instance that already has a non-zero configured cooldown.",
+      "detail": "GetCooldown() returns the override only when both instance cooldown_sec and this console var are > 0. Instances with cooldown 0 stay uncapped. Affects all CFARTSP class instances at once — not a per-reaction knob. Used when deciding if enough time has passed since lastReacted_sec for that salient type.",
+      "howTo": "Set to e.g. 5 to force 5 s between salient reactions while tuning. Set back to 0 to restore JSON cooldowns.",
+      "category": "Behaviors.CheckForAndReactToSalientPoint",
+      "related": [],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorCheckForAndReactToSalientPoint.cpp:39-41,75-89",
+      "status": "live",
+      "tags": ["behavior", "cooldown", "salient", "vision"]
+    },
+    "Cooldown_s": {
+      "process": "engine",
+      "blurb": "After StayOnChargerUntilCharged cancels itself via the long on-charger safeguard, how long (seconds, default 20×60 = 1200) before that behavior is allowed to activate again. Stops Vector from immediately re-latching “stay and charge” after a forced cancel.",
+      "detail": "Category StayOnCargerUntilCharged (typo in source). WantsToBeActivated is false while currTime < lastTimeCancelled_s + Cooldown_s. lastTimeCancelled_s is set when the safeguard timeout fires in BehaviorUpdate (not on every cancel path — voice-intent cancel does not start this cooldown). DynamicVariables initializes lastTimeCancelled so the first boot is not stuck on cooldown.",
+      "related": ["SafeguardTimeout_s", "MinTimeAtNominal_s"],
+      "category": "StayOnCargerUntilCharged",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/behaviorStayOnChargerUntilCharged.cpp:28-30,45-46,82-83,165-173",
+      "status": "live",
+      "tags": ["charger", "cooldown", "battery"]
+    },
+    "DancingCooldown_sec": {
+      "process": "engine",
+      "blurb": "Minimum seconds (default 10, range 0–3600) after the last dance session before DanceToTheBeatCoordinator will activate again from quiet cooldowns alone. A “strong” beat detection can still bypass this and ListeningCooldown together.",
+      "detail": "WantsToBeActivated requires both DancingCooldown and ListeningCooldown behavior timers to be expired, OR BeatDetectorComponent::IsBeatDetected(). Separately, MinIntraDancingPeriod_sec is always enforced on the dance timer and cannot be bypassed by a strong beat. Range-limited console var.",
+      "related": ["ListeningCooldown_sec", "MinIntraDancingPeriod_sec"],
+      "category": "BehaviorDanceToTheBeatCoordinator",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/danceToTheBeat/behaviorDanceToTheBeatCoordinator.cpp:42-48,104-121",
+      "status": "live",
+      "tags": ["dance", "beat", "cooldown"]
+    },
+    "DefaultNumFramesToWait": {
+      "process": "engine",
+      "blurb": "Intended default frame count (3) for WaitForImagesAction when constructed with the UseDefaultNumImages tag. In this tree that constructor is never called — every production WaitForImagesAction passes an explicit frame count — so changing this has no runtime effect.",
+      "detail": "Registered under category WaitForImages. The UseDefaultNumImages_t overload reads kDefaultNumFramesToWait at construction time. rg finds no call sites for WaitForImagesAction(UseDefaultNumImages, …) outside the declaration/definition. Explicit callers use hard-coded or local constants.",
+      "category": "WaitForImages",
+      "evidence": "engine/actions/basicActions.cpp:56,2692-2694; engine/actions/basicActions.h:574-580; no UseDefaultNumImages call sites (rg)",
+      "status": "dead",
+      "statusNote": "Only read by WaitForImagesAction(UseDefaultNumImages_t) which has zero call sites in this repo.",
+      "tags": ["vision", "actions", "orphan"]
+    },
+    "DefaultTimeout_ms": {
+      "process": "engine",
+      "blurb": "Default per-step timeout (milliseconds) for factory SelfTest and Playpen behavior steps. When a self-test/playpen step activates, it schedules a timer with this duration; if it fires, the step is marked timed out (or SUCCESS if IgnoreFailures is on).",
+      "detail": "Two separate C++ variables share the stripped dump id: SelfTestConfig::kDefaultTimeout_ms (default 20000, category SelfTest) and PlaypenConfig::kDefaultTimeout_ms (default 30000, category Playpen), each WRAP_EXTERN_CONSOLE_VAR. IBehaviorSelfTest::OnBehaviorActivated and IBehaviorPlaypen::OnBehaviorActivated call AddTimer with their namespace’s value. Which console registration wins on set-by-name can be ambiguous if both are registered under the same key — prefer category-scoped UI or verify after set.",
+      "related": ["IgnoreFailures"],
+      "category": "SelfTest / Playpen",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.h:36; selfTestConfig.cpp:21; iBehaviorSelfTest.cpp:73-86; playpen/playpenConfig.h:42; playpenConfig.cpp:76; iBehaviorPlaypen.cpp:69-82",
+      "status": "live",
+      "statusNote": "Dual registration: SelfTest (20s default) and Playpen (30s default) both expose kDefaultTimeout_ms → dump id DefaultTimeout_ms.",
+      "tags": ["selftest", "playpen", "factory", "timeout"]
+    },
+    "DelayCount": {
+      "process": "engine",
+      "blurb": "Omron OKAO movie-mode face detector: how many consecutive frames a face must be seen before it is reported (default 1, range 0–10). Higher values reduce flicker/false positives; lower values detect faster.",
+      "detail": "Passed to OKAO_DT_MV_SetDelayCount only inside FaceTracker::Impl::Init when DetectionMode is Movie. Changing the console value after the face tracker has already initialized does not re-call the OKAO API until re-init. Host faceEval tools set this before detection runs.",
+      "category": "Vision.FaceDetectorMovie",
+      "related": ["LostMaxRetry", "LostMaxHold"],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:94,212-216; okaoVision/include/OkaoDtAPI.h:148-149",
+      "status": "partial",
+      "statusNote": "Applied only at FaceTracker Impl::Init (movie mode). Live change needs face-tracker re-init.",
+      "tags": ["vision", "face", "okao"]
+    },
+    "DurationScalar": {
+      "process": "engine",
+      "blurb": "Speech-rate multiplier (default 1.0, range ~0.25–4) for the engine console function SayText. Values < 1 speak faster; > 1 slower. Only affects utterances created through that debug SayText path, not normal product TTS.",
+      "detail": "Under TextToSpeech category with VoiceStyle and PitchScalar. SayText builds an Immediate utterance via TextToSpeechCoordinator::CreateUtterance(..., kDurationScalar, kPitchScalar). ANKI_DEV_CHEATS. Acapela provider clamps scalars separately on the anim side for product TTS.",
+      "howTo": "1) Set DurationScalar (and optional PitchScalar / VoiceStyle). 2) Call SayText with text (underscores become spaces).",
+      "requires": ["SayText"],
+      "related": ["PitchScalar", "VoiceStyle"],
+      "category": "TextToSpeech",
+      "evidence": "engine/robot.cpp:177-234",
+      "status": "live",
+      "tags": ["tts", "dev", "console-func-param"]
+    },
+    "ExpireThreshold": {
+      "process": "engine",
+      "blurb": "How old (in vision timestamp units, default 50) an EyeContact tracker may be before GetExpired() returns true and the contact estimate is discarded. Smaller = stricter freshness; larger = keep last eye-contact state longer between face updates.",
+      "detail": "Vision.EyeContact: compares currentTime - _lastUpdated against this u32. Distinct from GazeDirection’s kGazeDirectionExpireThreshold_ms (different name). Used to drop stale eye-contact state when faces stop updating.",
+      "category": "Vision.EyeContact",
+      "related": ["HistorySize"],
+      "evidence": "coretech/vision/engine/eyeContact.cpp:34,163-166",
+      "status": "live",
+      "tags": ["vision", "eye-contact", "timeout"]
+    },
+    "FeatureToEdit": {
+      "process": "engine",
+      "blurb": "Dropdown of FeatureType names (Laser, Exploring, FetchCube, Alexa, …). Selecting a feature does nothing by itself — it chooses which feature the EnableFeature / DisableFeature / DefaultFeature console functions will override. Overrides are saved to cache for persistence.",
+      "detail": "CONSOLE_VAR_ENUM built from FeatureTypeToString for all FeatureType entries in featureGateTypes.clad. Enable/Disable/Default write sFeatureTypeOverrides[kFeatureToEdit] and call SaveFeatureOverrides. DefaultAllFeatures clears all overrides. Used with the product feature gate (features.json + runtime checks).",
+      "howTo": "1) Set FeatureToEdit to the feature name. 2) Call EnableFeature, DisableFeature, or DefaultFeature. 3) Confirm behavior gated on that feature.",
+      "requires": ["EnableFeature"],
+      "related": ["DisableFeature", "DefaultFeature", "DefaultAllFeatures"],
+      "category": "FeatureGate",
+      "paths": {
+        "assets": ["resources/config/features.json", "clad/src/clad/types/featureGateTypes.clad"],
+        "notes": "Overrides saved under platform cache path (FeatureGate save file); not a robot /data path for the selector itself."
+      },
+      "evidence": "engine/utils/cozmoFeatureGate.cpp:148-190; clad/src/clad/types/featureGateTypes.clad",
+      "status": "live",
+      "tags": ["feature-gate", "dev", "console-func-param"]
+    },
+    "HLAI_MinObservingBeforeExploring_s": {
+      "process": "engine",
+      "blurb": "Minimum seconds (default 10) HighLevelAI must stay in the current Observing state before the Observing→Exploring transition is allowed, even if the exploring cooldown from AIWhiteboard has already expired.",
+      "detail": "Injected BEI condition ExploringCooldownMet: if currTime - stateStartTime < this value, returns false. After the min time, also requires StateExitCooldownExpired for Exploring using GetExploringCooldown_s() from AIWhiteboard. Independent of TimeMultiplier (not divided by it in this check).",
+      "related": ["TimeMultiplier", "AI_MaxExtraExploringCooldown_s", "ExploringCooldownUpdatePeriod_s"],
+      "category": "BehaviorHighLevelAI",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/behaviorHighLevelAI.cpp:41-42,234-261",
+      "status": "live",
+      "tags": ["hlai", "observing", "exploring", "cooldown"]
+    },
+    "HistorySize": {
+      "process": "engine",
+      "blurb": "Number of gaze samples (default 6) kept in the EyeContact circular history used to average gaze and decide if someone is looking at Vector’s camera.",
+      "detail": "Constructor resizes _gazeHistory to kHistorySize. Update() wraps _currentIndex when it exceeds kHistorySize-1. Changing the console value after construction does not resize the vector; wrap logic would still use the new HistorySize and can desync from actual buffer length — set before face/eye-contact systems are constructed, or treat as init-time only.",
+      "category": "Vision.EyeContact",
+      "related": ["ExpireThreshold"],
+      "evidence": "coretech/vision/engine/eyeContact.cpp:23,37-55",
+      "status": "partial",
+      "statusNote": "Buffer allocated once in EyeContact ctor; runtime changes to HistorySize are not applied to the vector size.",
+      "tags": ["vision", "eye-contact"]
+    },
+    "IgnoreFailures": {
+      "process": "engine",
+      "blurb": "When true, factory SelfTest / Playpen steps treat many failures and timeouts as SUCCESS so the suite can continue (or complete) despite errors. SelfTest defaults false (strict); Playpen defaults true (lenient factory line).",
+      "detail": "Dual registration like DefaultTimeout_ms: SelfTestConfig::kIgnoreFailures (false) and PlaypenConfig::kIgnoreFailures (true), categories SelfTest and Playpen. ShouldIgnoreFailures() is consulted by timeout timers, result aggregation, and failure macros in iBehaviorSelfTest / iBehaviorPlaypen and their orchestrators. Dangerous for real validation if left true on SelfTest.",
+      "related": ["DefaultTimeout_ms"],
+      "category": "SelfTest / Playpen",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.h:33; selfTestConfig.cpp:20; iBehaviorSelfTest.cpp:77-86,294-296; playpen/playpenConfig.h:39; playpenConfig.cpp:75; iBehaviorPlaypen.cpp:73-82,315-317",
+      "status": "live",
+      "statusNote": "Dual SelfTest (default false) and Playpen (default true) registrations share dump id IgnoreFailures.",
+      "tags": ["selftest", "playpen", "factory", "danger"]
+    },
+    "ListeningCooldown_sec": {
+      "process": "engine",
+      "blurb": "Seconds (default 10, range 0–3600) the ListenForBeats cooldown timer must be expired before DanceToTheBeatCoordinator will re-activate from cooldowns alone. Strong beat detection can bypass this together with DancingCooldown.",
+      "detail": "Paired with DancingCooldown_sec in WantsToBeActivated. Uses BehaviorTimerTypes::ListenForBeatsCooldown. MinIntraDancingPeriod_sec still blocks re-entry briefly even with strong beats.",
+      "related": ["DancingCooldown_sec", "MinIntraDancingPeriod_sec"],
+      "category": "BehaviorDanceToTheBeatCoordinator",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/danceToTheBeat/behaviorDanceToTheBeatCoordinator.cpp:44,105-121",
+      "status": "live",
+      "tags": ["dance", "beat", "cooldown"]
+    },
+    "LostMaxHold": {
+      "process": "engine",
+      "blurb": "Omron OKAO movie-mode: how long (frames-related OKAO param, default 2, range 0–300) to keep holding a lost face track after retries fail. Higher values stick to a face longer after it leaves view.",
+      "detail": "Passed with LostMaxRetry to OKAO_DT_MV_SetLostParam only in FaceTracker::Impl::Init (Movie detection mode). Console changes after init are not pushed to OKAO until re-init. faceEvalDetection sets LostMaxHold=0 for offline eval.",
+      "category": "Vision.FaceDetectorMovie",
+      "related": ["LostMaxRetry", "DelayCount"],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:90,190-196",
+      "status": "partial",
+      "statusNote": "Applied only at face tracker Init; not re-applied each frame.",
+      "tags": ["vision", "face", "okao", "tracking"]
+    },
+    "LostMaxRetry": {
+      "process": "engine",
+      "blurb": "Omron OKAO movie-mode: how many times (default 2, range 0–300) to retry finding a face after tracking is lost before giving up (then LostMaxHold applies). Higher = more aggressive re-acquire.",
+      "detail": "OKAO_DT_MV_SetLostParam(LostMaxRetry, LostMaxHold) at FaceTracker Impl::Init only. Partial live-tunability same as LostMaxHold/DelayCount.",
+      "category": "Vision.FaceDetectorMovie",
+      "related": ["LostMaxHold", "DelayCount"],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:89,190-196",
+      "status": "partial",
+      "statusNote": "Applied only at face tracker Init; not re-applied each frame.",
+      "tags": ["vision", "face", "okao", "tracking"]
+    },
+    "MaxConsecFails": {
+      "process": "engine",
+      "blurb": "DockingTest (dev): stop and yell for help after this many consecutive failed dock attempts (default 3). A success resets the consecutive-fail counter.",
+      "detail": "BehaviorDockingTestSimple EndAttempt: on non-SUCCESS, numConsecFails++; if >= MaxConsecFails, enter ManualReset and set yellForHelp. Independent of MaxNumAttempts (total attempt budget).",
+      "related": ["MaxNumAttempts"],
+      "category": "DockingTest",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDockingTestSimple.cpp:66-67,996-1002",
+      "status": "live",
+      "tags": ["docking", "dev", "test"]
+    },
+    "MaxNumAttempts": {
+      "process": "engine",
+      "blurb": "DockingTest (dev): total dock attempts before the automated test declares success-complete (default 30). When numAttempts hits this and state is not ManualReset, stats are printed and completion yell is set.",
+      "detail": "Checked in BehaviorUpdate of BehaviorDockingTestSimple. Distinct from MaxConsecFails (early abort on a streak of failures). Other codebases also have local maxNumAttempts JSON keys (e.g. ClearChargerArea) that are not this console var.",
+      "related": ["MaxConsecFails"],
+      "category": "DockingTest",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDockingTestSimple.cpp:66,239-250",
+      "status": "live",
+      "tags": ["docking", "dev", "test"]
+    },
+    "MinIntraDancingPeriod_sec": {
+      "process": "engine",
+      "blurb": "Hard minimum seconds (default 5, range 0–3600) between dance activations. Always enforced — even a strong beat cannot re-start DanceToTheBeatCoordinator until the dance cooldown timer has aged this long.",
+      "detail": "Uses the same DancingCooldown behavior timer as DancingCooldown_sec but with this shorter/always-on threshold. If !danceTimer.HasCooldownExpired(MinIntraDancingPeriod), WantsToBeActivated returns false immediately before strong-beat logic.",
+      "related": ["DancingCooldown_sec", "ListeningCooldown_sec"],
+      "category": "BehaviorDanceToTheBeatCoordinator",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/danceToTheBeat/behaviorDanceToTheBeatCoordinator.cpp:47-48,111-115",
+      "status": "live",
+      "tags": ["dance", "beat", "cooldown"]
+    },
+    "MinListeningTimeout_s": {
+      "process": "engine",
+      "blurb": "After the wake word, ReactToVoiceCommand always stays in the listening UX at least this many seconds (default 5, range 0–30) if streaming has not started, is not expected, or an intent error is already pending. Also acts as the deadline for “stream should have opened by now.”",
+      "detail": "GetListeningTimeout(): if errorPending || !streamingHasBegun || !expectingStream → timeout = activatedTime + MinListeningTimeout_s; else timeout = streamingBegin + MaxStreamingDuration_s. Do not lower too far or brief cloud/mic lag will look like errors. Category TriggerWord.",
+      "related": ["MaxStreamingDuration_s"],
+      "category": "TriggerWord",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToVoiceCommand.cpp:95-99,1169-1186",
+      "status": "live",
+      "tags": ["voice", "wakeword", "timeout"]
+    },
+    "MinTimeAtNominal_s": {
+      "process": "engine",
+      "blurb": "When battery just dropped Full→Nominal (typical when leaving charger contacts), StayOnChargerUntilCharged will not re-activate for this many seconds at Nominal (default 4). Prevents immediately re-grabbing “stay on charger” during the drive-off animation while still on the platform.",
+      "detail": "briefDropToNominal = (level==Nominal && prev==Full && timeAtLevel < MinTimeAtNominal_s). Comment: should be ≥ time for any drive-off-charger anim to clear the platform. Combined with needsToCharge, cooldowns, safeguard, and user-intent gates in WantsToBeActivated.",
+      "related": ["Cooldown_s", "SafeguardTimeout_s"],
+      "category": "StayOnCargerUntilCharged",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/behaviorStayOnChargerUntilCharged.cpp:30,89-99",
+      "status": "live",
+      "tags": ["charger", "battery"]
+    },
+    "OverridePerformanceCooldowns": {
+      "process": "engine",
+      "blurb": "When true, PossiblePerformance behaviors (rare “performance” animations gated by multi-hour cooldowns) ignore their cooldown and probability roll and always count as ready. Default false. Use to force-test performance anims without waiting hours.",
+      "detail": "WantsToBeActivated: ready = OverridePerformanceCooldowns || (!onCooldown && lastRollPassed). Face requirement is separate (OverridePerformanceFaceNeeded, default true). Cooldown length comes from JSON cooldown_hours converted to seconds at construct.",
+      "related": ["OverridePerformanceFaceNeeded"],
+      "category": "PerformanceAnims",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/performaces/behaviorPossiblePerformance.cpp:28-29,96-108",
+      "status": "live",
+      "tags": ["performance", "cooldown", "dev"]
+    },
+    "PuzzleTimeout_sec": {
+      "process": "engine",
+      "blurb": "Maximum seconds BehaviorPuzzleMaze may stay activated before it cancels itself (default 24000 ≈ 6.7 hours, range 0–24000). Safety cap so a stuck cube-maze session cannot run forever.",
+      "detail": "BehaviorUpdate: if GetActivatedDuration() > PuzzleTimeout_sec, log warning and CancelSelf. Extremely large default means it rarely trips in normal play; lower it for faster fail-out while debugging.",
+      "category": "Behavior.PuzzleMaze",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorPuzzleMaze.cpp:50-53,460-465",
+      "status": "live",
+      "tags": ["puzzle", "timeout", "freeplay"]
+    },
+    "ResumeReferenceCooldown_s": {
+      "process": "engine",
+      "blurb": "When Exploring re-activates as a short “resume” (not a fresh start), wait at least this many seconds (default 20, range 0–60) since referenceHumanBehavior last activated before offering another “look at human” reference on resume. Reduces nagging face-checks between explore segments.",
+      "detail": "OnBehaviorActivated: if isResume and referenceHumanBehavior wants activation and (now - lastActivated) > ResumeReferenceCooldown_s and RNG < ProbReferenceOnResume, delegate to reference human then SampleAndDrive. Only applies on resume path (recent deactivation without end reason).",
+      "related": ["ProbReferenceOnResume"],
+      "category": "BehaviorExploring",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/exploring/behaviorExploring.cpp:69-70,302-310",
+      "status": "live",
+      "tags": ["exploring", "cooldown", "social"]
+    },
+    "SafeguardTimeout_s": {
+      "process": "engine",
+      "blurb": "Maximum continuous on-charger time (seconds, default 30×60 = 1800) before StayOnChargerUntilCharged cancels itself and starts Cooldown_s. Prevents Vector from parking on the charger indefinitely when the battery never reports Full.",
+      "detail": "Checked in both WantsToBeActivated (safeguard blocks re-activation while still over duration) and BehaviorUpdate (cancel + set lastTimeCancelled_s). onChargerDuration comes from robot info GetOnChargerDurationSec().",
+      "related": ["Cooldown_s", "MinTimeAtNominal_s"],
+      "category": "StayOnCargerUntilCharged",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/behaviorStayOnChargerUntilCharged.cpp:28,85-87,165-173",
+      "status": "live",
+      "tags": ["charger", "timeout", "battery"]
+    },
+    "TimeMultiplier": {
+      "process": "engine",
+      "blurb": "Dev time accelerator (default 1, range 1–300) that shortens many behavior cooldowns and advances mood/time-gated conditions as if time ran faster. At 10, a 100 s cooldown acts like 10 s. Does not change real wall clocks or engine tick rate.",
+      "detail": "Registered on BehaviorHighLevelAI. Divides HLAI socialize/cube cooldowns; BehaviorCooldownInfo::StartCooldown divides unless ignoreFastForward; ConditionBehaviorTimer and ConditionTimerInRange scale; InternalStatesBehavior and QuietModeCoordinator use it; MoodManager multiplies emotion integration dt. Warning in source: very large values can skip short [a,b] time windows so some conditions never fire. Tests force 1.0 for determinism.",
+      "howTo": "Raise above 1 to fast-forward freeplay cooldowns and mood dynamics while testing. Return to 1 for production-like pacing.",
+      "related": ["HLAI_MinObservingBeforeExploring_s", "HighLevelAI_socializeKnownFaceCooldown_s", "HighLevelAI_playWithCubeCooldown_s"],
+      "category": "BehaviorHighLevelAI",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/behaviorHighLevelAI.cpp:38-39,136,198-216; behaviorCooldownInfo.cpp:25,81-83; conditionBehaviorTimer.cpp:25,58; conditionTimerInRange.cpp:24,64-72; moodManager.cpp:57,319; internalStatesBehavior.cpp:51,331",
+      "status": "live",
+      "statusNote": "Large multipliers can skip narrow time-window conditions (source comment). Mood and many BEI timers speed up together.",
+      "tags": ["dev", "time", "cooldown", "mood", "hlai", "danger"]
+    },
+    "TimeoutUpdatePeriod_ms": {
+      "process": "engine",
+      "blurb": "How often (milliseconds of robot message time, default 5000) MapComponent runs TimeoutObjects to drop stale nav-map cells (prox obstacles, cliffs, unrecognized obstacles, vision edges). Lower = fresher map, more CPU; higher = longer-lived ghost obstacles.",
+      "detail": "TimeoutObjects returns early if currentTime <= _nextTimeoutUpdate_ms, then schedules next = current + TimeoutUpdatePeriod_ms. Separate console vars set per-content ages (VisionTimeout, ProxTimeout, CliffTimeout, UnrecognizedTimeout). Does not change those ages — only how often the sweep runs.",
+      "related": ["VisionTimeout_ms", "ProxTimeout_ms", "CliffTimeout_ms", "UnrecognizedTimeout_ms"],
+      "category": "MapComponent",
+      "evidence": "engine/navMap/mapComponent.cpp:80,502-510",
+      "status": "live",
+      "tags": ["navmap", "timeout", "performance"]
+    }
+  }
+}
