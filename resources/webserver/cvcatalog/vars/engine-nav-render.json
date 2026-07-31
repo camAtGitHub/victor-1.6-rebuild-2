@@ -1,0 +1,289 @@
+{
+  "vars": {
+    "DebugFindBorders": {
+      "process": "engine",
+      "blurb": "Intended to print verbose “find borders” debug lines while the nav-map quad-tree processor walks border cells. Default false. Flipping it does nothing in this tree: the logging macro is defined, but no call site ever expands it.",
+      "detail": "Registered next to RenderSeeds / RenderBorders* under category QuadTreeProcessor. A local DEBUG_FIND_BORDER macro gates channelled INFO on NMQTProcessor when this flag is true, but rg finds zero uses of that macro (or of kDebugFindBorders) outside the definition. Border-finding viz code that once consumed the sibling Render* flags is gone; only registration remains.",
+      "related": [
+        "RenderSeeds",
+        "RenderBordersFrom",
+        "RenderBordersToDot",
+        "RenderBordersToQuad"
+      ],
+      "evidence": "engine/navMap/quadTree/quadTreeProcessor.cpp:25-36 (kDebugFindBorders + DEBUG_FIND_BORDER); no other references (rg)",
+      "category": "QuadTreeProcessor",
+      "status": "dead",
+      "statusNote": "CONSOLE_VAR + unused debug macro only — never read at a call site.",
+      "tags": ["navmap", "quadtree", "debug", "dead"]
+    },
+    "DefaultMaxObservationDistance_mm": {
+      "process": "engine",
+      "blurb": "Maximum camera distance in millimeters at which a generic observable object (cube, custom object, etc.) is still accepted when the robot “sees” its markers. Default 500 mm; console range about 50–1000. Observations farther than this are dropped before they update block-world poses.",
+      "detail": "Returned by ObservableObject::GetMaxObservationDistance_mm() for types that do not override it. BlockWorld::FilterRawObservedObjects erases any raw observation whose last pose-update distance exceeds this value. The same number is used when estimating how much image border padding unobserved markers need (scale with distance / max distance). Chargers use a separate console var (ChargerMaxObservationDistance_mm) via Charger::GetMaxObservationDistance_mm override — this Default* knob does not move charger range.",
+      "related": ["ChargerMaxObservationDistance_mm"],
+      "evidence": "engine/cozmoObservableObject.cpp:19-26; engine/blockWorld/blockWorld.cpp:1074-1080,1167-1174; engine/charger.cpp:38,250-252",
+      "category": "PoseConfirmation",
+      "status": "live",
+      "tags": ["blockworld", "pose", "markers", "distance"]
+    },
+    "EdgeLineLengthToInsert_mm": {
+      "process": "engine",
+      "blurb": "Half-length (mm) of the thin rectangular strip written into the navigation memory map when vision reports a table-edge / cliff line from overhead-edge detection. Default 200 mm. Larger values stamp a longer “wall” of cliff cells along the estimated edge; smaller values make shorter cliff marks.",
+      "detail": "MapComponent::AddVisionOverheadEdges, after refining cliff pose from Hough-style line fitting, inserts a FastPolygon whose lateral extents are ±EdgeLineLengthToInsert_mm and whose depth uses VisionCliffPadding_mm. Only runs when OverheadEdges vision results are processed into the map. Sibling Hough knobs (angle resolution, min line length, gap, accum threshold) control how the line is found; this var only sizes the map geometry that is inserted once a cliff pose is accepted.",
+      "related": [
+        "OverheadEdges",
+        "VisionCliffPadding_mm",
+        "HoughMinLineLength_mm",
+        "HoughAccumThreshold"
+      ],
+      "evidence": "engine/navMap/mapComponent.cpp:91,1459-1604",
+      "category": "MapComponent.VisualEdgeDetection",
+      "status": "live",
+      "tags": ["navmap", "cliff", "vision", "overhead-edges"]
+    },
+    "MapRenderRate_sec": {
+      "process": "engine",
+      "blurb": "How often (seconds) the engine re-sends the full navigation memory map to the Viz 3D debug view when map rendering is enabled. Default 0.25 s (4 Hz). Lower values update Viz more often and use more clad/bandwidth; higher values throttle redraws.",
+      "detail": "MapComponent::UpdateDependent only paces BroadcastMapToViz with this rate. Viz send also requires ANKI_DEV_CHEATS draw enable, _isRenderEnabled (SetMemoryMapRenderEnabled game message / WebViz path), and a dirty map. WebViz navmap and SDK map broadcast use separate dirty flags / _broadcastRate_sec — this console var does not throttle those. Comment in code: clad was getting overloaded with too many quads at higher rates.",
+      "howTo": "1) Enable memory-map render (SetMemoryMapRenderEnabled or WebViz navmap). 2) Set MapRenderRate_sec. 3) Drive so the map changes and watch Viz refresh rate.",
+      "related": ["RenderProxBeliefs", "MergeOldMaps"],
+      "evidence": "engine/navMap/mapComponent.cpp:61-62,346-366,878-886",
+      "category": "MapComponent",
+      "status": "live",
+      "statusNote": "Only affects Viz when map render is enabled and dev drawing is compiled in; does not change planning.",
+      "tags": ["navmap", "viz", "performance", "broadcast"]
+    },
+    "MaxObsThreshold_mm": {
+      "process": "engine",
+      "blurb": "Farthest distance (mm) the front time-of-flight “prox” sensor still counts as a real obstacle. Default 400 mm. Readings at or beyond this are treated as clear (unobstructed); closer valid readings can become map obstacles. Also clamps the published distance field up to this max.",
+      "detail": "ProxSensorComponent::NotifyOfRobotStateInternal: foundObject requires raw distance < MaxObsThreshold_mm (plus quality, lift not in FOV, valid range status, pitch in band). unobstructed is true when quality is low or raw distance ≥ Max. _latestData.distance_mm is Clamp(raw, MinObsThreshold, MaxObsThreshold). Raising the cap lets the robot map farther objects; lowering ignores distant hits and shrinks the usable clear-beam cone. Not used on Whiskey builds (early return).",
+      "related": [
+        "MinObsThreshold_mm",
+        "MaxObstacleWidth_mm",
+        "ProxTimeout_ms",
+        "MinQualityThreshold"
+      ],
+      "evidence": "engine/components/sensors/proxSensorComponent.cpp:91-101,171-181",
+      "category": "ProxSensorComponent",
+      "status": "live",
+      "tags": ["prox", "tof", "obstacle", "sensors", "navmap"]
+    },
+    "MaxObstacleWidth_mm": {
+      "process": "engine",
+      "blurb": "Maximum lateral width (mm) of a prox-sensor obstacle stamp in the navigation map. Default 18 mm (about half a robot width). Even if the ToF beam would fan out wider at long range, the obstacle and clear-region math cap width at this value so far hits do not paint huge blocking blobs.",
+      "detail": "ObstacleWidth(measurement) = min(measurement × SensorAperture, MaxObstacleWidth_mm). GetClearRegion uses the same cap: if the natural beam half-width is already under Max/2 it inserts a simple triangle; otherwise it intersects the wide cone with a clamped rectangle so clear space does not stretch awkwardly. Comment in code: uncapped far obstacles cause planning failures. Raising allows wider prox marks; lowering makes prox obstacles thinner/more precise but can leave uncleared flanks.",
+      "related": [
+        "MaxObsThreshold_mm",
+        "MinObsThreshold_mm",
+        "SensorAperture",
+        "ObsPadding_x_mm"
+      ],
+      "evidence": "engine/components/sensors/proxSensorComponent.cpp:100-101,290-347",
+      "category": "ProxSensorComponent",
+      "status": "live",
+      "tags": ["prox", "obstacle", "navmap", "planning"]
+    },
+    "MergeOldMaps": {
+      "process": "engine",
+      "blurb": "When false (default), every previous navigation memory map is discarded whenever the robot creates a new localized map (new world origin). When true, maps whose pose origins are still “alive” (not zombie) are kept so they can be merged/reused across relocalization.",
+      "detail": "In CreateLocalizedMemoryMap, each stored map is deleted if BlockWorld::IsZombiePoseOrigin(origin) OR !MergeOldMaps. Default false therefore forces isZombie for every existing entry — wipe-all behavior. Enabling true only deletes origins that truly lost all localizable objects. Source comment still says “kNeverMergeOldMaps” but the registered id is MergeOldMaps. Affects how much historical cliff/prox/cube map survives delocalization; does not by itself re-run localization.",
+      "howTo": "Leave false for stock-like behavior (fresh map per origin). Set true only when debugging multi-origin map merge / zombie retention.",
+      "related": ["MapRenderRate_sec", "ProxTimeout_ms"],
+      "evidence": "engine/navMap/mapComponent.cpp:69-70,658-688",
+      "category": "MapComponent",
+      "status": "live",
+      "tags": ["navmap", "localization", "memory"]
+    },
+    "MinObsThreshold_mm": {
+      "process": "engine",
+      "blurb": "Closest distance (mm) reported for the front prox sensor after clamping. Default 30 mm. Sensor values nearer than this are pulled up to 30 so obstacle placement never uses near-zero depths that would sit inside the body.",
+      "detail": "Applied only as Util::Clamp on _latestData.distance_mm together with MaxObsThreshold_mm. foundObject / unobstructed gates use the raw message distance against Max and quality/pitch/lift checks — they do not re-test Min. Raising Min makes very-near hits look farther when inserted; lowering allows deeper near-field values if the sensor reports them. Pair with Max when tuning the usable ToF window.",
+      "related": [
+        "MaxObsThreshold_mm",
+        "MaxObstacleWidth_mm"
+      ],
+      "evidence": "engine/components/sensors/proxSensorComponent.cpp:90-92,171-172",
+      "category": "ProxSensorComponent",
+      "status": "live",
+      "tags": ["prox", "tof", "obstacle", "sensors"]
+    },
+    "NumRandomObstacles": {
+      "process": "engine",
+      "blurb": "How many fixed custom-block obstacles the DockingTestSimple developer behavior scatters near the cube’s pre-dock pose before each docking trial. Default 10. Set 0 to skip obstacle injection. Only matters while that docking test behavior is running — not freeplay.",
+      "detail": "When > 0, BehaviorDockingTestSimple deletes prior custom objects then CreateFixedCustomObject at random offsets around the pre-action pose (X in about −200…120 mm, Y ±300 mm, with a keep-out band so nothing sits directly in the approach lane). Obstacles are 10×10×50 mm. Used to stress path planning / docking under clutter. Behavior class is DockingTestSimple (dev/factory-style test), not production HighLevelAI.",
+      "howTo": "1) Run or select DockingTestSimple. 2) Set NumRandomObstacles (0 = clean). 3) Start a trial and watch custom obstacles appear near pre-dock.",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDockingTestSimple.cpp:78,429-468,621",
+      "category": "DockingTest",
+      "status": "partial",
+      "statusNote": "Live only inside BehaviorDockingTestSimple; ignored outside that dev behavior.",
+      "tags": ["docking", "dev-test", "obstacles", "blockworld"]
+    },
+    "OverheadEdges": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::OverheadEdges so the vision system runs table-edge / ground-plane edge detection on camera frames. Results feed MapComponent, which can insert vision-derived cliffs into the navigation map (used e.g. when reacting to cliffs).",
+      "detail": "Registered dynamically by VisionComponent::SetupVisionModeConsoleVars for every VisionMode enum name under category Vision.General.VisionModes. When toggled, EnableMode + DevOnly subscribe/unsubscribe schedule the mode. VisionSystem calls OverheadEdgesDetector::Detect; VisionComponent::UpdateOverheadEdges forwards OverheadEdgeFrame to MapComponent::ProcessVisionOverheadEdges. Behaviors such as ReactToCliff and a MapComponent console helper WaitForImagesAction(OverheadEdges) also request this mode. Edge geometry size uses EdgeLineLengthToInsert_mm after Hough refinement.",
+      "howTo": "Toggle OverheadEdges on in console (or wait for a behavior that schedules it). Point the head at a table edge with ground plane visible. Watch map cliffs / debug images; tune EdgeLineLengthToInsert_mm and Hough* vars if marks are wrong.",
+      "related": [
+        "EdgeLineLengthToInsert_mm",
+        "OverheadMap",
+        "VisionCliffPadding_mm"
+      ],
+      "evidence": "engine/components/visionComponent.cpp:936,1262-1266,2836-2882; engine/vision/visionSystem.cpp:1720-1732; clad/src/clad/types/visionModes.clad:17,82; engine/navMap/mapComponent.cpp:221,1398-1403",
+      "category": "Vision.General.VisionModes",
+      "status": "live",
+      "tags": ["vision", "visionmode", "overhead-edges", "navmap", "cliff"]
+    },
+    "OverheadMap": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::OverheadMap so the vision system warps the ground plane into a top-down RGB “overhead map” used for ground-pixel classification research (drivable vs non-drivable training data). Default product schedules normally leave this off; turning the console flag on runs UpdateOverheadMap when color images are available.",
+      "detail": "Same dynamic VisionMode console registration as OverheadEdges. VisionSystem constructs OverheadMap from vision_config.json “OverheadMap” (NumRows/NumCols). When the mode is enabled and the image has color, UpdateOverheadMap projects ground-plane pixels into the overhead canvas; comments note the path was kept while the mode was product-disabled. Related GroundPlaneClassifier / Obstacles mode consumes similar ground reasoning but is a separate VisionMode. Enabling this is mainly for vision debug and classifier data collection, not everyday navigation.",
+      "howTo": "1) Enable OverheadMap in Vision.General.VisionModes. 2) Ensure color frames and a visible ground plane. 3) Inspect OverheadMap debug images / classifier training dumps if configured.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/vision_config.json"
+        ],
+        "notes": "JSON key OverheadMap supplies NumRows/NumCols (and related) for the overhead canvas size."
+      },
+      "related": ["OverheadEdges", "Obstacles"],
+      "evidence": "engine/components/visionComponent.cpp:2836-2882; engine/vision/visionSystem.cpp:277-281,934-936,1685-1700; engine/vision/overheadMap.cpp; clad/src/clad/types/visionModes.clad:24,89",
+      "category": "Vision.General.VisionModes",
+      "status": "live",
+      "statusNote": "Code path is live when the mode is forced on; stock scheduling may leave it unused in freeplay.",
+      "tags": ["vision", "visionmode", "overhead-map", "ground-plane"]
+    },
+    "ProxExploredTriangleHalfWidth_mm": {
+      "process": "engine",
+      "blurb": "Half-width (mm) of the forward triangle used to mark prox-map obstacles as “explored” when the robot stands near them during explore-examine. Default 50 mm. Wider triangle covers more lateral prox cells per tick; narrower requires the robot to be more centered on the obstacle.",
+      "detail": "MapComponent::FlagProxObstaclesUsingPose builds a triangle from the robot pose: apex at the robot, far points at length ProxExploredTriangleLength_mm and ± half-width. Any ObstacleProx cell inside is MarkExplored. Called from BehaviorExploringExamineObstacle before flood-fill of explored borders. Pure map metadata — does not change ToF hardware thresholds.",
+      "related": [
+        "ProxExploredTriangleLength_mm",
+        "ProxTimeout_ms",
+        "RenderProxBeliefs"
+      ],
+      "evidence": "engine/navMap/mapComponent.cpp:83-85,584-617; engine/aiComponent/behaviorComponent/behaviors/exploring/behaviorExploringExamineObstacle.cpp:462-467",
+      "category": "MapComponent",
+      "status": "live",
+      "tags": ["prox", "navmap", "exploring", "explored"]
+    },
+    "ProxExploredTriangleLength_mm": {
+      "process": "engine",
+      "blurb": "Forward length (mm) of the “explored” triangle painted from the robot when examine-obstacle marks nearby ToF obstacles as seen. Default 300 mm — shorter than full prox reach so the robot must get fairly close before cells flip to explored.",
+      "detail": "Companion to ProxExploredTriangleHalfWidth_mm in FlagProxObstaclesUsingPose. Length is along the robot heading in the robot frame before transform to world. Exploring examine obstacle calls this every tick while active (non-activation check path). Longer values mark distant prox obstacles explored without approach; shorter forces closer inspection.",
+      "related": [
+        "ProxExploredTriangleHalfWidth_mm",
+        "ProxTimeout_ms",
+        "MaxObsThreshold_mm"
+      ],
+      "evidence": "engine/navMap/mapComponent.cpp:83-85,593-605; engine/aiComponent/behaviorComponent/behaviors/exploring/behaviorExploringExamineObstacle.cpp:462-467",
+      "category": "MapComponent",
+      "status": "live",
+      "tags": ["prox", "navmap", "exploring", "explored"]
+    },
+    "ProxTimeout_ms": {
+      "process": "engine",
+      "blurb": "How long (milliseconds of robot message time) a prox-sensor obstacle may sit on the navigation memory map without being re-observed before it is erased. Default 600,000 ms = 10 minutes.",
+      "detail": "MapComponent::TimeoutObjects runs about every TimeoutUpdatePeriod_ms. For EContentType::ObstacleProx, if last-observed time ≤ now − ProxTimeout_ms the node transform returns empty data (clears the cell). Other content types use their own timers (vision edges, cliffs, unrecognized). Raising keeps ghost ToF obstacles longer (planner keeps avoiding); lowering forgets them sooner so the robot may re-sense the space.",
+      "related": [
+        "CliffTimeout_ms",
+        "VisionTimeout_ms",
+        "UnrecognizedTimeout_ms",
+        "TimeoutUpdatePeriod_ms",
+        "MaxObsThreshold_mm"
+      ],
+      "evidence": "engine/navMap/mapComponent.cpp:77-80,492-527",
+      "category": "MapComponent",
+      "status": "live",
+      "tags": ["prox", "navmap", "timeout", "mapping"]
+    },
+    "RenderBordersFrom": {
+      "process": "engine",
+      "blurb": "Was meant to draw the origin quad of each detected nav-map border for debugging. Default false. No remaining code reads this flag — border debug rendering was removed while the console var stayed.",
+      "detail": "Registered in quadTreeProcessor.cpp with comment “renders detected borders (origin quad)”. Sibling vars RenderBordersToDot / ToQuad / Seeds / ZOffset / Border3DLines share the same fate. FillBorder / GetNodesToFill still implement fill logic but never consult these render switches.",
+      "related": [
+        "RenderBordersToDot",
+        "RenderBordersToQuad",
+        "RenderSeeds",
+        "DebugFindBorders"
+      ],
+      "evidence": "engine/navMap/quadTree/quadTreeProcessor.cpp:25-31; no kRenderBordersFrom reads (rg)",
+      "category": "QuadTreeProcessor",
+      "status": "dead",
+      "statusNote": "CONSOLE_VAR only; never referenced after registration.",
+      "tags": ["navmap", "quadtree", "debug", "dead", "viz"]
+    },
+    "RenderBordersToDot": {
+      "process": "engine",
+      "blurb": "Was meant to draw each detected border’s center as a debug dot. Default false. Unused in this tree — registration only.",
+      "detail": "Same orphan cluster as RenderBordersFrom / ToQuad / Seeds under QuadTreeProcessor. Changing it cannot affect Viz or WebViz navmap colors.",
+      "related": [
+        "RenderBordersFrom",
+        "RenderBordersToQuad",
+        "RenderSeeds",
+        "DebugFindBorders"
+      ],
+      "evidence": "engine/navMap/quadTree/quadTreeProcessor.cpp:27; no kRenderBordersToDot reads (rg)",
+      "category": "QuadTreeProcessor",
+      "status": "dead",
+      "statusNote": "CONSOLE_VAR only; never referenced after registration.",
+      "tags": ["navmap", "quadtree", "debug", "dead", "viz"]
+    },
+    "RenderBordersToQuad": {
+      "process": "engine",
+      "blurb": "Was meant to draw the destination quad of each detected nav-map border. Default false. Unused — no call sites read kRenderBordersToQuad.",
+      "detail": "Registered with RenderBordersFrom/ToDot/Seeds. Documented intent only; border-finding debug draw path is gone. Use live map broadcast (MapRenderRate_sec + render enabled) for actual map visualization instead.",
+      "related": [
+        "RenderBordersFrom",
+        "RenderBordersToDot",
+        "RenderSeeds",
+        "MapRenderRate_sec"
+      ],
+      "evidence": "engine/navMap/quadTree/quadTreeProcessor.cpp:28; no kRenderBordersToQuad reads (rg)",
+      "category": "QuadTreeProcessor",
+      "status": "dead",
+      "statusNote": "CONSOLE_VAR only; never referenced after registration.",
+      "tags": ["navmap", "quadtree", "debug", "dead", "viz"]
+    },
+    "RenderGazeDirectionPoints": {
+      "process": "engine",
+      "blurb": "When true, draws debug cuboids in Viz for where a tracked face is currently looking (orange = current gaze ground point, green = stable average gaze). Default false. Only runs if the GazeDirection product feature gate is also enabled.",
+      "detail": "FaceWorld drawing path: after DrawHumanHead for the face, if this flag and FeatureType::GazeDirection are on, looks up _gazeDirection[faceId] and DrawCuboid at current and (if stable) average gaze directions with fixed viz object ids starting at 2345. Visualization only — does not change gaze estimation, behaviors, or nav map. Feature gate off ⇒ flag is a no-op even when true.",
+      "howTo": "1) Ensure feature GazeDirection is enabled. 2) Enable RenderGazeDirectionPoints. 3) Look at a tracked face in Viz and confirm orange/green ground cuboids.",
+      "related": [],
+      "evidence": "engine/faceWorld.cpp:69,1029-1051",
+      "category": "Vision.GazeDirection",
+      "status": "live",
+      "statusNote": "Requires FeatureType::GazeDirection; otherwise no draw.",
+      "tags": ["face", "gaze", "viz", "debug"]
+    },
+    "RenderProxBeliefs": {
+      "process": "engine",
+      "blurb": "When true, navigation-map quads for ToF prox obstacles are colored as a cyan→green gradient by obstacle confidence (0–100) instead of a flat cyan style. Default false. Affects Viz/WebViz/SDK map broadcast colors only — not whether obstacles exist or how planning treats them.",
+      "detail": "memoryMap.cpp GetNodeVizColor: for EContentType::ObstacleProx, scale = clamp(GetObstacleConfidence()/100). ObstacleProx color = CYAN*scale + GREEN*(1−scale). Consumed when building MapBroadcastData quad colors for every leaf node. Pair with MapRenderRate_sec and render-enabled to see updates in Viz. Category string is ProxSensorComponent though the read is in MemoryMap broadcast.",
+      "related": [
+        "MapRenderRate_sec",
+        "ProxTimeout_ms",
+        "MaxObsThreshold_mm"
+      ],
+      "evidence": "engine/navMap/memoryMap/memoryMap.cpp:39,92-99,128-129,271-281",
+      "category": "ProxSensorComponent",
+      "status": "live",
+      "tags": ["prox", "navmap", "viz", "debug", "confidence"]
+    },
+    "RenderSeeds": {
+      "process": "engine",
+      "blurb": "Was meant to highlight “seed” quads differently when debugging nav-map border fill. Default false. Never read after registration — dead viz toggle.",
+      "detail": "Registered at top of quadTreeProcessor.cpp with the RenderBorders* cluster. GetNodesToFill / FillBorder implement seed expansion for fill but do not branch on kRenderSeeds. Same orphan status as RenderZOffset / RenderBorder3DLines documented in navmap-quadtree.json.",
+      "related": [
+        "RenderBordersFrom",
+        "RenderBordersToDot",
+        "RenderBordersToQuad",
+        "DebugFindBorders"
+      ],
+      "evidence": "engine/navMap/quadTree/quadTreeProcessor.cpp:25; no kRenderSeeds reads (rg)",
+      "category": "QuadTreeProcessor",
+      "status": "dead",
+      "statusNote": "CONSOLE_VAR only; never referenced after registration.",
+      "tags": ["navmap", "quadtree", "debug", "dead", "viz"]
+    }
+  }
+}
