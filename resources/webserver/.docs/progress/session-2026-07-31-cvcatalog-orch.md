@@ -28,7 +28,16 @@ Anim: mic (append), procface, eye-left, eye-right, alexa, audio-tts, procedural-
 ## Counts (end of session — re-run diff if needed)
 See orchestrator final python print for engine/anim documented vs unmapped.
 
-## Suggested next
-- Remaining engine singles / mid-size clusters (NeuralNetRunner, Onboarding/PRDemo, BodyTurnSpeed, RenderBorders, …)
-- Remaining anim dump orphans and shared util channel vars
+## Follow-on: +30 agents (3 parallel) — same day
+
+Second orchestrator pass: 30 agents, waves of 3, each agent wrote + git-committed a shard; orchestrator registered `index.json`.
+
+| Agents | Examples |
+|---|---|
+| A1 | anim dump orphans / Channels + MaxBlinkSpacing… |
+| E01–E29 | face tracking/directed, cube pose, dock, vision save/AE, neural, pet, onboarding, IMU, audio beat, nav render, debug, fake power, body look, viz UI, gaze, hough, palm/touch, cliff drive, enroll/sayname, timers, firmware/jdocs, distance/search, photo/tracker/calib, driving/FFT, misc A–C |
+
+### Suggested next
+- Re-diff unmapped (should be near-zero for vars if all batches applied)
 - Optional: console **functions** (`consolefunclist_*`)
+- Optional: revisit partial/dead status on Channels vs prior “orphan” notes for Alexa/Microphones
