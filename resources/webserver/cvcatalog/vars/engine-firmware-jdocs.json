@@ -1,0 +1,251 @@
+{
+  "vars": {
+    "AlwaysDoFirmwareUpdate": {
+      "process": "engine",
+      "category": "Firmware",
+      "blurb": "Bool under the Firmware console category (default false). Name suggests forcing a body/syscon firmware update on every robot connection, but nothing in this tree reads the value after registration.",
+      "detail": "Registered next to SkipFirmwareAutoUpdate in RobotInitialConnectionConsoleVars inside robotInitialConnection.cpp. RobotInitialConnection only handles robotAvailable / outdated-firmware disconnect responses and message filtering while _validFirmware is false — it never branches on this flag. No other TU references kAlwaysDoFirmwareUpdate. Treat as leftover Cozmo-era control surface; flipping it will not force an update path on this rebuild.",
+      "related": ["SkipFirmwareAutoUpdate"],
+      "evidence": "engine/robotInitialConnection.cpp:31-35 (registration only); rg finds no reads of kAlwaysDoFirmwareUpdate outside that file",
+      "status": "dead",
+      "statusNote": "CONSOLE_VAR registered; never read. No firmware-update logic keyed off this flag in-repo.",
+      "tags": ["firmware", "dead", "connection"]
+    },
+    "ButtonWakeWord": {
+      "process": "engine",
+      "category": "RobotSettings",
+      "blurb": "Staging enum for which wake word the backpack button should arm: BUTTON_WAKEWORD_HEY_VECTOR (0) or BUTTON_WAKEWORD_ALEXA (1). Changing the list alone does not reconfigure the robot — call DebugSetButtonWakeWord.",
+      "detail": "CONSOLE_VAR_ENUM under RobotSettings; string list must stay aligned with settings.proto ButtonWakeWord. DebugSetButtonWakeWord packages the current index into SettingsCommManager::HandleRobotSettingChangeRequest(button_wakeword), which validates and ApplySettingButtonWakeWord: sends RobotInterface::SetButtonWakeWord(isAlexa) toward anim (MicDataSystem::SetButtonWakeWordIsAlexa). RefreshConsoleVars copies the saved robot setting back into this enum so the UI matches app/cloud. Same path as SDK/app UpdateSettings for button_wakeword.",
+      "howTo": "1) Pick Hey Vector or Alexa in this list. 2) Call DebugSetButtonWakeWord. Confirm backpack button wakes the chosen assistant.",
+      "requires": ["DebugSetButtonWakeWord"],
+      "enumLabels": [
+        "BUTTON_WAKEWORD_HEY_VECTOR",
+        "BUTTON_WAKEWORD_ALEXA"
+      ],
+      "related": [
+        "DebugSetButtonWakeWord"
+      ],
+      "evidence": "engine/components/settingsCommManager.cpp:96-105,393-394; engine/components/settingsManager.cpp:326,899-934; animProcess/src/cozmoAnim/micData/micDataSystem.cpp:895+",
+      "status": "partial",
+      "statusNote": "Staging buffer only; Apply runs when DebugSetButtonWakeWord (or app/SDK) updates the setting.",
+      "tags": ["settings", "wakeword", "button", "alexa", "jdocs"]
+    },
+    "CheckFirmwareVersion": {
+      "process": "engine",
+      "category": "Playpen",
+      "blurb": "Playpen factory flag (default true) intended to gate a minimum firmware-version check at init. BehaviorPlaypenInitChecks never reads it — the battery/touch/cliff/charger checks run regardless.",
+      "detail": "PlaypenConfig::kCheckFirmwareVersion is WRAP_EXTERN_CONSOLE_VAR under category Playpen. Header comment and BehaviorPlaypenInitChecks file comment still talk about firmware version, but the activated path only checks cliffs, touch range, battery voltage, charger contacts, and NV wipe — no branch on kCheckFirmwareVersion / kMinFirmwareVersion / kMinHardwareVersion. Dead sibling of those min-version knobs.",
+      "related": [
+        "MinFirmwareVersion",
+        "MinHardwareVersion",
+        "MfgIDTimeout_ms"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:90-91; playpenConfig.cpp:84; behaviorPlaypenInitChecks.cpp:34-91 (no read); rg only hits config files for kCheckFirmwareVersion",
+      "status": "dead",
+      "statusNote": "Registered under Playpen; never read by any playpen behavior in this tree.",
+      "tags": ["playpen", "factory", "firmware", "dead"]
+    },
+    "DisconnectAtEnd": {
+      "process": "engine",
+      "category": "Playpen",
+      "blurb": "Playpen factory flag (default false) meant to disconnect the robot when the factory test sequence finishes. No playpen code reads PlaypenConfig::kDisconnectAtEnd.",
+      "detail": "Declared static in playpenConfig.h and WRAP_EXTERN_CONSOLE_VAR in playpenConfig.cpp. BehaviorPlaypenTest / IBehaviorPlaypen finish with EMR flags, NV writes, face result display, and EngineToGame FactoryTestResultEntry — they never consult this disconnect switch. Flipping the console var does nothing observable.",
+      "related": [
+        "WriteToStorage",
+        "SkipActiveObjectCheck"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:30-31; playpenConfig.cpp:73; rg kDisconnectAtEnd only config files",
+      "status": "dead",
+      "statusNote": "Registered; zero read sites outside playpenConfig.",
+      "tags": ["playpen", "factory", "dead"]
+    },
+    "EnableCladLogger": {
+      "process": "engine",
+      "category": "Logging",
+      "blurb": "When true (default), engine log lines that go through CLADLoggerProvider are also forwarded as DebugAppendConsoleLogLine messages on the external interface so a connected game/Webots/dev client can show the console stream. When false, that CLAD mirror is suppressed (file/DAS logs still work).",
+      "detail": "CLADLoggerProvider::Log checks kEnableCladLogger && _externalInterface before BroadcastDeferred of DebugAppendConsoleLogLine (message truncated to 2000 chars for packet size). Simulator Webots game-engine controller forces the var false so it does not flood sim. Only affects this provider’s CLAD path, not general PRINT_NAMED_* sinks.",
+      "related": [],
+      "evidence": "engine/debug/cladLoggerProvider.cpp:25,42-62; simulator/controllers/webotsCtrlGameEngine2/webotsCtrlGameEngine2.cpp:42,147; engine/cozmoEngine.cpp:633",
+      "status": "live",
+      "tags": ["logging", "clad", "debug"]
+    },
+    "JdocType": {
+      "process": "engine",
+      "category": "JdocsManager",
+      "blurb": "Staging enum of which cloud “jdoc” (JSON document) type to target with DebugDeleteSelectedJdocInCloud: RobotSettings, RobotLifetimeStats, AccountSettings, or UserEntitlements. Changing the list alone does nothing; the delete console function uses the current value.",
+      "detail": "CONSOLE_VAR_ENUM under JdocsManager (REMOTE_CONSOLE_ENABLED). Indices must stay aligned with external_interface::JdocType / settings.proto. DebugDeleteSelectedJdocInCloud casts kJdocType and calls DeleteJdocInCloud (cloud deleteReq for that doc name). DebugDeleteAllJdocsInCloud ignores this selector and walks every type. These jdocs hold robot settings, lifetime stats, account settings, and user entitlements — deleting them is destructive for that cloud account/thing.",
+      "howTo": "1) Pick the jdoc type. 2) Call DebugDeleteSelectedJdocInCloud only if you intend to wipe that cloud document. Prefer DebugDeleteAllJdocsInCloud only in lab accounts.",
+      "requires": ["DebugDeleteSelectedJdocInCloud"],
+      "enumLabels": [
+        "RobotSettings",
+        "RobotLifetimeStats",
+        "AccountSettings",
+        "UserEntitlements"
+      ],
+      "related": [
+        "DebugDeleteSelectedJdocInCloud",
+        "DebugDeleteAllJdocsInCloud"
+      ],
+      "evidence": "engine/components/jdocsManager.cpp:73-92,319-323",
+      "status": "partial",
+      "statusNote": "Selector only; effect is via DebugDeleteSelectedJdocInCloud. Delete is destructive to cloud jdocs.",
+      "tags": ["jdocs", "cloud", "settings", "danger"]
+    },
+    "MaxStreamingDuration_s": {
+      "process": "engine",
+      "category": "TriggerWord",
+      "blurb": "How long (seconds) BehaviorReactToVoiceCommand will keep waiting for a cloud intent after the mic stream opens (default 10 s, range 0–20). After this from stream begin, listening times out even if no intent arrived.",
+      "detail": "Returned by GetStreamingDuration() and used in GetListeningTimeout when a stream has begun and an intent is expected: timeout = streamingBeginTime + this duration. Before streaming starts (or on error path), kMinListeningTimeout_s from activation is used instead. DEV_ASSERT expects this ≥ MicData::kStreamingTimeout_ms/1000 so engine timeout is not shorter than anim stream timeout. Lower values cut off slow cloud replies; higher values leave Vector in “listening” longer.",
+      "related": [
+        "RespondsToTriggerWord",
+        "RecentDirFallbackTime",
+        "MinListeningTimeout_s"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToVoiceCommand.cpp:99,509,1161-1184",
+      "status": "live",
+      "tags": ["voice", "trigger-word", "streaming", "timeout"]
+    },
+    "MfgIDTimeout_ms": {
+      "process": "engine",
+      "category": "Playpen",
+      "blurb": "Playpen timeout (default 500 ms) intended for waiting on a manufacturing-ID reply after request. No current playpen behavior reads kMfgIDTimeout_ms.",
+      "detail": "Header comment: “Timeout to wait for MfgID message back from robot after requesting it.” WRAP_EXTERN_CONSOLE_VAR under Playpen. rg finds only playpenConfig.h/.cpp — no RequestMfgID / wait-timer usage in BehaviorPlaypen*. Dead leftover next to the unused firmware-version knobs.",
+      "related": [
+        "CheckFirmwareVersion",
+        "MinFirmwareVersion",
+        "MinHardwareVersion"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:102-103; playpenConfig.cpp:88; rg kMfgIDTimeout_ms only config",
+      "status": "dead",
+      "statusNote": "Registered; never read outside playpenConfig.",
+      "tags": ["playpen", "factory", "dead"]
+    },
+    "MinBatteryVoltage": {
+      "process": "engine",
+      "category": "Playpen",
+      "blurb": "Minimum battery voltage (volts, default 3.6) for factory/self-test pass. Playpen fails init/end with BATTERY_TOO_LOW if under this; SelfTest uses the same dump id (also default 3.6) for init, drive-forwards, and dock-with-charger checks.",
+      "detail": "Dual WRAP_EXTERN_CONSOLE_VAR: PlaypenConfig::kMinBatteryVoltage (category Playpen) and SelfTestConfig::kMinBatteryVoltage (category SelfTest). ConsoleSystem keeps the first registration and ignores the duplicate, so the console knob only mutates one of the two statics (static init order). Playpen: BehaviorPlaypenInitChecks (raw volts) and BehaviorPlaypenEndChecks (filtered GetBatteryVolts). SelfTest: BehaviorSelfTestInitChecks, DriveForwards, DockWithCharger. Only meaningful while those factory/self-test behaviors run — not freeplay low-battery logic.",
+      "related": [
+        "RequiredChargeTime_s",
+        "SkipActiveObjectCheck"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:93-94; playpenConfig.cpp:85; behaviorPlaypenInitChecks.cpp:67-71; behaviorPlaypenEndChecks.cpp:61-65; selfTest/selfTestConfig.h:66-67; selfTestConfig.cpp:26; behaviorSelfTestInitChecks.cpp:113; behaviorSelfTestDriveForwards.cpp:55; behaviorSelfTestDockWithCharger.cpp:97; lib/util/source/anki/util/console/consoleSystem.cpp:148-160",
+      "status": "partial",
+      "statusNote": "Live for first-registered of Playpen/SelfTest; second WRAP_EXTERN ignored (same dump id). Both defaults 3.6 V.",
+      "tags": ["playpen", "selftest", "factory", "battery", "duplicate-id"]
+    },
+    "MinFirmwareVersion": {
+      "process": "engine",
+      "category": "Playpen",
+      "blurb": "Playpen minimum firmware version integer (default 10501) that would be required if firmware checking were implemented. Nothing compares robot firmware against this value.",
+      "detail": "PlaypenConfig static + WRAP_EXTERN under Playpen. Paired with CheckFirmwareVersion / MinHardwareVersion, which are also unread. BehaviorPlaypenInitChecks does not query body/syscon version. Changing the console number has no effect.",
+      "related": [
+        "CheckFirmwareVersion",
+        "MinHardwareVersion",
+        "MfgIDTimeout_ms"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:96-97; playpenConfig.cpp:86; rg kMinFirmwareVersion only config",
+      "status": "dead",
+      "statusNote": "Registered; never read outside playpenConfig.",
+      "tags": ["playpen", "factory", "firmware", "dead"]
+    },
+    "MinHardwareVersion": {
+      "process": "engine",
+      "category": "Playpen",
+      "blurb": "Playpen minimum hardware version (default 3) intended for factory board revision gating. No behavior reads PlaypenConfig::kMinHardwareVersion.",
+      "detail": "Same dead cluster as CheckFirmwareVersion / MinFirmwareVersion: declared and console-wrapped, never compared to robot hardware ID in this tree.",
+      "related": [
+        "CheckFirmwareVersion",
+        "MinFirmwareVersion",
+        "MfgIDTimeout_ms"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:99-100; playpenConfig.cpp:87; rg kMinHardwareVersion only config",
+      "status": "dead",
+      "statusNote": "Registered; never read outside playpenConfig.",
+      "tags": ["playpen", "factory", "hardware", "dead"]
+    },
+    "RecentDirFallbackTime": {
+      "process": "engine",
+      "category": "TriggerWord",
+      "blurb": "When ReactToVoiceCommand cannot get a reliable mic direction from the wake-word or streaming windows, it falls back to “most recent direction” over this many seconds of mic history (default 1.0 s, range 0–10).",
+      "detail": "GetDirectionFromMicHistory converts the value to milliseconds and calls MicDirectionHistory::GetRecentDirection(duration). Used after reaction/trigger directions fail so Vector can still turn toward a plausible talker. timeLength_ms == 0 would mean “just the latest sample”; normal default aggregates history over the window and picks the best direction count. Independent of MaxStreamingDuration_s (which is the cloud listen timeout).",
+      "related": [
+        "MaxStreamingDuration_s",
+        "RespondsToTriggerWord",
+        "DirStreamingTimeToIgnoreBegin",
+        "DirStreamingTimeToIgnoreEnd"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToVoiceCommand.cpp:110,700-721; engine/components/mics/micDirectionHistory.cpp:141-152",
+      "status": "live",
+      "tags": ["voice", "mic", "direction", "trigger-word"]
+    },
+    "RequiredChargeTime_s": {
+      "process": "engine",
+      "category": "BatteryComponent",
+      "blurb": "Suggested on-charger time (seconds) the app/FTUE should show when the battery is low (default 300 s = 5 min, range 10–9999). Does not force the hardware charger; it drives BatteryComponent’s suggested-charge countdown returned to the client.",
+      "detail": "When low battery and charging with no countdown yet, sets _suggestedChargeEndTime_s = now + this value. Removing from charger pauses the remaining time; re-dock adds elapsed-off × (1 + kExtraChargingTimePerDischargePeriod_s) and reclamps so remaining never exceeds this max. GetSuggestedChargerTime() returns the full value if still low and countdown not started, else remaining/clamped pause time. Comment: set before low battery and avoid mid-countdown changes. Used for onboarding / time-to-charge UX, not the voltage cutoffs.",
+      "related": [
+        "FakeLowBattery",
+        "MinBatteryVoltage"
+      ],
+      "evidence": "engine/components/battery/batteryComponent.cpp:60-78,513-569",
+      "status": "live",
+      "statusNote": "Comment warns not to change after low-battery countdown starts; mid-flight edits can desync suggested end time.",
+      "tags": ["battery", "charger", "ftue", "onboarding"]
+    },
+    "RespondsToTriggerWord": {
+      "process": "engine",
+      "category": "TriggerWord",
+      "blurb": "Master enable for the ReactToVoiceCommand behavior (default true). When false, that behavior never activates even if a wake word is pending — Vector will not enter the listening/streaming reaction path from this behavior.",
+      "detail": "WantsToBeActivatedBehavior returns kRespondsToTriggerWord && UserIntentComponent::IsTriggerWordPending(). Does not disable anim-side wake-word detection or cloud streaming infrastructure; it only stops this engine behavior from claiming the trigger-word reaction (listening anims, turn-to-direction, stream wait, intent handoff). Useful to silence freeplay voice reactions while debugging other systems.",
+      "related": [
+        "MaxStreamingDuration_s",
+        "RecentDirFallbackTime"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToVoiceCommand.cpp:92,364-368",
+      "status": "live",
+      "tags": ["voice", "trigger-word", "behavior"]
+    },
+    "SkipActiveObjectCheck": {
+      "process": "engine",
+      "category": "Playpen",
+      "blurb": "When true, Playpen end checks do not fail if no advertising light cube (active object) was heard. Default false — factory playpen expects at least one cube radio contact unless EMR disables the cube test.",
+      "detail": "BehaviorPlaypenEndChecks: if EMR playpenTestDisableMask does not set CubeRadioError, and !kSkipActiveObjectCheck && !_heardFromLightCube, result is NO_ACTIVE_OBJECTS_DISCOVERED. CubeComms SetBroadcastObjectAvailable is used earlier so ObjectAvailable can set _heardFromLightCube. SelfTest also has a SelfTestConfig::kSkipActiveObjectCheck static (default true) used in cube connect callback, but that SelfTest static is NOT WRAP_EXTERN_CONSOLE_VAR — only the Playpen registration appears in the engine dump under this id.",
+      "related": [
+        "WriteToStorage",
+        "MinBatteryVoltage"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:47-48; playpenConfig.cpp:79; behaviorPlaypenEndChecks.cpp:49-74; selfTest/selfTestConfig.h:41-42; behaviorSelfTest.cpp:459-462 (SelfTest static, not console)",
+      "status": "live",
+      "statusNote": "Console id is Playpen only. SelfTest has a same-named static default true without console registration.",
+      "tags": ["playpen", "factory", "cube", "ble"]
+    },
+    "SkipFirmwareAutoUpdate": {
+      "process": "engine",
+      "category": "Firmware",
+      "blurb": "Bool under Firmware (default false) whose name suggests skipping automatic body firmware update after connect. Registered only; no code path reads kSkipFirmwareAutoUpdate.",
+      "detail": "Sibling of AlwaysDoFirmwareUpdate in RobotInitialConnectionConsoleVars. RobotInitialConnection never consults either flag when handling robotAvailable, factory firmware, or disconnect results. No other references in the tree. Dead leftover; does not gate OTA or spine firmware programming on this rebuild.",
+      "related": ["AlwaysDoFirmwareUpdate"],
+      "evidence": "engine/robotInitialConnection.cpp:31-35 (registration only); rg no reads of kSkipFirmwareAutoUpdate",
+      "status": "dead",
+      "statusNote": "CONSOLE_VAR registered; never read in-repo.",
+      "tags": ["firmware", "dead", "connection"]
+    },
+    "WriteToStorage": {
+      "process": "engine",
+      "category": "Playpen",
+      "blurb": "When true (default), successful Playpen factory steps write calibration and results into robot non-volatile factory storage (and birth-certificate/EMR on full pass). When false, helper writes are skipped and only log lines note that writing is disabled.",
+      "detail": "IBehaviorPlaypen::WriteToStorage gates NVStorageComponent::Write for tags such as camera calib, IMU info, observed cube pose, calib images. BehaviorPlaypenTest also requires this flag to write NVEntry_PlaypenTestResults and, on SUCCESS, birth certificate + EMR playpen fields. Factory lab tool — turning it off is useful for dry-runs; leaving it on on a non-factory robot can overwrite factory NV entries if playpen behaviors are forced active.",
+      "howTo": "For a non-destructive playpen dry-run: set WriteToStorage false before starting the playpen sequence. For real factory flash: leave true and ensure playpen is intentional.",
+      "related": [
+        "SkipActiveObjectCheck",
+        "DisconnectAtEnd",
+        "MinBatteryVoltage"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:33-34; playpenConfig.cpp:74; iBehaviorPlaypen.cpp:296-312; behaviorPlaypenTest.cpp:373-420; behaviorPlaypenCameraCalibration.cpp:229,253; behaviorPlaypenDriftCheck.cpp:80; behaviorPlaypenPickupCube.cpp:124",
+      "status": "live",
+      "statusNote": "Factory NV/EMR writes when playpen runs with this true — treat as danger outside fixture use.",
+      "tags": ["playpen", "factory", "nvstorage", "danger"]
+    }
+  }
+}
