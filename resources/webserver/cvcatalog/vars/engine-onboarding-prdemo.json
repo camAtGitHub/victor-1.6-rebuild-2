@@ -1,0 +1,61 @@
+{
+  "vars": {
+    "OnboardingComeHere_minDriveToFaceDistanceKey_mm": {
+      "process": "engine",
+      "blurb": "Per-instance stop distance (mm) for the OnboardingComeHere “come here” behavior (DriveToFace class). If Vector’s horizontal distance to the target face’s head is already ≤ this value, he skips the approach and plays the “already at face” reaction. JSON default is 200 mm.",
+      "detail": "Registered with MakeMemberTunable as GetDebugLabel() + “_minDriveToFaceDistanceKey_mm” (category BehaviorDriveToFace). Bound to InstanceConfig.minDriveToFaceDistance_mm, which is also seeded from behavior JSON. OnboardingComeHere sets animDriveOverride to OnboardingComeHere, so when he is *not* already close he does not DriveToPose by (distToHead − this); he plays that override animation instead. The tunable still controls the already-close gate (IsRobotAlreadyCloseEnoughToFace) that chooses AlreadyCloseEnough vs the override path. Sibling production Come Here uses the same class without an override and really drives to this standoff. ANKI_DEV_CHEATS only.",
+      "category": "BehaviorDriveToFace",
+      "related": [
+        "OnboardingComeHere_timeUntilCancelFaceTrack_s",
+        "PRDemoComeHere_minDriveToFaceDistanceKey_mm",
+        "ComeHereVoiceCommand_minDriveToFaceDistanceKey_mm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/simpleFaceBehaviors/behaviorDriveToFace.cpp:41,84,136,296,428-432; resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/onboarding/onboardingComeHere.json; engine/aiComponent/behaviorComponent/behaviors/iCozmoBehavior.h:787-806",
+      "status": "live",
+      "tags": ["onboarding", "comehere", "drivetoface", "distance", "MakeMemberTunable"]
+    },
+    "OnboardingComeHere_timeUntilCancelFaceTrack_s": {
+      "process": "engine",
+      "blurb": "Per-instance console knob that would set how long (seconds) OnboardingComeHere keeps tracking a face after arriving. On the shipping onboarding JSON this has no effect: tracking after approach is turned off for this instance.",
+      "detail": "DriveToFace always MakeMemberTunable-binds InstanceConfig.timeUntilCancelTracking_s under name timeUntilCancelFaceTrack_s (UI id OnboardingComeHere_timeUntilCancelFaceTrack_s). The value is only loaded from JSON when trackFaceOnceKnown is true, and TransitionToTrackingFace returns immediately when that flag is false—never scheduling trackEndTime_s or a TrackFaceAction. onboardingComeHere.json sets trackFaceOnceKnown: false and omits timeUntilCancelFaceTrack_s, so the member is unused for this behavior instance. Contrast PRDemoComeHere / ComeHereVoiceCommand (tracking on, default 5 s).",
+      "category": "BehaviorDriveToFace",
+      "related": [
+        "OnboardingComeHere_minDriveToFaceDistanceKey_mm",
+        "PRDemoComeHere_timeUntilCancelFaceTrack_s",
+        "ComeHereVoiceCommand_timeUntilCancelFaceTrack_s"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/simpleFaceBehaviors/behaviorDriveToFace.cpp:40,86-96,135,389-410; resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/onboarding/onboardingComeHere.json:8",
+      "status": "dead",
+      "statusNote": "Registered MakeMemberTunable, but onboardingComeHere.json has trackFaceOnceKnown:false, so TransitionToTrackingFace never reads timeUntilCancelTracking_s. Changing this console var cannot alter onboarding come-here behavior unless that JSON flag is changed in config and the behavior is rebuilt/reloaded.",
+      "tags": ["onboarding", "comehere", "drivetoface", "tracking", "dead", "MakeMemberTunable"]
+    },
+    "PRDemoComeHere_minDriveToFaceDistanceKey_mm": {
+      "process": "engine",
+      "blurb": "Per-instance standoff distance (mm) for PRDemoComeHere (DriveToFace). Vector drives forward by max(0, distance-to-face-head − this), and if already ≤ this distance he treats the face as close enough and plays AlreadyAtFace. JSON default is 200 mm.",
+      "detail": "Same MakeMemberTunable path as other DriveToFace instances (uniqueName = behavior debug label + key; category BehaviorDriveToFace). PRDemoComeHere has no animDriveOverride, so TransitionToDrivingToFace really issues DriveToPoseAction toward a pose translated by (distToHead − minDrive), with cliff-aware shortening. Also used by IsRobotAlreadyCloseEnoughToFace after FindFaceAndThen. Gated to PR demo via FeatureGate PRDemo=true on the behavior. Live at next drive/close check after you edit the console var (member reference, not construct-only copy). ANKI_DEV_CHEATS only.",
+      "category": "BehaviorDriveToFace",
+      "related": [
+        "PRDemoComeHere_timeUntilCancelFaceTrack_s",
+        "OnboardingComeHere_minDriveToFaceDistanceKey_mm",
+        "ComeHereVoiceCommand_minDriveToFaceDistanceKey_mm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/simpleFaceBehaviors/behaviorDriveToFace.cpp:41,84,136,260-332,428-432; resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/prDemo/prDemoComeHere.json:16-17; engine/aiComponent/behaviorComponent/behaviors/iCozmoBehavior.h:787-806",
+      "status": "live",
+      "tags": ["prdemo", "comehere", "drivetoface", "distance", "MakeMemberTunable"]
+    },
+    "PRDemoComeHere_timeUntilCancelFaceTrack_s": {
+      "process": "engine",
+      "blurb": "How long (seconds) PRDemoComeHere keeps actively tracking the found face after the drive (or already-close path) before the behavior cancels itself. JSON default is 5.0 s. Requires trackFaceOnceKnown (true by default for this instance).",
+      "detail": "When TransitionToTrackingFace runs, trackEndTime_s = current time + this value; BehaviorUpdate in State::TrackFace CancelSelf() when time expires. Also starts a TrackFaceAction with a short max time without a visible face (hardcoded 1 s). PRDemoComeHere omits trackFaceOnceKnown so it defaults true; time is parsed from JSON and re-tunable via console. After success anim / already-close / drive-override paths, tracking is the usual finish. Sibling of ComeHereVoiceCommand_timeUntilCancelFaceTrack_s. ANKI_DEV_CHEATS only.",
+      "category": "BehaviorDriveToFace",
+      "related": [
+        "PRDemoComeHere_minDriveToFaceDistanceKey_mm",
+        "OnboardingComeHere_timeUntilCancelFaceTrack_s",
+        "ComeHereVoiceCommand_timeUntilCancelFaceTrack_s"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/simpleFaceBehaviors/behaviorDriveToFace.cpp:40,86-88,135,231-246,389-410; resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/prDemo/prDemoComeHere.json:15",
+      "status": "live",
+      "tags": ["prdemo", "comehere", "drivetoface", "tracking", "MakeMemberTunable"]
+    }
+  }
+}
