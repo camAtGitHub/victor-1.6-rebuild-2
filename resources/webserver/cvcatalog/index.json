@@ -41,7 +41,10 @@
     "vars/engine-cliff-obs.json",
     "vars/anim-os-display-dev.json",
     "vars/engine-mood-stats.json",
-    "vars/engine-calib.json"
+    "vars/engine-calib.json",
+    "vars/anim-dump-orphans.json",
+    "vars/engine-face-tracking.json",
+    "vars/engine-face-directed.json"
   ],
   "categories": [
     "categories/vision.json",
