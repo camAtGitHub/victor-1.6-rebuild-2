@@ -240,6 +240,7 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 | `docs/mapping/ENGINE-PATH-PLANNING.md` | Drive-to-pose: PathComponent planner selection |
 | `docs/mapping/WEBVIZ-BEHAVIORS-REVIEW.md` | WebViz Behaviors/BehaviorConds review notes |
 | `docs/mapping/GLOSSARY.md` | ~130 repo terms |
+| `docs/mapping/IDEA-backpack-lights-flags.md` | Idea: Anki lights flag + customBackpackLights folder + Wired option |
 | `engine/components/cubes/` | L2 cube BLE/coordinator/lights stack |
 | `animProcess/src/cozmoAnim/{animation,faceDisplay,micData,speechRecognizer,audio,…}/` | L2 anim subsystems |
 | `robot/supervisor/`, `robot/hal/`, `robot/clad/` | L2 control path; `robot/syscon/` L1 shallow |
@@ -337,6 +338,7 @@ if you ran out of context mid-folder, say so here.
 | 2026-07-28 | Grok | Reviewed WebViz Behaviors + BehaviorConds (no code changes). Wrote `docs/mapping/WEBVIZ-BEHAVIORS-REVIEW.md`. | Continue mapping. |
 | 2026-07-28 | Grok (+ 7 subagents) | Top-level L1 closeout + engine L3 (observing/intents/path/cubes). Glossary ~134. | High-value L2: anim + robot. |
 | 2026-07-28 | Grok (+ 3 subagents) | **High-value finish:** `animProcess/` → mapped-L2 (8 child READMEs: animation, face, mic, speechRecognizer, audio, TTS, backpack, alexa; Picovoice wake word). `robot/` → mapped-L2 (supervisor, HAL/spine, clad, core; syscon L1 shallow). `docs/mapping/PROCESS-IPC.md` (sockets + anim relay). Quick answers updated. | Mapping phase complete for high-value paths. Remaining optional: intent-graph 1.8 diff, deep asset trees, syscon firmware internals. |
+| 2026-07-29 | Grok | Captured idea: Anki backpack lights via `/data/data/enableankilights` + auto custom lights from `/data/data/customBackpackLights/*` (Wired option) → `docs/mapping/IDEA-backpack-lights-flags.md`. Links existing CCIS/CHANGES. | Feature phase: verify if already coded; else implement flag/folder + Wired. |
 
 ---
 

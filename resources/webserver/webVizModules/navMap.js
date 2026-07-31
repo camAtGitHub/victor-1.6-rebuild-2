@@ -255,10 +255,41 @@
   var faceData = {};
   var robotPosition;
 
-  function SimpleQuad( center, sideSize, color ) {
+  // Semantic Z-lift for selected content types (3D only).
+  // Viz-only cue — not real world height from the robot.
+  // Live engine maps cube+charger footprints to ObstacleCube; ObstacleCharger is a canary.
+  // Positive = solid column floor→top; negative = solid column top→floor (pit).
+
+  function getContentZLiftMm( content ) {
+    switch( content ) {
+      case 'Cliff':                  return -50;
+      case 'ObstacleProx':           return  40;
+      case 'ObstacleProxExplored':   return  50;
+      case 'ObstacleUnrecognized':   return  35;
+      case 'ObstacleCube':           return  30;
+      case 'ObstacleCharger':        return  45;
+      default:                       return   0;
+    }
+  }
+
+  function getContentElevatedAlpha( content ) {
+    switch( content ) {
+      case 'Cliff':                  return 220;
+      case 'ObstacleProx':           return 160;
+      case 'ObstacleProxExplored':   return 230;
+      case 'ObstacleUnrecognized':   return 180;
+      case 'ObstacleCube':           return 220;
+      case 'ObstacleCharger':        return 220;
+      default:                       return   0;
+    }
+  }
+
+  function SimpleQuad( center, sideSize, color, content ) {
     this.center = center;
     this.sideSize = sideSize;
     this.color = color;
+    this.content = content || '';
+    this.zLiftMm = getContentZLiftMm( this.content );
   }
 
   function getQuadColor( content ) {
@@ -296,7 +327,7 @@
         if( this.center.x + half > extentsInfo.maxX ) { extentsInfo.maxX = this.center.x + half; }
         if( this.center.y - half < extentsInfo.minY ) { extentsInfo.minY = this.center.y - half; }
         if( this.center.y + half > extentsInfo.maxY ) { extentsInfo.maxY = this.center.y + half; }
-        destSimpleQuads.push( new SimpleQuad( this.center, this.size_m, color ) );
+        destSimpleQuads.push( new SimpleQuad( this.center, this.size_m, color, content ) );
         return true;
       }
 
@@ -716,6 +747,38 @@
       p.pop();
     }
 
+    /**
+     * Solid columns for sparse content types: filled from the floor (z=0)
+     * up to +height, or from floor down into a pit for negative heights.
+     * Floor bake stays flat; this is the 3D extrusion overlay.
+     */
+    function drawElevatedQuads3D() {
+      if( !quadTreeQuads || quadTreeQuads.length === 0 ) { return; }
+      p.noStroke();
+      for( var i = 0; i < quadTreeQuads.length; ++i ) {
+        var q = quadTreeQuads[i];
+        if( !q || !q.zLiftMm ) { continue; }
+        var cx = q.center.x * kMmPerMeter;
+        var cy = q.center.y * kMmPerMeter;
+        var side = q.sideSize * kMmPerMeter;
+        if( !isFinite( side ) || side <= 0 ) { continue; }
+        // Box centered halfway between floor and tip so it fills floor→height
+        var h = q.zLiftMm;
+        var colH = Math.abs( h );
+        var midZ = 0.5 * h;
+        var s = toScene( cx, cy, midZ );
+        var c = q.color;
+        var a = getContentElevatedAlpha( q.content );
+        if( a < 1 ) { continue; }
+        p.push();
+        p.translate( s.x, s.y, s.z );
+        p.fill( c.r, c.g, c.b, a );
+        // p5 box(w, h, d): h is vertical (map Z / p5 Y)
+        p.box( side, colH, side );
+        p.pop();
+      }
+    }
+
     function drawSupportFloor() {
       if( typeof dataExtentsInfo.minX === 'undefined' ) { return; }
       var minX = dataExtentsInfo.minX * kMmPerMeter;
@@ -960,6 +1023,7 @@
         p.ambientLight( 110 );
         p.directionalLight( 230, 230, 230, 0.35, -1.0, 0.25 );
 
+        drawElevatedQuads3D();
         if( shouldDrawRobot ) { drawRobot3D(); }
         if( shouldDrawCubes ) { drawCubes3D(); }
         if( shouldDrawFaces ) { drawFaces3D(); }

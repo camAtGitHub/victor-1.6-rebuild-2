@@ -208,6 +208,7 @@ Stock docs describe Anki 1.6. This tree differs — **always check `CHANGES.md`*
 - `docs/mapping/ENGINE-PATH-PLANNING.md` — drive-to-pose planner selection
 - `docs/mapping/PROCESS-IPC.md` — eng/anim/robot/cloud/switchboard IPC
 - `docs/mapping/IDEA-personality-packs.md` — **idea:** selectable JSON personality packs
+- `docs/mapping/IDEA-backpack-lights-flags.md` — **idea:** `/data/data/enableankilights` + `customBackpackLights/*` (+ Wired)
 - `engine/README.md` — engine hub + L2 links
 - `animProcess/README.md` — L2 (streamer, face, mic/Picovoice, relay)
 - `robot/README.mapping.md` — L2 (supervisor, HAL/spine, syscon shallow)
