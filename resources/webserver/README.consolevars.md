@@ -3,7 +3,7 @@
 **Path A (guaranteed on robot):** classic themed page only.  
 **Ports:** engine `:8888/consolevars`, anim `:8889/consolevars`  
 **Template:** `consolevarsui.html` → C++ injects tabs/controls at three markers  
-**Chrome:** `webviz/css/tokens.css` + `consolevars-chrome.css` (token-only colors)  
+**Chrome:** `consolevars-tokens.css` + `consolevars-chrome.css` (self-contained; same `--wv-*` as WebViz)  
 **Decorator:** `consolevars-app.js` — curated `?` help + `⌀` dead marks; raw controls always work  
 **Catalog (preferred):** sharded under `consolevars/` (`index.json` → `vars/`, `categories/`, `recipes/`, `meta.json`)  
 **Catalog fallback:** root `consolevars-catalog.json` if the shard index fails  
@@ -62,6 +62,9 @@ Recipe steps: `{ "var", "value" }` or `{ "func", "args" }`. Enum values are 0-ba
 |---|---|
 | `.js` / `.json` / `.css` only | `scp` + browser **hard-refresh** |
 | `consolevarsui.html` (template) | `scp` + **restart** eng/anim webserver (template cached at process start) |
+
+**Minimum scp set for themed Path A:**  
+`consolevarsui.html`, `consolevars-tokens.css`, `consolevars-chrome.css`, `consolevars-app.js`, `consolevars/` (shards), optional `consolevars-catalog.json` fallback.
 
 No new HTTP routes. Stock APIs only: `consolevarset`, `consolevarget`, `consolevarlist`, `consolefunclist`, `consolefunccall`.
 

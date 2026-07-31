@@ -42,7 +42,8 @@ Upstream notes: `docs/development/web-server.md`.
 ## 3. Visual theme (canonical)
 
 **Source of truth:** `webviz/css/tokens.css` (`--wv-*` variables).  
-New chrome (consolevars reskin, future pages) **must use these tokens** (or alias them). Do not invent a second palette.
+**Path A consolevars deploy copy:** `consolevars-tokens.css` (same values, lives next to `consolevarsui.html` so robots without the `webviz/` tree do not 404). Keep both in sync when palette changes.  
+New chrome **must use these tokens** (or alias them). Do not invent a second palette.
 
 ### Surfaces
 
