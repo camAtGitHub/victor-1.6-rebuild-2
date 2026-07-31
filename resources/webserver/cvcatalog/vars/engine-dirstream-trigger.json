@@ -1,0 +1,76 @@
+{
+  "vars": {
+    "DirStreamingConfToIgnore": {
+      "process": "engine",
+      "category": "TriggerWord",
+      "blurb": "Minimum microphone direction confidence required for a sample to count when Vector decides which way to turn after a wake-word. Samples at or below this value are thrown out; the most common remaining direction becomes the “look toward the speaker” reaction. Default 500 (range 0–10000).",
+      "detail": "Used only inside ComputeReactionDirectionFromStream on BehaviorReactToVoiceCommand (the wake-word / voice-command reaction). While the cloud mic stream is open, the engine records mic direction history. After the stream closes, it trims the window (see DirStreamingTimeToIgnoreBegin/End), then walks each history node. Nodes with confidenceAvg ≤ this threshold are ignored. Of the survivors, the direction with the highest sample count wins (unknown direction is never chosen). Raising this filters more noisy estimates so Vector may turn less often or fall back to older direction data if nothing survives. Lowering it trusts weaker mic DOA estimates.",
+      "related": [
+        "DirStreamingTimeToIgnoreBegin",
+        "DirStreamingTimeToIgnoreEnd",
+        "RecentDirFallbackTime"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToVoiceCommand.cpp:107 (reg), :658 (use)",
+      "status": "live",
+      "tags": ["triggerword", "mic", "direction", "streaming", "confidence"]
+    },
+    "DirStreamingTimeToIgnoreBegin": {
+      "process": "engine",
+      "category": "TriggerWord",
+      "blurb": "Seconds chopped off the start of the wake-word audio stream when estimating which way the user is speaking. Default 0.5 s (range 0–2). Skips the noisy open-stream / ear-con moment so early non-speech sound does not dominate the direction vote.",
+      "detail": "OnStreamingBegin stamps streamingBeginTime; OnStreamingEnd stamps the end and calls ComputeReactionDirectionFromStream. Effective window start = streamingBeginTime + this value (converted to ms). Comment in code: stream open/close often records non-intent sound. If after trimming begin and end the window is empty (end < begin), the behavior falls back to the most recent mic direction instead of a stream vote. Larger values discard more of the first part of the utterance.",
+      "related": [
+        "DirStreamingTimeToIgnoreEnd",
+        "DirStreamingConfToIgnore",
+        "RecentDirFallbackTime"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToVoiceCommand.cpp:102-105 (comment+reg), :620 (use), :725-748 (stream begin/end)",
+      "status": "live",
+      "tags": ["triggerword", "mic", "direction", "streaming", "timing"]
+    },
+    "DirStreamingTimeToIgnoreEnd": {
+      "process": "engine",
+      "category": "TriggerWord",
+      "blurb": "Seconds chopped off the end of the wake-word audio stream when estimating speak direction. Default 1.25 s (range 0–2). Drops trailing non-intent noise (stream close, robot motion/noise) from the direction vote.",
+      "detail": "Paired with DirStreamingTimeToIgnoreBegin. Effective window end = streamingEndTime − this value. Same ComputeReactionDirectionFromStream path: if the trimmed window is too short (end before begin), falls back to recent mic history rather than a stream-based vote. Default is larger than the begin trim because the post-utterance / stream-teardown period is often noisier.",
+      "related": [
+        "DirStreamingTimeToIgnoreBegin",
+        "DirStreamingConfToIgnore",
+        "RecentDirFallbackTime"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToVoiceCommand.cpp:102-105 (comment+reg), :621 (use)",
+      "status": "live",
+      "tags": ["triggerword", "mic", "direction", "streaming", "timing"]
+    },
+    "TriggerWord_FakeError": {
+      "process": "engine",
+      "category": "TriggerWord",
+      "blurb": "Dev toggle: treat every wake-word intent result as a stream/cloud error, even when the cloud returned a real answer. Default false. Use to force the error reaction path (turn + wifi/cloud error behaviors) without actually breaking connectivity.",
+      "detail": "In TransitionToIntentReceived, if this is true the status is forced to EIntentStatus::Error before the switch, so IntentHeard / Unknown / Silence never run—HandleStreamFailure always runs. Code comment: intents may still be processed under the hood with this set; recommend silence or a known mismatch phrase (e.g. “potatoes”) if you want no real intent side effects. When faking, wifi presence for the error branch is taken from TriggerWord_FakeError_HasWifi instead of the real OS SSID. Only meaningful while ReactToVoiceCommand is handling a wake-word session on engine :8888.",
+      "howTo": "1) Set TriggerWord_FakeError true. 2) Optionally set TriggerWord_FakeError_HasWifi true (cloud/no-internet path) or false (no-wifi path). 3) Say the wake word and speak (or stay silent). 4) Expect error emotion + attention-transfer trackers + optional noCloud/noWifi delegated behaviors after the usual listening get-out, not a successful intent.",
+      "requires": [],
+      "related": [
+        "TriggerWord_FakeError_HasWifi"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToVoiceCommand.cpp:112-115 (comment+reg), :967 (force Error), :1033-1036 (wifi override with HasWifi)",
+      "status": "live",
+      "tags": ["triggerword", "debug", "error", "wifi", "cloud"]
+    },
+    "TriggerWord_FakeError_HasWifi": {
+      "process": "engine",
+      "category": "TriggerWord",
+      "blurb": "When TriggerWord_FakeError is on, pretends the robot has (true) or lacks (false) a Wi‑Fi SSID so you can pick the cloud-side vs local no-wifi error reaction. Default false. Ignored when FakeError is off—real OS SSID is used.",
+      "detail": "HandleStreamFailure branches on hasSSID: true → cloud/internet error tracker and noCloud behavior path; false → wifi error tracker and noWifi behavior path. With FakeError enabled, hasSSID = this var instead of OSState::GetSSID(). Thresholds for when those child behaviors actually fire still come from behavior JSON (notifyOnWifiErrors / notifyOnCloudErrors trackers), so one fake error may only count toward the tracker until conditions are met.",
+      "howTo": "Enable TriggerWord_FakeError first. Set this true to exercise “has wifi but cloud/intent failed”; leave false for “no SSID / local wifi failure.” Then wake Vector.",
+      "requires": [
+        "TriggerWord_FakeError"
+      ],
+      "related": [
+        "TriggerWord_FakeError"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToVoiceCommand.cpp:115 (reg), :1030-1065 (hasSSID branch)",
+      "status": "live",
+      "tags": ["triggerword", "debug", "error", "wifi", "cloud"]
+    }
+  }
+}
