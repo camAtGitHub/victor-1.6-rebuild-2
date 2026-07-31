@@ -1,0 +1,120 @@
+{
+  "vars": {
+    "BackpackTriggerIdx": {
+      "process": "engine",
+      "blurb": "Index into the DevViewCubeBackpackLights behavior’s JSON list of backpack light animation triggers. Change the number while that dev behavior is active to switch Vector’s backpack LEDs to the matching pattern. Default 0. Values past the end of the list clamp to the last entry.",
+      "detail": "Category DevViewLights (same group as CubeTriggerIdx). On each BehaviorUpdate while DevViewCubeBackpackLights is activated, if this index differs from the last applied value the behavior calls BackpackLightComponent::SetBackpackAnimation for backpackTriggers[clampedIdx] from the behavior JSON (Spinner color celebration/hold/select triggers). Independent of cube lights. Changing it outside that behavior does nothing visible.",
+      "howTo": "1) Activate behavior DevViewCubeBackpackLights. 2) Set BackpackTriggerIdx to step through backpackTriggers in the behavior JSON. 3) Watch backpack LEDs; use CubeTriggerIdx for the cube.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/behaviorComponent/behaviors/devBehaviors/devViewCubeBackpackLights.json"
+        ],
+        "notes": "backpackTriggers array supplies the BackpackAnimationTrigger names this index selects."
+      },
+      "category": "DevViewLights",
+      "related": ["CubeTriggerIdx"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevViewCubeBackpackLights.cpp:31-33,126-129; resources/config/engine/behaviorComponent/behaviors/devBehaviors/devViewCubeBackpackLights.json:41-58",
+      "status": "partial",
+      "statusNote": "Only applied while DevViewCubeBackpackLights is activated.",
+      "tags": ["backpack", "lights", "dev"]
+    },
+    "EnableDrivingAnimations": {
+      "process": "engine",
+      "blurb": "Master switch for the “driving” and “path planning” face/body animations that normally play while Vector drives or plans a path. Default true (on). When false, StartDrivingAnim / EndDrivingAnim / StartPlanningAnim / EndPlanningAnim all return immediately so those start/loop/end clips never queue.",
+      "detail": "Category DrivingAnimationHandler. DrivingAnimationHandler is a robot component used by DriveTo-style actions and track actions: mood-based DriveStart/Loop/End and PlanningGetIn/Loop/GetOut triggers (or stacks pushed via PushDrivingAnimations). Playpen factory test forces this to false via NativeAnkiUtilConsoleSetValueWithString so factory motion is not interrupted by drive anims. Turning it off mid-drive does not cancel an already-playing clip; it only prevents new start/end planning/driving anim calls.",
+      "howTo": "Leave true for product-like motion character. Set false for clean motor/path tests (as playpen does). Re-enable when finished.",
+      "category": "DrivingAnimationHandler",
+      "evidence": "engine/drivingAnimationHandler.cpp:34,266-337; engine/actions/driveToActions.cpp:633-933; engine/actions/basicActions.cpp:807-877; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/behaviorPlaypenTest.cpp:175",
+      "status": "live",
+      "tags": ["driving", "animation", "path", "product"]
+    },
+    "FFTExpectedFreq_hz": {
+      "process": "engine",
+      "blurb": "Factory speaker/mic sound check: the frequency in hertz the microphones are expected to hear as the dominant FFT peak when the test tone plays (default 1024 Hz). Each mic channel’s peak must land within FFTFreqTolerance_hz of this value or that mic (or the speaker) is failed.",
+      "detail": "SelfTestConfig and PlaypenConfig each define and WRAP_EXTERN_CONSOLE_VAR this name (categories SelfTest and Playpen). Console registration is unique by id — first registration wins; the second logs DuplicateVariable and is ignored, so only one of the two statics is console-tunable (both default to 1024). BehaviorSelfTestSoundCheck and BehaviorPlaypenSoundCheck HandleAudioFFTResult compare each channel’s fftResult with Util::IsNear(expected, tolerance). If every channel misses, result is SPEAKER_NOT_WORKING; if some miss, the first bad channel maps to MIC_*_NOT_WORKING. Simulated robots ignore the result. Not used in freeplay.",
+      "howTo": "Only meaningful during SelfTest or Playpen sound-check. Set before the tone/FFT step if the fixture tone is not 1024 Hz. Pair with FFTFreqTolerance_hz.",
+      "category": "SelfTest / Playpen",
+      "related": [
+        "FFTFreqTolerance_hz",
+        "DurationOfAudioToRecord_ms",
+        "SoundVolume",
+        "HeadAngleToPlaySound"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.h:146; selfTestConfig.cpp:38; behaviorSelfTestSoundCheck.cpp:109-134; playpen/playpenConfig.h:218; playpenConfig.cpp:98; behaviorPlaypenSoundCheck.cpp:103-128",
+      "status": "live",
+      "statusNote": "Factory SelfTest/Playpen only. Dual WRAP under SelfTest and Playpen; one dump id. Ignored in freeplay.",
+      "tags": ["selftest", "playpen", "factory", "audio", "mic", "fft"]
+    },
+    "FFTFreqTolerance_hz": {
+      "process": "engine",
+      "blurb": "Factory speaker/mic sound check: how many hertz above or below FFTExpectedFreq_hz still count as a pass for each microphone’s FFT peak (default ±20 Hz).",
+      "detail": "Companion tolerance for FFTExpectedFreq_hz. Same dual SelfTest/Playpen WRAP_EXTERN registration pattern (first registration wins). Util::IsNear(fftResult, expected, this) decides per-channel pass/fail in BehaviorSelfTestSoundCheck and BehaviorPlaypenSoundCheck. Wider tolerance reduces false mic failures in noisy fixtures; narrower catches speaker/mic drift more strictly.",
+      "howTo": "Tune with FFTExpectedFreq_hz during SelfTest/Playpen sound check only.",
+      "category": "SelfTest / Playpen",
+      "related": [
+        "FFTExpectedFreq_hz",
+        "DurationOfAudioToRecord_ms",
+        "SoundVolume"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.h:149; selfTestConfig.cpp:39; behaviorSelfTestSoundCheck.cpp:111-122; playpen/playpenConfig.h:221; playpenConfig.cpp:99; behaviorPlaypenSoundCheck.cpp:105-116",
+      "status": "live",
+      "statusNote": "Factory SelfTest/Playpen only. Dual WRAP; one dump id.",
+      "tags": ["selftest", "playpen", "factory", "audio", "mic", "fft"]
+    },
+    "LoopingAnimationState": {
+      "process": "engine",
+      "blurb": "Dev Squawk Box test enum selecting which looping motor animation to play: 0 NONE (default), 1 Move Head, 2 Move Lift. Used with the SetLoopingAnimationState console function and automatically re-applied after a wake-word detection while the state is non-zero.",
+      "detail": "Category DevSquawkBoxBehavior. BehaviorDevSquawkBoxTest (ANKI_DEV_CHEATS; only WantsToBeActivated when cheats are on). SetLoopingAnimationState() switches on this enum and queues PlayAnimationAction with loops=0 (forever): head uses anim_qa_head_updown[_alt], lift uses anim_qa_lift_updown[_alt] depending on UseRestrictedMotionAnim. Default 0 leaves animName empty (stop). On triggerWordDetected while value > 0, the behavior restarts the looping clip after wake-word handling. Changing the enum alone does not start playback until you call SetLoopingAnimationState (or a wake word restarts a non-zero state).",
+      "howTo": "1) Activate DevSquawkBoxTest (dev cheats). 2) Set LoopingAnimationState to Move Head or Move Lift. 3) Call console function SetLoopingAnimationState. 4) Optionally toggle UseRestrictedMotionAnim for _alt clips. Set NONE and call the function again to stop (empty name still queues a PlayAnimationAction).",
+      "requires": ["SetLoopingAnimationState"],
+      "related": ["UseRestrictedMotionAnim"],
+      "enumLabels": ["NONE", "Move Head", "Move Lift"],
+      "category": "DevSquawkBoxBehavior",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevSquawkBoxTest.cpp:37-38,88-102,186-188,305-323; resources/config/engine/behaviorComponent/behaviors/devBehaviors/devSquawkBoxTest.json",
+      "status": "partial",
+      "statusNote": "Only while DevSquawkBoxTest is active under ANKI_DEV_CHEATS. Enum is applied by SetLoopingAnimationState or wake-word restart, not on every tick.",
+      "tags": ["dev", "squawkbox", "animation", "motors", "dev-cheats"]
+    },
+    "ShouldLockPulseTargetColor": {
+      "process": "engine",
+      "blurb": "Cube Spinner light pattern switch (default true). When true, the cycling cube pattern always uses the current cycle-color “cycle” animation, even on LEDs that are already locked in. When false, locked LEDs instead use the target color’s lockedPulse animation so locked lights pulse in the locked-in color.",
+      "detail": "Category CubeSpinner. CubeSpinnerGame::GetCurrentCyclePattern first picks cubeLockedPulseTrigger of the target color if the current LED is locked, else cubeCycleTrigger of the cycling color. If this flag is true (default), that choice is overwritten with the current cycle light’s cubeCycleTrigger — so locked positions keep the cycling color look rather than a distinct locked-pulse of the target. Product freeplay VectorPlaysCubeSpinner / DevCubeSpinner paths use this game object; flag is global for the process once the game code is loaded.",
+      "howTo": "Leave true for the stock spinner look. Set false if you want locked LEDs to pulse with lockedPulse of the target color for tuning light maps.",
+      "category": "CubeSpinner",
+      "related": ["DedupTimeAfterLock_ms"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/cubeSpinner/cubeSpinnerGame.cpp:33,331-350,381-384",
+      "status": "live",
+      "tags": ["cube", "spinner", "lights"]
+    },
+    "UseClosePreActionPose": {
+      "process": "engine",
+      "blurb": "Docking stress-test only: when true, BehaviorDockingTestSimple uses the closer of the two pre-action (pre-dock) poses for a block face (vector back()); when false (default), it uses the farther/front pose. Affects where the robot aims for approach-angle capture and random reset placement.",
+      "detail": "Category DockingTest. PreActionPose lists from GetCurrentPreActionPoses are ordered so the last entry is the closer pose (code comment: “The closer preaction pose is the second one in the vector”). Used when computing initial approach angle from the marker’s pre-dock pose and again when Reset places the robot at a random offset around that pose. Only meaningful while DockingTestSimple is running; does not change product dock/pickup pre-action selection.",
+      "howTo": "Activate DockingTestSimple with a visible cube marker, then toggle this to force near vs far pre-dock stand-off for approach tests.",
+      "category": "DockingTest",
+      "related": [
+        "DriveToAndPickupBlockOneAction",
+        "JustPickup",
+        "RollInsteadOfPickup",
+        "NumRandomObstacles"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDockingTestSimple.cpp:77,419,701-702; resources/config/engine/behaviorComponent/behaviors/devBehaviors/dockingTestSimple.json",
+      "status": "partial",
+      "statusNote": "Only read while BehaviorDockingTestSimple is active; freeplay docking ignores it.",
+      "tags": ["docking", "dev", "test", "pose"]
+    },
+    "UseRestrictedMotionAnim": {
+      "process": "engine",
+      "blurb": "Dev Squawk Box: when true (default), looping head/lift test animations use the restricted “_alt” clips (smaller motion). When false, uses the full anim_qa_head_updown / anim_qa_lift_updown clips.",
+      "detail": "Category DevSquawkBoxBehavior. Read only inside SetLoopingAnimationState when LoopingAnimationState is Move Head (1) or Move Lift (2): restricted → anim_qa_head_updown_alt / anim_qa_lift_updown_alt; unrestricted → anim_qa_head_updown / anim_qa_lift_updown. Changing this flag mid-loop does not swap the clip until SetLoopingAnimationState runs again (console function or wake-word restart with state > 0).",
+      "howTo": "With DevSquawkBoxTest active: set LoopingAnimationState, set this bool, call SetLoopingAnimationState.",
+      "requires": ["LoopingAnimationState", "SetLoopingAnimationState"],
+      "related": ["LoopingAnimationState"],
+      "category": "DevSquawkBoxBehavior",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevSquawkBoxTest.cpp:38,305-315",
+      "status": "partial",
+      "statusNote": "Only applied when SetLoopingAnimationState runs under active DevSquawkBoxTest (ANKI_DEV_CHEATS).",
+      "tags": ["dev", "squawkbox", "animation", "motors", "dev-cheats"]
+    }
+  }
+}
