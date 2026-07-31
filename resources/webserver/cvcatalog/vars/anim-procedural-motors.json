@@ -1,0 +1,281 @@
+{
+  "vars": {
+    "EnableBackpackLightsTrack": {
+      "process": "anim",
+      "blurb": "When true, animation backpack-light keyframes are actually sent from the anim process to the robot hardware. When false (default), those keyframes are dropped even if the backpack track is unlocked — so canned animations do not drive the backpack LEDs through the animation streamer path.",
+      "detail": "Checked in AnimationStreamer::SendIfTrackUnlocked for BACKPACK_LIGHTS_TRACK only. Head/lift/body tracks do not use this flag. The backpack track is still often locked separately (_lockedTracks starts with backpack locked; shipping builds force it locked). This console var is an extra gate on top of unlock: both unlock and EnableBackpackLightsTrack true are needed for animation backpack frames to reach the robot. Procedural/engine backpack light APIs are separate systems.",
+      "howTo": "1) Unlock the backpack lights track if your build allows it (ANKI_DEV_CHEATS). 2) Set EnableBackpackLightsTrack true. 3) Play an animation that has backpack light keyframes and watch the backpack LEDs.",
+      "related": ["GlitchLightDelay_ms", "GlitchLightDuration_ms"],
+      "evidence": "animProcess/src/cozmoAnim/animation/animationStreamer.cpp:385-386,1121-1136; animationStreamer.h:151-190",
+      "category": "AnimationStreamer",
+      "status": "live",
+      "tags": ["animation", "backpack", "lights", "track"]
+    },
+    "EnableHeadProceduralMovement": {
+      "process": "anim",
+      "blurb": "Master switch for procedural head motor sound. When true, Vector’s audio engine plays a head movement loop and updates head speed/acceleration parameters from live robot state. When false (default), no procedural head SFX are started or updated.",
+      "detail": "ProceduralAudioClient listens to RobotToEngine state messages (after syncRobotAck). UpdateHeadState returns immediately if this flag is false. This does not change actual head motor commands — only the synthetic “servo whir” style loops (Play/Stop Robot_Vic_Sfx Head_Loop and RTPCs Robot_Vic_Head_Speed / Head_Accelerate). Head is off by default; lift and treads default on.",
+      "related": [
+        "HeadCoolDown_ms",
+        "HeadMovementThreshold_rpms",
+        "MaxHeadSpeed_rpms",
+        "MaxHeadAccel_rpms2",
+        "EnableLiftProceduralMovement",
+        "EnableTreadProceduralMovement"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/audio/proceduralAudioClient.cpp:57,166-169,258-318",
+      "category": "Audio.Procedural",
+      "status": "live",
+      "tags": ["audio", "procedural", "head", "motors"]
+    },
+    "EnableLiftProceduralMovement": {
+      "process": "anim",
+      "blurb": "Master switch for procedural lift (fork) motor sound. When true (default), lift motion triggers a lift loop SFX with speed/acceleration RTPCs. When false, lift motion is silent on this procedural path.",
+      "detail": "Same architecture as head/tread: state-driven loops via Wwise GameObject Procedural, events Play/Stop Robot_Vic_Sfx Lift_Loop, parameters Robot_Vic_Lift_Speed and Lift_Accelerate. Does not move the lift — only sound. Default true so production freeplay includes lift motor audio.",
+      "related": [
+        "LiftCoolDown_ms",
+        "LiftMovementThreshold_rpms",
+        "MaxLiftSpeed_rpms",
+        "MaxLiftAccel_rpms2",
+        "EnableHeadProceduralMovement",
+        "EnableTreadProceduralMovement"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/audio/proceduralAudioClient.cpp:58,166-169,322-382",
+      "category": "Audio.Procedural",
+      "status": "live",
+      "tags": ["audio", "procedural", "lift", "motors"]
+    },
+    "EnablePausePrams": {
+      "process": "anim",
+      "blurb": "When true (default), text-to-speech applies the silence/pause console timings (leading/trailing silence and punctuation/comma/etc. pauses) to each new Acapela utterance. When false, those pause parameters are not written into the TTS engine — speech uses Acapela’s default pause behavior instead. Name is a historical typo for “Params,” not prams/strollers.",
+      "detail": "TextToSpeechProviderConfig::GetEnablePauseParams returns this flag. On the robot (VICOS), GetFirstAudioData only SETs BABIL_PARM_LEADINGSILENCE, TRAILINGSILENCE, and PAUSE1–5SILENCE when the flag is true. Comment in code: if you set any of those, the rest also need to be set — this flag batches them. Does not re-synthesize already prepared waves; next GetFirstAudioData only. Spelling of dump id is EnablePausePrams (missing “a” in Params).",
+      "related": [
+        "LeadingSilence_ms",
+        "TrailingSilence_ms",
+        "PausePunctuation_ms",
+        "PauseSemicolon_ms",
+        "PauseComma_ms",
+        "PauseBracket_ms",
+        "PauseSpelling_ms"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/textToSpeech/textToSpeechProviderConfig.cpp:35,76,215-221; textToSpeechProvider_vicos.cpp:283-329",
+      "category": "TextToSpeech",
+      "status": "live",
+      "tags": ["tts", "pause", "acapela", "typo-name"]
+    },
+    "EnableTreadProceduralMovement": {
+      "process": "anim",
+      "blurb": "Master switch for procedural tread/drive motor sound. When true (default), wheel motion starts a tread loop SFX with speed, acceleration, and spin RTPCs. When false, driving is silent on this procedural path.",
+      "detail": "UpdateTreadState early-outs when false. Detects point-turn vs drive using left/right wheel speeds and feeds Robot_Vic_Tread_Speed, Tread_Accelerate, and Tread_Spin_Speed. Spin RTPC > 0 means “point turn”; near-zero default (−0.01) means straight/curve drive. Sound only — does not change driving.",
+      "related": [
+        "TreadCoolDown_ms",
+        "TreadMovementThreshold_mmps",
+        "MaxTreadSpeed_mmps",
+        "MaxTurnSpeed_mmps",
+        "MaxTreadAccel_mmpms2",
+        "EnableHeadProceduralMovement",
+        "EnableLiftProceduralMovement"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/audio/proceduralAudioClient.cpp:59,176-254",
+      "category": "Audio.Procedural",
+      "status": "live",
+      "tags": ["audio", "procedural", "treads", "motors"]
+    },
+    "GlitchLightDelay_ms": {
+      "process": "anim",
+      "blurb": "Intended delay (ms) before a backpack “glitch” light sequence would start flashing. Default 200. Currently has no effect: the glitch light generator body is commented out.",
+      "detail": "Registered under category GlitchLights and only referenced inside a large block comment in BackpackLayerManager::GenerateGlitchLights. That function still runs (from TrackLayerComponent::AddGlitch) but only clears the track; the keyframes that used delay/duration are disabled. Code notes TODO VIC-447 restore glitching. Changing this var does not alter backpack LEDs until that path is restored.",
+      "related": ["GlitchLightDuration_ms", "EnableBackpackLightsTrack"],
+      "evidence": "animProcess/src/cozmoAnim/animation/trackLayerManagers/backpackLayerManager.cpp:22-89; trackLayerComponent.cpp:234-245",
+      "category": "GlitchLights",
+      "status": "dead",
+      "statusNote": "Only live uses are inside a multi-line comment; GenerateGlitchLights clears the track and does not schedule frames.",
+      "tags": ["backpack", "lights", "glitch", "dead"]
+    },
+    "GlitchLightDuration_ms": {
+      "process": "anim",
+      "blurb": "Intended duration (ms) of each step in a backpack glitch light sequence. Default 60. Currently has no effect for the same reason as GlitchLightDelay_ms — generation code is commented out.",
+      "detail": "Would have timed successive red backpack LED flashes (middle, then random sides) after GlitchLightDelay_ms. All of that logic is wrapped in /* … */ inside GenerateGlitchLights. AddGlitch still calls the function for face distortion and an empty backpack layer.",
+      "related": ["GlitchLightDelay_ms", "EnableBackpackLightsTrack"],
+      "evidence": "animProcess/src/cozmoAnim/animation/trackLayerManagers/backpackLayerManager.cpp:25-89; trackLayerComponent.cpp:234-245",
+      "category": "GlitchLights",
+      "status": "dead",
+      "statusNote": "Registered and named in dump, but only referenced inside commented-out glitch keyframe construction.",
+      "tags": ["backpack", "lights", "glitch", "dead"]
+    },
+    "HeadCoolDown_ms": {
+      "process": "anim",
+      "blurb": "After procedural head motor sound stops, how long (ms) the system waits before allowing the head loop to start again. Default 65; console range 0–250. Reduces rapid stop/start chatter when the head jitters near the movement threshold.",
+      "detail": "On transition to Stopped, ProceduralAudioClient sets _headCoolDownExpiresTimeStamp_ms = now + this value. While in cooldown, a new move goes to PendingStart instead of Started (no Play event until cooldown ends and still moving). Only matters when EnableHeadProceduralMovement is true.",
+      "requires": ["EnableHeadProceduralMovement"],
+      "related": [
+        "HeadMovementThreshold_rpms",
+        "LiftCoolDown_ms",
+        "TreadCoolDown_ms"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/audio/proceduralAudioClient.cpp:61,269-276,386-439",
+      "category": "Audio.Procedural",
+      "status": "live",
+      "tags": ["audio", "procedural", "head", "cooldown"]
+    },
+    "HeadMovementThreshold_rpms": {
+      "process": "anim",
+      "blurb": "Minimum absolute head angular speed (radians per millisecond) counted as “moving” for procedural head audio. Default 0.0 so any nonzero computed speed counts; range 0–0.01.",
+      "detail": "AudioProceduralFrame::IsHeadMoving compares |headSpeed_rpms| to this threshold. Head speed is delta headAngle_rad / delta time_ms from consecutive RobotState samples. Raising this ignores tiny head drifts so the head SFX loop does not trip on sensor noise. Used only for start/stop of the loop, not for RTPC magnitude (that uses MaxHeadSpeed_rpms).",
+      "requires": ["EnableHeadProceduralMovement"],
+      "related": [
+        "MaxHeadSpeed_rpms",
+        "HeadCoolDown_ms",
+        "LiftMovementThreshold_rpms",
+        "TreadMovementThreshold_mmps"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/audio/audioProceduralFrame.cpp:37,96-98,155-157; proceduralAudioClient.cpp:270",
+      "category": "Audio.Procedural",
+      "status": "live",
+      "tags": ["audio", "procedural", "head", "threshold"]
+    },
+    "LiftCoolDown_ms": {
+      "process": "anim",
+      "blurb": "Cooldown (ms) after procedural lift sound stops before a new lift loop may start. Default 65; range 0–250.",
+      "detail": "Same FrameStateUpdate cooldown pattern as head/treads. Applied when EnableLiftProceduralMovement is true. Stops micro-chatter if lift angle noise crosses the movement threshold.",
+      "requires": ["EnableLiftProceduralMovement"],
+      "related": [
+        "LiftMovementThreshold_rpms",
+        "HeadCoolDown_ms",
+        "TreadCoolDown_ms"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/audio/proceduralAudioClient.cpp:62,333-340,386-439",
+      "category": "Audio.Procedural",
+      "status": "live",
+      "tags": ["audio", "procedural", "lift", "cooldown"]
+    },
+    "LiftMovementThreshold_rpms": {
+      "process": "anim",
+      "blurb": "Minimum absolute lift angular speed (rad/ms) treated as lift motion for procedural audio. Default 0.0; range 0–0.01.",
+      "detail": "IsLiftMoving uses |liftSpeed_rpms| > threshold. Lift speed is derived from consecutive liftAngle samples. Higher values require more decisive lift motion before the lift loop plays.",
+      "requires": ["EnableLiftProceduralMovement"],
+      "related": [
+        "MaxLiftSpeed_rpms",
+        "LiftCoolDown_ms",
+        "HeadMovementThreshold_rpms",
+        "TreadMovementThreshold_mmps"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/audio/audioProceduralFrame.cpp:38,115-117,167-169; proceduralAudioClient.cpp:334",
+      "category": "Audio.Procedural",
+      "status": "live",
+      "tags": ["audio", "procedural", "lift", "threshold"]
+    },
+    "MaxHeadAccel_rpms2": {
+      "process": "anim",
+      "blurb": "Scale reference for head angular acceleration fed into the procedural audio RTPC (normalized −1…1). Default 0.0001 rad/ms²; range 0–0.001. Larger values make the same physical accel sound “milder” (lower |RTPC|).",
+      "detail": "GetNormalizedHeadAcceleration = clamp(headAccel / this, −1, 1), then sign-flipped when head speed is negative so accel RTPC tracks direction of travel. headAccel is Δspeed/Δt between frames. Only affects Robot_Vic_Head_Accelerate while the head loop is active.",
+      "requires": ["EnableHeadProceduralMovement"],
+      "related": ["MaxHeadSpeed_rpms", "HeadMovementThreshold_rpms"],
+      "evidence": "animProcess/src/cozmoAnim/audio/audioProceduralFrame.cpp:34,108-111; proceduralAudioClient.cpp:301-303",
+      "category": "Audio.Procedural",
+      "status": "live",
+      "tags": ["audio", "procedural", "head", "rtpc"]
+    },
+    "MaxHeadSpeed_rpms": {
+      "process": "anim",
+      "blurb": "Full-scale head angular speed for procedural audio: normalized head speed RTPC = clamp(actual / this, −1…1). Default 0.005 rad/ms; range 0–0.025. Smaller max makes moderate head moves sound “faster” in the mix.",
+      "detail": "Does not limit real head motors. Units are radians per millisecond from angle deltas on RobotState. Sign encodes up vs down. Pushed as Robot_Vic_Head_Speed when setRTPC is true.",
+      "requires": ["EnableHeadProceduralMovement"],
+      "related": ["MaxHeadAccel_rpms2", "HeadMovementThreshold_rpms"],
+      "evidence": "animProcess/src/cozmoAnim/audio/audioProceduralFrame.cpp:31,102-104; proceduralAudioClient.cpp:298-300",
+      "category": "Audio.Procedural",
+      "status": "live",
+      "tags": ["audio", "procedural", "head", "rtpc"]
+    },
+    "MaxLiftAccel_rpms2": {
+      "process": "anim",
+      "blurb": "Full-scale lift acceleration for procedural audio normalization (−1…1 RTPC). Default 0.0001 rad/ms²; range 0–0.001.",
+      "detail": "Same pattern as head: clamp(accel/max), sign with lift speed direction → Robot_Vic_Lift_Accelerate. Audio-only scale, not a hardware limit.",
+      "requires": ["EnableLiftProceduralMovement"],
+      "related": ["MaxLiftSpeed_rpms", "LiftMovementThreshold_rpms"],
+      "evidence": "animProcess/src/cozmoAnim/audio/audioProceduralFrame.cpp:35,127-130; proceduralAudioClient.cpp:365-367",
+      "category": "Audio.Procedural",
+      "status": "live",
+      "tags": ["audio", "procedural", "lift", "rtpc"]
+    },
+    "MaxLiftSpeed_rpms": {
+      "process": "anim",
+      "blurb": "Full-scale lift angular speed for procedural audio RTPC. Default 0.0025 rad/ms; range 0–0.05. Normalized lift speed = clamp(actual / this, −1…1).",
+      "detail": "Maps to Robot_Vic_Lift_Speed. Raising the max softens the perceived lift motor intensity for a given motion; lowering exaggerates it. Does not cap real lift velocity.",
+      "requires": ["EnableLiftProceduralMovement"],
+      "related": ["MaxLiftAccel_rpms2", "LiftMovementThreshold_rpms"],
+      "evidence": "animProcess/src/cozmoAnim/audio/audioProceduralFrame.cpp:32,121-123; proceduralAudioClient.cpp:362-364",
+      "category": "Audio.Procedural",
+      "status": "live",
+      "tags": ["audio", "procedural", "lift", "rtpc"]
+    },
+    "MaxTreadAccel_mmpms2": {
+      "process": "anim",
+      "blurb": "Full-scale tread (drive) acceleration for procedural audio. Default 5.0 mm/ms²; range 0–10. Normalized accel RTPC is clamped to −1…1 against this scale, with sign following average tread speed direction.",
+      "detail": "Tread accel is Δ(avg wheel speed)/Δt. Parameter Robot_Vic_Tread_Accelerate. Audio-only; not a chassis control limit.",
+      "requires": ["EnableTreadProceduralMovement"],
+      "related": ["MaxTreadSpeed_mmps", "MaxTurnSpeed_mmps", "TreadMovementThreshold_mmps"],
+      "evidence": "animProcess/src/cozmoAnim/audio/audioProceduralFrame.cpp:33,83-86; proceduralAudioClient.cpp:231-233",
+      "category": "Audio.Procedural",
+      "status": "live",
+      "tags": ["audio", "procedural", "treads", "rtpc"]
+    },
+    "MaxTreadSpeed_mmps": {
+      "process": "anim",
+      "blurb": "Full-scale average wheel speed for procedural tread drive sound. Default equals MAX_WHEEL_SPEED_MMPS (220 mm/s); console range about 120–320 (±100 around that constant). Normalized tread speed RTPC = avgWheelSpeed / this.",
+      "detail": "Average of left and right wheel speeds from RobotState. Can exceed ±1.0 if wheels exceed this scale (unlike head/lift which clamp). Point-turn intensity uses MaxTurnSpeed_mmps separately via spin RTPC. Does not limit real driving speed.",
+      "requires": ["EnableTreadProceduralMovement"],
+      "related": [
+        "MaxTurnSpeed_mmps",
+        "MaxTreadAccel_mmpms2",
+        "TreadMovementThreshold_mmps"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/audio/audioProceduralFrame.cpp:27-28,77-79; proceduralAudioClient.cpp:228-230; robot/include/anki/cozmo/shared/cozmoConfig.h:295",
+      "category": "Audio.Procedural",
+      "status": "live",
+      "tags": ["audio", "procedural", "treads", "rtpc"]
+    },
+    "MaxTurnSpeed_mmps": {
+      "process": "anim",
+      "blurb": "Full-scale differential (spin) speed for procedural point-turn audio. Default 220 mm/s (same MAX_WHEEL_SPEED_MMPS); range about 120–320. Normalized turn = min(|left−right| / this, 1).",
+      "detail": "When |turnSpeed| is larger than both the max and |min| wheel speeds, the client treats the motion as a point turn and sets Robot_Vic_Tread_Spin_Speed to the normalized value; otherwise spin RTPC stays slightly negative (−0.01) so the audio engine uses tread speed instead. Audio-only scale.",
+      "requires": ["EnableTreadProceduralMovement"],
+      "related": ["MaxTreadSpeed_mmps", "MaxTreadAccel_mmpms2"],
+      "evidence": "animProcess/src/cozmoAnim/audio/audioProceduralFrame.cpp:29-30,90-92,142-144; proceduralAudioClient.cpp:185-237",
+      "category": "Audio.Procedural",
+      "status": "live",
+      "tags": ["audio", "procedural", "treads", "turn", "rtpc"]
+    },
+    "TreadCoolDown_ms": {
+      "process": "anim",
+      "blurb": "Cooldown (ms) after procedural tread sound stops before a new tread loop may start. Default 65; range 0–250.",
+      "detail": "Set when tread frame state becomes Stopped. During cooldown, renewed motion is PendingStart until the timer expires. Prevents rapid loop restarts on stop-and-go driving. Requires EnableTreadProceduralMovement.",
+      "requires": ["EnableTreadProceduralMovement"],
+      "related": [
+        "TreadMovementThreshold_mmps",
+        "HeadCoolDown_ms",
+        "LiftCoolDown_ms"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/audio/proceduralAudioClient.cpp:60,189-196,386-439",
+      "category": "Audio.Procedural",
+      "status": "live",
+      "tags": ["audio", "procedural", "treads", "cooldown"]
+    },
+    "TreadMovementThreshold_mmps": {
+      "process": "anim",
+      "blurb": "Minimum absolute left or right wheel speed (mm/s) that counts as “treads moving” for procedural drive audio. Default 0.0; range 0–0.01.",
+      "detail": "IsTreadMoving is true if either wheel exceeds this threshold. With default 0, any nonzero wheel report starts/stops the loop logic. Slight increases reject tiny residual wheel reports without needing a large deadband.",
+      "requires": ["EnableTreadProceduralMovement"],
+      "related": [
+        "MaxTreadSpeed_mmps",
+        "TreadCoolDown_ms",
+        "HeadMovementThreshold_rpms",
+        "LiftMovementThreshold_rpms"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/audio/audioProceduralFrame.cpp:36,70-73; proceduralAudioClient.cpp:190",
+      "category": "Audio.Procedural",
+      "status": "live",
+      "tags": ["audio", "procedural", "treads", "threshold"]
+    }
+  }
+}
