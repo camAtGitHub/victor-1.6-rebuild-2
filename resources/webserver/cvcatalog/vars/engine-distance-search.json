@@ -1,0 +1,347 @@
+{
+  "vars": {
+    "DistanceSensorBiasAdjustment_mm": {
+      "process": "engine",
+      "blurb": "Factory/self-test ToF (front distance) check: millimeters subtracted from the raw proximity reading before comparing it to the vision-based distance to a marker target. Self-test default is −12 mm (on physical robots only; sim uses 0). If |sensor − bias − visual| exceeds DistanceSensorReadingThresh_mm, the self-test fails with DISTANCE_SENSOR_OOR.",
+      "detail": "Defined in SelfTestConfig (default −12) and PlaypenConfig (default 30). WRAP_EXTERN_CONSOLE_VAR registers the same dump id under both categories SelfTest and Playpen; ConsoleSystem keeps the first registration and ignores the duplicate. BehaviorSelfTestLookAtCharger applies the SelfTest value when recording prox samples against visual marker distance. Playpen’s matching OOR check is fully commented out, so changing this does nothing during playpen distance-sensor logging. Not used in freeplay navigation.",
+      "category": "SelfTest",
+      "related": [
+        "DistanceSensorReadingThresh_mm",
+        "VisualDistanceToDistanceSensorObjectThresh_mm",
+        "NumDistanceSensorReadingsToRecord"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.h:125; selfTestConfig.cpp:46; behaviorSelfTestLookAtCharger.cpp:151-166; playpen/playpenConfig.h:139; playpenConfig.cpp:106; behaviorPlaypenDistanceSensor.cpp:168-182",
+      "status": "live",
+      "statusNote": "Live for SelfTest look-at-charger comparison. Playpen use is commented out. Same id also registered under Playpen (duplicate ignored).",
+      "tags": ["selftest", "playpen", "tof", "distance-sensor", "factory"]
+    },
+    "DistanceSensorReadingThresh_mm": {
+      "process": "engine",
+      "blurb": "How close (mm) the bias-adjusted ToF reading must be to the camera-estimated distance to the target for the factory self-test to pass. Self-test default 30 mm; playpen default 20 mm (but playpen no longer enforces this).",
+      "detail": "SelfTestConfig / PlaypenConfig dual registration under dump id DistanceSensorReadingThresh_mm (categories SelfTest and Playpen). BehaviorSelfTestLookAtCharger fails DISTANCE_SENSOR_OOR when |prox − bias − visual| is outside this threshold. Playpen distance-sensor behavior has the same check commented (TODO rewrite for multi-ROI ToF). Does not affect freeplay obstacle sensing.",
+      "category": "SelfTest",
+      "related": [
+        "DistanceSensorBiasAdjustment_mm",
+        "VisualDistanceToDistanceSensorObjectThresh_mm",
+        "NumDistanceSensorReadingsToRecord"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.h:122; selfTestConfig.cpp:45; behaviorSelfTestLookAtCharger.cpp:157-166; playpen/playpenConfig.h:136; playpenConfig.cpp:105; behaviorPlaypenDistanceSensor.cpp:168-182",
+      "status": "live",
+      "statusNote": "Live in SelfTest; Playpen OOR path commented out.",
+      "tags": ["selftest", "playpen", "tof", "distance-sensor", "factory"]
+    },
+    "Distance_mm": {
+      "process": "engine",
+      "blurb": "Dev planner test only: how far (mm) past a cube Vector drives when computing the “far away” waypoint after visiting a cube. Default 1000 mm (range 0–2000). Larger = longer out-and-back paths while stressing the path planner.",
+      "detail": "BehaviorPlannerTest::CalcFarAwayPose takes the first known cube pose, rotates 180°, then TranslateForward(Distance_mm). That far pose is the alternate goal in the drive-to-cube / drive-away loop. Product freeplay and normal DriveToPose ignore this var entirely.",
+      "category": "BehaviorPlannerTest",
+      "related": ["OnlyUseOriginalGoal"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorPlannerTest.cpp:32,158-163",
+      "status": "live",
+      "statusNote": "Only affects BehaviorPlannerTest.",
+      "tags": ["planner", "dev", "test", "path"]
+    },
+    "DoDeepRoll": {
+      "process": "engine",
+      "blurb": "DockingTest-only: when true, roll attempts use a “deep roll” dock action (DA_DEEP_ROLL_LOW) instead of the normal low roll (DA_ROLL_LOW). Default false. Exercises the deeper lift/roll trajectory against a cube during the automated docking test loop.",
+      "detail": "BehaviorDockingTestSimple, after a successful DriveToObject(ROLLING), builds RollObjectAction and calls EnableDeepRoll(DoDeepRoll). EnableDeepRoll swaps DockAction to DA_DEEP_ROLL_LOW and renames the action DeepRollObject. Product roll paths use their own doDeepRoll message/flags (robotEventHandler), not this console var. Only meaningful when the docking test is in the roll branch (RollInsteadOfPickup / roll state), not pure pickup.",
+      "category": "DockingTest",
+      "related": [
+        "RollInsteadOfPickup",
+        "JustPickup",
+        "TestDockingMethod"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDockingTestSimple.cpp:76,345-347; engine/actions/dockActions.cpp:2261-2265",
+      "status": "live",
+      "statusNote": "Only affects BehaviorDockingTestSimple roll attempts.",
+      "tags": ["docking", "docking-test", "dev", "roll"]
+    },
+    "InsertWaitsInTurnTowardsObjectVerify": {
+      "process": "engine",
+      "blurb": "When true, TurnTowardsObject inserts a 2-second WaitAction before and after the VisuallyVerifyObjectAction that runs when verification-on-done is enabled. Default false. Used to slow the turn-and-verify sequence for debugging or simulator tests (e.g. interrupt timing).",
+      "detail": "In TurnTowardsObjectAction::CheckIfDone, after the face/turn compound finishes and a refined turn is not pending, if _visuallyVerifyWhenDone is set the action either queues Wait(2) → VisuallyVerifyObject → Wait(2) or just VisuallyVerifyObject. Does not change pan tolerances or whether verification is requested — only spacing around that verify. Product docking usually leaves this off.",
+      "category": "TurnTowardsObject",
+      "related": [],
+      "evidence": "engine/actions/basicActions.cpp:54,1878-1889; simulator/controllers/webotsCtrlBuildServerTest/CST_DockActionInterrupts.cpp:68",
+      "status": "live",
+      "tags": ["actions", "turn", "verify", "debug", "docking"]
+    },
+    "MaxObjectWidthToBump_rad": {
+      "process": "engine",
+      "blurb": "While exploring and examining an obstacle, maximum angular width (radians of body sweep while scanning the object) still allowed for a bump. Default ≈80° (DEG_TO_RAD(80)). Wider “objects” (open walls, large furniture) skip the bump and the examine behavior ends from the scan pose.",
+      "detail": "BehaviorExploringExamineObstacle after the second scan turn: totalObjectAngle_rad must lie between MinObjectWidthToBump_rad and MaxObjectWidthToBump_rad, then a random roll vs 0.8 decides whether to bump. PRDemo feature gate forces max width huge so almost everything can be bumped. Units are radians in the console (ranged 0–2π).",
+      "category": "BehaviorExploring",
+      "related": [
+        "MinObjectWidthToBump_rad",
+        "ProbReferenceBeforeBump",
+        "ProbReferenceOnResume"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/exploring/behaviorExploringExamineObstacle.cpp:63-64,326-356",
+      "status": "live",
+      "tags": ["exploring", "bump", "obstacle", "freeplay"]
+    },
+    "MinObjectWidthToBump_rad": {
+      "process": "engine",
+      "blurb": "While exploring and examining an obstacle, minimum angular width (radians) required before Vector will try to bump it. Default ≈10°. Very thin prox returns (noise, edges) are ignored so he does not lunge at wisps.",
+      "detail": "Paired with MaxObjectWidthToBump_rad in BehaviorExploringExamineObstacle after the second scan turn. If total scanned object angle is below min or above max, CancelSelf() without returning to center. Console range 0–π radians.",
+      "category": "BehaviorExploring",
+      "related": [
+        "MaxObjectWidthToBump_rad",
+        "ProbReferenceBeforeBump"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/exploring/behaviorExploringExamineObstacle.cpp:63-64,326-356",
+      "status": "live",
+      "tags": ["exploring", "bump", "obstacle", "freeplay"]
+    },
+    "NumDistanceSensorReadingsToRecord": {
+      "process": "engine",
+      "blurb": "How many front distance-sensor samples factory distance checks collect before finishing. Self-test default 1; playpen default 40 (more samples for manufacturing logs). Only used when those factory behaviors run, not during freeplay.",
+      "detail": "SelfTestConfig and PlaypenConfig both define and WRAP_EXTERN this name (categories SelfTest / Playpen; first registration wins for the console UI). BehaviorSelfTestLookAtCharger::TransitionToRecordSensor and BehaviorPlaypenDistanceSensor set _numRecordedReadingsLeft from their respective config, then decrement each update while logging/checking readings. Larger values prolong the ToF capture phase on the factory line.",
+      "category": "SelfTest",
+      "related": [
+        "DistanceSensorReadingThresh_mm",
+        "DistanceSensorBiasAdjustment_mm",
+        "VisualDistanceToDistanceSensorObjectThresh_mm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.h:113; selfTestConfig.cpp:43; behaviorSelfTestLookAtCharger.cpp:253-255; playpen/playpenConfig.h:127; playpenConfig.cpp:103; behaviorPlaypenDistanceSensor.cpp:359,378",
+      "status": "live",
+      "statusNote": "Dual SelfTest/Playpen registration of the same dump id.",
+      "tags": ["selftest", "playpen", "tof", "distance-sensor", "factory"]
+    },
+    "NumberOfTurnsForSurfacePoint": {
+      "process": "engine",
+      "blurb": "When reacting to a person’s gaze toward a surface (not toward Vector), how many times Vector turns to the gazed-at pose, plays the surface reaction, then turns back to the face. Default 1. Higher values repeat the look-there / look-back sequence.",
+      "detail": "BehaviorReactToGazeDirection builds a sequential compound; the surface branch loops NumberOfTurnsForSurfacePoint times: get-in anim, TurnTowardsPose(+loop anim), surface reaction, TurnWaitAfterFinalTurn_s, TurnTowardsFace, sleep. Feature-gated GazeDirection; wired under Observing/Socialize. Does not affect the eye-contact path (look-at-Vector reaction).",
+      "category": "Vision.GazeDirection",
+      "related": [
+        "TurnWaitAfterFinalTurn_s",
+        "UseEyeContact"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorReactToGazeDirection.cpp:43,186-217; resources/config/engine/behaviorComponent/behaviors/devBehaviors/reactToGazeDirection.json",
+      "status": "live",
+      "tags": ["gaze", "social", "turn", "behavior"]
+    },
+    "ObjectPositionChangeToReport_mm": {
+      "process": "engine",
+      "blurb": "How far (mm) a known object must move in the world model before the navigation memory map is updated (remove + re-add the object footprint). Default 5 mm. Smaller = map tracks cube/charger wiggles more tightly (more map churn); larger = ignore small pose noise.",
+      "detail": "MapComponent::OnObjectPoseChanged compares the new object pose to the last reported pose with distThreshold = this value and angleThreshold = ObjectRotationChangeToReport_deg. If “far from previous,” RemoveObservableObject then AddObservableObject for unique objects. DEV_ASSERT requires this mm threshold stay under half the object’s Z dimension. Does not change vision detection — only when map content is rewritten for pose updates.",
+      "category": "MapComponent",
+      "related": [
+        "ObjectRotationChangeToReport_deg",
+        "RobotPositionChangeToReport_mm",
+        "RobotRotationChangeToReport_deg"
+      ],
+      "evidence": "engine/navMap/mapComponent.cpp:66-67,952-973",
+      "status": "live",
+      "tags": ["navmap", "objects", "pose", "performance"]
+    },
+    "ObjectRotationChangeToReport_deg": {
+      "process": "engine",
+      "blurb": "How many degrees a known object must rotate before the navigation memory map is notified and the object is re-inserted. Default 10°. Works with ObjectPositionChangeToReport_mm as the pose “same as” tolerance.",
+      "detail": "Converted with DEG_TO_RAD and passed into Pose3d::IsSameAs alongside the position threshold in MapComponent::OnObjectPoseChanged. Reduces map thrash when markers jitter in yaw without a real move.",
+      "category": "MapComponent",
+      "related": [
+        "ObjectPositionChangeToReport_mm",
+        "RobotRotationChangeToReport_deg"
+      ],
+      "evidence": "engine/navMap/mapComponent.cpp:64-65,958-964",
+      "status": "live",
+      "tags": ["navmap", "objects", "pose", "performance"]
+    },
+    "OnlyUseOriginalGoal": {
+      "process": "engine",
+      "blurb": "Dev planner test only: when true (default), DriveToPose must keep pursuing the originally selected goal among multiple cube-side poses instead of switching goals mid-path. When false, the planner may retarget more freely during the test loop.",
+      "detail": "BehaviorPlannerTest::GoToCubePose calls DriveToPoseAction::SetMustContinueToOriginalGoal(OnlyUseOriginalGoal). That flag is _mustUseOriginalGoal on the action; product behaviors do not set this console var. After success, the test may shrink the pose list to the path component’s last selected index.",
+      "category": "BehaviorPlannerTest",
+      "related": ["Distance_mm"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorPlannerTest.cpp:33,166-170; engine/actions/driveToActions.h:58",
+      "status": "live",
+      "statusNote": "Only affects BehaviorPlannerTest.",
+      "tags": ["planner", "dev", "test", "path"]
+    },
+    "ProbReferenceBeforeBump": {
+      "process": "engine",
+      "blurb": "Probability (0–1, default 0) that after deciding to bump an examined obstacle, Vector first runs the “reference human” (look at person) behavior before re-centering and bumping. Default 0 means never — code comment prefers referencing after the bump from the bump behavior instead.",
+      "detail": "BehaviorExploringExamineObstacle when shouldBump is true and referenceHumanBehavior wants activation: if RandDbl() < this probability, state becomes ReferenceHuman, else ReturnToCenterEnd (then bump path). Live but defaulted off intentionally for animation quality.",
+      "category": "BehaviorExploring",
+      "related": [
+        "MinObjectWidthToBump_rad",
+        "MaxObjectWidthToBump_rad",
+        "ProbReferenceOnResume"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/exploring/behaviorExploringExamineObstacle.cpp:67-69,361-366",
+      "status": "live",
+      "statusNote": "Default 0 disables the branch; raising it enables pre-bump human reference.",
+      "tags": ["exploring", "bump", "social", "freeplay"]
+    },
+    "ProbReferenceOnResume": {
+      "process": "engine",
+      "blurb": "When exploring is interrupted and resumes within ~8 s without a clean end reason, probability (0–1, default 1.0) that Vector looks at a person (reference human) before sampling a new drive goal — if the reference child wants activation and resume-reference cooldown has elapsed.",
+      "detail": "BehaviorExploring::OnBehaviorActivated detects isResume (ever ran, empty endReason, within kMaxTimeToCountAsResume_s). Then requires referenceHumanBehavior wants activation, time since that behavior last activated > ResumeReferenceCooldown_s, and RandDbl() < ProbReferenceOnResume. On success, delegates reference then SampleAndDrive; otherwise goes straight to SampleAndDrive.",
+      "category": "BehaviorExploring",
+      "related": [
+        "ResumeReferenceCooldown_s",
+        "ProbReferenceBeforeBump"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/exploring/behaviorExploring.cpp:69-70,282-314",
+      "status": "live",
+      "tags": ["exploring", "resume", "social", "freeplay"]
+    },
+    "RobotPositionChangeToReport_mm": {
+      "process": "engine",
+      "blurb": "How far (mm) Vector must move before MapComponent re-marks clear-of-cliff under the body and refreshes robot-related map reporting. Default 8 mm. Smaller = more frequent map updates while walking; larger = coarser pose sampling for map writes.",
+      "detail": "MapComponent::UpdateRobotPose compares current robot pose vs _reportedRobotPose with Point3f(threshold) and RobotRotationChangeToReport_deg. When far enough, re-inserts ClearOfCliff under cliff-sensor quad and continues other robot-pose map bookkeeping. Tuning trades map freshness vs CPU/clad load (related comments on MapRenderRate).",
+      "category": "MapComponent",
+      "related": [
+        "RobotRotationChangeToReport_deg",
+        "ObjectPositionChangeToReport_mm"
+      ],
+      "evidence": "engine/navMap/mapComponent.cpp:74-75,447-477",
+      "status": "live",
+      "tags": ["navmap", "robot", "pose", "performance"]
+    },
+    "RobotRotationChangeToReport_deg": {
+      "process": "engine",
+      "blurb": "How many degrees Vector’s body must turn before MapComponent treats the robot pose as changed enough to re-report into the memory map. Default 20°. Pairs with RobotPositionChangeToReport_mm.",
+      "detail": "DEG_TO_RAD applied in UpdateRobotPose IsSameAs check. Spinning in place beyond this angle triggers the same clear-of-cliff / robot-pose map path as a translation change.",
+      "category": "MapComponent",
+      "related": [
+        "RobotPositionChangeToReport_mm",
+        "ObjectRotationChangeToReport_deg"
+      ],
+      "evidence": "engine/navMap/mapComponent.cpp:72-73,457-465",
+      "status": "live",
+      "tags": ["navmap", "robot", "pose", "performance"]
+    },
+    "Rotate": {
+      "process": "engine",
+      "blurb": "Dev cube-light designer: when true, the hand-tuned cube LED pattern is marked to rotate around the cube faces. Default false. Only applies while BehaviorDevDesignCubeLights is building/saving light animations from console RGB/timing knobs.",
+      "detail": "Under ANKI_DEV_CHEATS, category CubeLightDesign. GetLights() sets lights.rotate = Rotate before applying the four LED state machines. Product freeplay cube lights use JSON/animation assets, not this flag. Pair with SaveLights console function to persist a design.",
+      "category": "CubeLightDesign",
+      "related": [],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevDesignCubeLights.cpp:103,287",
+      "status": "live",
+      "statusNote": "Only when CubeLightDesign / BehaviorDevDesignCubeLights path is active (dev cheats).",
+      "tags": ["cube", "lights", "dev"]
+    },
+    "SearchDensity": {
+      "process": "engine",
+      "blurb": "OKAO face-detector search density enum: how thoroughly the face library scans the image (Highest → Lowest). Default Normal. Higher density finds small/hard faces more reliably but costs more CPU; lower density is cheaper and may miss faces.",
+      "detail": "CONSOLE_VAR_ENUM in DetectParams maps to Omron DENSITY_* via OKAO_DT_SetSearchDensity at FaceTracker::Impl::Init only. Enum labels: Highest, High, Normal, Low, Lowest. Runtime console edits do not re-call SetSearchDensity until ReinitDetector is set so Update rebuilds the detector. Same Init-only pattern as FaceDetectionThreshold.",
+      "howTo": "1) Set SearchDensity. 2) Set ReinitDetector = true. 3) Ensure Faces vision mode is running so Init applies the new density.",
+      "category": "Vision.FaceDetectorCommon",
+      "related": [
+        "SearchInitialCycle",
+        "SearchNewCycle",
+        "SearchNewInterval",
+        "ReinitDetector",
+        "FaceDetectionThreshold"
+      ],
+      "requires": ["ReinitDetector"],
+      "enumLabels": [
+        "Highest",
+        "High",
+        "Normal",
+        "Low",
+        "Lowest"
+      ],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:81,275-278,1067-1074; coretech/vision/engine/okaoParamInterface.cpp:81-92; okaoVision/include/OkaoDtAPI.h:107-109",
+      "status": "partial",
+      "statusNote": "Applied only at OKAO detector Init (or after ReinitDetector). Changing the console var alone mid-run does not update the live detector.",
+      "tags": ["vision", "faces", "okao", "performance", "detection"]
+    },
+    "SearchInitialCycle": {
+      "process": "engine",
+      "blurb": "Movie-mode face detection: frame-count budget for the initial full search for faces when tracking starts (OKAO “Initial Face Search” cycle). Default 2 (range 1–45). Higher = more thorough first scan, more latency/CPU on startup of tracking.",
+      "detail": "Passed to OKAO_DT_MV_SetSearchCycle as nInitialFaceSearchCycle together with SearchNewCycle and SearchNewInterval, only inside FaceTracker::Impl::Init when DetectionMode is Movie. Requires ReinitDetector to apply console changes. Still-mode / non-movie detectors ignore this.",
+      "howTo": "1) Confirm DetectionMode is Movie. 2) Set SearchInitialCycle. 3) Set ReinitDetector true.",
+      "category": "Vision.FaceDetectorMovie",
+      "related": [
+        "SearchNewCycle",
+        "SearchNewInterval",
+        "SearchDensity",
+        "ReinitDetector",
+        "DetectionMode"
+      ],
+      "requires": ["ReinitDetector"],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:86,181-188; okaoVision/include/OkaoDtAPI.h:126-131",
+      "status": "partial",
+      "statusNote": "Init-only via OKAO_DT_MV_SetSearchCycle; needs ReinitDetector for live edits.",
+      "tags": ["vision", "faces", "okao", "movie", "tracking"]
+    },
+    "SearchNewCycle": {
+      "process": "engine",
+      "blurb": "Movie-mode face detection: frame-count budget for searching for new faces while already tracking (OKAO “New Face Search” cycle). Default 2 (range 1–45). Higher spends more CPU looking for additional people entering the scene.",
+      "detail": "Middle argument to OKAO_DT_MV_SetSearchCycle(nInitial, nNew, nInterval) at FaceTracker Init. Only meaningful in Movie detection mode. Console changes need ReinitDetector.",
+      "howTo": "1) DetectionMode Movie. 2) Edit SearchNewCycle. 3) ReinitDetector = true.",
+      "category": "Vision.FaceDetectorMovie",
+      "related": [
+        "SearchInitialCycle",
+        "SearchNewInterval",
+        "SearchDensity",
+        "ReinitDetector"
+      ],
+      "requires": ["ReinitDetector"],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:87,181-188; okaoVision/include/OkaoDtAPI.h:126-131",
+      "status": "partial",
+      "statusNote": "Init-only; needs ReinitDetector for live edits.",
+      "tags": ["vision", "faces", "okao", "movie", "tracking"]
+    },
+    "SearchNewInterval": {
+      "process": "engine",
+      "blurb": "Movie-mode face detection: how often (in frames) OKAO schedules a new-face search while tracking. Default 5 (range −1–45). Larger interval = rarer new-face searches (cheaper, slower to notice a second person); smaller = more frequent scans.",
+      "detail": "Third argument nNewFaceSearchInterval to OKAO_DT_MV_SetSearchCycle at FaceTracker::Impl::Init. Applied only for Movie mode. Must ReinitDetector after console edits. Exact meaning of −1 is library-defined (see Omron OKAO docs).",
+      "howTo": "1) DetectionMode Movie. 2) Set SearchNewInterval. 3) ReinitDetector = true.",
+      "category": "Vision.FaceDetectorMovie",
+      "related": [
+        "SearchInitialCycle",
+        "SearchNewCycle",
+        "SearchDensity",
+        "ReinitDetector"
+      ],
+      "requires": ["ReinitDetector"],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:88,181-188; okaoVision/include/OkaoDtAPI.h:126-131",
+      "status": "partial",
+      "statusNote": "Init-only; needs ReinitDetector for live edits.",
+      "tags": ["vision", "faces", "okao", "movie", "tracking"]
+    },
+    "TurnFirst": {
+      "process": "engine",
+      "blurb": "When Vector reacts to motion in camera, if true (default) he turns toward the motion first (unless on the charger platform); if false, he plays eye animations / procedural eyes first without turning immediately.",
+      "detail": "BehaviorReactToMotion::OnBehaviorActivated: if !TurnFirst OR IsOnChargerPlatform(), goes to eye animation or procedural eyes; else TransitionToTurnAnimation / ProceduralTurn with lookingDirection set. Charger always takes the eyes-first path so he does not try to body-turn on the dock. Comment in code notes product still deciding eyes-vs-turn order.",
+      "category": "BehaviorReactToMotion",
+      "related": [],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToMotion.cpp:46,207-223",
+      "status": "live",
+      "tags": ["motion", "reaction", "turn", "behavior"]
+    },
+    "TurnWaitAfterFinalTurn_s": {
+      "process": "engine",
+      "blurb": "Seconds to pause after key turns in the gaze-direction reaction: after the look-at-Vector anim, and after each surface-look reaction before turning back to the face. Default 1 s. Longer holds make the reaction feel more deliberate.",
+      "detail": "BehaviorReactToGazeDirection inserts WaitAction(TurnWaitAfterFinalTurn_s) on both the eye-contact path (after GazingLookAtVectorReaction, before head raise) and inside each surface-point loop (after surface reaction, before TurnTowardsFace). Separate from SleepTimeAfterActionCompleted_s which waits later in the sequence.",
+      "category": "Vision.GazeDirection",
+      "related": [
+        "NumberOfTurnsForSurfacePoint",
+        "SleepTimeAfterActionCompleted_s"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorReactToGazeDirection.cpp:33,179-216",
+      "status": "live",
+      "tags": ["gaze", "social", "timing", "behavior"]
+    },
+    "VisualDistanceToDistanceSensorObjectThresh_mm": {
+      "process": "engine",
+      "blurb": "Factory distance checks: how far (mm) the camera-measured distance to the expected marker/object may differ from the configured expected distance before failing. Default 30 mm for both self-test and playpen. Gates the refined turn that faces the target before ToF sampling.",
+      "detail": "SelfTestConfig and PlaypenConfig both register this dump id. BehaviorSelfTestLookAtCharger and BehaviorPlaypenDistanceSensor TransitionToRefineTurn compare markerPose translation.x() to _expectedDistanceToObject_mm (from behavior JSON) with IsNear(..., this thresh). Fail codes DISTANCE_MARKER_VISUAL_OOR / DISTANCE_MARKER_OOR. Does not compare ToF to vision (that is DistanceSensorReadingThresh_mm + bias).",
+      "category": "SelfTest",
+      "related": [
+        "NumDistanceSensorReadingsToRecord",
+        "DistanceSensorReadingThresh_mm",
+        "DistanceSensorBiasAdjustment_mm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.h:118; selfTestConfig.cpp:44; behaviorSelfTestLookAtCharger.cpp:209-217; playpen/playpenConfig.h:132; playpenConfig.cpp:104; behaviorPlaypenDistanceSensor.cpp:233-241",
+      "status": "live",
+      "statusNote": "Dual SelfTest/Playpen registration of the same dump id; both behaviors read their own config defaults for the refine-turn gate.",
+      "tags": ["selftest", "playpen", "tof", "distance-sensor", "factory", "vision"]
+    }
+  }
+}
