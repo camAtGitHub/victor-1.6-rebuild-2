@@ -1,0 +1,41 @@
+{
+  "vars": {
+    "IgnoreAnimWhitelist": {
+      "process": "engine",
+      "blurb": "When true, allows playing animations that are normally blocked while on the charger (animator testing).",
+      "status": "live",
+      "evidence": "engine/actions/animActions.cpp (kIgnoreAnimWhitelist)",
+      "tags": ["animation", "engine"]
+    },
+    "EyeDartFocusValue_pix": {
+      "process": "engine",
+      "blurb": "Focus / amplitude scale (pixels) for keep-alive eye dart motion driven by the animation component.",
+      "status": "live",
+      "evidence": "engine/components/animationComponent.cpp (kEyeDartFocusValue_pix)",
+      "tags": ["animation", "eyes"]
+    },
+    "ShouldPreCacheSprites": {
+      "process": "engine",
+      "blurb": "If true, pre-cache animation sprite assets when loading canned anims (memory vs hitch tradeoff).",
+      "status": "live",
+      "evidence": "cannedAnimLib/cannedAnims/animation.cpp (kShouldPreCacheSprites)",
+      "tags": ["animation", "perf"]
+    },
+    "PlayAnimationByName": {
+      "process": "engine",
+      "blurb": "Console function: play a named animation. Args: animName, optional numLoops, optional renderInEyeHue.",
+      "status": "live",
+      "evidence": "engine/robot.cpp CONSOLE_FUNC PlayAnimationByName",
+      "related": ["AddAnimation"],
+      "tags": ["animation", "func"]
+    },
+    "AddAnimation": {
+      "process": "engine",
+      "blurb": "Console function: load/add an animation file by path (see function tooltip for signature).",
+      "status": "live",
+      "evidence": "consolefunclist_8888",
+      "related": ["PlayAnimationByName"],
+      "tags": ["animation", "func"]
+    }
+  }
+}

@@ -8,6 +8,7 @@
     "vars/anim-animations.json",
     "vars/mood-webviz.json",
     "vars/navmap-quadtree.json",
+    "vars/engine-animation.json",
     "vars/engine-keepaway.json",
     "vars/engine-enroll-face.json",
     "vars/engine-explore-hlai.json",

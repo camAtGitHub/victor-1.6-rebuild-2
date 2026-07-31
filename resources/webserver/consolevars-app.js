@@ -11,8 +11,10 @@
   var catalog = null;
   var processHint = guessProcess();
   var DEAD_STATUSES = { dead: 1, orphan: 1, noop: 1 };
-  var CATALOG_INDEX = "consolevars/index.json";
-  var CATALOG_FALLBACK = "consolevars-catalog.json";
+  // Root-relative so fetch works from /consolevars (no trailing slash) and
+  // does not resolve to /consolevars/consolevars/...
+  var CATALOG_INDEX = "/consolevars/index.json";
+  var CATALOG_FALLBACK = "/consolevars-catalog.json";
 
   function guessProcess() {
     var p = String(window.location.port || "");
@@ -29,13 +31,13 @@
     return Array.prototype.slice.call((root || document).querySelectorAll(sel));
   }
 
-  /** Resolve shard path relative to consolevars/ (or accept root-relative paths). */
+  /** Resolve shard path to a root-absolute URL under /consolevars/. */
   function shardUrl(path) {
     if (!path) return null;
-    if (/^https?:\/\//i.test(path) || path.indexOf("consolevars/") === 0) {
-      return path;
-    }
-    return "consolevars/" + String(path).replace(/^\//, "");
+    if (/^https?:\/\//i.test(path)) return path;
+    if (path.indexOf("/") === 0) return path;
+    if (path.indexOf("consolevars/") === 0) return "/" + path;
+    return "/consolevars/" + String(path).replace(/^\//, "");
   }
 
   function fetchJson(url) {
@@ -221,11 +223,16 @@
 
   function labelForRow(row, name) {
     if (!row) return null;
-    var lab = row.querySelector('label[for="' + name + '"]');
-    if (lab) return lab;
     var candidates = idCandidates(name);
-    for (var i = 0; i < candidates.length; i++) {
-      lab = row.querySelector('label[for="' + candidates[i] + '"]');
+    var i, lab, c;
+    for (i = 0; i < candidates.length; i++) {
+      c = candidates[i];
+      lab = row.querySelector('label[for="' + c + '"]');
+      if (lab) return lab;
+      // Console funcs use label for="Name_function"
+      lab = row.querySelector('label[for="' + c + '_function"]');
+      if (lab) return lab;
+      lab = row.querySelector('label[for="' + c + '_amount"]');
       if (lab) return lab;
     }
     return row.querySelector("label");
@@ -718,16 +725,49 @@
     }
   }
 
+  /** Classic page has no #cvStatus — inject a small load line so 404s are visible. */
+  function setClassicCatalogStatus(text, isError) {
+    var el = $("#cvStatus");
+    if (el) {
+      el.textContent = text;
+      return;
+    }
+    var host = $("#console") || document.body;
+    if (!host) return;
+    var bar = $("#cvClassicStatus");
+    if (!bar) {
+      bar = document.createElement("p");
+      bar.id = "cvClassicStatus";
+      bar.className = "cv-classic-status";
+      var h = host.querySelector("h3");
+      if (h && h.nextSibling) {
+        host.insertBefore(bar, h.nextSibling);
+      } else {
+        host.insertBefore(bar, host.firstChild);
+      }
+    }
+    bar.textContent = text;
+    bar.classList.toggle("cv-classic-status-err", !!isError);
+  }
+
+  function countDecorated() {
+    return $all(".cv-marks").length;
+  }
+
   function boot() {
     // Explorer-only chrome: no-ops when nodes are absent (classic /consolevars).
     setProcessBadge();
     initTabs();
     wireSearch();
     wireClicks();
+    setClassicCatalogStatus("Loading catalog…", false);
     fetchCatalog().then(function (c) {
       catalog = c;
       if (!c) {
-        // Safe no-op: raw injected controls still work without catalog.
+        setClassicCatalogStatus(
+          "Catalog not loaded (check /consolevars/index.json). Raw controls still work.",
+          true
+        );
         var root = $("#cvRecipes");
         if (root) {
           root.innerHTML =
@@ -739,11 +779,11 @@
       decorateRows(); // always: help / dead marks on #tabs or #main
       var n = Object.keys(c.vars || {}).length;
       var r = (c.recipes || []).length;
-      var status = $("#cvStatus");
-      if (status) {
-        status.textContent =
-          "Catalog: " + n + " annotated vars, " + r + " recipes · filter with search";
-      }
+      var d = countDecorated();
+      setClassicCatalogStatus(
+        "Catalog: " + n + " notes · " + d + " marked on this page · " + r + " recipes",
+        false
+      );
     });
   }
 

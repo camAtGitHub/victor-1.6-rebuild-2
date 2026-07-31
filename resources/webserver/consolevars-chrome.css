@@ -34,6 +34,115 @@ a:hover {
   color: var(--wv-text);
 }
 
+/* ── Aligned control rows (label | slider | value) ──
+   C++ emits each control in a bare <div> with optional <br> between rows. */
+#tabs > div[id^="tabs-"] > div,
+#main > div[id^="tabs-"] > div,
+#tabs .ui-tabs-panel > div,
+#main .ui-tabs-panel > div {
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  width: 100%;
+  max-width: 52rem;
+  box-sizing: border-box;
+  margin: 0 0 2px !important;
+  vertical-align: top;
+}
+
+/* Hide the sparse <br> separators C++ inserts between rows */
+#tabs > div[id^="tabs-"] > br,
+#main > div[id^="tabs-"] > br,
+#tabs .ui-tabs-panel > br,
+#main .ui-tabs-panel > br {
+  display: none !important;
+}
+
+#tabs label,
+#main label {
+  flex: 0 0 16rem;
+  max-width: 16rem;
+  margin: 0 !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#tabs .slider,
+#main .slider {
+  flex: 0 0 10rem !important;
+  width: 10rem !important;
+  margin: 0 !important;
+}
+
+#tabs input.amount,
+#main input.amount {
+  flex: 0 0 4.5rem;
+  width: 4.5rem !important;
+  min-width: 4.5rem;
+  margin: 0 !important;
+  text-align: right;
+}
+
+#tabs input[type="checkbox"],
+#main input[type="checkbox"] {
+  flex: 0 0 auto;
+  margin: 0 !important;
+}
+
+#tabs input.function,
+#main input.function,
+#tabs input[type="submit"],
+#main input[type="submit"] {
+  flex: 0 0 auto;
+  margin: 0 !important;
+}
+
+#tabs input[type="text"]:not(.amount),
+#main input[type="text"]:not(.amount) {
+  flex: 1 1 10rem;
+  min-width: 8rem;
+  max-width: 20rem;
+  margin: 0 !important;
+}
+
+#tabs fieldset,
+#main fieldset {
+  display: block !important;
+  width: 100%;
+  max-width: 52rem;
+  box-sizing: border-box;
+}
+
+#tabs fieldset > div,
+#main fieldset > div {
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  width: 100%;
+}
+
+/* Status line when catalog loads (classic has no #cvStatus) */
+.cv-classic-status {
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 0 var(--wv-space-2) !important;
+  padding: 6px 10px !important;
+  font: 11px/1.4 var(--wv-mono) !important;
+  color: var(--wv-text-dim) !important;
+  background: var(--wv-bg-elev) !important;
+  border: 1px solid var(--wv-line) !important;
+  border-radius: var(--wv-radius-sm) !important;
+  text-align: left !important;
+}
+.cv-classic-status-err {
+  color: var(--wv-warn) !important;
+  border-color: var(--wv-warn) !important;
+}
+
 /* ── Shell: #console + header ── */
 #console.ui-widget-content,
 #console {
@@ -73,6 +182,14 @@ a:hover {
 #main.ui-widget,
 #main.ui-widget-content,
 #main,
+/* Let ? popovers escape tab panels */
+#main.ui-tabs .ui-tabs-panel,
+#tabs.ui-tabs .ui-tabs-panel,
+#main > div[id^="tabs-"],
+#tabs > div[id^="tabs-"] {
+  overflow: visible !important;
+}
+
 #tabs.ui-tabs,
 #tabs.ui-widget,
 #tabs.ui-widget-content,

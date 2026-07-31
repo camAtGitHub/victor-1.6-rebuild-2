@@ -2,21 +2,31 @@
   "vars": {
     "PlayAnimation": {
       "process": "anim",
-      "blurb": "Console function: play animation by name (args: name [numLoops]).",
-      "category": "Animations",
+      "blurb": "Console function (anim process): play animation by name. Args: name, optional numLoops.",
+      "status": "live",
+      "evidence": "animProcess/.../animProcessMessages.cpp CONSOLE_FUNC PlayAnimation",
       "related": ["ListAnimations", "AbortCurrentAnimation"],
       "tags": ["anim", "func"]
     },
     "ListAnimations": {
       "process": "anim",
-      "blurb": "Console function: dump animation names to the result box.",
-      "category": "Animations",
+      "blurb": "Console function: list animation names into the result box.",
+      "status": "live",
+      "related": ["PlayAnimation", "AbortCurrentAnimation"],
       "tags": ["anim", "func"]
     },
     "AbortCurrentAnimation": {
       "process": "anim",
-      "blurb": "Console function: stop current animation.",
-      "category": "Animations",
+      "blurb": "Console function: stop the currently playing animation.",
+      "status": "live",
+      "related": ["PlayAnimation"],
+      "tags": ["anim", "func"]
+    },
+    "AddAnimation": {
+      "process": "anim",
+      "blurb": "Console function: add/load an animation file (anim process).",
+      "status": "live",
+      "related": ["PlayAnimation", "ListAnimations"],
       "tags": ["anim", "func"]
     }
   }
