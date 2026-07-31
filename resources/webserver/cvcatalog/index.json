@@ -62,7 +62,10 @@
     "vars/engine-gaze-eye.json",
     "vars/engine-hough.json",
     "vars/engine-palm-touch.json",
-    "vars/engine-cliff-drive.json"
+    "vars/engine-cliff-drive.json",
+    "vars/engine-enroll-sayname.json",
+    "vars/engine-timers-cooldowns.json",
+    "vars/engine-firmware-jdocs.json"
   ],
   "categories": [
     "categories/vision.json",
