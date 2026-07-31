@@ -1,0 +1,91 @@
+{
+  "vars": {
+    "BodyTurnSpeedThreshPet_degs": {
+      "process": "engine",
+      "blurb": "Maximum body turn rate (degrees per second, default 30) allowed when Vector first accepts a brand-new pet detection into PetWorld. If the body was spinning faster than this at the camera frame’s timestamp, that new cat/dog ID is discarded so motion blur does not invent pets.",
+      "detail": "Read only in PetWorld::Update for IDs not already known. Existing tracked pets are always kept even if the robot is turning. Together with HeadTurnSpeedThreshPet_degs, the check is enabled only if at least one of the two thresholds is > 0; set both ≤ 0 to disable the rotating-too-fast gate for new pets. Degrees are converted to radians for ImuHistory::WasRotatingTooFast. Sibling defaults match faces (10°/s head, 30°/s body) and marker body threshold.",
+      "category": "WasRotatingTooFast.Pet.Body_deg/s",
+      "related": [
+        "HeadTurnSpeedThreshPet_degs",
+        "NumImuDataToLookBackPet",
+        "Pets"
+      ],
+      "evidence": "engine/petWorld.cpp:28-30,73-87; engine/components/sensors/imuComponent.h:58-61,129-136",
+      "status": "live",
+      "tags": ["vision", "pets", "imu", "rotating-too-fast"]
+    },
+    "HeadTurnSpeedThreshPet_degs": {
+      "process": "engine",
+      "blurb": "Maximum head tilt/pitch rate (degrees per second, default 10) allowed when first accepting a new pet ID into PetWorld. Fast head motion at detection time blocks that new ID so shaky frames do not spawn false cats or dogs.",
+      "detail": "Same gate as BodyTurnSpeedThreshPet_degs: only new IDs (not already in _knownPets) consult IMU history; already-known pets keep updating. WasRotatingTooFast is true if either head or body rate exceeds its threshold. Set both head and body thresholds ≤ 0 to turn the whole check off. For tracked detections, NumImuDataToLookBackPet also widens the IMU samples examined around the frame time.",
+      "category": "WasRotatingTooFast.Pet.Head_deg/s",
+      "related": [
+        "BodyTurnSpeedThreshPet_degs",
+        "NumImuDataToLookBackPet",
+        "Pets"
+      ],
+      "evidence": "engine/petWorld.cpp:28-30,73-87; engine/components/sensors/imuComponent.h:58-61,129-136",
+      "status": "live",
+      "tags": ["vision", "pets", "imu", "rotating-too-fast"]
+    },
+    "NumImuDataToLookBackPet": {
+      "process": "engine",
+      "blurb": "How many IMU samples before the image timestamp to also check for too-fast motion when accepting a new pet that is already marked “being tracked” by the Omron detector (default 5). First-sight detections (not tracked yet) always use look-back 0.",
+      "detail": "Passed as the last argument to ImuHistory::WasRotatingTooFast only when petDetection.IsBeingTracked() is true (OMCV DET_METHOD_TRACKED_MIDDLE). For pure first detections look-back is forced to 0, so only samples at/near that timestamp matter. Larger values are stricter (more history can fail the gate); 0 only samples around t. Only matters when body or head turn thresholds are > 0 so the rotating-too-fast check is enabled.",
+      "category": "WasRotatingTooFast.Pet.NumToLookBack",
+      "related": [
+        "BodyTurnSpeedThreshPet_degs",
+        "HeadTurnSpeedThreshPet_degs",
+        "Pets"
+      ],
+      "evidence": "engine/petWorld.cpp:30,77-81; coretech/vision/engine/petTracker.cpp:304; engine/components/sensors/imuComponent.h:58-61,81-85",
+      "status": "live",
+      "tags": ["vision", "pets", "imu", "rotating-too-fast"]
+    },
+    "Pets": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::Pets so every scheduled vision pass can run cat/dog face detection (Omron OMCV Pet Detector). Off by default as a console override; production behaviors subscribe the mode when they need pet awareness.",
+      "detail": "Created dynamically for every VisionMode under category Vision.General.VisionModes (SetupVisionModeConsoleVars). When the bool flips, VisionComponent enables/disables the mode and DevOnly self-subscribes/unsubscribes so Pets is actually on the schedule even if no behavior requested it. When mode runs, VisionSystem::DetectPets calls PetTracker on the gray (optionally masked) image; results go to PetWorld (RobotObservedPet broadcast, viz ovals, DAS on first sight). Behaviors such as PetDetection, FindFaces, TrackPetFaceAction, and several reactions request Pets at Low/Med/High/Standard. Schedule cost is relatively high (relativeCost 16 in visionScheduleMediator_config). Masking: pet search blacks out rects already used by earlier detectors in the same frame (e.g. faces).",
+      "howTo": "1) Toggle Pets on in console (Vision.General.VisionModes). 2) Point Vector at a cat or dog face of reasonable size (~60–240 px per vision_config PetTracker). 3) Optionally lower RuntimePetDetectionThreshold if detections are sparse. 4) Watch PetWorld viz / RobotObservedPet or WebViz detections; use Body/Head turn thresholds if spinning invents ghosts.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/vision_config.json",
+          "resources/config/engine/visionScheduleMediator_config.json"
+        ],
+        "notes": "PetTracker block: MaxPets 4, DetectionThreshold 900 (0–1000), Min/MaxFaceSize 60/240, search cycles, track lost/steadiness. Schedule: Pets low=4 med=2 high=1 standard=1, relativeCost 16."
+      },
+      "category": "Vision.General.VisionModes",
+      "related": [
+        "RuntimePetDetectionThreshold",
+        "BodyTurnSpeedThreshPet_degs",
+        "HeadTurnSpeedThreshPet_degs",
+        "NumImuDataToLookBackPet",
+        "Faces",
+        "MirrorMode"
+      ],
+      "evidence": "engine/components/visionComponent.cpp:2836-2882,931-933,1147-1150; engine/vision/visionSystem.cpp:880-910,1646-1655; clad/src/clad/types/visionModes.clad:22,88; coretech/vision/engine/petTracker.cpp; engine/petWorld.cpp; resources/config/engine/vision_config.json:61-71; resources/config/engine/visionScheduleMediator_config.json:81-88; engine/actions/trackPetFaceAction.cpp:56; engine/aiComponent/behaviorComponent/behaviors/victor/behaviorPetDetection.h:37",
+      "status": "live",
+      "tags": ["vision", "pets", "visionmode", "omcv", "okao"]
+    },
+    "RuntimePetDetectionThreshold": {
+      "process": "engine",
+      "blurb": "Live override for how confident the Omron pet detector must be (0–1000) before reporting a cat or dog. Default −1 means “leave the value from vision_config.json alone” (stock DetectionThreshold 900). Set ≥ 0 to push a new threshold into the detector on the next pet Update.",
+      "detail": "CONSOLE_VAR_RANGED −1…1000 under Vision.PetDetection. PetTracker::Init loads DetectionThreshold from JSON and calls OMCV_PD_SetThreshold once. On each Update, if this console value is ≥ 0 and differs from the last applied runtime threshold, it re-calls OMCV_PD_SetThreshold and caches the new value. Lower values accept weaker detections (more hits, more false positives); higher values are stricter. Only affects the classic PetTracker path (VisionMode::Pets), not neural-net people/hands. Failed SetThreshold returns an error from Update.",
+      "howTo": "1) Ensure Pets mode is running. 2) Set RuntimePetDetectionThreshold to a value 0–1000 (try ~700–850 if stock 900 misses pets). 3) Point at a pet and watch detections. 4) Set back to −1 to stop overriding (threshold stays at last applied value until process restart reloads JSON).",
+      "paths": {
+        "assets": [
+          "resources/config/engine/vision_config.json"
+        ],
+        "notes": "PetTracker.DetectionThreshold default 900 (0–1000). Console −1 = do not override at runtime."
+      },
+      "category": "Vision.PetDetection",
+      "related": [
+        "Pets"
+      ],
+      "requires": ["Pets"],
+      "evidence": "coretech/vision/engine/petTracker.cpp:48-49,169-173,225-238; coretech/vision/engine/petTracker.h:47; resources/config/engine/vision_config.json:61-71",
+      "status": "live",
+      "tags": ["vision", "pets", "threshold", "omcv"]
+    }
+  }
+}
