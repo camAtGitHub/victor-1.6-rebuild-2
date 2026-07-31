@@ -16,7 +16,8 @@
     "vars/engine-interact.json",
     "vars/engine-actions-dock.json",
     "vars/engine-blockworld.json",
-    "vars/engine-net-ops.json"
+    "vars/engine-net-ops.json",
+    "vars/engine-vision-motion-laser.json"
   ],
   "categories": [
     "categories/vision.json",

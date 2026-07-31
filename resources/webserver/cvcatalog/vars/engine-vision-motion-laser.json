@@ -1,0 +1,368 @@
+{
+  "vars": {
+    "Motion": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::Motion so the engine runs frame-to-frame motion detection every vision tick (when the schedule would otherwise leave it off). Without this mode, the MotionDetection_* tunables never run.",
+      "detail": "When Motion is on, VisionSystem::DetectMotion calls MotionDetector on the camera image. Results become RobotObservedMotion messages (image centroid, ground-plane centroid, peripheral regions). Used for reactions such as pounce-on-motion and looking toward movement. Pair with the MotionDetection_* group under Vision.MotionDetection to change sensitivity.",
+      "category": "Vision.General.VisionModes",
+      "related": [
+        "MotionDetection_RatioThreshold",
+        "MotionDetection_MinBrightness",
+        "MotionDetection_ScaleMultiplier",
+        "MotionDetectionDebug"
+      ],
+      "evidence": "engine/vision/visionSystem.cpp:1658-1667; clad/src/clad/types/visionModes.clad (Motion)",
+      "status": "live",
+      "tags": ["vision", "motion", "visionmode"]
+    },
+    "MotionDetection_ScaleMultiplier": {
+      "process": "engine",
+      "blurb": "Downsamples the camera image before motion detection for speed. 1 = full resolution of the cache size path, higher = smaller (default 4). Range 1–8.",
+      "detail": "ImageCache::GetSize(scaleMultiplier) picks the working resolution. Larger values are cheaper on CPU but blur small motion and make pixel-based thresholds (e.g. MinAreaForMotion_pix) apply on a coarser grid; morphological size is also divided by this scale.",
+      "category": "Vision.MotionDetection",
+      "related": ["Motion", "MotionDetection_MinAreaForMotion_pix", "MotionDetection_MorphologicalSize_pix"],
+      "evidence": "engine/vision/motionDetector.cpp:36,489-508",
+      "status": "live",
+      "tags": ["vision", "motion", "performance"]
+    },
+    "MotionDetection_LastMotionDelay_ms": {
+      "process": "engine",
+      "blurb": "Minimum milliseconds between successive motion-detection attempts (default 500). While this cool-down is active, the detector only stores the current frame and does not run frame differencing.",
+      "detail": "Prevents flooding from back-to-back detections and reduces false motion caused by residual robot movement after a previous report. Lower = more frequent reports and more CPU; higher = laggier motion events.",
+      "category": "Vision.MotionDetection",
+      "related": ["Motion", "MotionDetection_MaxPoseChange_mm"],
+      "evidence": "engine/vision/motionDetector.cpp:40,564-570",
+      "status": "live",
+      "tags": ["vision", "motion", "timing"]
+    },
+    "MotionDetection_MinBrightness": {
+      "process": "engine",
+      "blurb": "Pixels darker than this 0–255 level in either the current or previous frame are ignored for change detection (default 10). Stops dark/noisy regions from counting as motion.",
+      "detail": "Both pixels in a pair must be brighter than this before the ratio test runs. Setting to 0 is asserted invalid at MotionDetector construct. Higher = less sensitive in dim areas; lower = more noise sensitivity.",
+      "category": "Vision.MotionDetection",
+      "related": ["MotionDetection_RatioThreshold", "Motion"],
+      "evidence": "engine/vision/motionDetector.h:46; motionDetector.cpp:44,369,424-465; motionDetector_neon.h",
+      "status": "live",
+      "tags": ["vision", "motion", "sensitivity"]
+    },
+    "MotionDetection_RatioThreshold": {
+      "process": "engine",
+      "blurb": "Main sensitivity knob: how much brighter/darker a pixel must be vs the previous frame to count as changed (default 1.25). Higher = less sensitive (needs a bigger brightness ratio).",
+      "detail": "Frame differencing compares current vs previous (after blur). For grayscale, max(a,b)/min(a,b) must exceed this. For RGB, any channel ratio over the threshold marks the pixel. This is the primary control for false positives vs missed motion.",
+      "category": "Vision.MotionDetection",
+      "related": ["MotionDetection_MinBrightness", "MotionDetection_MinAreaFraction", "Motion"],
+      "evidence": "engine/vision/motionDetector.h:47; motionDetector.cpp:48,430,465; motionDetector_neon.h",
+      "status": "live",
+      "tags": ["vision", "motion", "sensitivity"]
+    },
+    "MotionDetection_MinAreaFraction": {
+      "process": "engine",
+      "blurb": "Minimum fraction of the (scaled) image that must pass the ratio test before an overall image-motion centroid is computed (default 1/225 ≈ 0.0044). Below this, image centroid is skipped.",
+      "detail": "Compared as numAboveThresh > imageElements * MinAreaFraction. Does not by itself emit peripheral motion; peripheral blobs use MinAreaForMotion_pix. Raise to ignore tiny speckles; lower to pick up smaller overall motion.",
+      "category": "Vision.MotionDetection",
+      "related": ["MotionDetection_RatioThreshold", "MotionDetection_MinAreaForMotion_pix", "MotionDetection_CentroidPercentileX"],
+      "evidence": "engine/vision/motionDetector.cpp:49,633-638",
+      "status": "live",
+      "tags": ["vision", "motion", "threshold"]
+    },
+    "MotionDetection_CentroidPercentileX": {
+      "process": "engine",
+      "blurb": "Horizontal percentile (0–1) used when computing the robust image-motion centroid in image coordinates (default 0.5 = median). Affects reported img_x of RobotObservedMotion.",
+      "detail": "GetCentroid walks motion pixels and picks the percentile along X. 0.5 is center-of-mass style median; other values bias the reported point left/right within the motion blob.",
+      "category": "Vision.MotionDetection",
+      "related": ["MotionDetection_CentroidPercentileY", "MotionDetection_MinAreaFraction"],
+      "evidence": "engine/vision/motionDetector.cpp:52,637-638",
+      "status": "live",
+      "tags": ["vision", "motion", "centroid"]
+    },
+    "MotionDetection_CentroidPercentileY": {
+      "process": "engine",
+      "blurb": "Vertical percentile (0–1) for the robust image-motion centroid in image coordinates (default 0.5). Affects reported img_y.",
+      "category": "Vision.MotionDetection",
+      "related": ["MotionDetection_CentroidPercentileX"],
+      "evidence": "engine/vision/motionDetector.cpp:53,637-638",
+      "status": "live",
+      "tags": ["vision", "motion", "centroid"]
+    },
+    "MotionDetection_GroundCentroidPercentileX": {
+      "process": "engine",
+      "blurb": "Percentile for ground-plane motion centroid along robot-forward distance after coordinate remap (default 0.05). Comment in code: most important for pounce — prefers motion closer to the robot.",
+      "detail": "When both current and previous ground planes are visible, motion inside the ground ROI is masked and GetCentroid is called with swapped axes so that this X maps to distance-from-robot in ground coordinates. Low values bias toward nearer motion for pounce targeting.",
+      "category": "Vision.MotionDetection",
+      "related": ["MotionDetection_GroundCentroidPercentileY", "MotionDetection_DrawGroundDetectionsInCameraView"],
+      "evidence": "engine/vision/motionDetector.cpp:54,772-780",
+      "status": "live",
+      "tags": ["vision", "motion", "ground", "pounce"]
+    },
+    "MotionDetection_GroundCentroidPercentileY": {
+      "process": "engine",
+      "blurb": "Percentile for ground-plane motion centroid along the lateral axis in robot coordinates (default 0.50). Used with GroundCentroidPercentileX when projecting motion onto the floor.",
+      "category": "Vision.MotionDetection",
+      "related": ["MotionDetection_GroundCentroidPercentileX"],
+      "evidence": "engine/vision/motionDetector.cpp:55,777-780",
+      "status": "live",
+      "tags": ["vision", "motion", "ground"]
+    },
+    "MotionDetection_MaxHeadAngleChange_deg": {
+      "process": "engine",
+      "blurb": "If the head tilted more than this many degrees between frames (default 0.1°), frame differencing is skipped for that pair — motion would be camera motion, not the world.",
+      "detail": "Together with MaxBodyAngleChange_deg and MaxPoseChange_mm, this is a hard gate: head and body must be nearly still, camera not moving, robot not picked up, and LastMotionDelay elapsed, or only the previous-image buffer is updated.",
+      "category": "Vision.MotionDetection",
+      "related": [
+        "MotionDetection_MaxBodyAngleChange_deg",
+        "MotionDetection_MaxPoseChange_mm",
+        "MotionDetection_LastMotionDelay_ms"
+      ],
+      "evidence": "engine/vision/motionDetector.cpp:58,555-570",
+      "status": "live",
+      "tags": ["vision", "motion", "stability"]
+    },
+    "MotionDetection_MaxBodyAngleChange_deg": {
+      "process": "engine",
+      "blurb": "Max body yaw/pose angle change (degrees) allowed between frames before skipping differencing (default 0.1°). Stops false motion while turning.",
+      "category": "Vision.MotionDetection",
+      "related": ["MotionDetection_MaxHeadAngleChange_deg", "MotionDetection_MaxPoseChange_mm"],
+      "evidence": "engine/vision/motionDetector.cpp:59,557-559",
+      "status": "live",
+      "tags": ["vision", "motion", "stability"]
+    },
+    "MotionDetection_MaxPoseChange_mm": {
+      "process": "engine",
+      "blurb": "Max body translation (mm) allowed between frames for differencing (default 0.5). Tiny moves only — anything larger is treated as robot motion, not scene motion.",
+      "category": "Vision.MotionDetection",
+      "related": ["MotionDetection_MaxBodyAngleChange_deg", "MotionDetection_MaxHeadAngleChange_deg"],
+      "evidence": "engine/vision/motionDetector.cpp:60,557-559",
+      "status": "live",
+      "tags": ["vision", "motion", "stability"]
+    },
+    "MotionDetection_DrawGroundDetectionsInCameraView": {
+      "process": "engine",
+      "blurb": "When true, draws a yellow oval on the camera/Viz view at the image motion centroid sized from ground motion area. Debug overlay only; does not change detection logic.",
+      "detail": "Requires a non-null VizManager. Off by default. Useful with MirrorMode / viz camera tools when tuning ground pounce motion.",
+      "category": "Vision.MotionDetection",
+      "related": ["MotionDetection_GroundCentroidPercentileX", "MotionDetectionDebug"],
+      "evidence": "engine/vision/motionDetector.cpp:62,661-665",
+      "status": "live",
+      "tags": ["vision", "motion", "debug", "viz"]
+    },
+    "MotionDetection_MorphologicalSize_pix": {
+      "process": "engine",
+      "blurb": "Closing kernel size (pixels at full-res intent, then divided by ScaleMultiplier) used to join fragmented motion blobs before peripheral detection (default 20).",
+      "detail": "cv::morphologyEx MORPH_CLOSE on the ratio image. Too small → broken/noisy patches; too large → artificially huge motion regions. Comment in code warns both extremes.",
+      "category": "Vision.MotionDetection",
+      "related": ["MotionDetection_MinAreaForMotion_pix", "MotionDetection_ScaleMultiplier"],
+      "evidence": "engine/vision/motionDetector.cpp:66,891-899",
+      "status": "live",
+      "tags": ["vision", "motion", "morphology"]
+    },
+    "MotionDetection_MinAreaForMotion_pix": {
+      "process": "engine",
+      "blurb": "Connected-component area (scaled back toward full-res pixels) must be at least this large to update peripheral motion regions top/left/right/bottom (default 500). Filters speck noise.",
+      "detail": "Uses stat.area * scaleMultiplier compared to this threshold. Separate from MinAreaFraction (overall image centroid). Higher = fewer peripheral activations; lower = twitchier side/top reactions.",
+      "category": "Vision.MotionDetection",
+      "related": ["MotionDetection_MorphologicalSize_pix", "MotionDetection_MinAreaFraction"],
+      "evidence": "engine/vision/motionDetector.cpp:70,909-917",
+      "status": "live",
+      "tags": ["vision", "motion", "peripheral"]
+    },
+    "MotionDetection_BlurFilterSize_pix": {
+      "process": "engine",
+      "blurb": "Box-filter blur kernel size applied to current (and previous if needed) images before ratio testing (default 21). Smooths noise so single-pixel flicker is less likely to count as motion.",
+      "detail": "Larger blur = smoother / less sensitive to fine texture; smaller = sharper differencing and more noise. Applied via Image::BoxFilter.",
+      "category": "Vision.MotionDetection",
+      "related": ["MotionDetection_RatioThreshold", "MotionDetection_MinBrightness"],
+      "evidence": "engine/vision/motionDetector.cpp:73,875-882",
+      "status": "live",
+      "tags": ["vision", "motion", "filter"]
+    },
+    "MotionDetectionDebug": {
+      "process": "engine",
+      "blurb": "When true, prints extra MotionDetector log lines (found centroid, motion message sent) and can attach debug ratio images. Does not change detection thresholds.",
+      "detail": "Uses PRINT_CH_INFO on channel VisionSystem-style motion logs and may push RatioImg into debugImages. Leave false on a live robot unless diagnosing missed/false motion.",
+      "category": "Vision.MotionDetection",
+      "related": ["MotionDetection_DrawGroundDetectionsInCameraView", "Motion"],
+      "evidence": "engine/vision/motionDetector.cpp:75,596-598,652-658,698-707",
+      "status": "live",
+      "tags": ["vision", "motion", "debug"]
+    },
+
+    "Lasers": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::Lasers so the laser-dot detector runs when the vision schedule enables it. Still requires the Laser feature gate to be on in product config.",
+      "detail": "VisionSystem only calls DetectLaserPoints if Lasers mode is enabled AND FeatureType::Laser is enabled on the feature gate (COZMO-11185). Detection needs a visible ground plane. Emits RobotObservedLaserPoint. Tune with the Laser_* group under Vision.LaserPointDetector.",
+      "category": "Vision.General.VisionModes",
+      "related": [
+        "Laser_scaleMultiplier",
+        "Laser_lowThreshold_normalExposure",
+        "Laser_DrawDetectionsInCameraView",
+        "LaserDetectionDebug"
+      ],
+      "evidence": "engine/vision/visionSystem.cpp:1768-1781; clad/src/clad/types/visionModes.clad (Lasers)",
+      "status": "live",
+      "statusNote": "Mode flag is live, but detection is no-op if FeatureType::Laser is disabled or ground plane is not visible.",
+      "tags": ["vision", "laser", "visionmode"]
+    },
+    "Laser_scaleMultiplier": {
+      "process": "engine",
+      "blurb": "Downsamples the image used for laser-dot detection (default 2, range 1–8). Higher is faster and coarser; min/max radius are area-normalized for resolution.",
+      "detail": "Same pattern as motion: ImageCache::GetSize(scaleMultiplier). Coordinates are scaled back when reporting and drawing. Radius area fractions are tuned assuming 320×240, then scaled by image element count.",
+      "category": "Vision.LaserPointDetector",
+      "related": ["Lasers", "Laser_minRadius_pix", "Laser_maxRadius_pix"],
+      "evidence": "engine/vision/laserPointDetector.cpp:37,182-188,255-267",
+      "status": "live",
+      "tags": ["vision", "laser", "performance"]
+    },
+    "Laser_minRadius_pix": {
+      "process": "engine",
+      "blurb": "Minimum laser blob radius in pixels at the 320×240 tuning resolution (default 2). Converted to a min area fraction so smaller/larger working images stay consistent.",
+      "detail": "minAreaFraction = π·r² / (320·240). Blobs smaller than that fraction of the current image are discarded after the dual-threshold connected-component pass.",
+      "category": "Vision.LaserPointDetector",
+      "related": ["Laser_maxRadius_pix", "Laser_scaleMultiplier"],
+      "evidence": "engine/vision/laserPointDetector.cpp:41,183-213",
+      "status": "live",
+      "tags": ["vision", "laser", "size"]
+    },
+    "Laser_maxRadius_pix": {
+      "process": "engine",
+      "blurb": "Maximum laser blob radius at the 320×240 tuning resolution (default 25). Rejects large bright regions that are not a compact laser dot.",
+      "category": "Vision.LaserPointDetector",
+      "related": ["Laser_minRadius_pix"],
+      "evidence": "engine/vision/laserPointDetector.cpp:42,183-213",
+      "status": "live",
+      "tags": ["vision", "laser", "size"]
+    },
+    "Laser_lowThreshold_normalExposure": {
+      "process": "engine",
+      "blurb": "Low brightness threshold (0–255) used in normal exposure to seed connected components for candidate laser spots (default 235). Pixels at/above this form candidate regions.",
+      "detail": "Paired with highThreshold_normalExposure: a component must also contain at least one pixel above the high threshold. Normal vs dark exposure selects this pair vs the _darkExposure pair.",
+      "category": "Vision.LaserPointDetector",
+      "related": [
+        "Laser_highThreshold_normalExposure",
+        "Laser_lowThreshold_darkExposure",
+        "Laser_highThreshold_darkExposure"
+      ],
+      "evidence": "engine/vision/laserPointDetector.cpp:51,266-269",
+      "status": "live",
+      "tags": ["vision", "laser", "threshold"]
+    },
+    "Laser_highThreshold_normalExposure": {
+      "process": "engine",
+      "blurb": "High brightness threshold in normal exposure (default 240). A low-threshold blob is kept only if some pixel inside it reaches this level — requires a hot core, not just a large dim region.",
+      "category": "Vision.LaserPointDetector",
+      "related": ["Laser_lowThreshold_normalExposure"],
+      "evidence": "engine/vision/laserPointDetector.cpp:52,190-200,266-269",
+      "status": "live",
+      "tags": ["vision", "laser", "threshold"]
+    },
+    "Laser_lowThreshold_darkExposure": {
+      "process": "engine",
+      "blurb": "Low brightness threshold when the camera is in dark/laser exposure mode (default 128). Same dual-threshold role as the normal-exposure low threshold, but for darker AE settings.",
+      "category": "Vision.LaserPointDetector",
+      "related": ["Laser_highThreshold_darkExposure", "Laser_lowThreshold_normalExposure"],
+      "evidence": "engine/vision/laserPointDetector.cpp:54,266-269",
+      "status": "live",
+      "tags": ["vision", "laser", "threshold", "exposure"]
+    },
+    "Laser_highThreshold_darkExposure": {
+      "process": "engine",
+      "blurb": "High brightness threshold in dark exposure (default 160). Candidate must have a core at/above this value after low-threshold region growing.",
+      "category": "Vision.LaserPointDetector",
+      "related": ["Laser_lowThreshold_darkExposure"],
+      "evidence": "engine/vision/laserPointDetector.cpp:55,266-269",
+      "status": "live",
+      "tags": ["vision", "laser", "threshold", "exposure"]
+    },
+    "Laser_darkThresholdFraction_darkExposure": {
+      "process": "engine",
+      "blurb": "For dark exposure, surround pixels must be darker than this fraction of the center pixel brightness (default 0.7) to count as a laser-like dark ring.",
+      "detail": "IsSurroundedByDark samples 8 points around the blob at darkSurroundRadiusFraction × radius. Each must be ≤ center×fraction. Rejects blobs that are not a bright spot on a darker background.",
+      "category": "Vision.LaserPointDetector",
+      "related": [
+        "Laser_darkThresholdFraction_normalExposure",
+        "Laser_darkSurroundRadiusFraction",
+        "Laser_MaxSurroundStdDev"
+      ],
+      "evidence": "engine/vision/laserPointDetector.cpp:44,502-504,533-576",
+      "status": "live",
+      "tags": ["vision", "laser", "surround"]
+    },
+    "Laser_darkThresholdFraction_normalExposure": {
+      "process": "engine",
+      "blurb": "Same dark-ring test as the dark-exposure fraction, used under normal exposure (default 0.9 — surround may be closer to the center brightness).",
+      "category": "Vision.LaserPointDetector",
+      "related": ["Laser_darkThresholdFraction_darkExposure", "Laser_darkSurroundRadiusFraction"],
+      "evidence": "engine/vision/laserPointDetector.cpp:45,502-504,533-576",
+      "status": "live",
+      "tags": ["vision", "laser", "surround"]
+    },
+    "Laser_darkSurroundRadiusFraction": {
+      "process": "engine",
+      "blurb": "How far out (as a multiple of the blob’s equivalent radius) to sample the dark surround ring (default 2.5×). Larger checks a wider halo around the candidate dot.",
+      "category": "Vision.LaserPointDetector",
+      "related": ["Laser_darkThresholdFraction_normalExposure", "Laser_MaxSurroundStdDev"],
+      "evidence": "engine/vision/laserPointDetector.cpp:47,540",
+      "status": "live",
+      "tags": ["vision", "laser", "surround"]
+    },
+    "Laser_MaxSurroundStdDev": {
+      "process": "engine",
+      "blurb": "Maximum standard deviation allowed among the eight surround samples (default 25). If the ring is uneven (high variance), the candidate is rejected as not a clean laser spot.",
+      "detail": "Compared as variance > MaxSurroundStdDev². Helps reject textured bright patches. Lower = stricter uniform dark ring; higher = more permissive.",
+      "category": "Vision.LaserPointDetector",
+      "related": ["Laser_darkSurroundRadiusFraction", "Laser_darkThresholdFraction_normalExposure"],
+      "evidence": "engine/vision/laserPointDetector.cpp:49,582-592",
+      "status": "live",
+      "tags": ["vision", "laser", "surround"]
+    },
+    "Laser_saturationThreshold_red": {
+      "process": "engine",
+      "blurb": "When color is available, average red-excess saturation over a scaled bounding box must exceed this (default 30) OR the green threshold — otherwise the bright spot is rejected as uncolored glare.",
+      "detail": "Saturation metric per pixel: max(0, R − max(G,B)). Averaged over ROI. Red or green laser pointers need one channel dominating. Only applied if a color image is present.",
+      "category": "Vision.LaserPointDetector",
+      "related": [
+        "Laser_saturationThreshold_green",
+        "Laser_saturationBoundingBoxFraction"
+      ],
+      "evidence": "engine/vision/laserPointDetector.cpp:59,513,600-638",
+      "status": "live",
+      "tags": ["vision", "laser", "color"]
+    },
+    "Laser_saturationThreshold_green": {
+      "process": "engine",
+      "blurb": "Green-channel excess saturation threshold (default 15) for accepting a laser candidate when color is available. Lower than red default — green lasers need less excess to pass.",
+      "category": "Vision.LaserPointDetector",
+      "related": ["Laser_saturationThreshold_red", "Laser_saturationBoundingBoxFraction"],
+      "evidence": "engine/vision/laserPointDetector.cpp:60,513,600-638",
+      "status": "live",
+      "tags": ["vision", "laser", "color"]
+    },
+    "Laser_saturationBoundingBoxFraction": {
+      "process": "engine",
+      "blurb": "Scales the connected-component bounding box (≥1.0) before measuring red/green saturation (default 1.25). Slightly larger box averages color around the core, not only the hot pixels.",
+      "category": "Vision.LaserPointDetector",
+      "related": ["Laser_saturationThreshold_red", "Laser_saturationThreshold_green"],
+      "evidence": "engine/vision/laserPointDetector.cpp:61,608-610",
+      "status": "live",
+      "tags": ["vision", "laser", "color"]
+    },
+    "Laser_DrawDetectionsInCameraView": {
+      "process": "engine",
+      "blurb": "When true, draws laser detection overlays via VizManager (ovals at candidates, surround sample points, circles on accepted points). Debug only; does not change accept/reject math except visibility.",
+      "category": "Vision.LaserPointDetector",
+      "related": ["LaserDetectionDebug", "Lasers"],
+      "evidence": "engine/vision/laserPointDetector.cpp:63,357-373,469-485,559-562",
+      "status": "live",
+      "tags": ["vision", "laser", "debug", "viz"]
+    },
+    "LaserDetectionDebug": {
+      "process": "engine",
+      "blurb": "Debug level for laser detection: 0 = off (default), 1 = draw/annotate in camera view tools, 2 = also build separate saliency debug images and extra warnings. Integer, not a bool.",
+      "detail": "At >1, allocates _debugImage from low-threshold components and logs surround/saturation failures. Use briefly when tuning thresholds; level 2 is heavier.",
+      "category": "Vision.LaserPointDetector",
+      "related": ["Laser_DrawDetectionsInCameraView", "Lasers"],
+      "evidence": "engine/vision/laserPointDetector.cpp:69,217-232,569-590,629-633",
+      "status": "live",
+      "tags": ["vision", "laser", "debug"]
+    }
+  }
+}
