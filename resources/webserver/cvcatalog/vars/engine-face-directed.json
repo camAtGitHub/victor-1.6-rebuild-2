@@ -1,0 +1,172 @@
+{
+  "vars": {
+    "ConeFor180TurnForFaceSearch_deg": {
+      "process": "engine",
+      "blurb": "Width in degrees (default 40) of the “behind the robot” cone used when ReactToGazeDirection is searching for faces. If someone’s gaze point falls inside this rear cone, Vector does a full about-face turn instead of a left/right side turn.",
+      "detail": "Used only when the behavior’s searchForFaces config is true (behavior ReactToGazeDirection, not Surface). ComputeTurnAngleFromGazePose takes the gaze point in robot coordinates, forms gazeAngle = atan2(y,x), then angleDifference = 180° − gazeAngle. If that difference is within ±(this value / 2), the turn is classified as “turn around” and uses SearchForFaceTurnAroundAngle_deg; otherwise y sign picks side turn via SearchForFaceTurnSideAngle_deg. Wider cone → more rear gazes trigger a 180° spin; narrower → more left/right side turns.",
+      "category": "Vision.GazeDirection",
+      "related": [
+        "SearchForFaceTurnAroundAngle_deg",
+        "SearchForFaceTurnSideAngle_deg",
+        "SearchForFaceNumberOfImagesToWait",
+        "UseExistingFacesWhenSearchingForFaces"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorReactToGazeDirection.cpp:38,223-248,267-286; resources/config/engine/behaviorComponent/behaviors/devBehaviors/reactToGazeDirection.json",
+      "status": "live",
+      "tags": ["face", "gaze", "search", "turn", "behavior"]
+    },
+    "FaceDirectedAtRobotMaxXThres_mm": {
+      "process": "engine",
+      "blurb": "Maximum forward (X) offset in millimeters (default 20) for treating a surface gaze point as “looking at Vector.” Together with the Min X and Min/Max Y thresholds, defines a small rectangle in front of the robot.",
+      "detail": "Read only on the surface-point path (searchForFaces false → ReactToGazeDirectionSurface, and “look over there” voice command). TransitionToCheckForPointOnSurface tests whether the gaze pose translation WRT robot is inside [MinX, MaxX] × [MinY, MaxY]. If yes (or eye contact is allowed via kUseEyeContact), Vector plays GazingLookAtVectorReaction instead of turning to a floor/surface point. Raising Max X expands the “looking at me” zone farther forward; lowering it makes the zone stricter.",
+      "category": "Vision.GazeDirection",
+      "related": [
+        "FaceDirectedAtRobotMinXThres_mm",
+        "FaceDirectedAtRobotMinYThres_mm",
+        "FaceDirectedAtRobotMaxYThres_mm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorReactToGazeDirection.cpp:30,165-184; resources/config/engine/behaviorComponent/behaviors/devBehaviors/reactToGazeDirectionSurface.json",
+      "status": "live",
+      "tags": ["face", "gaze", "surface", "threshold", "behavior"]
+    },
+    "FaceDirectedAtRobotMaxYThres_mm": {
+      "process": "engine",
+      "blurb": "Maximum lateral (Y) offset in millimeters (default 100) for the “gaze is on Vector” box used in surface-gaze reactions. With Min Y, this is left/right width of that box.",
+      "detail": "Same TransitionToCheckForPointOnSurface path as the X thresholds: Util::InRange(translation.y(), MinY, MaxY). Only matters when searchForFaces is false. Larger Max Y (and more negative Min Y) accept gazes farther off to the side as “at the robot”; tighter values make Vector more often turn toward the surface point instead of reacting to being looked at.",
+      "category": "Vision.GazeDirection",
+      "related": [
+        "FaceDirectedAtRobotMinYThres_mm",
+        "FaceDirectedAtRobotMinXThres_mm",
+        "FaceDirectedAtRobotMaxXThres_mm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorReactToGazeDirection.cpp:32,172-176",
+      "status": "live",
+      "tags": ["face", "gaze", "surface", "threshold", "behavior"]
+    },
+    "FaceDirectedAtRobotMinXThres_mm": {
+      "process": "engine",
+      "blurb": "Minimum forward (X) offset in millimeters (default −25) for the “looking at Vector” gaze box. Negative allows the projected gaze point slightly behind the robot origin.",
+      "detail": "Paired with FaceDirectedAtRobotMaxXThres_mm in Util::InRange on gaze translation.x() (robot frame). Surface mode only (searchForFaces false). Moving this up (e.g. toward 0) requires the gaze hit to be more clearly in front; lowering it accepts more rear-of-origin projections as “at robot.”",
+      "category": "Vision.GazeDirection",
+      "related": [
+        "FaceDirectedAtRobotMaxXThres_mm",
+        "FaceDirectedAtRobotMinYThres_mm",
+        "FaceDirectedAtRobotMaxYThres_mm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorReactToGazeDirection.cpp:29,172-176",
+      "status": "live",
+      "tags": ["face", "gaze", "surface", "threshold", "behavior"]
+    },
+    "FaceDirectedAtRobotMinYThres_mm": {
+      "process": "engine",
+      "blurb": "Minimum lateral (Y) offset in millimeters (default −100) for the “looking at Vector” gaze box in surface mode. Negative is one side of the robot; Max Y is the other.",
+      "detail": "Used with MaxY in TransitionToCheckForPointOnSurface when deciding GazingLookAtVectorReaction vs turn-to-surface-point. Only for ReactToGazeDirection with searchForFaces false. Does not affect the face-search turn bucketing (ConeFor180 / side / around angles).",
+      "category": "Vision.GazeDirection",
+      "related": [
+        "FaceDirectedAtRobotMaxYThres_mm",
+        "FaceDirectedAtRobotMinXThres_mm",
+        "FaceDirectedAtRobotMaxXThres_mm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorReactToGazeDirection.cpp:31,172-176",
+      "status": "live",
+      "tags": ["face", "gaze", "surface", "threshold", "behavior"]
+    },
+    "FaceReactCooldown_s": {
+      "process": "engine",
+      "blurb": "Intended seconds (default 4, range 0–60) between “face became close” acknowledgment reactions. Changing it currently has no effect because the cooldown timestamp is never updated.",
+      "detail": "Registered under AcknowledgementBehaviors with ConditionFacePositionUpdated. When a known face transitions far→close (DistanceToConsiderClose_mm ± gap hysteresis), the code requires notOnCooldown: _lastReactionTime_s < 0 or last + this cooldown ≤ now. First-time named faces bypass this path. However _lastReactionTime_s is only default-initialized to −1.0f and is never written after a reaction, so notOnCooldown is always true. Distance thresholds still work; only the time spacing is broken.",
+      "category": "AcknowledgementBehaviors",
+      "related": [
+        "DistanceToConsiderClose_mm",
+        "DistanceToConsiderClose_gap_mm"
+      ],
+      "evidence": "engine/aiComponent/beiConditions/conditions/conditionFacePositionUpdated.cpp:31,146-147; engine/aiComponent/beiConditions/conditions/conditionFacePositionUpdated.h:56",
+      "status": "noop",
+      "statusNote": "kFaceReactCooldown_s is read, but ConditionFacePositionUpdated::_lastReactionTime_s is never assigned after construction (−1), so the cooldown branch never arms. rg shows no write of _lastReactionTime_s.",
+      "tags": ["face", "acknowledgement", "cooldown", "bei", "noop"]
+    },
+    "SearchForFaceNumberOfImagesToWait": {
+      "process": "engine",
+      "blurb": "How many face-detection camera frames (default 5) Vector waits after turning when hunting for a face along someone’s gaze, before raising the head and running TurnTowardsFace.",
+      "detail": "In TransitionToCheckForFace (searchForFaces path), after the turn-in-place + looking animation, a WaitForImagesAction runs with this count and VisionMode::Faces, then MoveHeadToAngle(MAX) and TurnTowardsFaceAction. Higher values give the face detector more frames after the body stop (more reliable, slower reaction); lower values finish the search sooner. Only used when actually turning to search, not when UseExistingFacesWhenSearchingForFaces short-circuits to an already-known face.",
+      "category": "Vision.GazeDirection",
+      "related": [
+        "ConeFor180TurnForFaceSearch_deg",
+        "SearchForFaceTurnAroundAngle_deg",
+        "SearchForFaceTurnSideAngle_deg",
+        "UseExistingFacesWhenSearchingForFaces"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorReactToGazeDirection.cpp:41,104-131",
+      "status": "live",
+      "tags": ["face", "gaze", "search", "vision", "behavior"]
+    },
+    "SearchForFaceTurnAroundAngle_deg": {
+      "process": "engine",
+      "blurb": "Absolute degrees (default 180) of the about-face turn when a gaze point is classified into the rear “turn around” cone. Sign is chosen left vs right from which side of dead-ahead-behind the gaze falls.",
+      "detail": "When angleDifference is inside ±ConeFor180TurnForFaceSearch_deg/2: if angleDifference < 0, turnAngle = −this value (right about-face); else +this value (left). Used only for searchForFaces true. Setting e.g. 160 shortens the spin; values near 0 make “around” turns tiny (usually not useful). Side gazes ignore this and use SearchForFaceTurnSideAngle_deg.",
+      "category": "Vision.GazeDirection",
+      "related": [
+        "ConeFor180TurnForFaceSearch_deg",
+        "SearchForFaceTurnSideAngle_deg",
+        "SearchForFaceNumberOfImagesToWait"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorReactToGazeDirection.cpp:40,232-241",
+      "status": "live",
+      "tags": ["face", "gaze", "search", "turn", "behavior"]
+    },
+    "SearchForFaceTurnSideAngle_deg": {
+      "process": "engine",
+      "blurb": "Signed side-turn angle in degrees (default −90) for left/right face search. When the gaze is not in the rear cone, negative Y uses this value as-is (default right), positive Y uses the negation (default left +90).",
+      "detail": "ComputeTurnAngleFromGazePose: if not in the 180° cone and translation.y() < 0 → turnAngle = DEG_TO_RAD(this); else → turnAngle = DEG_TO_RAD(−this). So magnitude is |this| for both sides; the default −90 gives right = −90° and left = +90°. Changing to −45 makes both side turns 45°. searchForFaces path only; drives TransitionToCheckForFace / LookAtFace animation direction (sign of turnAngle).",
+      "category": "Vision.GazeDirection",
+      "related": [
+        "ConeFor180TurnForFaceSearch_deg",
+        "SearchForFaceTurnAroundAngle_deg",
+        "SearchForFaceNumberOfImagesToWait",
+        "UseExistingFacesWhenSearchingForFaces"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorReactToGazeDirection.cpp:39,242-248",
+      "status": "live",
+      "tags": ["face", "gaze", "search", "turn", "behavior"]
+    },
+    "TimeBetweenFaceEnrollmentUpdates_sec": {
+      "process": "engine",
+      "blurb": "Minimum seconds (default 0.5) between successive OKAO enrollment-feature samples stored for the same person while that face is being updated. Stops the album from filling every vision frame.",
+      "detail": "In FaceRecognizer::UpdateExistingAlbumEntry, time since enrollData.GetLastUpdateTime() must be ≥ round(this) seconds before new FR data is registered (or a weaker slot replaced when full). Also requires enrollment enabled for that face/ID and free or replaceable slots (see kEnableEnrollmentAfterFull). Raising it slows album enrichment during meet/enroll and freeplay face learning; lowering (or 0) allows denser samples. Face recognition unit tests set this to 1.0s for timing control. Category Vision.FaceRecognition.",
+      "category": "Vision.FaceRecognition",
+      "related": [
+        "FaceRecognitionThreshold",
+        "FaceRecognitionExtraDebug",
+        "EnableEnrollmentAfterFull"
+      ],
+      "evidence": "coretech/vision/engine/faceRecognizer_okao.cpp:71,1261-1274; test/engine/faceRecognitionTests.cpp:57,356",
+      "status": "live",
+      "tags": ["face", "recognition", "enrollment", "okao", "timing"]
+    },
+    "TimeToDisplayResultOnFace_ms": {
+      "process": "engine",
+      "blurb": "Intended milliseconds (default 10000) to leave factory self-test / playpen pass-fail text on Vector’s face. Not read by any behavior; DisplayResult draws the screen and waits for button or restart without using this value.",
+      "detail": "Declared and WRAP_EXTERN_CONSOLE_VAR-registered twice: PlaypenConfig (category Playpen) and SelfTestConfig (category SelfTest), both static defaults 10000. BehaviorSelfTest::DisplayResult and BehaviorPlaypenTest::DisplayResult set backpack lights and DrawTextOnScreen / DrawTextOnScreen messages but never schedule a WaitAction or timer from kTimeToDisplayResultOnFace_ms. Self-test end waits for a button press; playpen restarts via OnBehaviorActivated. Console changes do nothing.",
+      "category": "SelfTest / Playpen",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.h:39; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.cpp:22; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:45; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.cpp:77; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/behaviorSelfTest.cpp:379-429; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/behaviorPlaypenTest.cpp:465-509",
+      "status": "dead",
+      "statusNote": "Registered under SelfTest and Playpen; rg finds no read of kTimeToDisplayResultOnFace_ms outside config headers/wrappers. DisplayResult never times display with it.",
+      "tags": ["selftest", "playpen", "factory", "dead", "orphan"]
+    },
+    "UseExistingFacesWhenSearchingForFaces": {
+      "process": "engine",
+      "blurb": "When true, face-search along a gaze may snap to a face already known in FaceWorld that would be visible after the planned turn, instead of always spinning to the bucketed angle and waiting for a new detection. Default false.",
+      "detail": "After ComputeTurnAngleFromGazePose, if searchForFaces is on: FaceWorld::FaceInTurnAngle(turnAngle, exclude current gazer, robotPose, out faceID). Only if that succeeds AND this flag is true does TransitionToLookAtFace run; otherwise TransitionToCheckForFace (turn + WaitForImages + TurnTowardsFace). Enabling can make multi-person rooms faster when the other face is already tracked; leaving false always does a fresh search after the turn. Does not affect surface-point mode.",
+      "category": "Vision.GazeDirection",
+      "related": [
+        "ConeFor180TurnForFaceSearch_deg",
+        "SearchForFaceTurnSideAngle_deg",
+        "SearchForFaceTurnAroundAngle_deg",
+        "SearchForFaceNumberOfImagesToWait"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorReactToGazeDirection.cpp:42,267-286",
+      "status": "live",
+      "tags": ["face", "gaze", "search", "behavior"]
+    }
+  }
+}
