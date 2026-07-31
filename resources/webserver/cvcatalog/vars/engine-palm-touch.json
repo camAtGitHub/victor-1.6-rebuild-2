@@ -1,0 +1,226 @@
+{
+  "vars": {
+    "CanDoubleTapDirtyPoses": {
+      "process": "engine",
+      "blurb": "Registered under category DoubleTap (default true) next to cube double-tap timing, but the engine never reads this flag. Marking cube poses dirty after a double-tap wait still happens unconditionally when the ignore-move timeout expires.",
+      "detail": "CONSOLE_VAR kCanDoubleTapDirtyPoses is only defined in BlockTapFilterComponent. The Update() path that calls BlockWorld::MarkObjectDirty after ignoreNextMoveTime uses isIgnoringMoveMessages and pose-state checks only — no branch on this bool. Changing it via consolevarset has no effect.",
+      "category": "DoubleTap",
+      "related": [
+        "DoubleTapTime_ms",
+        "IgnoreMoveTimeAfterDoubleTap_ms",
+        "IgnoreMovementWhileWaitingForDoubleTap"
+      ],
+      "evidence": "engine/components/blockTapFilterComponent.cpp:37 (registration only); dirty path 83-114 does not reference kCanDoubleTapDirtyPoses",
+      "status": "dead",
+      "statusNote": "rg finds only the CONSOLE_VAR line; no reads of kCanDoubleTapDirtyPoses.",
+      "tags": ["cube", "double-tap", "pose", "dead", "orphan"]
+    },
+    "DoubleTapTime_ms": {
+      "process": "engine",
+      "blurb": "How long (ms) after a cube tap the engine waits for a second tap before treating the first as a single tap and starting double-tap tracking. Default 500 ms. Only applies on physical robots with the block tap filter enabled.",
+      "detail": "On each ObjectTapped, CheckForDoubleTap sets doubleTapTime = now + DoubleTapTime_ms and ignoreNextMoveTime = now + IgnoreMoveTimeAfterDoubleTap_ms, and marks the cube as ignoring move messages. A second tap before doubleTapTime ends logs a double-tap and clears the wait. While the cube is marked isMoving (from ObjectMoved before any double-tap window), double-tap tracking is reset. Sim / filter-disabled path broadcasts taps without filtering but still runs CheckForDoubleTap.",
+      "category": "TapFilter.DoubleTapTime",
+      "related": [
+        "IgnoreMoveTimeAfterDoubleTap_ms",
+        "IgnoreMovementWhileWaitingForDoubleTap",
+        "TapWaitOffset_ms",
+        "CanDoubleTapDirtyPoses"
+      ],
+      "evidence": "engine/components/blockTapFilterComponent.cpp:35,249-264",
+      "status": "live",
+      "tags": ["cube", "double-tap", "timing"]
+    },
+    "DurationOfTouchToRecord_ms": {
+      "process": "engine",
+      "blurb": "Factory playpen only: how long (ms) to sample backpack touch-sensor data when a playpen step calls RecordTouchSensorData (default 1000). Set 0 to skip recording entirely.",
+      "detail": "IBehaviorPlaypen::RecordTouchSensorData starts TouchSensorComponent recording into a buffer, then AddTimer(this duration) stops recording and appends TouchSensor_<name> to the playpen log. Called from playpen drift check, pickup cube, and sound check steps. Timer is marked DontDelete so the behavior cannot finish until capture completes. Not used in normal freeplay.",
+      "category": "Playpen",
+      "related": [
+        "UseTouchToStart",
+        "TouchDurationToStart_ms",
+        "MinExpectedTouchValue",
+        "MaxExpectedTouchValue"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:60; playpenConfig.cpp:82; iBehaviorPlaypen.cpp:371-389; behaviorPlaypenDriftCheck.cpp:60; behaviorPlaypenPickupCube.cpp:70; behaviorPlaypenSoundCheck.cpp:55",
+      "status": "live",
+      "tags": ["playpen", "factory", "touch", "logging"]
+    },
+    "IgnoreMoveTimeAfterDoubleTap_ms": {
+      "process": "engine",
+      "blurb": "After a cube tap opens a double-tap window, for this many milliseconds (default 500) the filter treats the cube as still in a post-tap settle period: it may ignore movement messages (if that toggle is on) and, when the period ends, marks known cube poses dirty so vision can re-localize them.",
+      "detail": "Set together with DoubleTapTime_ms in CheckForDoubleTap as ignoreNextMoveTime. Update() watches isIgnoringMoveMessages; when ignoreNextMoveTime passes, clears the flag and MarkObjectDirty for located instances with known pose. CubeAccelComponent consults ShouldIgnoreMovementDueToDoubleTap (which compares now to ignoreNextMoveTime) only when IgnoreMovementWhileWaitingForDoubleTap is true.",
+      "category": "TapFilter.IgnoreMoveTimeAfterDoubleTap",
+      "related": [
+        "DoubleTapTime_ms",
+        "IgnoreMovementWhileWaitingForDoubleTap",
+        "CanDoubleTapDirtyPoses"
+      ],
+      "evidence": "engine/components/blockTapFilterComponent.cpp:36,83-114,216-229,261-263; engine/components/cubes/cubeAccelComponent.cpp:208-214",
+      "status": "live",
+      "tags": ["cube", "double-tap", "movement", "pose"]
+    },
+    "IgnoreMovementWhileWaitingForDoubleTap": {
+      "process": "engine",
+      "blurb": "When true, cube “started moving” messages are dropped for a cube still inside the post-tap ignore window (IgnoreMoveTimeAfterDoubleTap_ms). Default false — movement is accepted even while waiting for a possible double-tap.",
+      "detail": "BlockTapFilterComponent::ShouldIgnoreMovementDueToDoubleTap returns false immediately if this is off; otherwise true while ignoreNextMoveTime is still in the future. Robot::… and CubeAccelComponent use that to skip treating tap-induced vibration as real cube motion. Does not change double-tap detection itself; only gates movement handling during the wait.",
+      "category": "DoubleTap",
+      "related": [
+        "IgnoreMoveTimeAfterDoubleTap_ms",
+        "DoubleTapTime_ms"
+      ],
+      "evidence": "engine/components/blockTapFilterComponent.cpp:38,216-229; engine/components/cubes/cubeAccelComponent.cpp:208-214; engine/robot.cpp:1582",
+      "status": "live",
+      "tags": ["cube", "double-tap", "movement"]
+    },
+    "MaxExpectedTouchValue": {
+      "process": "engine",
+      "blurb": "Upper bound on raw backpack touch ADC when “no touch” is expected during factory/self-test init checks. Playpen default 700; SelfTest also registers the same dump id with default 7000. ConsoleSystem keeps the first registration and ignores the duplicate.",
+      "detail": "Playpen: PlaypenConfig::kMaxExpectedTouchValue (500–700 band with Min) used in BehaviorPlaypenInitChecks — TOUCH_VALUES_OOR if out of range. SelfTest: SelfTestConfig values 3000–7000 used in BehaviorSelfTestInitChecks the same way. Both WRAP_EXTERN_CONSOLE_VAR to id MaxExpectedTouchValue (Hungarian k stripped); Register logs DuplicateVariable and ignores the second. Whichever TU registers first owns the live console pointer; the other static stays at its compile-time default. Dump sits with other Playpen touch ids.",
+      "category": "Playpen",
+      "related": [
+        "MinExpectedTouchValue",
+        "DurationOfTouchToRecord_ms",
+        "UseTouchToStart"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:109; playpenConfig.cpp:90; behaviorPlaypenInitChecks.cpp:52-63; selfTest/selfTestConfig.h:76; selfTestConfig.cpp:28; behaviorSelfTestInitChecks.cpp:82-93; lib/util/source/anki/util/console/consoleSystem.cpp:148-160",
+      "status": "partial",
+      "statusNote": "Live for whichever of Playpen/SelfTest registered first; second WRAP_EXTERN is ignored (same dump id). Defaults differ (700 vs 7000).",
+      "tags": ["playpen", "selftest", "factory", "touch", "duplicate-id"]
+    },
+    "MaxTimeForInitialHeldInPalmReaction_ms": {
+      "process": "engine",
+      "blurb": "After Vector has been held in a palm longer than this many milliseconds (default 1000, range 0–5000), the initial “just put in palm” get-in animation is blocked so it only plays on a fresh placement — not after long palm holds or when reactions were suppressed.",
+      "detail": "BehaviorCoordinateWhileHeldInPalm compares HeldInPalmTracker::GetHeldInPalmDuration_ms() to this threshold. If over threshold or the initial reaction already played this palm session, InitialHeldInPalmReaction is SetDontActivateThisTick. Leaving the palm clears the played flag. Only meaningful while HeldInPalmTracker reports IsHeldInPalm and no other held-in-palm dispatcher reaction is already running.",
+      "category": "HeldInPalm.Coordinator",
+      "related": [
+        "MinTimeToConfirmRobotHeldInPalm_ms",
+        "MaxUnexpectedMovementCountWhileHeldInPalm",
+        "Toggle_CoordinateWhileInAir"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/coordinators/behaviorCoordinateWhileHeldInPalm.cpp:30,91-139",
+      "status": "live",
+      "tags": ["held-in-palm", "behavior", "animation", "timing"]
+    },
+    "MaxUnexpectedMovementCountWhileHeldInPalm": {
+      "process": "engine",
+      "blurb": "How high the unexpected-movement counter must go before “stuck / unexpected movement” fires while held-in-palm mode is on. Default 200 vs only 11 on the ground — far more tolerant so palm fidgeting does not spam stuck reactions.",
+      "detail": "MovementComponent::UnexpectedMovement::GetMaxCount returns this value when EnableHeldInPalmMode(true) was set by HeldInPalmTracker, else the fixed kMaxUnexpectedMovementCount (11). Held-in-palm mode also clamps turn speed. Raising this makes stuck detection even less sensitive on the palm; lowering toward 11 makes palm handling as strict as tabletop.",
+      "category": "Robot",
+      "related": [
+        "MinTimeToConfirmRobotHeldInPalm_ms",
+        "MaxTimeForInitialHeldInPalmReaction_ms"
+      ],
+      "evidence": "engine/components/movementComponent.cpp:1236-1237,1278-1280,488-491; engine/aiComponent/behaviorComponent/heldInPalmTracker.cpp:96-106",
+      "status": "live",
+      "tags": ["held-in-palm", "movement", "stuck"]
+    },
+    "MinExpectedTouchValue": {
+      "process": "engine",
+      "blurb": "Lower bound on raw backpack touch ADC for “no touch” during factory/self-test init. Playpen default 500; SelfTest registers the same dump id with default 3000. First registration wins; duplicate is ignored.",
+      "detail": "Paired with MaxExpectedTouchValue. Init checks fail with TOUCH_VALUES_OOR if GetLatestRawTouchValue is outside [Min, Max]. Same dual WRAP_EXTERN / ConsoleSystem duplicate issue as Max — Playpen and SelfTest share dump id MinExpectedTouchValue but different statics and defaults.",
+      "category": "Playpen",
+      "related": [
+        "MaxExpectedTouchValue",
+        "UseTouchToStart",
+        "DurationOfTouchToRecord_ms"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:106; playpenConfig.cpp:89; behaviorPlaypenInitChecks.cpp:52-63; selfTest/selfTestConfig.h:73; selfTestConfig.cpp:27; behaviorSelfTestInitChecks.cpp:82-93",
+      "status": "partial",
+      "statusNote": "Live for first-registered of Playpen/SelfTest; second WRAP_EXTERN ignored. Defaults 500 (Playpen) vs 3000 (SelfTest).",
+      "tags": ["playpen", "selftest", "factory", "touch", "duplicate-id"]
+    },
+    "MinTimeToConfirmRobotHeldInPalm_ms": {
+      "process": "engine",
+      "blurb": "Short confirmation window (ms, default 500, max 10000) used when enough cliff sensors saw a real pickup: robot must stay held and upright (OffTreads InAir) this long before HeldInPalmTracker commits “held in palm.” Without enough cliffs, a fixed 10 s fallback is used instead of this value.",
+      "detail": "When IsBeingHeld, not on charger, and enough cliffs were seen since pickup, timeToConfirmRobotHeldInPalm_ms = this var; else 10 s default. WasRobotPlacedInPalmWhileHeld requires being held + InAir for at least that confirmation time (and related held-time checks). Also used when re-confirming palm status after already having been in palm more recently than on-treads. Enabling palm sets movement held-in-palm mode (unexpected movement threshold, turn clamp).",
+      "category": "HeldInPalm.Tracker",
+      "related": [
+        "MaxTimeForInitialHeldInPalmReaction_ms",
+        "MaxUnexpectedMovementCountWhileHeldInPalm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/heldInPalmTracker.cpp:39,71-77,234-292,311-329",
+      "status": "live",
+      "tags": ["held-in-palm", "tracker", "cliff", "timing"]
+    },
+    "ShakeTime": {
+      "process": "engine",
+      "blurb": "Dev-only BehaviorDispatchAfterShake: how many seconds of continuous shaking (or continuous stillness) are required before a shake session starts or ends. Default 0.1 s; console range 0.01–2.0. Not used in production freeplay.",
+      "detail": "When head filtered accel magnitude exceeds ~16000, shaking is detected. After ShakeTime of continuous shake, countShaken increments and backpack lights go red; after ShakeTime of continuous non-shake, session ends and lights go steady. On treads with a non-zero count, delegates to the Nth configured child behavior (shake count selects which). Separate kDevDispatchAfterShake can fake the count in sim. Only active while DispatchAfterShake is on the behavior stack (dev/test trees).",
+      "category": "DevBaseBehavior",
+      "related": [],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDispatchAfterShake.cpp:42,141-200",
+      "status": "live",
+      "tags": ["dev", "shake", "behavior", "timing"]
+    },
+    "TapIntensityMin": {
+      "process": "engine",
+      "blurb": "Registered under TapFilter.IntesityMin (typo in category) with default 60, but no code path compares cube tap intensity to this value. Soft-tap filtering by intensity is not implemented.",
+      "detail": "File comment describes filtering to the most intense of clustered taps, but HandleObjectTapped only batches taps for TapWaitOffset_ms and broadcasts the last payload — intensity is never checked. kTapIntensityMin appears solely on the CONSOLE_VAR line.",
+      "category": "TapFilter.IntesityMin",
+      "related": [
+        "TapWaitOffset_ms",
+        "DoubleTapTime_ms"
+      ],
+      "evidence": "engine/components/blockTapFilterComponent.cpp:33 (registration only); handle path 120-158 has no intensity compare",
+      "status": "dead",
+      "statusNote": "rg finds only the CONSOLE_VAR definition; never read.",
+      "tags": ["cube", "tap", "dead", "orphan"]
+    },
+    "TapWaitOffset_ms": {
+      "process": "engine",
+      "blurb": "On a physical robot with the block tap filter enabled, after the first cube tap in a burst the engine waits this many milliseconds (default 75) then reports a single ObjectTapped (last message in the batch) to game/engine consumers. Softens phantom multi-taps.",
+      "detail": "When _tapInfo is empty, first tap sets _waitToTime = now + TapWaitOffset_ms and queues payloads; Update broadcasts ObjectTapped(_tapInfo.back()) once currTime > _waitToTime. Disabled filter or non-physical robot forwards immediately without wait. Double-tap logic runs in parallel via CheckForDoubleTap.",
+      "category": "TapFilter.WaitOffsetTime",
+      "related": [
+        "TapIntensityMin",
+        "DoubleTapTime_ms"
+      ],
+      "evidence": "engine/components/blockTapFilterComponent.cpp:34,68-80,139-156",
+      "status": "live",
+      "tags": ["cube", "tap", "timing", "filter"]
+    },
+    "Toggle_CoordinateWhileInAir": {
+      "process": "engine",
+      "blurb": "Dev cheat bool (default true) that can force-disable the CoordinateWhileInAir coordinator each tick. That behavior sits in the freeplay spine between held-in-palm coordination and GlobalInterruptions (pickup / in-air reactions, track locking). Only applied when ANKI_DEV_CHEATS is compiled in.",
+      "detail": "BehaviorCoordinateGlobalInterrupts::CreateConsoleVars dynamically registers Toggle_<BehaviorID> for each direct GetAllDelegates of its pass-through child. Production tree is CoordinateGlobalInterrupts → CoordinateWhileHeldInPalm → CoordinateWhileInAir → GlobalInterruptions, so only Toggle_CoordinateWhileInAir appears (sole Toggle_* in the engine dump). When false, SetDontActivateThisTick suppresses CoordinateWhileInAir. CoordinateWhileInAir itself locks body tracks while InAir/Falling (unless certain behaviors run), suppresses WhileInAirDispatcher when blacklist behaviors are active, and gates InitialPickupAnimation after ~1 s off treads. Turning this off can break the pass-through into GlobalInterruptions — use only for debugging the coordinator stack.",
+      "howTo": "1) Ensure a build with ANKI_DEV_CHEATS. 2) Let freeplay reach CoordinateGlobalInterrupts so CreateConsoleVars runs. 3) Set Toggle_CoordinateWhileInAir false to suppress that coordinator for testing. 4) Set true (default) to restore.",
+      "category": "BehaviorCoordinateGlobalInterrupts",
+      "related": [
+        "MaxTimeForInitialHeldInPalmReaction_ms",
+        "MinTimeToConfirmRobotHeldInPalm_ms"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/coordinators/behaviorCoordinateGlobalInterrupts.cpp:249,299-306,427-452; behaviorCoordinateWhileInAir.cpp:111-198; resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/coordinateGlobalInterrupts.json; coordinateWhileHeldInPalm.json; coordinateWhileInAir.json",
+      "status": "live",
+      "statusNote": "Suppression loop is #if ANKI_DEV_CHEATS only. Var is created at runtime when CoordinateGlobalInterrupts first inits console vars.",
+      "tags": ["dev", "behavior", "in-air", "held-in-palm", "toggle"]
+    },
+    "TouchDurationToStart_ms": {
+      "process": "engine",
+      "blurb": "Playpen factory start gate: if UseTouchToStart is true, backpack must stay touched this many milliseconds (default 1000) before WaitToStart can succeed (still needs button/charger conditions).",
+      "detail": "BehaviorPlaypenWaitToStart: touchGood = !UseTouchToStart OR (touch active long enough vs TouchDurationToStart_ms). Combined with UseButtonToStart / button press and on-charger/charging. Only relevant on playpen/factory behavior trees, not freeplay.",
+      "category": "Playpen",
+      "related": [
+        "UseTouchToStart",
+        "DurationOfTouchToRecord_ms",
+        "MinExpectedTouchValue",
+        "MaxExpectedTouchValue"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:51-54; playpenConfig.cpp:78-80; behaviorPlaypenWaitToStart.cpp:88-109",
+      "status": "live",
+      "tags": ["playpen", "factory", "touch", "start"]
+    },
+    "UseTouchToStart": {
+      "process": "engine",
+      "blurb": "Playpen factory: when true, require sustained backpack touch (see TouchDurationToStart_ms) before the test sequence can leave WaitToStart. Default false — touch is not required; button/charger gates still apply as configured.",
+      "detail": "If false, touchGood is always true in BehaviorPlaypenWaitToStart. If true, needs a non-zero _touchStartTime_ms and elapsed > TouchDurationToStart_ms. Success also requires buttonGood (UseButtonToStart default true) and on charger contacts or charging. Completely unused outside playpen.",
+      "category": "Playpen",
+      "related": [
+        "TouchDurationToStart_ms",
+        "DurationOfTouchToRecord_ms"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:51; playpenConfig.cpp:80; behaviorPlaypenWaitToStart.cpp:88-109",
+      "status": "live",
+      "tags": ["playpen", "factory", "touch", "start"]
+    }
+  }
+}
