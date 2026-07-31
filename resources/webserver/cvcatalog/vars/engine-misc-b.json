@@ -1,0 +1,113 @@
+{
+  "vars": {
+    "DedupTimeAfterLock_ms": {
+      "process": "engine",
+      "blurb": "How long (milliseconds) the Cube Spinner mini-game ignores extra “lock” inputs after a successful light lock. Default 1000 ms. Stops double-taps or rapid AI lock calls from scoring twice on the same cycle color.",
+      "detail": "CubeSpinnerGame::LockNow() compares basestation time to lastTimeLightLocked_ms. If now is still within this window, it logs CubeSpinnerGame.LockNow.DuplicateLock and returns without scoring. lastTimeLightLocked_ms is set when lights are locked in. Only matters while the Cube Spinner game is running (player or Vector-plays-spinner behaviors call LockNow).",
+      "category": "CubeSpinner",
+      "related": ["ShouldLockPulseTargetColor", "IReallyReallyWantToBreakCubeSpinner"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/cubeSpinner/cubeSpinnerGame.cpp:32,313,409-416; behaviorVectorPlaysCubeSpinner.cpp:430,496",
+      "status": "live",
+      "tags": ["behavior", "cube", "cube-spinner", "timing"]
+    },
+    "DriveSpeed_mmps": {
+      "process": "engine",
+      "blurb": "Wheel speed (mm/s) used only by the factory/dev SelfTest “drive forwards” step. Default 60. Does not change freeplay driving, path following, or other behaviors.",
+      "detail": "SelfTestConfig::kDriveSpeed_mmps is exposed via WRAP_EXTERN_CONSOLE_VAR under category SelfTest. BehaviorSelfTestDriveForwards builds a DriveStraightAction with kDistanceToDriveForwards_mm and this speed (animation off, can move on charger). After the drive, it checks that the robot left charger contacts and battery voltage is above the SelfTest min. Unrelated to robot-supervisor roll/face-plant speeds or simulator rollDriveSpeed fields of similar names.",
+      "howTo": "Only relevant when running the on-robot SelfTest sequence. Adjust before that step if the default crawl is too slow/fast for the fixture surface; pair with DistanceToDriveForwards_mm.",
+      "related": ["DistanceToDriveForwards_mm", "IgnoreFailures", "DefaultTimeout_ms"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.h:128-132; selfTestConfig.cpp:48-49; behaviorSelfTestDriveForwards.cpp:28-36",
+      "category": "SelfTest",
+      "status": "live",
+      "statusNote": "SelfTest / factory path only — not freeplay locomotion.",
+      "tags": ["selftest", "factory", "drive", "speed"]
+    },
+    "EnableAngleExtension": {
+      "process": "engine",
+      "blurb": "OKAO movie-mode face tracker flag: when true, allows a wider face roll/angle search while tracking (OKAO_DT_MV_SetAngleExtension). Default false. Only applied when the face detector is (re)initialized in Movie mode.",
+      "detail": "Registered under Vision.FaceDetectorMovie with other Movie-only OKAO knobs. FaceTracker::Impl::Init reads this once when creating the DETECTION_MODE_MOVIE handle; Still mode never calls SetAngleExtension. Runtime toggles do nothing until you pulse ReinitDetector (Deinit+Init on next Update). Intentionally off by default so tracking stays conservative.",
+      "howTo": "1) DetectionMode = Movie (usual). 2) Set EnableAngleExtension. 3) Set ReinitDetector true once. 4) Verify face track under tilted heads.",
+      "requires": ["ReinitDetector"],
+      "related": ["EnablePoseExtension", "UseHeadTracking", "DetectionMode", "ReinitDetector"],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:96,224-228,1067-1074; okaoVision/include/OkaoDtAPI.h:159-161",
+      "category": "Vision.FaceDetectorMovie",
+      "status": "partial",
+      "statusNote": "Applied only at face-tracker Init (Movie path). Needs ReinitDetector after change; ignored in Still mode.",
+      "tags": ["vision", "faces", "okao", "tracking"]
+    },
+    "EnablePoseExtension": {
+      "process": "engine",
+      "blurb": "OKAO movie-mode face tracker flag: when true (default), enables pose-angle extension during tracking via OKAO_DT_MV_SetPoseExtension (paired with UseHeadTracking). Helps keep a track when the face turns more in yaw/pitch; applied only at face-detector Init.",
+      "detail": "Same Init-time Movie path as EnableAngleExtension. SetPoseExtension(_okaoDetectorHandle, EnablePoseExtension, UseHeadTracking). Omron notes (in source next to UseHeadTracking) that head-tracking pose extension can report “HEAD” (back of head) and hurt facial-parts detection — that is why UseHeadTracking defaults false even though pose extension defaults true. Still mode does not call this API. Changing the console bool requires ReinitDetector to rebuild the tracker.",
+      "howTo": "1) Set EnablePoseExtension (and optionally UseHeadTracking). 2) Pulse ReinitDetector. 3) Check track continuity on profile faces vs part-detection quality.",
+      "requires": ["ReinitDetector"],
+      "related": ["EnableAngleExtension", "UseHeadTracking", "DetectionMode", "ReinitDetector"],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:97-109,230-235,1067-1074; okaoVision/include/OkaoDtAPI.h:163-165",
+      "category": "Vision.FaceDetectorMovie",
+      "status": "partial",
+      "statusNote": "Init-only (Movie). Runtime change needs ReinitDetector. Coupled with UseHeadTracking on the same OKAO call.",
+      "tags": ["vision", "faces", "okao", "tracking"]
+    },
+    "HandReaction_DriveForwardSpeed_mmps": {
+      "process": "engine",
+      "blurb": "How fast (mm/s) Vector drives straight toward a detected hand during the ReactToHand reaction. Default 120; console-clamped from 0 to MAX_SAFE_WHEEL_SPEED_MMPS. Distance is separate (prox reading × ReactToHand_DriveDistanceFraction).",
+      "detail": "On ReactToHand activate, engine builds a parallel compound: DriveStraightAction(distance, this speed, no driving anim), looping ExploringReactToHandDrive anim, and unexpected-movement cancel. Drive ends on distance complete or unexpected movement; then lift-or-reaction branches use pitch vs ReactToHand_PitchAngleThresh_deg. Only affects the hand-reaction behavior sequence after something already activated ReactToHand (e.g. CheckForAndReactToHand after VisionMode::Hands + HandDetection feature).",
+      "related": [
+        "ReactToHand_DriveDistanceFraction",
+        "ReactToHand_PitchAngleThresh_deg",
+        "Hands",
+        "FakeHandDetectionProbability"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToHand.cpp:33-34,63-96; resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/reactions/reactToHand.json",
+      "category": "Behavior.ReactToHand",
+      "status": "live",
+      "tags": ["behavior", "hand", "drive", "speed"]
+    },
+    "Hands": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::Hands so the vision system schedules the hand_detector neural net every pass (even if no behavior subscribed). Off as a console override by default; freeplay still requests Hands when HandDetection is gated on and reactions need it.",
+      "detail": "Created for every VisionMode under Vision.General.VisionModes (SetupVisionModeConsoleVars). Flipping the bool EnableMode’s Hands and DevOnly self-subscribes/unsubscribes so it stays on the schedule. When the mode runs, neural nets registered to Hands produce SalientPointType::Hand detections (or FakeHandDetectionProbability injects fakes under ANKI_DEV_CHEATS). Used by CheckForAndReactToHand (feature HandDetection), ExploringExamineObstacle (single-frame hand check before approaching an obstacle), and WaitForImagesAction paths. Without the net assets / feature, enabling the mode alone may process empty results.",
+      "howTo": "1) Toggle Hands on under Vision.General.VisionModes. 2) Optionally raise FakeHandDetectionProbability to 1.0 to test reactions without a working model. 3) Watch WebViz / hand reactions / SalientPoints.",
+      "related": [
+        "FakeHandDetectionProbability",
+        "People",
+        "HandReaction_DriveForwardSpeed_mmps",
+        "SaveNeuralNetImages"
+      ],
+      "paths": {
+        "assets": [
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/reactions/checkForAndReactToHand.json",
+          "resources/config/features.json"
+        ],
+        "notes": "hand_detector network name from visionModesHelpers; product gate feature HandDetection."
+      },
+      "evidence": "engine/components/visionComponent.cpp:2836-2882; engine/vision/visionModesHelpers.cpp:27-30; engine/vision/visionProcessingResult.cpp:63-64; clad/src/clad/types/visionModes.clad:29; resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/reactions/checkForAndReactToHand.json; engine/aiComponent/behaviorComponent/behaviors/exploring/behaviorExploringExamineObstacle.cpp:226-242",
+      "category": "Vision.General.VisionModes",
+      "status": "live",
+      "tags": ["vision", "hands", "neural-nets", "visionmode"]
+    },
+    "Illumination": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::Illumination so the engine classifies scene lighting (Illuminated / Darkened / Unknown) from camera brightness features. Off as a console override by default; reactions such as react-to-darkness subscribe the mode when feature ReactToIllumination is on.",
+      "detail": "Same Vision.General.VisionModes console-bool machinery as Hands/Markers: flip → EnableMode + schedule subscribe. When enabled (and AutoExp_Cycling is not), VisionSystem::DetectIllumination runs IlluminationDetector: needs feature ReactToIllumination, optional still robot (AllowMovement config), a rolling buffer of image-percentile features, then a linear classifier from illuminationClassifier.json. Results become RobotObservedIllumination / last illumination state for behaviors (ReactToDarkness, RobustChargerObservation light check). Does not change camera exposure by itself — separate from AutoExp.",
+      "howTo": "1) Ensure features.json ReactToIllumination is enabled on the robot. 2) Toggle Illumination on. 3) Hold still in light vs dark; pair EnableExtraIlluminationDetectorDebug for classifier logs. Thresholds live under vision_config IlluminationDetector.",
+      "related": [
+        "EnableExtraIlluminationDetectorDebug",
+        "AutoExp",
+        "AutoExp_Cycling"
+      ],
+      "paths": {
+        "assets": [
+          "resources/config/engine/vision_config.json",
+          "resources/config/engine/vision/illuminationClassifier/illuminationClassifier.json",
+          "resources/config/features.json"
+        ],
+        "notes": "IlluminationDetector block: ClassifierConfigPath, IlluminatedMinProbability, DarkenedMaxProbability, AllowMovement."
+      },
+      "evidence": "engine/components/visionComponent.cpp:946,1430-1434,2836-2882; engine/vision/visionSystem.cpp:965-970,1830-1841; engine/vision/illuminationDetector.cpp:35-180; clad/src/clad/types/visionModes.clad:30; resources/config/engine/vision_config.json:23-31",
+      "category": "Vision.General.VisionModes",
+      "status": "live",
+      "tags": ["vision", "illumination", "visionmode", "lighting"]
+    }
+  }
+}
