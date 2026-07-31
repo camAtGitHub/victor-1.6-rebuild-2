@@ -1,0 +1,263 @@
+{
+  "vars": {
+    "*": {
+      "process": "both",
+      "blurb": "Log-channel master wildcard. When true, every log channel is treated as enabled: ChannelFilter::IsChannelEnabled returns true for any name because \"*\" matches everything. When false (robot/vicos default), only channels whose own bools are on pass the filter.",
+      "detail": "Registered as a ChannelVar under category Channels from console_filter_config.json (must be last in the channels list). Anim and engine both load this file at process start (cozmoAnimMain / cozmoEngineMain) and attach the filter to the process logger. Enabling * is the blunt way to un-silence all LOG_CHANNEL traffic in that process; it does not create channels that never log. Prefer turning on a specific channel name when you only need one subsystem.",
+      "howTo": "1) Open Channels on :8889 (anim) or :8888 (engine). 2) Set * true to flood logs, or leave false and enable individual channel bools. 3) Restart not required — filter reads the bool each log.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/console_filter_config.json"
+        ],
+        "notes": "vicos and osx sections list channel \"*\" last; vicos default enabled=false."
+      },
+      "related": [
+        "Actions",
+        "Audio",
+        "Behaviors",
+        "CpuProfiler",
+        "VisionSystem"
+      ],
+      "evidence": "lib/util/source/anki/util/logging/channelFilter.h:31-48; channelFilter.cpp:37-52,108-129; resources/config/engine/console_filter_config.json channel \"*\"; animProcess/src/cozmoAnim/cozmoAnimMain.cpp:130-148; engine/tools/engined/cozmoEngineMain.cpp:163-180",
+      "category": "Channels",
+      "status": "live",
+      "statusNote": "Turning on floods INFO/DEBUG for every channel name in this process — use sparingly on-robot.",
+      "tags": ["logging", "channels", "wildcard", "danger"]
+    },
+    "AIWhiteboard": {
+      "process": "both",
+      "blurb": "Log-channel enable for the name “AIWhiteboard”. When on, INFO/DEBUG lines tagged with that channel (engine AI whiteboard: possible-object search, explore cooldown notes, etc.) are allowed through the channel filter; when off, they are filtered out.",
+      "detail": "Not an AI policy knob. ChannelFilter loads channels from console_filter_config.json and registers each name as a bool under category Channels. On robot (vicos) AIWhiteboard defaults to disabled. Real AIWhiteboard *tuning* vars (kBW_*, exploring cooldowns) live under console category “AIWhiteboard” on the engine process and are separate ids.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/console_filter_config.json"
+        ],
+        "notes": "vicos default enabled=false; osx true. Engine emits PRINT_CH_*(\"AIWhiteboard\", …) from aiWhiteboard.cpp."
+      },
+      "related": ["*", "Behaviors"],
+      "evidence": "lib/util/source/anki/util/logging/channelFilter.h:31-48; channelFilter.cpp:37-52,108-129; resources/config/engine/console_filter_config.json channel AIWhiteboard; engine/aiComponent/aiWhiteboard.cpp PRINT_CH_*",
+      "category": "Channels",
+      "status": "live",
+      "tags": ["logging", "channels", "ai"]
+    },
+    "Actions": {
+      "process": "both",
+      "blurb": "Log-channel enable for the name “Actions”. When on, engine action-stack logs (docking, drive-to, track, wait-for-images, …) tagged with channel Actions pass the filter; when off (vicos default), they are suppressed.",
+      "detail": "ChannelVar from console_filter_config.json, category Channels — not a master switch for the action system. Action tuning uses other categories (DockingMethod, DriveToActions, TrackingActions, Animation, …). Anim process also registers this channel from the same config even though most Actions logs originate in engine.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/console_filter_config.json"
+        ],
+        "notes": "vicos default enabled=false. LOG_CHANNEL \"Actions\" is #define’d across engine/actions/*."
+      },
+      "related": ["*", "Behaviors", "BlockWorld"],
+      "evidence": "lib/util/source/anki/util/logging/channelFilter.h:31-48; channelFilter.cpp:37-52; resources/config/engine/console_filter_config.json channel Actions; engine/actions/*.cpp LOG_CHANNEL \"Actions\"",
+      "category": "Channels",
+      "status": "live",
+      "tags": ["logging", "channels", "actions"]
+    },
+    "AdjustHeightOfSpinnerLift": {
+      "process": "both",
+      "blurb": "Dev-cheats lift height (integer mm-style units, default 81) written into the second lift keyframe of the cube-spinner tap animation anim_spinner_tap_01. Changing this number alone does nothing until you call the console function SetNewTapHeight.",
+      "detail": "Registered only under ANKI_DEV_CHEATS in cannedAnimLib (linked into both anim canned_anim_lib_anim and engine canned_anim_lib_engine). SetNewTapHeight looks up anim_spinner_tap_01 on the global CannedAnimationContainer pointer, walks the LiftHeightKeyFrame track, and OverrideHeight()s the second frame with this value. Category CubeSpinner (same group as SetNewTapHeight and other cube-spinner game knobs). Used when tuning how high Vector’s lift goes during the spinner tap anim.",
+      "howTo": "1) ANKI_DEV_CHEATS build. 2) Set AdjustHeightOfSpinnerLift to the desired height. 3) Call SetNewTapHeight. 4) Run cube spinner / play anim_spinner_tap_01 and watch lift.",
+      "requires": ["SetNewTapHeight"],
+      "related": ["SetNewTapHeight"],
+      "evidence": "cannedAnimLib/cannedAnims/cannedAnimationContainer.cpp:28-47; animProcess/CMakeLists.txt canned_anim_lib_anim; resources/webserver/.docs/consolevarlist_8889:129; consolefunclist_8889 SetNewTapHeight",
+      "category": "CubeSpinner",
+      "status": "partial",
+      "statusNote": "ANKI_DEV_CHEATS only. Value is applied only when SetNewTapHeight runs after the container exists.",
+      "tags": ["cube-spinner", "animation", "lift", "dev-cheats"]
+    },
+    "Audio": {
+      "process": "both",
+      "blurb": "Log-channel enable for the name “Audio”. When on, INFO/DEBUG lines tagged Audio (anim audio controller paths, animation audio client debug, ALSA sink plugin, engine audio mux, …) pass the filter; when off (vicos default), they are filtered out.",
+      "detail": "ChannelVar under category Channels from console_filter_config.json — not the product audio engine on/off. Real audio/mic knobs use categories such as Audio.Microphone, Animation, Alexa, MicData. Anim process has substantial Audio-tagged logging (CozmoAudioController, AnimationAudioClient).",
+      "paths": {
+        "assets": [
+          "resources/config/engine/console_filter_config.json"
+        ],
+        "notes": "vicos default enabled=false; osx true."
+      },
+      "related": ["*", "Microphones", "NoiseFloorMin", "AllowAudioOnCharger"],
+      "evidence": "lib/util/source/anki/util/logging/channelFilter.h:31-48; channelFilter.cpp:37-52; resources/config/engine/console_filter_config.json channel Audio; animProcess/src/cozmoAnim/audio/cozmoAudioController.cpp:257-258; animationAudioClient.cpp:29",
+      "category": "Channels",
+      "status": "live",
+      "tags": ["logging", "channels", "audio"]
+    },
+    "BehaviorSDKInterface": {
+      "process": "both",
+      "blurb": "Log-channel enable for the name “BehaviorSDKInterface”. When on, engine logs from the SDK-controlled behavior (behaviorSDKInterface.cpp LOG_CHANNEL) pass the filter; when off (vicos default), they are suppressed.",
+      "detail": "Channel filter bool only — does not enable or disable the SDK behavior stack. Same registration path as other Channels entries via console_filter_config.json. Present on anim’s :8889 list because anim loads the same filter config even though the channel’s producers are engine-side.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/console_filter_config.json"
+        ],
+        "notes": "vicos default enabled=false."
+      },
+      "related": ["*", "Behaviors"],
+      "evidence": "lib/util/source/anki/util/logging/channelFilter.h:31-48; channelFilter.cpp:37-52; resources/config/engine/console_filter_config.json channel BehaviorSDKInterface; engine/aiComponent/behaviorComponent/behaviors/sdkBehaviors/behaviorSDKInterface.cpp:28",
+      "category": "Channels",
+      "status": "live",
+      "tags": ["logging", "channels", "sdk", "behaviors"]
+    },
+    "Behaviors": {
+      "process": "both",
+      "blurb": "Log-channel enable for the name “Behaviors”. When on, engine behavior-tree / ICozmoBehavior and related PRINT_CH_*(\"Behaviors\", …) lines pass the filter; when off (vicos default), they are filtered out.",
+      "detail": "Not a freeplay or behavior-stack enable. ChannelVar from console_filter_config.json under category Channels. Behavior authors use LOG_CHANNEL \"Behaviors\" widely under engine/aiComponent/behaviorComponent/. Turning this on is the usual first step when debugging which behavior is activating.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/console_filter_config.json"
+        ],
+        "notes": "vicos default enabled=false; osx true."
+      },
+      "related": ["*", "Actions", "AIWhiteboard", "BehaviorSDKInterface"],
+      "evidence": "lib/util/source/anki/util/logging/channelFilter.h:31-48; channelFilter.cpp:37-52; resources/config/engine/console_filter_config.json channel Behaviors; engine/aiComponent/behaviorComponent/behaviors/iCozmoBehavior.cpp:71",
+      "category": "Channels",
+      "status": "live",
+      "tags": ["logging", "channels", "behaviors"]
+    },
+    "BlockPool": {
+      "process": "both",
+      "blurb": "Log-channel enable for the name “BlockPool”. When on, cube/block-pool related INFO lines (e.g. BlockTapFilterComponent double-tap / active-object tapped) pass the filter; when off (vicos default), they are suppressed.",
+      "detail": "Channel filter bool from console_filter_config.json, category Channels. Not cube connection or light-pool control. Tap filtering still has its own TapFilter.* / DoubleTap console vars on engine.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/console_filter_config.json"
+        ],
+        "notes": "vicos default enabled=false. PRINT_CH_INFO(\"BlockPool\", …) in blockTapFilterComponent.cpp."
+      },
+      "related": ["*", "BlockWorld"],
+      "evidence": "lib/util/source/anki/util/logging/channelFilter.h:31-48; channelFilter.cpp:37-52; resources/config/engine/console_filter_config.json channel BlockPool; engine/components/blockTapFilterComponent.cpp:133,252",
+      "category": "Channels",
+      "status": "live",
+      "tags": ["logging", "channels", "cubes"]
+    },
+    "BlockWorld": {
+      "process": "both",
+      "blurb": "Log-channel enable for the name “BlockWorld”. When on, engine BlockWorld LOG_CHANNEL traffic (object origins, select/cycle object, clear helpers, define/undefine objects, …) passes the filter; when off (vicos default), it is filtered out.",
+      "detail": "ChannelVar only — does not change world model or localization. Real block-world tuning is other console ids. Anim registers the same Channels list from the shared filter config.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/console_filter_config.json"
+        ],
+        "notes": "vicos default enabled=false. engine/blockWorld/blockWorld.cpp #define LOG_CHANNEL \"BlockWorld\"."
+      },
+      "related": ["*", "Actions", "BlockPool", "VisionSystem"],
+      "evidence": "lib/util/source/anki/util/logging/channelFilter.h:31-48; channelFilter.cpp:37-52; resources/config/engine/console_filter_config.json channel BlockWorld; engine/blockWorld/blockWorld.cpp:58",
+      "category": "Channels",
+      "status": "live",
+      "tags": ["logging", "channels", "blockworld"]
+    },
+    "FaceRecognizer": {
+      "process": "both",
+      "blurb": "Log-channel enable for the name “FaceRecognizer”. When on, face-recognition / OKAO tracker and enrollment-related logs tagged FaceRecognizer pass the filter; when off (vicos default), they are suppressed.",
+      "detail": "Channel filter bool (category Channels), not recognition thresholds. Threshold and enrollment knobs use categories such as Vision.FaceRecognition. LOG_CHANNEL \"FaceRecognizer\" appears in coretech faceRecognizer_okao, faceTrackerImpl_okao, enrolledFaceEntry, and some enroll behaviors. FaceWorld component sometimes logs with this channel name as well.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/console_filter_config.json"
+        ],
+        "notes": "vicos default enabled=false."
+      },
+      "related": ["*", "FaceWorld", "VisionComponent", "VisionSystem"],
+      "evidence": "lib/util/source/anki/util/logging/channelFilter.h:31-48; channelFilter.cpp:37-52; resources/config/engine/console_filter_config.json channel FaceRecognizer; coretech/vision/engine/faceRecognizer_okao.cpp:34,204",
+      "category": "Channels",
+      "status": "live",
+      "tags": ["logging", "channels", "faces", "vision"]
+    },
+    "FaceWorld": {
+      "process": "both",
+      "blurb": "Log-channel enable for the name “FaceWorld”. When on, logs tagged FaceWorld pass the channel filter; when off (vicos default), they are filtered out.",
+      "detail": "ChannelVar from console_filter_config.json under Channels. FaceWorld *component* console knobs use category Vision.FaceWorld (deletion timeout, frontal stability, ignore faces below robot, …) — those are separate ids. Enabling this bool only unmutes FaceWorld-tagged log lines in the process that owns the filter instance you flipped.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/console_filter_config.json"
+        ],
+        "notes": "vicos default enabled=false. Face-world tuning: engine/faceWorld.cpp Vision.FaceWorld CONSOLE_VARs."
+      },
+      "related": ["*", "FaceRecognizer", "VisionComponent"],
+      "evidence": "lib/util/source/anki/util/logging/channelFilter.h:31-48; channelFilter.cpp:37-52; resources/config/engine/console_filter_config.json channel FaceWorld; engine/faceWorld.cpp Vision.FaceWorld vars",
+      "category": "Channels",
+      "status": "live",
+      "tags": ["logging", "channels", "faces"]
+    },
+    "JdocsManager": {
+      "process": "both",
+      "blurb": "Log-channel enable for the name “JdocsManager”. When on, jdocs manager LOG_CHANNEL lines pass the filter. On robot (vicos) this channel defaults to **enabled** (unlike most peer channels), so jdocs logs are visible unless you turn this off.",
+      "detail": "Channel filter bool under category Channels — not the jdocs cloud debug console functions (DebugDeleteSelectedJdocInCloud, …) which use console category \"JdocsManager\" on engine. Flip this when jdocs chatter is too noisy or when you need to re-enable it after silencing Channels wholesale.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/console_filter_config.json"
+        ],
+        "notes": "vicos default enabled=true; osx true. engine/components/jdocsManager.cpp #define LOG_CHANNEL \"JdocsManager\"."
+      },
+      "related": ["*"],
+      "evidence": "lib/util/source/anki/util/logging/channelFilter.h:31-48; channelFilter.cpp:37-52; resources/config/engine/console_filter_config.json channel JdocsManager; engine/components/jdocsManager.cpp:32,73",
+      "category": "Channels",
+      "status": "live",
+      "tags": ["logging", "channels", "jdocs"]
+    },
+    "MaxBlinkSpacingTimeForScreenProtection_ms": {
+      "process": "anim",
+      "blurb": "Hard upper limit (milliseconds, default 30000 = 30 s) on how far apart keep-face-alive blinks are allowed to be. Protects the OLED from burn-in if something tries to set blink spacing longer than this. Also used as the fallback min/max blink spacing when keep-alive params are invalid (max ≤ min).",
+      "detail": "CONSOLE_VAR f32 under category Face.Layers in FaceLayerManager. AnimationStreamer::SetParam clamps KeepFaceAliveParameter::BlinkSpacingMaxTime_ms down to this value with a warning (MaxBlinkSpacingTooLong). FaceLayerManager::GetNextBlinkTime_ms, when blinkSpaceMax_ms ≤ blinkSpaceMin_ms, substitutes min = 0.25× this value and max = this value, then picks a random time in that range. Getter is exposed through TrackLayerComponent for the streamer.",
+      "howTo": "Lower to force more frequent blinks for screen protection testing. Raise only if you accept longer gaps between blinks (burn-in risk). Invalid keep-alive spacing params already snap to this ceiling.",
+      "related": [
+        "GlitchLightDelay_ms",
+        "GlitchLightDuration_ms"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/animation/trackLayerManagers/faceLayerManager.cpp:26-34,198-210,306-308; trackLayerComponent.cpp:264-266; animationStreamer.cpp:1149-1161",
+      "category": "Face.Layers",
+      "status": "live",
+      "tags": ["face", "blink", "keep-alive", "screen-protection"]
+    },
+    "NeuralNets": {
+      "process": "both",
+      "blurb": "Log-channel enable for the name “NeuralNets”. When on, neural-net runner / model logs tagged NeuralNets pass the filter; when off (vicos default), they are suppressed.",
+      "detail": "ChannelVar only. Neural-net *tuning* lives under categories such as Vision.NeuralNetRunner and Vision.NeuralNets (fake detection probabilities, gamma, save-images). LOG_CHANNEL \"NeuralNets\" is used across coretech/neuralnets and neuralNetRunner.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/console_filter_config.json"
+        ],
+        "notes": "vicos default enabled=false."
+      },
+      "related": ["*", "VisionSystem", "VisionComponent"],
+      "evidence": "lib/util/source/anki/util/logging/channelFilter.h:31-48; channelFilter.cpp:37-52; resources/config/engine/console_filter_config.json channel NeuralNets; coretech/neuralnets/* LOG_CHANNEL; coretech/vision/engine/neuralNetRunner.cpp:51",
+      "category": "Channels",
+      "status": "live",
+      "tags": ["logging", "channels", "vision", "neuralnets"]
+    },
+    "VisionComponent": {
+      "process": "both",
+      "blurb": "Log-channel enable for the name “VisionComponent”. When on, engine VisionComponent and some docking logs tagged VisionComponent pass the filter; when off (vicos default), they are filtered out.",
+      "detail": "Channel filter bool (Channels), not a vision-mode schedule control. VisionComponent itself has many Vision.General / Vision.PreProcessing console vars and debug funcs. Enabling this is useful when debugging pause, capture, or docking interactions that PRINT_CH_INFO(\"VisionComponent\", …).",
+      "paths": {
+        "assets": [
+          "resources/config/engine/console_filter_config.json"
+        ],
+        "notes": "vicos default enabled=false. engine/components/visionComponent.cpp #define LOG_CHANNEL \"VisionComponent\"."
+      },
+      "related": ["*", "VisionSystem", "FaceRecognizer", "FaceWorld"],
+      "evidence": "lib/util/source/anki/util/logging/channelFilter.h:31-48; channelFilter.cpp:37-52; resources/config/engine/console_filter_config.json channel VisionComponent; engine/components/visionComponent.cpp:67,507",
+      "category": "Channels",
+      "status": "live",
+      "tags": ["logging", "channels", "vision"]
+    },
+    "VisionSystem": {
+      "process": "both",
+      "blurb": "Log-channel enable for the name “VisionSystem”. When on, vision-pipeline logs tagged VisionSystem (marker detection helpers, motion/laser detectors, crop scheduler, camera params, tests, …) pass the filter; when off (vicos default), they are suppressed.",
+      "detail": "ChannelVar under Channels — not VisionMode force-enables (Markers, AutoExp, …). Many vision files use static kLogChannelName = \"VisionSystem\". Pair with VisionComponent / NeuralNets / FaceRecognizer channels when tracing end-to-end vision.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/console_filter_config.json"
+        ],
+        "notes": "vicos default enabled=false."
+      },
+      "related": ["*", "VisionComponent", "NeuralNets", "FaceRecognizer", "BlockWorld"],
+      "evidence": "lib/util/source/anki/util/logging/channelFilter.h:31-48; channelFilter.cpp:37-52; resources/config/engine/console_filter_config.json channel VisionSystem; engine/vision/visionSystem.cpp:142; engine/vision/cropScheduler.cpp:29",
+      "category": "Channels",
+      "status": "live",
+      "tags": ["logging", "channels", "vision"]
+    }
+  }
+}
