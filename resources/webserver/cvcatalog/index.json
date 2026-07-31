@@ -26,7 +26,10 @@
     "vars/engine-vision-benchmark.json",
     "vars/engine-faces.json",
     "vars/anim-eye-left.json",
-    "vars/anim-eye-right.json"
+    "vars/anim-eye-right.json",
+    "vars/anim-alexa.json",
+    "vars/engine-led1.json",
+    "vars/engine-autoexp.json"
   ],
   "categories": [
     "categories/vision.json",
