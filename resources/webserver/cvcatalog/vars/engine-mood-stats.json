@@ -1,0 +1,74 @@
+{
+  "vars": {
+    "MapPerformanceTestsEnabled": {
+      "process": "engine",
+      "blurb": "Developer switch that times how long navigation-map (quad-tree) operations take. When false (default), map merge/insert/transform/fold work runs at full speed with no timing. When true, those hot paths are wrapped in a microsecond timer and averages are printed to the engine log.",
+      "detail": "Registered under the ProxSensorComponent console group but implemented in the memory map (MemoryMap). The MONITOR_PERFORMANCE macro only runs PerformanceMonitor when this flag is true: it records wall time around Merge, FillBorder, TransformContent, Insert, and FindContentIf (quad-tree Fold). Results go into a process-local map of rolling averages and are logged as PerformanceMonitor named-info lines every sample window. Leave off on a real robot unless you are profiling map cost; the extra chrono + logging adds overhead and can flood logs when the map is busy (prox updates, exploration).",
+      "category": "ProxSensorComponent",
+      "related": ["MapPerformanceTestsSampleWindow", "RenderProxBeliefs"],
+      "evidence": "engine/navMap/memoryMap/memoryMap.cpp:37,44,49-89,170,178,185,236,244,300",
+      "status": "live",
+      "statusNote": "Dev profiling only. True adds timing overhead and periodic log spam on map ops; default false is normal.",
+      "tags": ["navmap", "perf", "debug", "quadtree", "prox"]
+    },
+    "MapPerformanceTestsSampleWindow": {
+      "process": "engine",
+      "blurb": "How many map-operation samples are averaged before a PerformanceMonitor log line is printed when MapPerformanceTestsEnabled is on. Default 128. Must be a power of two (2, 4, 8, …) because the code uses a bit-mask instead of modulo to decide when to print.",
+      "detail": "Each timed call updates a rolling average for that method name. After the window has filled, new samples use an approximate rolling mean: avg += (sample − avg) / window. Every window samples (samples & (window−1) == 0) the average is printed via PRINT_NAMED_INFO(\"PerformanceMonitor\", …). A DEV_ASSERT fires if the window is not a power of two. Has no effect while MapPerformanceTestsEnabled is false. Larger windows smooth noise and print less often; smaller windows print sooner with noisier averages.",
+      "category": "ProxSensorComponent",
+      "requires": ["MapPerformanceTestsEnabled"],
+      "related": ["MapPerformanceTestsEnabled"],
+      "evidence": "engine/navMap/memoryMap/memoryMap.cpp:38,49-63",
+      "status": "live",
+      "statusNote": "Non-power-of-two values trip DEV_ASSERT when a sample would be printed (debug builds).",
+      "tags": ["navmap", "perf", "debug", "quadtree"]
+    },
+    "MoodManager_AppPeriod_s": {
+      "process": "engine",
+      "blurb": "How often (seconds) Vector’s stimulation (excitement) mood is pushed to the companion app over the gateway. Default 1.0 s. The robot also sends immediately when emotion events are pending, so the app still sees event-driven spikes without waiting for this timer.",
+      "detail": "On every MoodManager update tick, if there are pending app emotion-event names or at least this many seconds have passed since the last app send, SendStimToApp runs. That builds a StimulationInfo protobuf (current stimulated value, rate/velocity, accel, min/max, optional event list) and broadcasts it through the gateway interface for the phone app. Periodic sends keep the app’s stim graph alive even when nothing new happened; event sends make reactions feel immediate. Lower values increase gateway traffic; higher values make the app graph update more laggy between events. Independent of MoodManager_WebVizPeriod_s (WebViz Mood tab) and MoodManager_AudioSendPeriod_s (audio engine parameters).",
+      "category": "MoodManager",
+      "related": [
+        "MoodManager_AudioSendPeriod_s",
+        "MoodManager_WebVizPeriod_s"
+      ],
+      "evidence": "engine/moodSystem/moodManager.cpp:66,376-382,557-578",
+      "status": "live",
+      "tags": ["mood", "stim", "app", "gateway"]
+    },
+    "MoodManager_AudioSendPeriod_s": {
+      "process": "engine",
+      "blurb": "How often (seconds) mood values are pushed into the audio engine as real-time parameters (e.g. so music/SFX can react to how stimulated or calm Vector is). Default 0.5 s. Only runs when the engine audio client component is present.",
+      "detail": "Each MoodManager update, if an EngineRobotAudioClient exists and more than this period has elapsed since the last audio push, SendEmotionsToAudio posts Wwise-style parameters for every emotion type mapped in audioParameterMap, plus a simple-mood parameter from simpleMoodAudioEventMap. Config for which emotion maps to which audio param comes from mood JSON (audioParameterMap / simpleMoodAudioParameters). When the PRDemo feature gate is on, the function returns without posting (audio uses its own demo settings). Shorter periods track mood more tightly at the cost of more audio API traffic; longer periods smooth changes. Does not send to the phone app (that is MoodManager_AppPeriod_s) or WebViz.",
+      "category": "MoodManager",
+      "related": [
+        "MoodManager_AppPeriod_s",
+        "MoodManager_WebVizPeriod_s"
+      ],
+      "evidence": "engine/moodSystem/moodManager.cpp:64,349-351,521-555",
+      "status": "live",
+      "tags": ["mood", "audio", "wwise", "stim"]
+    },
+    "RobotStats_AliveUpdatePeriod_s": {
+      "process": "engine",
+      "blurb": "How often (seconds) the robot credits another chunk of “time alive” into lifetime stats. Default 60 s: about once a minute, Alive.seconds grows by that many seconds. Lifetime hours-alive (used by some behaviors) is derived from that counter.",
+      "detail": "RobotStatsTracker::UpdateDependent compares current time to _timeOfNextAliveTimeCheck. When the deadline passes it calls IncreaseHelper(\"Alive\", \"seconds\", period) and schedules the next check by adding this period again. On shutdown, AddRemainingAliveTimeOnShutdown credits any partial interval so time is not lost. Alive.seconds is part of the ROBOT_LIFETIME_STATS jdoc (persisted; also filtered to the app via FilterStatsForApp). GetNumHoursAlive() divides those seconds by 3600 unless RobotStats_OverrideAliveHours is set. Changing this mid-run changes both how often the counter ticks and how many seconds are added each tick (the period value itself is cast to the delta). Very small values dirty stats more often; very large values make age coarse until the next tick or shutdown flush.",
+      "category": "RobotStats",
+      "related": ["RobotStats_OverrideAliveHours"],
+      "evidence": "engine/components/robotStatsTracker.cpp:81,146,223-231,311-339",
+      "status": "live",
+      "tags": ["stats", "alive", "jdoc", "lifetime"]
+    },
+    "RobotStats_OverrideAliveHours": {
+      "process": "engine",
+      "blurb": "Forces “how many hours has this robot been alive?” to a fake value for testing. Default −1 means use the real Alive.seconds lifetime counter. Set to 0 or any positive hours to override what behaviors and cooldowns see as robot age.",
+      "detail": "GetNumHoursAlive() returns this float whenever it is ≥ 0; otherwise it reads Alive.seconds from the lifetime-stats jdoc and converts to hours. Callers include: BehaviorHowOldAreYou (fallback when onboarding timestamps are missing — answers “how old are you?”), BehaviorGreetAfterLongTime (greeting cooldown grows with age: 30 min under 24 h, 1 h under 1 week, etc.), and AIWhiteboard exploring-transition cooldown (starts aggressive for young robots, settles to ~5 min after a week). Does not rewrite the stored Alive.seconds counter — only the reported age — so turning the override off restores the real value. Useful to test age-gated personality without waiting real time; leave at −1 for production-like behavior.",
+      "category": "RobotStats",
+      "related": ["RobotStats_AliveUpdatePeriod_s"],
+      "evidence": "engine/components/robotStatsTracker.cpp:82,311-328; engine/aiComponent/behaviorComponent/behaviors/character/howOldAreYou/behaviorHowOldAreYou.cpp:195; engine/aiComponent/behaviorComponent/behaviors/behaviorGreetAfterLongTime.cpp:330-342; engine/aiComponent/aiWhiteboard.cpp:813-836",
+      "status": "live",
+      "statusNote": "Test override only. Does not persist into Alive.seconds; affects age-dependent behavior cooldowns and age speech while ≥ 0.",
+      "tags": ["stats", "alive", "debug", "behavior", "cooldown"]
+    }
+  }
+}
