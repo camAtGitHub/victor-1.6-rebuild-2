@@ -29,7 +29,10 @@
     "vars/anim-eye-right.json",
     "vars/anim-alexa.json",
     "vars/engine-led1.json",
-    "vars/engine-autoexp.json"
+    "vars/engine-autoexp.json",
+    "vars/anim-audio-tts.json",
+    "vars/engine-led2.json",
+    "vars/engine-custom-eye.json"
   ],
   "categories": [
     "categories/vision.json",
