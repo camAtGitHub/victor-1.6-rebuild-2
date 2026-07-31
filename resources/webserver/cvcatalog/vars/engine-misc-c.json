@@ -1,0 +1,211 @@
+{
+  "vars": {
+    "MaxEmotionHistorySamples": {
+      "process": "engine",
+      "blurb": "How many past samples of each mood emotion (stimulated, confident, etc.) Vector keeps in a circular history buffer. Default 128. Used so mood code can ask “what was this emotion N ticks or N seconds ago?” when scoring mood deltas and events.",
+      "detail": "Each Emotion object constructs its CircularBuffer with this capacity and re-sizes on Emotion::Reset() (MoodManager reset path). On every Emotion::Update tick a new HistorySample is pushed; older samples fall off when full. GetHistoryValueTicksAgo / GetHistoryValueSecondsAgo and the delta helpers read this buffer (e.g. MoodManager stim/conf comparisons). Changing the console value mid-run does not resize existing buffers until Reset (or a new Emotion is constructed) — so a hot tweak alone will not grow or shrink the live history.",
+      "category": "Mood.Emotion",
+      "related": [
+        "MoodManager_AppPeriod_s",
+        "MoodManager_AudioSendPeriod_s"
+      ],
+      "evidence": "engine/moodSystem/emotion.cpp:34-52,56-109; engine/moodSystem/moodManager.cpp:300,854-875; engine/moodSystem/emotion.h:50-72",
+      "status": "partial",
+      "statusNote": "Capacity is applied only at Emotion construction and Reset(). Live buffer size does not follow console changes until the next Reset.",
+      "tags": ["mood", "emotion", "history", "buffer"]
+    },
+    "MaxExpectedTimeBetweenCapturedFrames_ms": {
+      "process": "engine",
+      "blurb": "How long (milliseconds) the engine will wait without a new camera frame before logging a warning that capture is stalled. Default 500 ms. Does not change exposure, restart the camera, or drop frames — it only gates a diagnostic log line.",
+      "detail": "In VisionComponent::CaptureImage, after a failed CameraGetFrame when capture is supposed to be running (not waiting for a format change, not in power-save, and at least one frame has been captured before), if current basestation time exceeds last capture time by this many ms, it prints VisionComponent.CaptureImage.TooLongSinceFrameWasCaptured with last/now timestamps. Useful when hunting freezes or camera service hang-ups; raising it reduces false positives under load; lowering it logs sooner.",
+      "category": "Vision.General",
+      "related": [
+        "Stats",
+        "ImageMeanSampleInc"
+      ],
+      "evidence": "engine/components/visionComponent.cpp:104,2324-2344",
+      "status": "live",
+      "statusNote": "Live for logging only — no recovery or capture-policy change.",
+      "tags": ["vision", "camera", "debug", "timing"]
+    },
+    "MaxFractionOverexposed": {
+      "process": "engine",
+      "blurb": "When auto-exposure looks at the brightness histogram, if more than this fraction of sampled pixels are overexposed (default 0.8 = 80%), exposure is cut hard using OverExposedAdjustmentFraction instead of the normal target-percentile adjustment. Range 0–1.",
+      "detail": "CameraParamsController::ComputeAdjustmentFraction counts the top histogram bin (pixels above OverExposedThreshold, default 240) versus total samples. If fractionOverexposed exceeds this threshold, adjustmentFraction is set to kOverExposedAdjustmentFraction (default 0.5) so the next exposure/gain step drops quickly in blow-out lighting. Below the threshold, normal percentile→target math runs (or cycling AE targets). Part of Vision.PreProcessing console group alongside under/over thresholds and center-weighted metering. Coretech vision library used by engine AE.",
+      "category": "Vision.PreProcessing",
+      "related": [
+        "OverExposedAdjustmentFraction",
+        "OverExposedThreshold",
+        "UnderExposedThreshold",
+        "Exposure_TargetPercentile",
+        "Exposure_TargetValue",
+        "AutoExp"
+      ],
+      "evidence": "coretech/vision/engine/cameraParamsController.cpp:27-43,505-519",
+      "status": "live",
+      "tags": ["vision", "autoexposure", "camera"]
+    },
+    "MaxNumInitialReactAttemptsBeforeGivingUp": {
+      "process": "engine",
+      "blurb": "While Vector is held in a palm and drives both front (or both rear) cliff sensors over the palm edge, how many failed initial edge-react animations/actions are allowed before the robot gives up and runs the “stuck on palm edge / ask for help” path. Default 2.",
+      "detail": "BehaviorReactToPalmEdge (category Behavior.ReactToPalmEdge). On each initial reaction attempt, numInitialReactAttempts is incremented. Before starting another attempt, if the counter exceeds this limit, TransitionToStuckOnPalmEdge runs (delegates to askForHelpBehavior). Prevents thrashing forever in a “cliffy” palm orientation or when StuckOnPalmEdge is not otherwise detecting the pose. Only matters when the held-in-palm palm-edge reaction is active.",
+      "category": "Behavior.ReactToPalmEdge",
+      "related": [],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/heldInPalm/behaviorReactToPalmEdge.cpp:60-62,210-229,247",
+      "status": "live",
+      "tags": ["behavior", "heldInPalm", "cliff", "safety"]
+    },
+    "MaxNumRobotStopsBeforeGivingUp": {
+      "process": "engine",
+      "blurb": "During cliff reaction, how many cliff-related RobotStopped events Vector will tolerate before quitting recovery backups/animations and going to StuckOnEdge / ask-for-help. Default 5. Protects against thrashing on a very cliffy surface.",
+      "detail": "BehaviorReactToCliff (category Behavior.ReactToCliff) listens for EngineToGame RobotStopped with StopReason::CLIFF and increments persistent numStops. When TransitionToPlayingCliffReaction runs, if numStops exceeds this limit it logs TooManyRobotStops and TransitionToStuckOnEdge. Separate from MaxNumCliffReactAttemptsBeforeGivingUp (animation/action failure count, default 2). Only active while ReactToCliff is activated.",
+      "category": "Behavior.ReactToCliff",
+      "related": [],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToCliff.cpp:94-101,341-347,639-664",
+      "status": "live",
+      "tags": ["behavior", "cliff", "safety", "stop"]
+    },
+    "MaxRobotAngleChangeDuringBackup_rad": {
+      "process": "engine",
+      "blurb": "Factory playpen test: maximum allowed yaw change (radians) while the robot backs up after placing a cube. Default about 10° (DEG_TO_RAD(10)). If the robot twists more than this during backup or the triple-backup anim, the pickup-cube playpen step fails (BACKUP_NOT_STRAIGHT / BACK_AND_FORTH_NOT_STRAIGHT).",
+      "detail": "PlaypenConfig static, exposed via WRAP_EXTERN_CONSOLE_VAR under category Playpen. BehaviorPlaypenPickupCube records yaw at pickup, then after PlaceObjectOnGroundAction and after anim_triple_backup compares absolute Z-angle change to this limit. Used only in factory/dev playpen, not freeplay. Units are radians in the console (default ~0.175 rad).",
+      "category": "Playpen",
+      "related": [
+        "UseButtonToStart"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:240; playpenConfig.cpp:134; behaviorPlaypenPickupCube.cpp:208-217,243-253",
+      "status": "live",
+      "tags": ["playpen", "factory", "pickup", "angle"]
+    },
+    "NumTimesToSeeFrontalToBeStable": {
+      "process": "engine",
+      "blurb": "How many times an unnamed face must be observed looking toward the camera before FaceWorld treats it as a “stable session-only” face (default 30). Named faces are stable immediately; tracking-only IDs never are.",
+      "detail": "FaceEntry::HasStableID requires positive face ID and either a name or numTimesObservedFacingCamera ≥ this threshold. On the observation that crosses the threshold for an unnamed recognized ID, FaceWorld emits a one-shot DAS event (robot.vision.face_recognition.persistent_session_only) and bumps the frontal counter so it does not re-fire. Stable IDs also gate re-see DAS logging (TimeUnobservedBeforeReLoggingToDAS_ms). Lower values mark strangers stable sooner (more DAS/telemetry); higher values demand longer frontal observation.",
+      "category": "Vision.FaceWorld",
+      "related": [
+        "TimeUnobservedBeforeReLoggingToDAS_ms",
+        "Faces"
+      ],
+      "evidence": "engine/faceWorld.cpp:55-56,89-95,490-515",
+      "status": "live",
+      "tags": ["vision", "faces", "das", "recognition"]
+    },
+    "Obstacles": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::Obstacles. When on, each vision tick runs the ground-plane classifier on the color camera image to mark free vs non-drivable ground, producing visual obstacle edge frames that the nav map can add as detected obstacles.",
+      "detail": "Auto-registered bool under Vision.General.VisionModes by SetupVisionModeConsoleVars (name = VisionMode enum string). Toggling calls EnableMode + DevOnly_SelfSubscribe/Unsubscribe so the schedule runs even if no behavior subscribed. VisionSystem::Update requires color; UpdateGroundPlaneClassifier fills visualObstacles; VisionComponent::UpdateVisualObstacles calls MapComponent::AddDetectedObstacles. Distinct from prox-sensor “prox obstacles” and unexpected-movement obstacles. Needs calibrated camera and GroundPlaneClassifier config from vision_config.json. Costs CPU when forced on continuously.",
+      "howTo": "1) Set Obstacles true in console. 2) Ensure color frames are flowing (not power-save starving vision). 3) Watch nav map / logs for detected obstacle edges. 4) Turn off when done to free vision budget.",
+      "category": "Vision.General.VisionModes",
+      "related": [
+        "OverheadEdges",
+        "OverheadMap",
+        "Markers"
+      ],
+      "paths": {
+        "assets": [
+          "resources/config/engine/vision_config.json"
+        ],
+        "notes": "GroundPlaneClassifier block in vision_config.json configures the classifier used when Obstacles runs."
+      },
+      "evidence": "clad/src/clad/types/visionModes.clad:25,90; engine/components/visionComponent.cpp:944,1163-1169,2836-2881; engine/vision/visionSystem.cpp:298,942-948,1703-1717; engine/vision/groundPlaneClassifier.h:7-8",
+      "status": "live",
+      "tags": ["vision", "obstacles", "navmap", "visionmode", "groundplane"]
+    },
+    "People": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::People. When on, the vision system runs the person_detector neural net (TFLite) on camera frames and reports Person salient points used by body-react / find-face-style behaviors.",
+      "detail": "Same Vision.General.VisionModes console-var machinery as other VisionModes. People is registered to network name person_detector in visionModesHelpers. When the mode is enabled, VisionSystem collects networksToRun and StartProcessingIfIdle on the matching NeuralNetRunner; completed detections become SalientPointType::Person and mark People processed. Behaviors such as FindFaceAndThen and ConditionSalientPointDetected can also subscribe at Low/Med frequency without this toggle. Force-on is for testing person detection without waiting for those behaviors. Requires neural-net models from vision_config (graphFile under person_detector). Heavy on CPU/NPU vs pure classic CV modes.",
+      "howTo": "1) Set People true. 2) Confirm person_detector model is present in vision assets. 3) Point camera at a person; watch salient-point / behavior reactions or NeuralNetRunner_SaveImages for debug PNGs. 4) Disable when finished.",
+      "category": "Vision.General.VisionModes",
+      "related": [
+        "Hands",
+        "NeuralNetRunner_SaveImages",
+        "Faces",
+        "Pets"
+      ],
+      "paths": {
+        "assets": [
+          "resources/config/engine/vision_config.json"
+        ],
+        "notes": "NeuralNets.Models entry networkName person_detector (TFLite graph + person-labels.txt)."
+      },
+      "evidence": "clad/src/clad/types/visionModes.clad:28,93; engine/components/visionComponent.cpp:2836-2881; engine/vision/visionModesHelpers.cpp:27-31; engine/vision/visionSystem.cpp:1790-1810; engine/vision/visionProcessingResult.cpp:66-67; resources/config/engine/vision_config.json:117-139",
+      "status": "live",
+      "tags": ["vision", "people", "neuralnets", "visionmode", "salient"]
+    },
+    "SlowLoopBeginSize_loops": {
+      "process": "engine",
+      "blurb": "Dev override for how many slow counting-loop animation cycles play at the start of the counting animation (each loop covers two counts). Default −1 means “use the value from behavior JSON.” Set ≥ 0 to force that many begin-slow loops when the counting behavior activates.",
+      "detail": "BehaviorCountingAnimation (category BehaviorCountingAnimation). JSON keys SlowLoopBeginSize / SlowLoopEndSize set InstanceConfig defaults (code default 1 if missing). On activation SetCountParameters copies the console var into config only when ≥ 0, then partitions the remaining count target into slow-begin, fast-middle, and slow-end loops (loop count × 2 = counts covered). Only applies when something activates counting with SetCountTarget (e.g. count-related gameplay). Leave at −1 for production config-driven timing.",
+      "category": "BehaviorCountingAnimation",
+      "related": [
+        "SlowLoopEndSize_loops"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/animationWrappers/behaviorCountingAnimation.cpp:28-29,39-44,131-144,170-207,227-231",
+      "status": "live",
+      "statusNote": "Only applied when BehaviorCountingAnimation activates and value ≥ 0; −1 leaves JSON config alone.",
+      "tags": ["behavior", "animation", "counting"]
+    },
+    "SlowLoopEndSize_loops": {
+      "process": "engine",
+      "blurb": "Dev override for how many slow counting-loop animation cycles play at the end of the counting animation (each loop covers two counts). Default −1 = use behavior JSON. Set ≥ 0 to force that many end-slow loops on the next counting activation.",
+      "detail": "Sibling of SlowLoopBeginSize_loops. Same SetCountParameters path: if ≥ 0, overrides InstanceConfig.slowLoopEndSize_loops before remaining counts are split into begin slow / fast / end slow. After the end slow loops, CountingGetOut (optional TTS announcement) always plays. Only meaningful while counting behavior is used.",
+      "category": "BehaviorCountingAnimation",
+      "related": [
+        "SlowLoopBeginSize_loops"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/animationWrappers/behaviorCountingAnimation.cpp:28-29,139-144,185-197,243-247",
+      "status": "live",
+      "statusNote": "Only applied when BehaviorCountingAnimation activates and value ≥ 0; −1 leaves JSON config alone.",
+      "tags": ["behavior", "animation", "counting"]
+    },
+    "Stats": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::Stats. When on, each vision pass computes a subsampled mean gray level (imageMean) for the frame and attaches it to processed-image results / RobotProcessedImage messages. Lightweight diagnostics, not a detector.",
+      "detail": "Vision.General.VisionModes console toggle (SetupVisionModeConsoleVars). VisionSystem::ComputeMean samples gray ImageCache every ImageMeanSampleInc pixels and stores result.imageMean; modesProcessed includes Stats. VisionComponent later puts that mean into RobotProcessedImage only when Stats was processed. Default product schedules may already enable Stats periodically via visionScheduleMediator_config — this console force-on keeps it continuous for testing. Does not drive auto-exposure (AE uses its own histogram).",
+      "category": "Vision.General.VisionModes",
+      "related": [
+        "ImageMeanSampleInc",
+        "MaxExpectedTimeBetweenCapturedFrames_ms"
+      ],
+      "evidence": "clad/src/clad/types/visionModes.clad:21,87; engine/components/visionComponent.cpp:971-978,2836-2881; engine/vision/visionSystem.cpp:114,515-536,1558-1563",
+      "status": "live",
+      "tags": ["vision", "stats", "visionmode", "diagnostics"]
+    },
+    "TimeToBeUpsideDown_ms": {
+      "process": "engine",
+      "blurb": "Self-test (factory/dev pickup check): how long (milliseconds) the robot must stay upside-down before cliff sensors are evaluated. Default 2000 ms. Prevents a brief flip from counting as the held-upside-down cliff test.",
+      "detail": "SelfTestConfig static exposed under category SelfTest via WRAP_EXTERN_CONSOLE_VAR. BehaviorSelfTestPickup watches IMU Z accel ≤ kUpsideDownZAccel; once inverted long enough, it requires all four cliff sensors detecting cliff and raw values below threshold for SUCCESS. Separate from UpsideDownTimeout_ms (max time allowed after first inversion before fail). Only runs during self-test pickup sequence, not freeplay.",
+      "category": "SelfTest",
+      "related": [],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.h:53; selfTestConfig.cpp:24; behaviorSelfTestPickup.cpp:60-106",
+      "status": "live",
+      "tags": ["selftest", "factory", "cliff", "imu"]
+    },
+    "TimeUnobservedBeforeReLoggingToDAS_ms": {
+      "process": "engine",
+      "blurb": "If a stable face has not been seen for at least this long (default 10000 ms = 10 s), the next re-observation logs a DAS “persistent_session_only” re-see event. Named and stable session-only faces both qualify via HasStableID.",
+      "detail": "In FaceWorld observation handling, after immediate-recognition and first-stable-session DAS branches, if timeSinceLastSeen_ms exceeds this threshold and HasStableID(), a DAS message is sent with face ID and whether the face is named. Suppresses spam while continuously tracking the same person; re-arms after a gap. Pair with NumTimesToSeeFrontalToBeStable for when unnamed faces become eligible for this path.",
+      "category": "Vision.FaceWorld",
+      "related": [
+        "NumTimesToSeeFrontalToBeStable",
+        "Faces"
+      ],
+      "evidence": "engine/faceWorld.cpp:58-59,516-525,89-95",
+      "status": "live",
+      "tags": ["vision", "faces", "das", "telemetry"]
+    },
+    "UseButtonToStart": {
+      "process": "engine",
+      "blurb": "Factory playpen: when true (default), playpen wait-to-start will not finish until the backpack power button has been pressed (and charger/touch conditions also pass). When false, the button is not required to start playpen.",
+      "detail": "PlaypenConfig bool, WRAP_EXTERN_CONSOLE_VAR category Playpen. BehaviorPlaypenWaitToStart computes buttonGood = !kUseButtonToStart || (kUseButtonToStart && _buttonPressed). Combined with optional touch-to-start (kUseTouchToStart, default false) and a requirement that the robot is on charger contacts or charging. On success clears face text and sets FactoryTestResultCode::SUCCESS. Factory/dev only — not freeplay. Related: kUseTouchToStart, kTouchDurationToStart_ms.",
+      "category": "Playpen",
+      "related": [
+        "MaxRobotAngleChangeDuringBackup_rad"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:57; playpenConfig.cpp:81; behaviorPlaypenWaitToStart.cpp:89-109",
+      "status": "live",
+      "tags": ["playpen", "factory", "button", "start"]
+    }
+  }
+}
