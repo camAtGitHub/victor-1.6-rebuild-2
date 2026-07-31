@@ -1,0 +1,335 @@
+{
+  "vars": {
+    "AllowAudioOnCharger": {
+      "process": "anim",
+      "blurb": "When true (default), Alexa still plays short UI beeps (wake sound and endpointing earcons) even if Vector is docked and in “frozen on charger” acoustic test mode. When false, those earcons are suppressed while frozen on the charger so microphone tests stay quiet.",
+      "detail": "Only gates Alexa UX-state earcons in Alexa::UpdateUXState (Listening wake beeps and Listening→Thinking endpoint beep). It does not mute all robot audio, animations, or TTS. Frozen-on-charger is a separate path used for Alexa acoustic testing (animation streamer also skips motion/audio while frozen on dock). Default true means production-like earcons remain on during that mode unless you turn this off.",
+      "howTo": "1) Put robot on charger in frozen/acoustic-test mode. 2) Set AllowAudioOnCharger false. 3) Trigger Alexa listen transitions — wake/endpoint beeps should not play.",
+      "related": [],
+      "evidence": "animProcess/src/cozmoAnim/alexa/alexa.cpp:79,610-630; animationStreamer.cpp:2350-2352,2386-2399",
+      "category": "Alexa",
+      "status": "live",
+      "tags": ["alexa", "audio", "charger", "test"]
+    },
+    "AudioAnimationOffset_ms": {
+      "process": "anim",
+      "blurb": "How many milliseconds early animation sound keyframes are scheduled so they line up with the face and motors. Default 200 ms on the robot (range 0–300). Larger values start animation audio earlier; 0 plays audio on the nominal keyframe time.",
+      "detail": "Robot-only console var (VICOS). Comment in code: Wwise buffer math is ~85 ms (1024/48000×4), plus ~115 ms measured latency → 200 ms total. TrackLayerComponent::ApplyAudioLayersToAnim treats a keyframe as “time to play” when stream time + this offset reaches the keyframe time, so audio is posted early to counteract speaker-path delay. On non-robot platforms the offset is compiled to 0 (not a console var).",
+      "howTo": "Play an animation with tight audio/face sync. Raise if audio still feels late; lower if audio leads the face. Typical production value is 200.",
+      "evidence": "animProcess/src/cozmoAnim/animation/trackLayerComponent.cpp:40-47,319-342",
+      "category": "Audio.AnimationStreamer",
+      "status": "live",
+      "tags": ["audio", "animation", "latency", "sync"]
+    },
+    "BeatDetectorUseProcessedAudio": {
+      "process": "anim",
+      "blurb": "When true (default), the dance/beat detector listens to the beamformed/processed mic mix. When false, it listens to the first channel of the raw four-mic chunk instead.",
+      "detail": "Each mic block, MicDataProcessor feeds either nextSample.audioBlock (processed) or the raw audioChunk into UpdateBeatDetector. Processed audio is what Signal Essence produces for direction/VAD; raw is unprocessed hardware channels. Tempo bias differs slightly between streams — see TempoCorrectionScaleFactor (comments cite ~1.2% high on processed vs ~1.7% on raw before correction).",
+      "related": ["TempoCorrectionScaleFactor"],
+      "evidence": "animProcess/src/cozmoAnim/micData/micDataProcessor.cpp:76,422-426; animProcess/src/cozmoAnim/beatDetector/beatDetector.cpp:24-27,94-97",
+      "category": "MicData",
+      "status": "live",
+      "tags": ["mic", "beat", "dance", "audio"]
+    },
+    "LeadingSilence_ms": {
+      "process": "anim",
+      "blurb": "Milliseconds of silence Acapela inserts before spoken text-to-speech audio begins. Default 10 ms on the robot (50 ms on Mac builds); console range 0–5000.",
+      "detail": "Read via TextToSpeechProviderConfig::GetLeadingSilence_ms and applied on VICOS as BABIL_PARM_LEADINGSILENCE when pause params are enabled (EnablePausePrams). Only affects newly generated utterances (next GetFirstAudioData). Does not change already-cached/prepared TTS waves.",
+      "related": [
+        "TrailingSilence_ms",
+        "PausePunctuation_ms",
+        "PauseSemicolon_ms",
+        "PauseComma_ms",
+        "PauseBracket_ms",
+        "PauseSpelling_ms",
+        "VoiceSpeed",
+        "VoicePitch",
+        "VoiceShaping"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/textToSpeech/textToSpeechProviderConfig.cpp:69,152-158; textToSpeechProvider_vicos.cpp:284-329",
+      "category": "TextToSpeech",
+      "status": "live",
+      "tags": ["tts", "silence", "acapela"]
+    },
+    "MinPlayableFrames": {
+      "process": "anim",
+      "blurb": "How many audio sample frames of TTS wave must be generated before the utterance is marked “Playable” so playback can start while synthesis continues. Default 8192 (range 0–65536).",
+      "detail": "During CreateSpeech, after each chunk of synthesis, if frames received ≥ MinPlayableFrames and Playable has not been sent yet, TextToSpeechComponent pushes TextToSpeechState::Playable (with an estimated duration). When generation finishes, Prepared is always sent; if the whole utterance was shorter than the threshold, Playable is still sent at completion. Raising this delays early start of streaming TTS; lowering allows earlier barge-in to play with less buffered audio (more risk of underrun if the synthesizer is slow).",
+      "related": ["WriteTTSFile"],
+      "evidence": "animProcess/src/cozmoAnim/textToSpeech/textToSpeechComponent.cpp:51-55,198-226,241-250",
+      "category": "TextToSpeech",
+      "status": "live",
+      "tags": ["tts", "streaming", "buffer"]
+    },
+    "NumberOfFramesToIncrement": {
+      "process": "anim",
+      "blurb": "Step size (in animation frames) used by the IncrementPlaybackFrame console function during manual single-frame animation scrubbing. Default 1.",
+      "detail": "Only meaningful after ToggleManualControlOfAnimStreamer enables manual update mode. In that mode the streamer’s relative time is forced to kCurrentManualFrameNumber × AnimTimeStepMS and does not auto-advance. Each IncrementPlaybackFrame call adds this count to the manual frame number so you can step forward by N frames (or jump larger strides) while inspecting face/audio keyframes. Unrelated to normal freeplay playback.",
+      "howTo": "1) Call ToggleManualControlOfAnimStreamer. 2) Set NumberOfFramesToIncrement (e.g. 1 or 5). 3) Call IncrementPlaybackFrame to step. Optional: CaptureFaceImage to save the face buffer.",
+      "requires": ["ToggleManualControlOfAnimStreamer", "IncrementPlaybackFrame"],
+      "related": ["ShouldDisplayKeyframeNumber"],
+      "evidence": "animProcess/src/cozmoAnim/animation/animationStreamer.cpp:201-242,1987-1990,2010-2022",
+      "category": "ManualAnimationPlayback",
+      "status": "live",
+      "statusNote": "Requires manual playback mode; does nothing during normal streaming.",
+      "tags": ["animation", "debug", "manual-playback"]
+    },
+    "PauseBracket_ms": {
+      "process": "anim",
+      "blurb": "Pause length (ms) Acapela uses for bracket-style punctuation in TTS (SDK pause slot 4). Default 100 ms; console range 50–4000.",
+      "detail": "Mapped to BABIL_PARM_PAUSE4SILENCE when pause params are enabled. Applied at the start of each new utterance generation on the robot. Use with other Pause* vars to space list-like or parenthetical speech.",
+      "related": [
+        "PausePunctuation_ms",
+        "PauseSemicolon_ms",
+        "PauseComma_ms",
+        "PauseSpelling_ms",
+        "LeadingSilence_ms",
+        "TrailingSilence_ms"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/textToSpeech/textToSpeechProviderConfig.cpp:74,197-203; textToSpeechProvider_vicos.cpp:289,327",
+      "category": "TextToSpeech",
+      "status": "live",
+      "tags": ["tts", "pause", "acapela"]
+    },
+    "PauseComma_ms": {
+      "process": "anim",
+      "blurb": "Pause length (ms) Acapela uses at commas in TTS (SDK pause slot 3). Default 250 ms; console range 50–4000.",
+      "detail": "Mapped to BABIL_PARM_PAUSE3SILENCE when pause params are enabled. Affects newly synthesized speech only.",
+      "related": [
+        "PausePunctuation_ms",
+        "PauseSemicolon_ms",
+        "PauseBracket_ms",
+        "PauseSpelling_ms"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/textToSpeech/textToSpeechProviderConfig.cpp:73,188-194; textToSpeechProvider_vicos.cpp:288,326",
+      "category": "TextToSpeech",
+      "status": "live",
+      "tags": ["tts", "pause", "acapela"]
+    },
+    "PausePunctuation_ms": {
+      "process": "anim",
+      "blurb": "Pause length (ms) Acapela uses for major punctuation (periods and similar; SDK pause slot 1). Default 1000 ms (language JSON may override at boot); console range 50–4000.",
+      "detail": "Mapped to BABIL_PARM_PAUSE1SILENCE. On provider config construct, the slider is seeded from tts_config.json pausePunctuation_ms when present for the language, else the programmatic 1000 ms default. Longer values make Vector “breathe” more between sentences; shorter makes speech denser.",
+      "related": [
+        "PauseSemicolon_ms",
+        "PauseComma_ms",
+        "PauseBracket_ms",
+        "PauseSpelling_ms"
+      ],
+      "paths": {
+        "assets": [
+          "resources/config/engine/tts_config.json"
+        ],
+        "notes": "Optional per-language pausePunctuation_ms seeds the console default at TextToSpeechProviderConfig construction."
+      },
+      "evidence": "animProcess/src/cozmoAnim/textToSpeech/textToSpeechProviderConfig.cpp:30,71,104,120,170-176; textToSpeechProvider_vicos.cpp:286,324",
+      "category": "TextToSpeech",
+      "status": "live",
+      "tags": ["tts", "pause", "acapela"]
+    },
+    "PauseSemicolon_ms": {
+      "process": "anim",
+      "blurb": "Pause length (ms) Acapela uses at semicolons in TTS (SDK pause slot 2). Default 500 ms; console range 50–4000.",
+      "detail": "Mapped to BABIL_PARM_PAUSE2SILENCE when pause params are enabled. Affects newly synthesized speech only.",
+      "related": [
+        "PausePunctuation_ms",
+        "PauseComma_ms",
+        "PauseBracket_ms",
+        "PauseSpelling_ms"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/textToSpeech/textToSpeechProviderConfig.cpp:72,179-185; textToSpeechProvider_vicos.cpp:287,325",
+      "category": "TextToSpeech",
+      "status": "live",
+      "tags": ["tts", "pause", "acapela"]
+    },
+    "PauseSpelling_ms": {
+      "process": "anim",
+      "blurb": "Pause length (ms) Acapela uses between spelled-out characters/units in TTS (SDK pause slot 5). Default 100 ms; console range 50–4000.",
+      "detail": "Mapped to BABIL_PARM_PAUSE5SILENCE when pause params are enabled. Useful when Vector spells letters or digits so each character is not crushed together.",
+      "related": [
+        "PausePunctuation_ms",
+        "PauseSemicolon_ms",
+        "PauseComma_ms",
+        "PauseBracket_ms"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/textToSpeech/textToSpeechProviderConfig.cpp:75,206-212; textToSpeechProvider_vicos.cpp:290,328",
+      "category": "TextToSpeech",
+      "status": "live",
+      "tags": ["tts", "pause", "spelling", "acapela"]
+    },
+    "TempoCorrectionScaleFactor": {
+      "process": "anim",
+      "blurb": "Multiplies the aubio beat detector’s reported BPM so the estimated tempo matches real music better. Default 0.988 (about a 1.2% slowdown of the raw estimate).",
+      "detail": "On each detected beat, tempo = aubio_tempo_get_bpm × this scale. Comments: aubio usually reports ~1.2% high on processed mic audio and ~1.7% high on raw; default is tuned for the processed path (BeatDetectorUseProcessedAudio true). If you switch to raw audio, you may want a slightly smaller factor (~0.983).",
+      "related": ["BeatDetectorUseProcessedAudio"],
+      "evidence": "animProcess/src/cozmoAnim/beatDetector/beatDetector.cpp:24-27,90-97",
+      "category": "MicData",
+      "status": "live",
+      "tags": ["mic", "beat", "tempo", "dance"]
+    },
+    "TrailingSilence_ms": {
+      "process": "anim",
+      "blurb": "Milliseconds of silence Acapela appends after spoken TTS finishes. Default 10 ms on the robot (50 ms on Mac); console range 0–5000.",
+      "detail": "Applied as BABIL_PARM_TRAILINGSILENCE with the other pause params when enabled. Helps avoid clipping the end of a phrase; large values add a dead tail before the utterance is considered complete.",
+      "related": [
+        "LeadingSilence_ms",
+        "PausePunctuation_ms",
+        "PauseSemicolon_ms",
+        "PauseComma_ms",
+        "PauseBracket_ms",
+        "PauseSpelling_ms"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/textToSpeech/textToSpeechProviderConfig.cpp:70,161-167; textToSpeechProvider_vicos.cpp:285,323",
+      "category": "TextToSpeech",
+      "status": "live",
+      "tags": ["tts", "silence", "acapela"]
+    },
+    "VoicePitch": {
+      "process": "anim",
+      "blurb": "Base pitch for Acapela TTS (SDK pitch parameter). Default ~100 from tts_config (English); console range 70–160. Higher = higher-pitched voice for newly generated speech.",
+      "detail": "TextToSpeechProviderConfig seeds the slider from language config at construct. GetPitch() returns this console value on remote-console builds. Per-utterance pitchScalar from the request further adjusts via AcapelaTTS::GetAdjustedPitch before BABIL_PARM_PITCH is set. Does not re-pitch already prepared waves.",
+      "related": ["VoiceSpeed", "VoiceShaping", "LeadingSilence_ms"],
+      "paths": {
+        "assets": ["resources/config/engine/tts_config.json"],
+        "notes": "Per-platform/language pitch seeds the console default (e.g. vicos en pitch 100)."
+      },
+      "evidence": "animProcess/src/cozmoAnim/textToSpeech/textToSpeechProviderConfig.cpp:68,119,143-149; textToSpeechProvider_vicos.cpp:276-278,318; textToSpeechProvider_acapela.cpp:85-95",
+      "category": "TextToSpeech",
+      "status": "live",
+      "tags": ["tts", "voice", "pitch"]
+    },
+    "VoiceShaping": {
+      "process": "anim",
+      "blurb": "Acapela “voice shape” timbre control (BABIL_PARM_SEL_VOICESHAPE). Default ~130 from English tts_config (code programmatic default 100); console range 70–140.",
+      "detail": "Higher/lower shaping changes the character of the synthetic voice without changing speed or pitch directly. Applied each GetFirstAudioData. Seeded from tts_config.json shaping for the active language at provider config construction.",
+      "related": ["VoiceSpeed", "VoicePitch"],
+      "paths": {
+        "assets": ["resources/config/engine/tts_config.json"],
+        "notes": "vicos en sets shaping 130 in tts_config.json."
+      },
+      "evidence": "animProcess/src/cozmoAnim/textToSpeech/textToSpeechProviderConfig.cpp:67,118,134-140; textToSpeechProvider_vicos.cpp:281,317",
+      "category": "TextToSpeech",
+      "status": "live",
+      "tags": ["tts", "voice", "timbre"]
+    },
+    "VoiceSpeed": {
+      "process": "anim",
+      "blurb": "Base speaking rate for Acapela TTS. Higher = faster speech. Default ~80–100 depending on language config; console range 30–300. Only applies when no speedTraits row matches the text length.",
+      "detail": "GetSpeed() returns this console value, but GetSpeed(rng, textLength) may override it when tts_config speedTraits match the utterance length (traits intentionally beat the console var). Duration scalar from the speech request further adjusts rate via AcapelaTTS::GetSpeechRate (speechRate = speed / durationScalar, clamped) before BABIL_PARM_SPEED. Seeded from tts_config at construct (e.g. vicos en speed 80).",
+      "related": ["VoicePitch", "VoiceShaping", "MinPlayableFrames"],
+      "paths": {
+        "assets": ["resources/config/engine/tts_config.json"],
+        "notes": "speedTraits for short vs long English strings force fixed rates (e.g. 68 vs 83) and ignore this slider when they match."
+      },
+      "evidence": "animProcess/src/cozmoAnim/textToSpeech/textToSpeechProviderConfig.cpp:66,117,125-131,224-241; textToSpeechProvider_vicos.cpp:270-273,316; textToSpeechProvider_acapela.cpp:72-82; resources/config/engine/tts_config.json",
+      "category": "TextToSpeech",
+      "status": "live",
+      "statusNote": "speedTraits in tts_config can override this console value for matching text lengths.",
+      "tags": ["tts", "voice", "speed"]
+    },
+    "WriteAudioOutputCapture": {
+      "process": "anim",
+      "blurb": "Intended flag to record the Wwise final mix to a WAV under the robot sound cache. Default false. Flipping this bool alone after boot does not start/stop capture — use console function SetWriteAudioOutputCapture, or set true before the audio controller constructs.",
+      "detail": "On CozmoAudioController init, if the flag is already true, WriteAudioOutputCapture(true) runs and creates VictorOutputSession_<utc>.wav, pruning older .wav files using WriteAudioOutputMaxLogCount. Runtime: SetWriteAudioOutputCapture sets this var and calls WriteAudioOutputCapture so capture starts/stops immediately. Leaving capture on can fill flash and adds I/O load.",
+      "howTo": "Preferred: call SetWriteAudioOutputCapture(writeOutput=true), play audio, then SetWriteAudioOutputCapture(false). Pull WAVs from the cache sound folder. Optional: DeleteAudioOutputCaptures to clear.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/sound/VictorOutputSession_*.wav"
+        ],
+        "notes": "sWritePath = DataPlatform Scope::Cache + \"sound\". Filename pattern VictorOutputSession_<utc datetime>.wav."
+      },
+      "requires": ["SetWriteAudioOutputCapture"],
+      "related": [
+        "WriteAudioOutputMaxLogCount",
+        "WriteAudioProfilerCapture",
+        "SetWriteAudioOutputCapture",
+        "DeleteAudioOutputCaptures"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/audio/cozmoAudioController.cpp:128-150,230-231,256-271,353-359,415-427; lib/audio/source/engine/wwiseComponent.cpp:499-517",
+      "category": "Audio.Controller",
+      "status": "partial",
+      "statusNote": "Live at controller construct if already true; after boot, only applied when SetWriteAudioOutputCapture runs (var alone is not polled).",
+      "tags": ["audio", "wwise", "capture", "debug", "paths"]
+    },
+    "WriteAudioOutputMaxLogCount": {
+      "process": "anim",
+      "blurb": "How many Wwise output-capture WAV files to keep in the sound cache when a new capture starts. Default 1; range 1–5. Older files are deleted to make room for the new session file.",
+      "detail": "Used only inside WriteAudioOutputCapture(true): maxLogCount = this − 1 remaining old files, then a new VictorOutputSession_*.wav is created. Does not delete files by itself; changing it mid-capture does not prune until the next start.",
+      "related": [
+        "WriteAudioOutputCapture",
+        "SetWriteAudioOutputCapture",
+        "DeleteAudioOutputCaptures"
+      ],
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/sound/*.wav"
+        ]
+      },
+      "evidence": "animProcess/src/cozmoAnim/audio/cozmoAudioController.cpp:131,415-427,430-436",
+      "category": "Audio.Controller",
+      "status": "live",
+      "tags": ["audio", "wwise", "capture", "retention"]
+    },
+    "WriteAudioProfilerCapture": {
+      "process": "anim",
+      "blurb": "Intended flag to write a Wwise profiler capture (.prof) for audio performance debugging. Default false. Like output capture, the bool alone after boot is not polled — use SetWriteAudioProfilerCapture, or set true before audio controller init.",
+      "detail": "Init path: if true at CozmoAudioController construction, starts profiler capture with name VictorProfilerSession_<utc>.prof and prunes by WriteAudioProfilerMaxLogCount. Runtime: SetWriteAudioProfilerCapture assigns the var and calls WriteProfilerCapture. Profiler files are for Wwise tooling, not listener-facing audio.",
+      "howTo": "Call SetWriteAudioProfilerCapture(writeProfiler=true), exercise audio, then set false. Pull .prof from cache/sound. DeleteAudioProfilerCaptures clears them.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/sound/VictorProfilerSession_*.prof"
+        ],
+        "notes": "Same sWritePath as output capture (Cache/sound)."
+      },
+      "requires": ["SetWriteAudioProfilerCapture"],
+      "related": [
+        "WriteAudioProfilerMaxLogCount",
+        "WriteAudioOutputCapture",
+        "SetWriteAudioProfilerCapture",
+        "DeleteAudioProfilerCaptures"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/audio/cozmoAudioController.cpp:128-142,230,353-356,399-411; lib/audio/source/engine/wwiseComponent.cpp:472-490",
+      "category": "Audio.Controller",
+      "status": "partial",
+      "statusNote": "Live at controller construct if already true; after boot needs SetWriteAudioProfilerCapture to start/stop.",
+      "tags": ["audio", "wwise", "profiler", "debug", "paths"]
+    },
+    "WriteAudioProfilerMaxLogCount": {
+      "process": "anim",
+      "blurb": "How many Wwise profiler .prof captures to retain when a new profiler session starts. Default 3; range 1–5. Older .prof files in the sound cache are removed first.",
+      "detail": "Read only when WriteProfilerCapture(true) runs (init auto-start or SetWriteAudioProfilerCapture). maxLogCount = this − 1 kept, then the new file is written.",
+      "related": [
+        "WriteAudioProfilerCapture",
+        "SetWriteAudioProfilerCapture",
+        "DeleteAudioProfilerCaptures"
+      ],
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/sound/*.prof"
+        ]
+      },
+      "evidence": "animProcess/src/cozmoAnim/audio/cozmoAudioController.cpp:130,399-411,430-436",
+      "category": "Audio.Controller",
+      "status": "live",
+      "tags": ["audio", "wwise", "profiler", "retention"]
+    },
+    "WriteTTSFile": {
+      "process": "anim",
+      "blurb": "When true, every chunk of synthesized TTS PCM is appended to a raw file on the robot so you can inspect the Acapela output offline. Default false.",
+      "detail": "In AppendAudioData, samples are written to /data/data/com.anki.victor/cache/tts.pcm (opened create/truncate on first chunk, closed when the utterance signals done). Comment in registration still says /tmp/tts.pcm but the open path is the cache file above. Overwrites the same path across utterances (fd reset when done). Raw s16 PCM — not a WAV header. Leaving this on increases disk I/O during all TTS.",
+      "howTo": "1) Set true. 2) Trigger any spoken TTS. 3) Pull /data/data/com.anki.victor/cache/tts.pcm. 4) Set false. Import as raw PCM with the TTS sample rate/channel count from the provider.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/tts.pcm"
+        ],
+        "notes": "Code comment mentions /tmp/tts.pcm; implementation opens the cache path. Raw PCM (short samples), not WAV."
+      },
+      "related": ["MinPlayableFrames"],
+      "evidence": "animProcess/src/cozmoAnim/textToSpeech/textToSpeechComponent.cpp:54-55,349-371",
+      "category": "TextToSpeech",
+      "status": "live",
+      "statusNote": "Can grow/overwrite cache on every utterance while true; mild storage/debug risk.",
+      "tags": ["tts", "debug", "capture", "paths"]
+    }
+  }
+}
