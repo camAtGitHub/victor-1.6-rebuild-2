@@ -1,0 +1,149 @@
+{
+  "vars": {
+    "CubeDistance_mm": {
+      "process": "engine",
+      "blurb": "How far (mm) beside a light-cube face the planner-test stand-off pose is placed. Default 25; console range 0–100. Only used by the DevPlannerTest behavior: for each cube face it aims at, it builds a goal pose offset by this distance along the face’s local −Y (and half cube height down), then DriveToPose-loops cube ↔ far pose.",
+      "detail": "BehaviorPlannerTest (JSON DevPlannerTest) finds located light cubes, picks approach poses from vertical face markers (or top when the cube is on its side), and constructs each goal as Point3f{0, −CubeDistance_mm, −halfHeight} relative to that marker, rotated π/2 about Z. Does nothing in normal freeplay — only when that dev behavior is activated. Sibling Distance_mm (same category) is the far-away drive distance after reaching the cube.",
+      "category": "BehaviorPlannerTest",
+      "related": ["Distance_mm", "OnlyUseOriginalGoal"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorPlannerTest.cpp:31,104-154; resources/config/engine/behaviorComponent/behaviors/devBehaviors/devPlannerTest.json",
+      "status": "partial",
+      "statusNote": "Live only while BehaviorPlannerTest / DevPlannerTest is activated; freeplay ignores it.",
+      "tags": ["cube", "planner", "dev", "distance"]
+    },
+    "CubeTriggerIdx": {
+      "process": "engine",
+      "blurb": "Index into the DevViewCubeBackpackLights behavior’s JSON list of cube light animation triggers. Change the number to play the next cube-light pattern on a connected light cube. Default 0. Out-of-range values clamp to the last entry in the list.",
+      "detail": "Category DevViewLights. On each BehaviorUpdate while DevViewCubeBackpackLights is active, if this index differs from the last applied value the behavior finds a connected light cube and calls PlayLightAnimByTrigger / StopAndPlayLightAnim for cubeTriggers[validIdx] from the behavior JSON. Independent sibling BackpackTriggerIdx drives backpack LEDs the same way. Without that dev behavior running and without a connected cube, changing this does nothing.",
+      "howTo": "1) Activate behavior DevViewCubeBackpackLights. 2) Connect a light cube. 3) Set CubeTriggerIdx to step through cubeTriggers in the behavior JSON.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/behaviorComponent/behaviors/devBehaviors/devViewCubeBackpackLights.json"
+        ],
+        "notes": "cubeTriggers array supplies the animation trigger names this index selects."
+      },
+      "category": "DevViewLights",
+      "related": ["BackpackTriggerIdx"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevViewCubeBackpackLights.cpp:31-33,147-161; resources/config/engine/behaviorComponent/behaviors/devBehaviors/devViewCubeBackpackLights.json",
+      "status": "partial",
+      "statusNote": "Only applied while DevViewCubeBackpackLights is activated and a connected light cube is found.",
+      "tags": ["cube", "lights", "dev"]
+    },
+    "DebugPossibleBlockInteraction": {
+      "process": "engine",
+      "blurb": "When true, every engine visualization tick logs one debug line per located light cube: pose state, moving/flat/carried flags, relative Z, up-axis, and whether docking thinks the robot can stack on / pick up the cube (including from ground). Off by default. Visualization-only logging — does not change interaction rules.",
+      "detail": "Registered under category Robot. Read inside Robot::Update’s ENABLE_DRAWING block (ENABLE_DRAWING = ANKI_DEV_CHEATS). Uses BlockWorldFilter::IsLightCubeFilter and DockingComponent CanStackOnTopOfObject / CanPickUpObject / CanPickUpObjectFromGround. Log channel key Robot.ObjectInteractionState. Can flood logs if many cubes are tracked every 60 ms tick.",
+      "category": "Robot",
+      "evidence": "engine/robot.cpp:99,1330-1407",
+      "status": "partial",
+      "statusNote": "Use path is compiled only when ANKI_DEV_CHEATS (ENABLE_DRAWING). On builds without that, the var may still appear but the if-body is gone.",
+      "tags": ["cube", "debug", "logging", "docking"]
+    },
+    "DriveToAndPickupBlockOneAction": {
+      "process": "engine",
+      "blurb": "Docking-test mode switch (default true). When the DockingTestSimple behavior is about to pick up a block and JustPickup is false: true runs a single combined DriveToPickupObjectAction (or align+lift compound if AlignInsteadOfPickup); false splits drive-to-object and pickup into two sequential states.",
+      "detail": "Category DockingTest. Only consulted in BehaviorDockingTestSimple’s pickup branch after JustPickup is checked. Combined path uses DriveToPickupObjectAction with TestDockingMethod, or DriveToAlignWithObjectAction(LIFT_PLATE)+MoveLiftToHeight(CARRY) when AlignInsteadOfPickup. Split path uses DriveToObjectAction then PickupObjectAction. Does not affect product freeplay pickup — only the docking stress-test behavior.",
+      "category": "DockingTest",
+      "related": [
+        "JustPickup",
+        "AlignInsteadOfPickup",
+        "RollInsteadOfPickup",
+        "TestDockingMethod"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDockingTestSimple.cpp:72,475-547; resources/config/engine/behaviorComponent/behaviors/devBehaviors/dockingTestSimple.json",
+      "status": "partial",
+      "statusNote": "Live only while DockingTestSimple is running; ignored in freeplay.",
+      "tags": ["cube", "docking", "dev", "pickup"]
+    },
+    "ExpectedCubePoseAngleThresh_rad": {
+      "process": "engine",
+      "blurb": "Factory playpen only: max allowed rotation difference (radians) between the observed paperclip light cube (LIGHTCUBE1) and the expected fixture pose when PlaypenPickupCube checks placement. Default DEG_TO_RAD(10) ≈ 0.175 rad. Larger = looser angle pass.",
+      "detail": "PlaypenConfig value wrapped under category Playpen. Passed to Pose3d::IsSameAs_WithAmbiguity with upright-only rotation ambiguities and ExpectedCubePoseDistThresh_mm. Failures set FactoryTestResultCode::CUBE_NOT_WHERE_EXPECTED. Freeplay never reads this.",
+      "category": "Playpen",
+      "related": [
+        "ExpectedCubePoseX_mm",
+        "ExpectedCubePoseY_mm",
+        "ExpectedCubePoseDistThresh_mm",
+        "ExpectedCubePoseHeightThresh_mm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:237; playpenConfig.cpp:133; behaviorPlaypenPickupCube.cpp:133-154",
+      "status": "partial",
+      "statusNote": "Only during BehaviorPlaypenPickupCube (factory playpen suite).",
+      "tags": ["cube", "playpen", "factory", "pose"]
+    },
+    "ExpectedCubePoseDistThresh_mm": {
+      "process": "engine",
+      "blurb": "Factory playpen only: max allowed XY translation error (mm) between observed LIGHTCUBE1 pose and the expected fixture pose during PlaypenPickupCube. Default 30 mm. Failures report CUBE_NOT_WHERE_EXPECTED.",
+      "detail": "Paired with ExpectedCubePoseAngleThresh_rad in IsSameAs_WithAmbiguity (upright rotation ambiguities only). Expected position comes from ExpectedCubePoseX/Y (defaults 420, 0 mm in world origin frame) with Z fixed at 22 mm in the behavior’s static expected pose. Height is checked separately via ExpectedCubePoseHeightThresh_mm.",
+      "category": "Playpen",
+      "related": [
+        "ExpectedCubePoseX_mm",
+        "ExpectedCubePoseY_mm",
+        "ExpectedCubePoseAngleThresh_rad",
+        "ExpectedCubePoseHeightThresh_mm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:231; playpenConfig.cpp:131; behaviorPlaypenPickupCube.cpp:133-154",
+      "status": "partial",
+      "statusNote": "Only during BehaviorPlaypenPickupCube.",
+      "tags": ["cube", "playpen", "factory", "pose"]
+    },
+    "ExpectedCubePoseHeightThresh_mm": {
+      "process": "engine",
+      "blurb": "Factory playpen only: max allowed |cube_center_z − half_cube_height| (mm) when PlaypenPickupCube validates that the cube is sitting at a sane height. Default 10 mm. Too high → CUBE_HEIGHT_TOO_HIGH; too low → CUBE_HEIGHT_TOO_LOW (compared against expected pose Z = 22 mm).",
+      "detail": "Separate from the XY/angle IsSameAs check. Uses observed translation.z() minus 0.5×object size.z() as the residual; if |residual| exceeds this threshold, classifies high vs low using expected pose Z. Does not affect freeplay object filtering.",
+      "category": "Playpen",
+      "related": [
+        "ExpectedCubePoseX_mm",
+        "ExpectedCubePoseY_mm",
+        "ExpectedCubePoseDistThresh_mm",
+        "ExpectedCubePoseAngleThresh_rad"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:234; playpenConfig.cpp:132; behaviorPlaypenPickupCube.cpp:156-173",
+      "status": "partial",
+      "statusNote": "Only during BehaviorPlaypenPickupCube.",
+      "tags": ["cube", "playpen", "factory", "pose"]
+    },
+    "ExpectedCubePoseX_mm": {
+      "process": "engine",
+      "blurb": "Factory playpen only: expected world-X (mm) of the paperclip light cube relative to the playpen starting / world origin when PlaypenPickupCube verifies placement. Default 420 mm. Documents the fixture layout; see statusNote about console liveness.",
+      "detail": "Declared in PlaypenConfig and WRAP_EXTERN_CONSOLE_VAR-registered under Playpen. behaviorPlaypenPickupCube builds a file-static const Pose3d once from X, Y, and Z=22 at load time, then copies it when the check runs. Observed LIGHTCUBE1 must match that pose within Dist/Angle thresh (with upright ambiguities) or the test fails CUBE_NOT_WHERE_EXPECTED. Changing this console value after process start does not rebuild that static Pose3d.",
+      "category": "Playpen",
+      "related": [
+        "ExpectedCubePoseY_mm",
+        "ExpectedCubePoseDistThresh_mm",
+        "ExpectedCubePoseAngleThresh_rad",
+        "ExpectedCubePoseHeightThresh_mm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:225-226; playpenConfig.cpp:129; behaviorPlaypenPickupCube.cpp:30-34,102-154",
+      "status": "partial",
+      "statusNote": "Default 420 is used to initialize a file-static const expected pose at load. Runtime console sets do not re-read X into that pose. Only meaningful in PlaypenPickupCube.",
+      "tags": ["cube", "playpen", "factory", "pose"]
+    },
+    "ExpectedCubePoseY_mm": {
+      "process": "engine",
+      "blurb": "Factory playpen only: expected world-Y (mm) of the paperclip light cube for PlaypenPickupCube’s placement check. Default 0 (on the playpen centerline). Same static-pose caveat as ExpectedCubePoseX_mm.",
+      "detail": "Paired with ExpectedCubePoseX_mm when building the static expected Pose3d (Z fixed 22). Observed cube must be within Dist/Angle thresholds of that pose. Console registration under Playpen; freeplay never uses it.",
+      "category": "Playpen",
+      "related": [
+        "ExpectedCubePoseX_mm",
+        "ExpectedCubePoseDistThresh_mm",
+        "ExpectedCubePoseAngleThresh_rad",
+        "ExpectedCubePoseHeightThresh_mm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:228-229; playpenConfig.cpp:130; behaviorPlaypenPickupCube.cpp:30-34,102-154",
+      "status": "partial",
+      "statusNote": "Default 0 baked into file-static const expected pose at load; runtime console changes do not rebuild it. PlaypenPickupCube only.",
+      "tags": ["cube", "playpen", "factory", "pose"]
+    },
+    "IReallyReallyWantToBreakCubeSpinner": {
+      "process": "engine",
+      "blurb": "When true, Vector still plays the cube-spinner “tap/lock” animation but does not call the game’s LockNow() — so the software game never registers Vector’s tap as locking the current light. Default false. Product Cube Spinner (VectorPlaysCubeSpinner) normally fakes a successful lock because real lift taps are unreliable.",
+      "detail": "Category CubeSpinner. Authors’ comment: spinner depends on faking the lock due to gear/lift, cube sensitivity, anim pressure variants, and light lag; vision does not confirm the light. TapIfAppropriate still schedules PlayAnimationAction for the lock anim, then skips cubeSpinnerGame->LockNow() if this flag is true — desyncing animation from game state (missed locks, stuck rounds, hard-to-repro bugs). Leave false unless deliberately stress-testing failure modes.",
+      "category": "CubeSpinner",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/cubeSpinner/behaviorVectorPlaysCubeSpinner.cpp:57-64,422-431; resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/highLevelDelegates/playWithCube/activeCubeBehaviors/vectorPlaysCubeSpinner.json",
+      "status": "danger",
+      "statusNote": "Live in freeplay Cube Spinner. Intentionally breaks game/animation coupling; do not enable casually.",
+      "tags": ["cube", "spinner", "danger", "freeplay"]
+    }
+  }
+}
