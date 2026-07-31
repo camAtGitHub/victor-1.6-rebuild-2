@@ -32,7 +32,10 @@
     "vars/engine-autoexp.json",
     "vars/anim-audio-tts.json",
     "vars/engine-led2.json",
-    "vars/engine-custom-eye.json"
+    "vars/engine-custom-eye.json",
+    "vars/anim-procedural-motors.json",
+    "vars/engine-led3.json",
+    "vars/engine-dirstream-trigger.json"
   ],
   "categories": [
     "categories/vision.json",
