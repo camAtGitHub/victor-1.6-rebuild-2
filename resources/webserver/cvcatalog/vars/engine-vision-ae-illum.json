@@ -1,0 +1,254 @@
+{
+  "vars": {
+    "DetectionMode": {
+      "process": "engine",
+      "blurb": "OKAO face-detector operating mode enum (default Movie). Movie is the live-video tracker with multi-frame search/lost/steadiness settings. Still is a single-image detector (no movie tracker). Other listed modes (Default, Whole, Partition 3, Gradual) are in the OKAO enum string but Init only accepts Movie or Still — anything else logs UnknownDetectionMode and fails init.",
+      "detail": "Registered as CONSOLE_VAR_ENUM under Vision.FaceDetectorCommon. Applied only inside FaceTracker::Impl::Init when creating the OKAO detection handle (DETECTION_MODE_MOVIE vs DETECTION_MODE_STILL). Movie path also applies SearchCycle, Lost, Steadiness, TrackingSwap, DelayCount, Accuracy, Angle/Pose extension, DirectionMask, and tracking edge masks. Changing this at runtime does nothing until ReinitDetector is pulsed true so Deinit+Init run again. Face-eval host tools force Still for offline images.",
+      "howTo": "1) Set DetectionMode (Movie for on-robot video, Still for single-frame tests). 2) Set ReinitDetector true once so the tracker rebuilds. 3) Confirm face tracking still works.",
+      "requires": ["ReinitDetector"],
+      "related": ["ReinitDetector", "MinDetectionConfidence"],
+      "enumLabels": ["Default", "Whole", "Partition 3", "Gradual", "Still", "Movie"],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:83,170-258,1042-1051,1067-1074; coretech/vision/engine/okaoParamInterface.cpp:95-107; coretech/vision/engine/okaoParamInterface.h:76-85",
+      "category": "Vision.FaceDetectorCommon",
+      "status": "partial",
+      "statusNote": "Read only at face-tracker Init. Runtime changes need ReinitDetector. Init implements only Movie and Still; other enum labels fail Init.",
+      "tags": ["vision", "faces", "okao", "enum"]
+    },
+    "DistanceFromCameraThresholdSq_mm": {
+      "process": "engine",
+      "blurb": "Maximum squared distance (mm²) from the camera to a tracked face for “making eye contact” to be allowed. Default 700×700 (= 490000 → face within about 0.7 m). Faces farther away fail the secondary eye-contact constraints even if gaze looks centered.",
+      "detail": "EyeContact::SecondaryConstraints requires head pose translation LengthSq() < this threshold, plus head pitch/yaw in cone and blink-amount checks. Used by FaceWorld::IsMakingEyeContact, conditionEyeContact, face selection, track-face, and gaze-react behaviors. Larger values allow eye-contact at greater range; smaller values require the person to be closer.",
+      "related": [],
+      "evidence": "coretech/vision/engine/eyeContact.cpp:33,144-160; coretech/vision/engine/faceTrackerImpl_okao.cpp:700-709; engine/faceWorld.cpp:1159-1171; engine/aiComponent/beiConditions/conditions/conditionEyeContact.cpp:35",
+      "category": "Vision.EyeContact",
+      "status": "live",
+      "tags": ["vision", "faces", "eye-contact", "distance"]
+    },
+    "EnableExtraIlluminationDetectorDebug": {
+      "process": "engine",
+      "blurb": "When true, logs extra DEBUG lines from the illumination detector: feature-buffer fill progress, histogram percentile feature vectors, and classifier probability. Off by default. Does not change Illuminated/Darkened decisions — logging only.",
+      "detail": "IlluminationDetector runs under VisionMode::Illumination when feature ReactToIllumination is on. It builds a window of image-brightness percentiles and classifies with a linear model from resources. Extra debug is intentionally spammy (comment in source). Pair with Illumination mode / feature gate when tuning thresholds in vision_config IlluminationDetector block.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/vision_config.json",
+          "resources/config/engine/vision/illuminationClassifier/illuminationClassifier.json"
+        ],
+        "notes": "ClassifierConfigPath and IlluminatedMinProbability / DarkenedMaxProbability live under IlluminationDetector in vision_config."
+      },
+      "related": ["Illumination"],
+      "evidence": "engine/vision/illuminationDetector.cpp:35,136-170,188-197; engine/vision/visionSystem.cpp:965-970,1835-1841; resources/config/engine/vision_config.json:23-31",
+      "category": "Vision.Illumination",
+      "status": "live",
+      "tags": ["vision", "illumination", "debug", "logging"]
+    },
+    "FakeCatDetectionProbability": {
+      "process": "engine",
+      "blurb": "Probability (0–1, default 0) that, after a neural-net run registered to Pets mode, the vision system injects a full-frame fake Cat salient point. For testing pet behaviors when real cat detection is missing or unreliable.",
+      "detail": "Only under ANKI_DEV_CHEATS. AddFakeDetections runs after neural-net results; for each mode in the net’s mode set, if Pets is present and a uniform random draw is below this value, appends SalientPointType::Cat covering the whole image. Independent of FakeDogDetectionProbability (both can fire on the same Pets frame). Zero leaves real detections alone.",
+      "howTo": "1) Ensure Pets / neural nets are scheduled. 2) Set this > 0 (e.g. 1.0 for always). 3) Confirm Cat salient points / pet behaviors. Reset to 0 when done.",
+      "related": ["FakeDogDetectionProbability", "FakeHandDetectionProbability", "Pets"],
+      "evidence": "engine/vision/visionSystem.cpp:124-127,1417-1461",
+      "category": "Vision.NeuralNets",
+      "status": "partial",
+      "statusNote": "Only compiled/used when ANKI_DEV_CHEATS is enabled; default 0 means no fakes.",
+      "tags": ["vision", "pets", "neural-nets", "debug", "dev-cheats"]
+    },
+    "FakeDogDetectionProbability": {
+      "process": "engine",
+      "blurb": "Probability (0–1, default 0) of injecting a full-frame fake Dog salient point after a Pets-mode neural-net result. Same dev-cheat path as FakeCatDetectionProbability.",
+      "detail": "AddFakeDetections under ANKI_DEV_CHEATS; independent RNG check from cat fakes on the same Pets mode. Used to exercise dog-related AI without a working pet model.",
+      "related": ["FakeCatDetectionProbability", "FakeHandDetectionProbability", "Pets"],
+      "evidence": "engine/vision/visionSystem.cpp:124-127,1417-1461",
+      "category": "Vision.NeuralNets",
+      "status": "partial",
+      "statusNote": "ANKI_DEV_CHEATS only; default 0.",
+      "tags": ["vision", "pets", "neural-nets", "debug", "dev-cheats"]
+    },
+    "FakeHandDetectionProbability": {
+      "process": "engine",
+      "blurb": "Probability (0–1, default 0) of injecting a full-frame fake Hand salient point after a neural-net result registered to Hands mode. For testing hand-reaction behaviors without a reliable hand model.",
+      "detail": "Same ANKI_DEV_CHEATS AddFakeDetections path as pet fakes, but keyed on VisionMode::Hands and SalientPointType::Hand.",
+      "related": ["FakeCatDetectionProbability", "FakeDogDetectionProbability", "Hands"],
+      "evidence": "engine/vision/visionSystem.cpp:124-127,1417-1461",
+      "category": "Vision.NeuralNets",
+      "status": "partial",
+      "statusNote": "ANKI_DEV_CHEATS only; default 0.",
+      "tags": ["vision", "hands", "neural-nets", "debug", "dev-cheats"]
+    },
+    "Gain": {
+      "process": "engine",
+      "blurb": "Factory playpen camera gain (default 1.0). When the playpen test behavior activates, it builds fixed CameraParams from Exposure_ms and this Gain (also used for the three white-balance gain channels) and calls SetAndDisableCameraControl so auto-exposure and white balance stop updating.",
+      "detail": "WRAP_EXTERN_CONSOLE_VAR of PlaypenConfig::kGain under category Playpen — not the live AutoExp gain floor. Only relevant during factory playpen camera calibration / test sequences. Normal freeplay AE uses CameraParamsController and MIN_CAMERA_GAIN/MAX_CAMERA_GAIN constants, not this var.",
+      "howTo": "Only needed when running playpen factory tests. Set before starting playpen; activation snapshots params into SetAndDisableCameraControl.",
+      "related": ["Exposure_ms", "AutoExp", "WhiteBalance", "MinCameraGain"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:151-152; playpenConfig.cpp:108-109; behaviorPlaypenTest.cpp:177-180; engine/components/visionComponent.cpp:2217-2242",
+      "category": "Playpen",
+      "status": "live",
+      "statusNote": "Playpen/factory only. Does not change freeplay auto-exposure gain.",
+      "tags": ["playpen", "factory", "camera", "gain"]
+    },
+    "GetEnrollmentTimeFromImageTimestamp": {
+      "process": "engine",
+      "blurb": "When true, face enrollment records use the camera image timestamp as enrollment/update time instead of wall-clock system time. Default false. Mainly for offline/unit tests that process image files faster than real time.",
+      "detail": "FaceRecognizer_okao uses this when RegisterNewUser and UpdateExistingAlbumEntry build EnrolledFaceEntry::Time. True → Time(milliseconds(image timestamp)); false → system_clock::now(). Host tools (recognizeFaces) and face-recognition tests force true. Production robots should leave false so enrollment ages match real calendar time.",
+      "related": [],
+      "evidence": "coretech/vision/engine/faceRecognizer_okao.cpp:73-77,995-998,1223-1225; test/engine/faceRecognitionTests.cpp:58,357; tools/recognizeFaces/recognizeFaces.cpp:30,392",
+      "category": "Vision.FaceRecognition",
+      "status": "live",
+      "tags": ["vision", "faces", "enrollment", "testing"]
+    },
+    "LinearizeForAutoExposure": {
+      "process": "engine",
+      "blurb": "When true, auto-exposure converts pixel brightness through the camera linearization LUT (undo gamma) before filling the brightness histogram. Default false. Intended to make exposure math more accurate; often left off as “not super necessary.”",
+      "detail": "CameraParamsController::ComputeExposureAdjustment installs linearizeFcn from _linearizationLUT when this is on. Used on grayscale AE path histogram fill. RGB combined AE/WB path comments still TODO linearization for channel sums. Pair with AutoExp; gamma table must be set elsewhere for LUT to be meaningful.",
+      "related": ["AutoExp", "UnderExposedThreshold", "OverExposedThreshold", "UseCenterWeightedMetering"],
+      "evidence": "coretech/vision/engine/cameraParamsController.cpp:29-32,577-598,626",
+      "category": "Vision.PreProcessing",
+      "status": "live",
+      "tags": ["vision", "autoexposure", "gamma"]
+    },
+    "MeteringHoldTime_ms": {
+      "process": "engine",
+      "blurb": "After the vision system last used detection boxes (markers, faces, etc.) to drive auto-exposure metering, it freezes AE updates for this many milliseconds (default 2000) once those boxes disappear. Prevents exposure from jumping the moment a face or cube leaves frame.",
+      "detail": "In UpdateCameraParams, if MeterFromDetections is on and _meteringRegions is empty, but a prior metering timestamp exists and current image time is still within lastMetering + hold, the function returns early without recomputing exposure. While hold is active you may see log HoldingExposureAfterRecentMeteredRegions. Only matters when AutoExp (and/or WhiteBalance) is running and metering-from-detections is enabled in vision config.",
+      "related": ["AutoExp", "WhiteBalance", "Markers_ChargerOnly"],
+      "evidence": "engine/vision/visionSystem.cpp:100-101,599-610; resources/config/engine/vision_config.json:46",
+      "category": "Vision.PreProcessing",
+      "status": "live",
+      "tags": ["vision", "autoexposure", "metering", "timing"]
+    },
+    "MinCameraGain": {
+      "process": "engine",
+      "blurb": "Appears under Vision.PreProcessing as a float defaulting to 0.1, but the value is never read. Real minimum camera gain for AE and APIs is the compile-time constant MIN_CAMERA_GAIN (0.25 on this tree, bandaid for VIC-6653).",
+      "detail": "CONSOLE_VAR kMinCameraGain is registered in visionComponent.cpp only. VisionSystem::GetMinCameraGain returns MIN_CAMERA_GAIN; CameraParamsController uses the min/max passed at construction from those constants. Changing this console id does nothing to live AE or SDK CameraConfigResponse.",
+      "related": ["Gain", "AutoExp", "AutoExp_MinGain"],
+      "evidence": "engine/components/visionComponent.cpp:85 (register only); engine/vision/visionSystem.h:186; engine/vision/visionSystem.cpp:152-156; robot/include/anki/cozmo/shared/cozmoConfig.h:186-188; rg shows no other kMinCameraGain readers",
+      "category": "Vision.PreProcessing",
+      "status": "dead",
+      "statusNote": "Registered but unused. Runtime floor is MIN_CAMERA_GAIN (0.25f), not this console var.",
+      "tags": ["vision", "camera", "gain", "orphan"]
+    },
+    "MinDetectionConfidence": {
+      "process": "engine",
+      "blurb": "Minimum OKAO face-detection confidence (default 500, typical OKAO scale ~0–1000) required before a tracked face is considered enrollable for face recognition. Does not gate ordinary face tracking — only enrollment eligibility.",
+      "detail": "FaceTracker::Impl::IsEnrollable requires detectionInfo.nConfidence > this value, plus frontal pose, IsFacingCamera, and minimum inter-eye distance. Comment notes that in default tracking accuracy, OKAO may report a fixed track confidence equal to the detection threshold, so this knob may have little effect unless high-accuracy tracking is used. Category Vision.FaceTracker (FaceEnrollParams).",
+      "related": ["DetectionMode", "ReinitDetector"],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:34-38,1466-1476",
+      "category": "Vision.FaceTracker",
+      "status": "live",
+      "tags": ["vision", "faces", "enrollment", "confidence"]
+    },
+    "OverExposedAdjustmentFraction": {
+      "process": "engine",
+      "blurb": "When the brightness histogram’s top bin (fully saturated pixels) exceeds MaxFractionOverexposed, AE multiplies exposure by this fraction (default 0.5, range 0–1) instead of the normal target/percentile ratio — a hard step-down for badly blown-out frames.",
+      "detail": "CameraParamsController::ComputeAdjustmentFraction special case. Lower values darken faster when washed out; 1.0 would not reduce on overexposure via this path. Works with AutoExp whenever the histogram is rebuilt for exposure.",
+      "related": ["AutoExp", "OverExposedThreshold", "UnderExposedThreshold", "LinearizeForAutoExposure"],
+      "evidence": "coretech/vision/engine/cameraParamsController.cpp:43,513-519",
+      "category": "Vision.PreProcessing",
+      "status": "live",
+      "tags": ["vision", "autoexposure", "overexposure"]
+    },
+    "OverExposedThreshold": {
+      "process": "engine",
+      "blurb": "RGB channel value above which a pixel is treated as over-exposed (strictly greater than this, default 240 on 0–255). Over/under-exposed pixels are skipped when summing channels for gray-world white balance. Set both this and UnderExposedThreshold to 0 to treat every pixel as well-exposed.",
+      "detail": "IsWellExposed requires each of R,G,B in [UnderExposedThreshold, OverExposedThreshold]. Used in ComputeWhiteBalanceAdjustment and the combined RGB AE+WB path. Does not by itself trigger the OverExposedAdjustmentFraction histogram special case (that uses the top hist bin vs MaxFractionOverexposed).",
+      "related": ["UnderExposedThreshold", "WhiteBalance", "AutoExp", "OverExposedAdjustmentFraction"],
+      "evidence": "coretech/vision/engine/cameraParamsController.cpp:37-38,661-673,697-707,756-763",
+      "category": "Vision.PreProcessing",
+      "status": "live",
+      "tags": ["vision", "whitebalance", "autoexposure", "overexposure"]
+    },
+    "PostClaheSmooth": {
+      "process": "engine",
+      "blurb": "Smoothing applied after CLAHE contrast enhancement used for marker detection. Default −3: box filter of size 3. 0 = no smooth. Positive = Gaussian sigma (kernel ~3×sigma, forced odd). Negative = box-filter size = −value.",
+      "detail": "Runs only when ApplyCLAHE actually produces a CLAHE image (_currentUseCLAHE). Affects the image fed to DetectMarkers when UseCLAHE_u8 is On/Both/Alternating/WhenDark (not Off). Playpen calibration temporarily forces UseCLAHE_u8 off then restores WhenDark (4).",
+      "related": ["UseCLAHE_u8", "ClaheClipLimit", "ClaheTileSize", "ClaheWhenDarkThreshold", "Markers"],
+      "evidence": "engine/vision/visionSystem.cpp:88,1071-1088,1548-1555",
+      "category": "Vision.PreProcessing",
+      "status": "live",
+      "tags": ["vision", "clahe", "markers", "preprocessing"]
+    },
+    "ReinitDetector": {
+      "process": "engine",
+      "blurb": "One-shot: set true to tear down and re-create the OKAO face detector on the next face-tracker Update, applying current FaceDetectorCommon console params (DetectionMode, sizes, thresholds, movie params, etc.). Automatically clears back to false after reinit.",
+      "detail": "Only present when REMOTE_CONSOLE_ENABLED. FaceTracker::Impl::Update checks the flag, Deinit(), Init(), then sets the flag false. Use after changing DetectionMode or other init-only OKAO knobs. May briefly interrupt face tracking.",
+      "howTo": "1) Change face-detector console params as needed. 2) Set ReinitDetector true. 3) Wait one vision faces tick; flag self-clears. 4) Verify faces still track.",
+      "related": ["DetectionMode", "MinDetectionConfidence"],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:65-68,1066-1074",
+      "category": "Vision.FaceDetectorCommon",
+      "status": "live",
+      "statusNote": "REMOTE_CONSOLE_ENABLED builds only; self-clearing pulse.",
+      "tags": ["vision", "faces", "okao", "reinit"]
+    },
+    "RollingShutterCorrectionEnabled": {
+      "process": "engine",
+      "blurb": "When true (default), physical robots enable rolling-shutter correction so vision can compensate for motion distortion across camera rows using IMU/pose history. When false, correction is forced off and vision-while-rotating-fast is also disabled.",
+      "detail": "Read only inside VisionComponent::SetCameraCalibration: if enabled, ShouldDoRollingShutterCorrection(robot.IsPhysical()); else false + EnableVisionWhileRotatingFast(false). Simulator/non-physical stays off even if the flag is true. Runtime toggle after calibration was set does nothing until calibration is applied again. Correction itself runs in VisionSystem::UpdateRollingShutter via RollingShutterCorrector.",
+      "howTo": "Prefer setting before/at camera calibration. To re-apply after boot, force a path that calls SetCameraCalibration again (e.g. recalibrate) after changing the flag.",
+      "related": ["Markers_FastRotation"],
+      "evidence": "engine/components/visionComponent.cpp:83-85,313-321; engine/vision/visionSystem.cpp:1466-1478; engine/vision/visionSystem.h:178-179,197-198",
+      "category": "Vision.PreProcessing",
+      "status": "partial",
+      "statusNote": "Only applied when SetCameraCalibration runs, not every frame. False also turns off vision-while-rotating-fast.",
+      "tags": ["vision", "rolling-shutter", "imu", "camera"]
+    },
+    "SensorAperture": {
+      "process": "engine",
+      "blurb": "Not a camera setting. Multiplier that turns a ToF/prox distance reading into a sensor-beam width for the navigation map (default 0.4 ≈ tan of half-cone). Beam width = measurement × SensorAperture; obstacle width is that value clamped by MaxObstacleWidth_mm.",
+      "detail": "ProxSensorComponent clear-region / obstacle geometry: wider aperture clears a fatter cone but can create large far obstacles (comments warn about planning failures). Category ProxSensorComponent — unrelated to camera aperture/f-stop.",
+      "related": [],
+      "evidence": "engine/components/sensors/proxSensorComponent.cpp:98-101,290-310",
+      "category": "ProxSensorComponent",
+      "status": "live",
+      "tags": ["prox", "tof", "navmap", "obstacle"]
+    },
+    "UnderExposedThreshold": {
+      "process": "engine",
+      "blurb": "RGB channel value below which a pixel is treated as under-exposed (strictly less than this, default 15). Together with OverExposedThreshold, filters which pixels contribute to white-balance channel sums. Both thresholds 0 → every pixel counts as well-exposed.",
+      "detail": "IsWellExposed helper in CameraParamsController. Same WB statistics path as OverExposedThreshold. Does not define the “TooDark” image-quality message (that uses separate vision_config percentiles).",
+      "related": ["OverExposedThreshold", "WhiteBalance", "AutoExp", "LinearizeForAutoExposure"],
+      "evidence": "coretech/vision/engine/cameraParamsController.cpp:34-35,661-673,697-707,756-763",
+      "category": "Vision.PreProcessing",
+      "status": "live",
+      "tags": ["vision", "whitebalance", "autoexposure", "underexposure"]
+    },
+    "UseCLAHE_u8": {
+      "process": "engine",
+      "blurb": "Selects how CLAHE (local contrast boost) is used before marker detection. Integer 0–4 mapping MarkerDetectionCLAHE: 0 Off, 1 On (CLAHE only), 2 Both (original then CLAHE), 3 Alternating frames, 4 WhenDark (default — CLAHE only if image mean is below ClaheWhenDarkThreshold). Improves reading fiducials in uneven lighting at CPU cost.",
+      "detail": "Cast to MarkerDetectionCLAHE each vision Update; ApplyCLAHE may leave claheImage empty when Off or WhenDark-and-bright. DetectMarkers chooses gray vs CLAHE pointers from the same mode. Playpen camera calibration sets 0 while capturing the calib image, then restores 4. Not used for face detection. Related knobs: ClaheClipLimit, ClaheTileSize, ClaheWhenDarkThreshold, PostClaheSmooth.",
+      "howTo": "0 for raw markers / calib; 4 for product-like dark scenes; 2 if you want max chance at cost of two detector passes.",
+      "related": ["PostClaheSmooth", "ClaheClipLimit", "ClaheTileSize", "ClaheWhenDarkThreshold", "Markers"],
+      "enumLabels": ["Off", "On", "Both", "Alternating", "WhenDark"],
+      "evidence": "engine/vision/visionSystem.cpp:84,989-1088,1105-1173,1548-1555; engine/vision/visionSystem.h:257-264; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/behaviorPlaypenCameraCalibration.cpp:127,178",
+      "category": "Vision.PreProcessing",
+      "status": "live",
+      "tags": ["vision", "clahe", "markers", "preprocessing"]
+    },
+    "UseCenterWeightedMetering": {
+      "process": "engine",
+      "blurb": "When true (default) and no explicit metering weight mask from detections, auto-exposure weights the green-channel histogram toward the image center (L1 falloff from mid-frame). When false, every subsampled pixel counts equally.",
+      "detail": "In ComputeExposureAndWhiteBalance: if GetMeteringWeightMask already has detection weights, those win; else if this flag, center weights; else uniform. Only affects RGB AE/WB combined path histogram. Detection-based metering (faces/markers) bypasses center weighting via the weight mask.",
+      "related": ["AutoExp", "WhiteBalance", "MeteringHoldTime_ms", "LinearizeForAutoExposure"],
+      "evidence": "coretech/vision/engine/cameraParamsController.cpp:45,740-782",
+      "category": "Vision.PreProcessing",
+      "status": "live",
+      "tags": ["vision", "autoexposure", "metering"]
+    },
+    "WhiteBalance": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::WhiteBalance so the engine continuously adjusts camera red/blue gains toward gray-world balance from well-exposed pixels. Default product schedule also runs WhiteBalance about every 5th frame from vision_config. When off (and nothing subscribed it), WB gains stay at their last values.",
+      "detail": "SetupVisionModeConsoleVars registers every VisionMode name as a bool under Vision.General.VisionModes; toggling true DevOnly-subscribes and EnableMode. UpdateCameraParams sets WhiteBalanceMode::GrayWorld when the mode is on, computing adjR/adjB so channel averages match green (skipping under/over-exposed pixels). Applied to the camera via CameraService::CameraSetWhiteBalanceParameters when the mode was processed. Playpen/manual SetAndDisableCameraControl turns WB off and forces fixed gains. Sibling of AutoExp; both can run in the same UpdateCameraParams call.",
+      "related": [
+        "AutoExp",
+        "UnderExposedThreshold",
+        "OverExposedThreshold",
+        "UseCenterWeightedMetering",
+        "Gain"
+      ],
+      "evidence": "engine/components/visionComponent.cpp:2212-2214,2574-2579,2836-2882; engine/vision/visionSystem.cpp:593-597,1848-1861; clad/src/clad/types/visionModes.clad:20,85; resources/config/engine/vision_config.json:11; coretech/vision/engine/cameraParamsController.cpp:677-721,725-798",
+      "category": "Vision.General.VisionModes",
+      "status": "live",
+      "tags": ["vision", "whitebalance", "camera", "visionmode"]
+    }
+  }
+}
