@@ -1,0 +1,51 @@
+{
+  "vars": {
+    "DrawMirrorModeSalientPointsFor_ms": {
+      "process": "engine",
+      "blurb": "How long (milliseconds) neural-net and bright-color detections stay painted on Vector’s face when Mirror Mode is showing the camera feed. Default 0 means each new detection batch replaces the previous drawings immediately. Set above 0 to keep boxes/labels on the face for that many ms so slow neural-net results are easier to see.",
+      "detail": "Used only inside MirrorModeManager::DrawSalientPoints, which runs when building the mirrored camera image for the LCD (and only if DisplayDetectionsInMirrorMode is true). Salient points come from BrightColors and any VisionModes that use neural nets. With value 0, the draw list is cleared the next time those modes produce results, then refilled. With a positive value, old points are expired by timestamp instead of cleared, so overlays persist across slow net frames. Does not change detection, AI, or pathing — face display only. Sibling of KeepDrawingSalientPointsFor_ms, which does the same idea for the host Viz camera view instead of the face.",
+      "howTo": "1) Enable Mirror Mode so the camera is on the face. 2) Ensure neural-net and/or BrightColors vision modes are running. 3) Leave DisplayDetectionsInMirrorMode on (default true). 4) Set this to e.g. 2000–5000 if detections flicker because nets run slowly.",
+      "category": "Vision.MirrorMode",
+      "related": [
+        "KeepDrawingSalientPointsFor_ms",
+        "DisplayDetectionsInMirrorMode",
+        "MirrorModeGamma",
+        "NeuralNetRunner_Gamma"
+      ],
+      "evidence": "engine/vision/mirrorModeManager.cpp:35,182-258,270-275",
+      "status": "live",
+      "tags": ["vision", "mirror", "salient", "neural", "debug", "viz"]
+    },
+    "KeepDrawingSalientPointsFor_ms": {
+      "process": "engine",
+      "blurb": "How long (milliseconds) neural-net and bright-color detections stay drawn in the engine’s host Viz camera view. Default 0 means drawings are replaced as soon as the next detection batch arrives. Set above 0 so boxes and labels hang around while slow nets catch up — useful for debugging object/scene labels on a connected Viz client.",
+      "detail": "Read in VisionComponent::UpdateSalientPoints. Comment in code: hack because neural nets run slowly. When > 0, points in the draw list expire after this duration from their stamp. When 0, the list is cleared on each new BrightColors or neural-net result frame, then refilled from that result. Drawing is via VizManager (DrawCameraPoly / DrawCameraText) on the scaled camera view — not the robot face (see DrawMirrorModeSalientPointsFor_ms for that). New detections are still forwarded to SalientPointsComponent for AI regardless of this value; only the debug overlay persistence changes.",
+      "howTo": "1) Run with Viz/camera debug connected. 2) Enable neural-net and/or BrightColors vision modes. 3) Set this to a few thousand ms if overlays blink off between net frames. 4) Set 0 for the default “last result only” behavior.",
+      "category": "Vision.General",
+      "related": [
+        "DrawMirrorModeSalientPointsFor_ms",
+        "NeuralNetRunner_Gamma"
+      ],
+      "evidence": "engine/components/visionComponent.cpp:98-100,1183-1257",
+      "status": "live",
+      "tags": ["vision", "salient", "neural", "debug", "viz"]
+    },
+    "NeuralNetRunner_Gamma": {
+      "process": "engine",
+      "blurb": "Gamma correction applied to the resized camera RGB image right before it is sent into a neural-net model. Default 1.0 means no change (correction disabled). Values other than 1.0 rebuild a 256-entry LUT and remap every R/G/B sample so the model sees a brighter or darker/more contrasty frame.",
+      "detail": "Applied in NeuralNetRunner::ApplyGamma after half-res resize and before RunModel/Detect. Formula uses 1/gamma as the power exponent on normalized pixel values (standard gamma LUT). Only runs when StartProcessingIfIdle actually starts a job (color present, runner initialized, not already busy). Changing the value mid-session rebuilds the LUT when it differs from the cached gamma. Does not affect the debayer pipeline, Mirror Mode face gamma (MirrorModeGamma), or saved full/half images except the resized save path, which is written after ApplyGamma. Use when tuning model sensitivity to lighting; leave at 1.0 for stock input.",
+      "howTo": "1) Leave at 1.0 for no preprocessing. 2) Try values above 1 to lighten midtones into the model, or below 1 to darken, then re-run scenes with neural modes on. 3) Optionally pair with NeuralNetRunner_SaveImages = Save Resized to inspect the post-gamma input PNGs under the runner cache path.",
+      "category": "Vision.NeuralNetRunner",
+      "related": [
+        "NeuralNetRunner_SaveImages",
+        "KeepDrawingSalientPointsFor_ms",
+        "DrawMirrorModeSalientPointsFor_ms",
+        "DebayerGamma",
+        "MirrorModeGamma"
+      ],
+      "evidence": "coretech/vision/engine/neuralNetRunner.cpp:60-62,165-201,239-246",
+      "status": "live",
+      "tags": ["vision", "neural", "gamma", "preprocessing"]
+    }
+  }
+}
