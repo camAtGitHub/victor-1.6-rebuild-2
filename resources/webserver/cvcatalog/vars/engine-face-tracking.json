@@ -1,0 +1,228 @@
+{
+  "vars": {
+    "EnableTestFaceImageRGBDrawing": {
+      "process": "engine",
+      "blurb": "When true, every robot-state tick draws a looping demo RGB animation onto Vector’s face display (an “x” scrolling across a color-cycling background). Off by default. Intended only as example code for DisplayFaceImage / procedural face streaming.",
+      "detail": "UpdateFullRobotState calls UpdateFaceImageRGBExample when this is on. That helper builds a FACE_DISPLAY-sized ImageRGB, fills it with a cycling background, draws “x”, and pushes it through AnimationComponent::DisplayFaceImage for 2×AnimTimeStepMS. It throttles if more than 30 procedural face keyframes are already queued. This is not face-camera vision — it hijacks the screen for a test pattern and will fight real animations/expressions while left on.",
+      "category": "Robot",
+      "related": [],
+      "evidence": "engine/robot.cpp:104-105,863-936,949-952",
+      "status": "danger",
+      "statusNote": "Live but overwrites the face display every state message; leave false on a real robot unless intentionally testing face-image streaming.",
+      "tags": ["robot", "face-display", "debug", "danger"]
+    },
+    "FaceDetectionThreshold": {
+      "process": "engine",
+      "blurb": "OKAO face-detector confidence gate (1–1000, default 500). Higher = fewer false positives but more missed faces; lower = more sensitive detection.",
+      "detail": "Applied only when the OKAO detector handle is created/configured in FaceTracker::Impl::Init via OKAO_DT_SetThreshold. Runtime console edits do not re-call SetThreshold until you reinit: flip ReinitDetector true so Update Deinit+Init applies current DetectParams. Offline faceEvalDetection can set this via NativeAnkiUtilConsoleSetValueWithString.",
+      "howTo": "1) Change FaceDetectionThreshold. 2) Set ReinitDetector = true (next face Update rebuilds the detector). 3) Confirm Faces vision mode is running.",
+      "category": "Vision.FaceDetectorCommon",
+      "related": [
+        "MinFaceSize",
+        "MaxFaceSize",
+        "MaxDetectedFaces",
+        "ReinitDetector"
+      ],
+      "requires": ["ReinitDetector"],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:82,281-286,1067-1074; coretech/vision/tools/faceEval/faceEvalDetection.cpp:57",
+      "status": "partial",
+      "statusNote": "Value is only pushed into OKAO at Init (and after ReinitDetector). Changing the console var alone mid-run does not update the live detector.",
+      "tags": ["vision", "faces", "okao", "threshold", "detection"]
+    },
+    "FaceRecMaxDebugResults": {
+      "process": "engine",
+      "blurb": "Max number of OKAO identify candidates (2–10, default 3) stored on a face’s debug match list when recognition extra-debug is on. Does not change who is recognized — only how many ranked names/scores are kept for debug.",
+      "detail": "Inside the FaceRecognitionExtraDebug block after Identify, the code always records the top match, then walks remaining album matches until the list size reaches this cap (or identify results run out). Useful when tuning FaceRecognitionThreshold / margins and inspecting near-misses in debug UI or logs. Harmless when ExtraDebug is false (the loop is not entered).",
+      "category": "Vision.FaceRecognition",
+      "related": [
+        "FaceRecognitionExtraDebug",
+        "FaceRecognitionThreshold"
+      ],
+      "requires": ["FaceRecognitionExtraDebug"],
+      "evidence": "coretech/vision/engine/faceRecognizer_okao.cpp:83,1856-1890",
+      "status": "live",
+      "tags": ["vision", "faces", "recognition", "debug"]
+    },
+    "FaceSelectionDebugging": {
+      "process": "engine",
+      "blurb": "When true, FaceSelectionComponent logs per-criterion costs and totals while choosing the “best” face among several candidates. Off by default. Does not change which face wins — log spam only.",
+      "detail": "GetBestFaceToUse scores each candidate with weighted penalties (distance, body/head angle, time since seen, tracking-only, eye contact, etc.). With this flag, each criteriaScore×factor and the running total print on channel Behaviors (FaceSelectionComponent.Scoring). Use when behaviors pick the wrong person in multi-face scenes.",
+      "category": "FaceSelection",
+      "related": [],
+      "evidence": "engine/aiComponent/faceSelectionComponent.cpp:37,138-159",
+      "status": "live",
+      "tags": ["faces", "selection", "debug", "behaviors"]
+    },
+    "FaceTrackingCropWidthFraction": {
+      "process": "engine",
+      "blurb": "Horizontal crop width as a fraction of the camera image (0–1, default ≈0.667) used when Faces_Crop is on. Smaller = faster search over a narrower center band; larger = more side coverage.",
+      "detail": "DetectFaces sets cropFactor to this value when useCropping is true (VisionMode::Faces_Crop), else 1.0 (full width). FaceTracker::SetCroppingMask applies that factor to OKAO’s edge mask. Only meaningful while Faces runs with Crop enabled (behaviors often request Crop for CPU). At 0 the mask path asserts (cropFactor must be > 0).",
+      "category": "Vision.FaceDetection",
+      "related": [
+        "Faces_Crop",
+        "Faces",
+        "FaceTrackingMaxHeadAngleChange_deg",
+        "FaceTrackingMaxBodyAngleChange_deg",
+        "FaceTrackingMaxPoseChange_mm"
+      ],
+      "requires": ["Faces_Crop"],
+      "evidence": "engine/vision/visionSystem.cpp:121-122,824-841,1631-1637; coretech/vision/engine/faceTrackerImpl_okao.cpp:1013-1020",
+      "status": "live",
+      "tags": ["vision", "faces", "crop", "performance"]
+    },
+    "FaceTrackingMaxBodyAngleChange_deg": {
+      "process": "engine",
+      "blurb": "Max body rotation (degrees, default 8) between consecutive vision frames before face tracking is treated as unreliable and reset. Larger = tolerate more turn before forgetting track IDs.",
+      "detail": "DetectFaces compares current vs previous pose with IsBodyPoseSame(..., DEG_TO_RAD(this), FaceTrackingMaxPoseChange_mm). If body angle or translation exceeds thresholds (or head angle exceeds FaceTrackingMaxHeadAngleChange_deg), AccountForRobotMove runs so the tracker does not glue one person’s track onto a neighbor after a big camera move. Comment: chosen so two close faces at max useful range are less likely to swap under motion.",
+      "category": "Vision.FaceDetection",
+      "related": [
+        "FaceTrackingMaxHeadAngleChange_deg",
+        "FaceTrackingMaxPoseChange_mm",
+        "FaceTrackingCropWidthFraction"
+      ],
+      "evidence": "engine/vision/visionSystem.cpp:103-111,809-822; coretech/vision/engine/faceTracker.cpp:90-95",
+      "status": "live",
+      "tags": ["vision", "faces", "tracking", "motion"]
+    },
+    "FaceTrackingMaxHeadAngleChange_deg": {
+      "process": "engine",
+      "blurb": "Max head (lift) angle change (degrees, default 8) between frames before the face tracker is reset. Raising it keeps tracks through larger head nods; lowering resets sooner on head motion.",
+      "detail": "Paired with body angle and pose-change thresholds in DetectFaces. IsHeadAngleSame uses DEG_TO_RAD of this value. When head or body motion exceeds limits, AccountForRobotMove clears allowed tracked faces (unless enroll-style allowed faces are held). Independent of WasRotatingTooFast IMU gates used elsewhere.",
+      "category": "Vision.FaceDetection",
+      "related": [
+        "FaceTrackingMaxBodyAngleChange_deg",
+        "FaceTrackingMaxPoseChange_mm"
+      ],
+      "evidence": "engine/vision/visionSystem.cpp:109,813-822",
+      "status": "live",
+      "tags": ["vision", "faces", "tracking", "motion"]
+    },
+    "FaceTrackingMaxPoseChange_mm": {
+      "process": "engine",
+      "blurb": "Max body translation (millimeters, default 10) between vision frames before face tracking is reset along with the angle thresholds. Larger = allow more drive/slide without dropping tracks.",
+      "detail": "Passed as the distance tolerance to IsBodyPoseSame with FaceTrackingMaxBodyAngleChange_deg. Translation larger than this (or body/head angle over their deg limits) triggers AccountForRobotMove. Units are robot pose mm in the world, not face-size in the image.",
+      "category": "Vision.FaceDetection",
+      "related": [
+        "FaceTrackingMaxBodyAngleChange_deg",
+        "FaceTrackingMaxHeadAngleChange_deg"
+      ],
+      "evidence": "engine/vision/visionSystem.cpp:111,814-822",
+      "status": "live",
+      "tags": ["vision", "faces", "tracking", "motion"]
+    },
+    "IgnoreFacesBelowRobot": {
+      "process": "engine",
+      "blurb": "When true (default), FaceWorld drops faces whose estimated head height is below the world origin (z < 0) while Vector is on its treads — cuts false positives that look like faces on the floor or under the robot. When picked up, the filter is skipped.",
+      "detail": "AddOrUpdateFace transforms head pose into the historical world origin. If this flag is on, OffTreadsState is OnTreads, and head translation.z() < 0, the face is not reported (RESULT_OK without inserting). Tests set it false when they need below-origin faces. Turn off only if you intentionally need detections under the ground plane.",
+      "category": "Vision.FaceWorld",
+      "related": [],
+      "evidence": "engine/faceWorld.cpp:61-62,275-283; test/engine/faceRecognitionTests.cpp:51,360",
+      "status": "live",
+      "tags": ["vision", "faces", "faceworld", "filter"]
+    },
+    "KeepUndistortedFaceFeatures": {
+      "process": "engine",
+      "blurb": "When true, facial landmark points stored on TrackedFace (eyes, nose, mouth) are the lens-undistorted coordinates used for pose. Default false: landmarks stay in the original distorted image space after pose is computed.",
+      "detail": "SetFacePoseFromParts always undistorts landmarks for OKAO direction and eye-distance translation (see UseUndistortionForFacePose), then restores distorted points into the OKAO part handle for image-aligned work. Only if this flag is set does it rewrite face feature geometry to undistorted pixel positions. Leave false unless debug/viz expects undistorted overlays on a rectified image.",
+      "category": "Vision.FaceDetectorCommon",
+      "related": [
+        "UseUndistortionForFacePose"
+      ],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:70-72,846-897,975-1008",
+      "status": "live",
+      "tags": ["vision", "faces", "landmarks", "undistort"]
+    },
+    "MaxDetectedFaces": {
+      "process": "engine",
+      "blurb": "Maximum simultaneous faces OKAO may track (1–1023, default 10). Passed into OKAO_DT_CreateHandle at detector construction — capacity of the movie/still detector, not a soft filter after the fact.",
+      "detail": "Read only in FaceTracker::Impl::Init when creating DETECTION_MODE_MOVIE or STILL handles. Changing the console value mid-run does nothing until ReinitDetector rebuilds the detector (which also re-applies size range and threshold). Higher values cost more OKAO memory/CPU if many faces appear.",
+      "howTo": "Set MaxDetectedFaces, then set ReinitDetector = true so the next face Update recreates the handle.",
+      "category": "Vision.FaceDetectorCommon",
+      "related": [
+        "MinFaceSize",
+        "MaxFaceSize",
+        "FaceDetectionThreshold",
+        "ReinitDetector"
+      ],
+      "requires": ["ReinitDetector"],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:76,174-175,247,1067-1074",
+      "status": "partial",
+      "statusNote": "Applied only at OKAO CreateHandle in Init; needs ReinitDetector for live changes.",
+      "tags": ["vision", "faces", "okao", "detection", "capacity"]
+    },
+    "MaxFaceSize": {
+      "process": "engine",
+      "blurb": "Largest face box OKAO will search for, in pixels (20–8192, default 640). Faces larger than this in the working image are not detected.",
+      "detail": "Paired with MinFaceSize in OKAO_DT_SetSizeRange during Init only. Default 640 covers a face filling a typical camera frame; raising it only matters if the working resolution allows larger boxes. Must reinit detector after changing. Not the same as pet-tracker JSON keys of the same name.",
+      "howTo": "Adjust with MinFaceSize, then ReinitDetector = true.",
+      "category": "Vision.FaceDetectorCommon",
+      "related": [
+        "MinFaceSize",
+        "MaxDetectedFaces",
+        "FaceDetectionThreshold",
+        "ReinitDetector"
+      ],
+      "requires": ["ReinitDetector"],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:77-78,261-266,1067-1074",
+      "status": "partial",
+      "statusNote": "SetSizeRange only in Init; console change needs ReinitDetector.",
+      "tags": ["vision", "faces", "okao", "detection", "size"]
+    },
+    "MaxTimeSinceTrackedFaceUpdated_ms": {
+      "process": "engine",
+      "blurb": "How recent a face observation must be (milliseconds, default 500) to count for eye-contact and gaze-direction checks. Larger = treat “looking at me” / stable gaze as true longer after the last vision update; smaller = stricter recency.",
+      "detail": "Two separate CONSOLE_VAR registrations share this dump name (both default 500): (1) Behaviors.ConditionEyeContact — used by ConditionEyeContact, VisionComponent mirror-mode eye-contact indicator via GetMaxTimeSinceTrackedFaceUpdated_ms, and FaceWorld::IsMakingEyeContact(withinLast_ms); (2) Vision.GazeDirection inside BehaviorReactToGazeDirection for AnyStableGazeDirection / GetGazeDirectionPose / eye-contact helpers in that behavior. FaceWorld compares face timestamps against last image time minus this window. Only one name appears in the engine dump; treat both code paths as the intended 500 ms recency gate.",
+      "category": "Behaviors.ConditionEyeContact",
+      "related": [
+        "Faces_Gaze",
+        "Faces_Blink"
+      ],
+      "evidence": "engine/aiComponent/beiConditions/conditions/conditionEyeContact.cpp:24,33-39; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorReactToGazeDirection.cpp:44,94,168,256,362-364; engine/faceWorld.cpp:1159-1210; engine/components/visionComponent.cpp:1484-1485",
+      "status": "live",
+      "statusNote": "Duplicate C++ registrations (ConditionEyeContact vs ReactToGazeDirection). Same default; UI may surface one category string depending on registration order.",
+      "tags": ["faces", "eye-contact", "gaze", "timeout", "behaviors"]
+    },
+    "MinFaceSize": {
+      "process": "engine",
+      "blurb": "Smallest face box OKAO will search for, in pixels (20–8192, default 48). Lower catches farther/smaller faces at higher cost and more false positives; higher ignores tiny blobs.",
+      "detail": "OKAO_DT_SetSizeRange(min, MaxFaceSize) in FaceTracker Init. Applied only at init/reinit — not every frame. Offline eval tools sometimes force related thresholds. Unrelated to petTracker JSON MinFaceSize config keys.",
+      "howTo": "Set MinFaceSize (and MaxFaceSize if needed), then ReinitDetector = true.",
+      "category": "Vision.FaceDetectorCommon",
+      "related": [
+        "MaxFaceSize",
+        "MaxDetectedFaces",
+        "FaceDetectionThreshold",
+        "ReinitDetector"
+      ],
+      "requires": ["ReinitDetector"],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:77,261-266,1067-1074",
+      "status": "partial",
+      "statusNote": "SetSizeRange only in Init; needs ReinitDetector for mid-run changes.",
+      "tags": ["vision", "faces", "okao", "detection", "size"]
+    },
+    "OverridePerformanceFaceNeeded": {
+      "process": "engine",
+      "blurb": "When true (the default), rare “performance” animations can activate without a recently seen recognizable face. When false, BehaviorPossiblePerformance requires a recognizable face within ~2 s of the last camera image.",
+      "detail": "WantsToBeActivatedBehavior: hasFace = this || FaceWorld::HasAnyFaces(GetRecentFaceTime(), requireRecognizableFace=true). GetRecentFaceTime is last image timestamp minus a fixed 2000 ms (not this console var). Default true effectively disables the face gate for these cooldowned performance behaviors — set false to restore the “someone known nearby” requirement. Sibling OverridePerformanceCooldowns ignores the long cooldown/probability roll.",
+      "category": "PerformanceAnims",
+      "related": [
+        "OverridePerformanceCooldowns"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/performaces/behaviorPossiblePerformance.cpp:28-29,96-118",
+      "status": "live",
+      "tags": ["behaviors", "performance", "faces", "override"]
+    },
+    "UseUndistortionForFacePose": {
+      "process": "engine",
+      "blurb": "When true (default), OKAO head-direction (roll/pitch/yaw) is computed from lens-undistorted facial landmarks, improving pose accuracy with the camera’s distortion model. When false, direction uses the raw distorted part points.",
+      "detail": "SetFacePoseFromParts always runs OpenCV undistortPoints for eye-distance / translation math. If this flag is on, undistorted coords are written into the OKAO part-result handle before OKAO_PT_GetFaceDirection / GetResult, then the original distorted coords are restored so later image-space work stays aligned with the real frame. Turning off is mainly for A/B debugging pose error vs distortion correction.",
+      "category": "Vision.FaceDetectorCommon",
+      "related": [
+        "KeepUndistortedFaceFeatures"
+      ],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:70,846-908,925-957",
+      "status": "live",
+      "tags": ["vision", "faces", "pose", "undistort", "okao"]
+    }
+  }
+}
