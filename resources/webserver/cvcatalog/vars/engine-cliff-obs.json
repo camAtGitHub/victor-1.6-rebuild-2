@@ -1,0 +1,133 @@
+{
+  "vars": {
+    "CliffSensorThreshold": {
+      "process": "engine",
+      "blurb": "Cliff-sensor raw threshold (0–1023 scale, default 180) used only during the factory playpen “drive forwards over a cliff” test. When that test starts, all four cliff sensors are set to this same threshold via SetCliffDetectThresholds so the robot will stop when it rolls onto the playpen cliff section.",
+      "detail": "Does not change everyday freeplay cliff detection. BehaviorPlaypenDriveForwards pauses CliffSensorComponent auto-threshold updates, sends this value for FL/FR/BL/BR, drives onto the cliff fixture, and expects RobotStopped + CliffEvent. On deactivate it unpauses the component. Lower values make cliffs trigger sooner (more sensitive); higher values require darker/more cliff-like readings. Only meaningful if you are running the playpen factory suite.",
+      "category": "Playpen",
+      "related": [
+        "CliffSpeed_mmps",
+        "DistanceToTriggerFrontCliffs_mm",
+        "DistanceToTriggerBackCliffs_mm",
+        "TimeToWaitForCliffEvent_ms"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:205; playpenConfig.cpp:127 (WRAP_EXTERN_CONSOLE_VAR); behaviorPlaypenDriveForwards.cpp:40-44",
+      "status": "live",
+      "statusNote": "Live only while factory playpen DriveForwards is active; ignored in normal operation.",
+      "tags": ["cliff", "playpen", "factory", "sensors"]
+    },
+    "CliffSpeed_mmps": {
+      "process": "engine",
+      "blurb": "Drive speed in millimeters per second (default 60) for the factory playpen cliff-sensor check. The robot drives straight at this speed first far enough to trip the front cliffs, then again to trip the back cliffs, while mic recording length is also derived from this speed and the cliff drive distances.",
+      "detail": "Used only by BehaviorPlaypenDriveForwards (not freeplay). Two DriveStraightAction legs use this speed; a third overshoot segment uses the default path motion profile speed. Mic raw recording duration is estimated as front_distance/speed + back_distance/speed + overshoot/default_speed (seconds). Too fast may skip reliable cliff stops; too slow lengthens the test and the mic capture.",
+      "category": "Playpen",
+      "related": [
+        "CliffSensorThreshold",
+        "DistanceToTriggerFrontCliffs_mm",
+        "DistanceToTriggerBackCliffs_mm",
+        "DistanceToDriveOverCliff_mm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:199; playpenConfig.cpp:125; behaviorPlaypenDriveForwards.cpp:47-61,122-123",
+      "status": "live",
+      "statusNote": "Live only while factory playpen DriveForwards is active; ignored in normal operation.",
+      "tags": ["cliff", "playpen", "factory", "drive"]
+    },
+    "CliffTimeout_ms": {
+      "process": "engine",
+      "blurb": "How long cliff marks stay on the navigation memory map before they expire (default 1,200,000 ms = 20 minutes). Each map cell typed as Cliff is removed when its last-observed time is older than now minus this value.",
+      "detail": "MapComponent::TimeoutObjects runs about every TimeoutUpdatePeriod_ms and drops several content types on age. Cliff uses this timer; unrelated timeouts (vision edges, prox obstacles, unrecognized obstacles) have their own vars. Raising it keeps old drop-off / table-edge marks longer (path planner keeps avoiding them); lowering clears them sooner so the robot may re-explore areas it once thought were cliffs. Units are milliseconds of robot message time.",
+      "category": "MapComponent",
+      "related": [
+        "ProxTimeout_ms",
+        "UnrecognizedTimeout_ms",
+        "VisionTimeout_ms",
+        "TimeoutUpdatePeriod_ms"
+      ],
+      "evidence": "engine/navMap/mapComponent.cpp:81,508,516",
+      "status": "live",
+      "tags": ["cliff", "navmap", "timeout", "mapping"]
+    },
+    "CliffValHeldInPalmSurface": {
+      "process": "engine",
+      "blurb": "Maximum filtered cliff-sensor reading (default 500, range 0–1000) allowed when deciding the robot is sitting in a person’s palm. While held upright, palm is confirmed only if few enough cliffs have been detected for long enough *and* the max of the four filtered cliff channels stays below this value.",
+      "detail": "HeldInPalmTracker treats a high reading as “solid surface under the treads” (table/floor/object), not palm gaps. Code comment: values above this threshold likely mean put-down on ground or non-palm support. Lowering makes palm harder to confirm (more readings rejected as ground); raising allows brighter/more reflective palms but can false-positive palm on real floors. Works together with cliff-count duration and hold/in-air timing, not alone.",
+      "category": "HeldInPalm.Tracker",
+      "related": [
+        "MinTimeToConfirmRobotHeldInPalm_ms",
+        "EnableDebugTransitionPrintouts"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/heldInPalmTracker.cpp:74,331-362",
+      "status": "live",
+      "tags": ["cliff", "heldInPalm", "pickup", "sensors"]
+    },
+    "CreateUnexpectedMovementObstacles": {
+      "process": "engine",
+      "blurb": "When true (default), a detected “unexpected movement” of certain types inserts a small unrecognized obstacle into the navigation map beside the robot (front/back/left/right depending on wheel directions) and may correct the robot’s pose using history. When false, unexpected-movement events still fire to game/behaviors, but no map obstacle is added and that pose-correction block is skipped.",
+      "detail": "MovementComponent only builds obstacles for TURNED_BUT_STOPPED and TURNED_IN_OPPOSITE_DIRECTION (not ROTATING_WITHOUT_MOTORS or TURNED_IN_SAME_DIRECTION). On detect it can SetNewPose from historical translation + latest orientation, then insert a ~30×10 mm ObstacleUnrecognized polygon offset ~25 mm from the body. Comment notes this is meant to track ReactToUnexpectedMovement being enabled; the console var is the actual gate. Disabling reduces phantom map clutter when wheels slip; enabling helps path planning avoid places the robot got stuck.",
+      "category": "Robot",
+      "related": [],
+      "evidence": "engine/components/movementComponent.cpp:50,342-469",
+      "status": "live",
+      "statusNote": "Can re-localize pose and stamp map obstacles; leave on unless debugging false stuck detection or map pollution.",
+      "tags": ["obstacle", "movement", "navmap", "unexpectedMovement"]
+    },
+    "DistanceToConsiderClose_mm": {
+      "process": "engine",
+      "blurb": "Base face distance in millimeters (default 300) that counts as “close” for face-position acknowledgment reactions. When a known face was far and then moves inside this range (with cooldown), the condition queues that face as a desired reaction target.",
+      "detail": "Used by ConditionFacePositionUpdated (AcknowledgementBehaviors). Distance is robot pose to head pose. First-time named faces react regardless of this threshold. Hysteresis: once a face was already marked close, the far→close check uses DistanceToConsiderClose_mm + DistanceToConsiderClose_gap_mm so small motion near the boundary does not thrash. Cooldown is separate (FaceReactCooldown_s). Raising delays “person came near” reactions until closer; lowering reacts at longer range.",
+      "category": "AcknowledgementBehaviors",
+      "related": [
+        "DistanceToConsiderClose_gap_mm",
+        "FaceReactCooldown_s"
+      ],
+      "evidence": "engine/aiComponent/beiConditions/conditions/conditionFacePositionUpdated.cpp:29,131-159",
+      "status": "live",
+      "tags": ["face", "distance", "acknowledgement", "bei"]
+    },
+    "DistanceToConsiderClose_gap_mm": {
+      "process": "engine",
+      "blurb": "Extra millimeters of hysteresis (default 100) added to DistanceToConsiderClose_mm once a face has already been classified as close. While “was close,” the threshold becomes base+gap so the face must move farther away before it is considered far again, reducing flip-flop reactions.",
+      "detail": "Only applied when the per-face lastPoseClose flag is true. Example defaults: first become-close at <300 mm; stay close until ≥400 mm before a later approach can re-trigger face-became-close. Does not change the first-named-face reaction path. Increase for noisier pose/distance estimates; decrease if you want quicker re-react when someone steps back slightly then forward again.",
+      "category": "AcknowledgementBehaviors",
+      "related": [
+        "DistanceToConsiderClose_mm",
+        "FaceReactCooldown_s"
+      ],
+      "evidence": "engine/aiComponent/beiConditions/conditions/conditionFacePositionUpdated.cpp:30,131-140",
+      "status": "live",
+      "tags": ["face", "distance", "hysteresis", "acknowledgement", "bei"]
+    },
+    "ObsPadding_x_mm": {
+      "process": "engine",
+      "blurb": "Extra depth padding in millimeters along the robot’s forward (sensor beam) axis for proximity obstacles written into the nav map (default 6). The obstacle rectangle depth is 2× this value, and clear-region corners are pulled back by the same amount so clearing and obstacle geometry stay aligned.",
+      "detail": "ProxSensorComponent builds ObstacleProx polygons from the ToF distance reading. X padding fattens the obstacle in depth (toward/away from the robot) and also shapes the clear cone so map free-space clears up to just before the padded obstacle. Larger values make prox hits block more space ahead of the hit point (safer but more conservative); 0 makes a zero-depth strip. Used whenever prox nav-map update is enabled and a valid object/clear reading is processed.",
+      "category": "ProxSensorComponent",
+      "related": [
+        "ObsPadding_y_mm",
+        "MinObsThreshold_mm",
+        "MaxObsThreshold_mm",
+        "MaxObstacleWidth_mm",
+        "SensorAperture"
+      ],
+      "evidence": "engine/components/sensors/proxSensorComponent.cpp:87-88,319-320,340-341,355-357",
+      "status": "live",
+      "tags": ["prox", "obstacle", "navmap", "padding"]
+    },
+    "ObsPadding_y_mm": {
+      "process": "engine",
+      "blurb": "Extra lateral (left/right) padding in millimeters added to proximity obstacle and clear-region half-width (default 0). Widens each prox obstacle sideways beyond the sensor beam / max-obstacle-width calculation.",
+      "detail": "Applied on both sides of the beam and on clear-region clamps. Default 0 means width comes only from SensorAperture × distance (capped by MaxObstacleWidth_mm). Positive values make the robot treat ToF hits as wider barriers—useful if thin poles were clipping path planning; large values can block corridors unnecessarily. Same code paths as ObsPadding_x_mm whenever prox updates the map.",
+      "category": "ProxSensorComponent",
+      "related": [
+        "ObsPadding_x_mm",
+        "MinObsThreshold_mm",
+        "MaxObsThreshold_mm",
+        "MaxObstacleWidth_mm",
+        "SensorAperture"
+      ],
+      "evidence": "engine/components/sensors/proxSensorComponent.cpp:88,319-320,333-334,340-341,355-356",
+      "status": "live",
+      "tags": ["prox", "obstacle", "navmap", "padding"]
+    }
+  }
+}
