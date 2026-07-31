@@ -172,17 +172,18 @@ Suggested status values: `live` | `dead` | `partial` | `danger`.
 **Target layout** (create when implementing; keep shards small for agents):
 
 ```text
-resources/webserver/consolevars/
-  index.json              # manifest of shards
-  meta.json               # version, symbol legend
-  vars/*.json             # { "vars": { "Name": { ... } } }
+resources/webserver/cvcatalog/   # URL /cvcatalog/*  — NOT under /consolevars/
+  index.json
+  meta.json
+  vars/*.json
   categories/*.json
   recipes/*.json
 ```
 
-- Browser loads `index.json`, fetches shards, merges (`vars` object-assign, `recipes` concat).
-- One domain per file (e.g. `vars/navmap-quadtree.json`); ~dozens of entries max per file.
-- **Existing** single file `consolevars-catalog.json` may remain until split; new work should prefer shards + index.
+⚠️ **CivetWeb:** handler `/consolevars` also matches `/consolevars/*`. Catalog JSON must **not** live at `/consolevars/...` or fetches return the HTML UI.
+
+- Browser loads `/cvcatalog/index.json`, merges shards.
+- Fallback: `/consolevars-catalog.json` (OK — no slash after `consolevars`).
 
 Entry sketch:
 
@@ -252,7 +253,7 @@ Module JS should keep working if the shell is absent; do not break stock module 
 | `consolevars-explorer.html` | Explorer template; needs C++ route to inject |
 | `consolevars-app.js` | Decorator / recipes (wire into classic for Path A) |
 | `consolevars-catalog.json` | Legacy monolithic catalog |
-| `consolevars/` | Preferred multi-file catalog (when present) |
+| `cvcatalog/` | Multi-file catalog (URL `/cvcatalog/`) |
 | `README.consolevars.md` | Human consolevars notes |
 | `webViz.html`, `webviz/` | Modern WebViz |
 | `webVizModules/` | Per-module scripts |

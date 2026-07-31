@@ -6,13 +6,29 @@
       "id": "mirror-face-boxes",
       "title": "Face boxes on the face LCD (MirrorMode)",
       "process": "engine",
-      "blurb": "Camera feed on Vector’s screen with face (and related) overlays. Mode must be scheduled AND the mirror display flags enabled.",
-      "where": "Engine :8888 → Vision → General.VisionModes + Vision.General / Vision.MirrorMode",
+      "blurb": "Camera feed on Vector\u2019s screen with face (and related) overlays. Mode must be scheduled AND the mirror display flags enabled.",
+      "where": "Engine :8888 \u2192 Vision \u2192 General.VisionModes + Vision.General / Vision.MirrorMode",
       "steps": [
-        { "var": "Faces", "value": true, "note": "Vision mode: run face detection so there is something to draw." },
-        { "var": "MirrorMode", "value": true, "note": "Vision mode: render camera to the face display (mirror screen)." },
-        { "var": "DisplayDetectionsInMirrorMode", "value": true, "note": "Draw detections (objects/faces/markers) into the mirror image." },
-        { "var": "DisplayEyeContactInMirrorMode", "value": true, "note": "Extra face/eye-contact debug drawing (often the ‘boxes’ people notice)." }
+        {
+          "var": "Faces",
+          "value": true,
+          "note": "Vision mode: run face detection so there is something to draw."
+        },
+        {
+          "var": "MirrorMode",
+          "value": true,
+          "note": "Vision mode: render camera to the face display (mirror screen)."
+        },
+        {
+          "var": "DisplayDetectionsInMirrorMode",
+          "value": true,
+          "note": "Draw detections (objects/faces/markers) into the mirror image."
+        },
+        {
+          "var": "DisplayEyeContactInMirrorMode",
+          "value": true,
+          "note": "Extra face/eye-contact debug drawing (often the \u2018boxes\u2019 people notice)."
+        }
       ],
       "tips": [
         "Engine only (port 8888), not anim 8889.",
@@ -24,27 +40,45 @@
       "title": "Marker / charger detections in MirrorMode",
       "process": "engine",
       "blurb": "Fiducial / marker overlays on the face camera feed.",
-      "where": "Engine :8888 → Vision",
+      "where": "Engine :8888 \u2192 Vision",
       "steps": [
-        { "var": "Markers", "value": true, "note": "Vision mode for marker detection." },
-        { "var": "MirrorMode", "value": true, "note": "Show camera on face LCD." },
-        { "var": "DisplayDetectionsInMirrorMode", "value": true, "note": "Draw detections into mirror frame." },
-        { "var": "DisplayMarkerNamesScale", "value": 0.5, "note": "If > 0, also labels marker names (0–1 scale)." }
+        {
+          "var": "Markers",
+          "value": true,
+          "note": "Vision mode for marker detection."
+        },
+        {
+          "var": "MirrorMode",
+          "value": true,
+          "note": "Show camera on face LCD."
+        },
+        {
+          "var": "DisplayDetectionsInMirrorMode",
+          "value": true,
+          "note": "Draw detections into mirror frame."
+        },
+        {
+          "var": "DisplayMarkerNamesScale",
+          "value": 0.5,
+          "note": "If > 0, also labels marker names (0\u20131 scale)."
+        }
       ],
-      "tips": ["DisplayMarkerNamesScale is under Vision.MirrorMode; 0 hides names."]
+      "tips": [
+        "DisplayMarkerNamesScale is under Vision.MirrorMode; 0 hides names."
+      ]
     },
     {
       "id": "procface-custom-eyes-builtin",
       "title": "Custom eye overlay (built-in pattern)",
       "process": "anim",
-      "blurb": "Tint/overlay procedural eyes with a built-in faceOverlays asset (pride flags, frog, galaxy, …).",
-      "where": "Anim :8889 → Face → ParameterizedFace",
+      "blurb": "Tint/overlay procedural eyes with a built-in faceOverlays asset (pride flags, frog, galaxy, \u2026).",
+      "where": "Anim :8889 \u2192 Face \u2192 ParameterizedFace",
       "steps": [
         {
           "var": "ProcFace_CustomEyeOverlay",
           "value": 0,
           "enumLabel": "Trans (index 0)",
-          "note": "List: Trans,Lesbian,Gay,Bi,Pan,Frog,All,Galaxy,Custom. Pick any built-in 0–7."
+          "note": "List: Trans,Lesbian,Gay,Bi,Pan,Frog,All,Galaxy,Custom. Pick any built-in 0\u20137."
         },
         {
           "func": "LoadFaceOverlay",
@@ -59,12 +93,12 @@
         {
           "var": "ProcFace_CustomEyeOpacity",
           "value": 0.8,
-          "note": "Optional blend strength (0–1)."
+          "note": "Optional blend strength (0\u20131)."
         }
       ],
       "tips": [
         "Anim process only (port 8889).",
-        "Order matters: choose list → LoadFaceOverlay → tick CustomEyes.",
+        "Order matters: choose list \u2192 LoadFaceOverlay \u2192 tick CustomEyes.",
         "Built-in assets live under cozmo_resources/assets/faceOverlays/."
       ]
     },
@@ -73,7 +107,7 @@
       "title": "Custom eye overlay from /data/data/customFaceOverlay.jpg",
       "process": "anim",
       "blurb": "Same as built-in overlay, but uses your file on the robot after picking Custom in the list.",
-      "where": "Anim :8889 → Face → ParameterizedFace",
+      "where": "Anim :8889 \u2192 Face \u2192 ParameterizedFace",
       "steps": [
         {
           "var": "ProcFace_CustomEyeOverlay",
@@ -84,13 +118,21 @@
         {
           "func": "LoadFaceOverlay",
           "args": "",
-          "note": "Reads that file; fails silently if missing/empty — scp/curl the jpg first."
+          "note": "Reads that file; fails silently if missing/empty \u2014 scp/curl the jpg first."
         },
-        { "var": "ProcFace_CustomEyes", "value": true, "note": "Enable overlay composite." },
-        { "var": "ProcFace_CustomEyeOpacity", "value": 0.8, "note": "Blend opacity." }
+        {
+          "var": "ProcFace_CustomEyes",
+          "value": true,
+          "note": "Enable overlay composite."
+        },
+        {
+          "var": "ProcFace_CustomEyeOpacity",
+          "value": 0.8,
+          "note": "Blend opacity."
+        }
       ],
       "tips": [
-        "Push an image first, e.g. curl -T my.jpg http://ROBOT:8889/… or scp to /data/data/customFaceOverlay.jpg",
+        "Push an image first, e.g. curl -T my.jpg http://ROBOT:8889/\u2026 or scp to /data/data/customFaceOverlay.jpg",
         "Image is resized to face display resolution if needed.",
         "Re-press LoadFaceOverlay after replacing the file."
       ]
@@ -100,12 +142,12 @@
       "title": "Record a mic data clip",
       "process": "anim",
       "blurb": "Capture raw + processed mic audio for a few seconds (debug / ear pull).",
-      "where": "Anim :8889 → MicData → RecordMicDataClip",
+      "where": "Anim :8889 \u2192 MicData \u2192 RecordMicDataClip",
       "steps": [
         {
           "var": "MicData_ClipRecordTime_ms",
           "value": 4000,
-          "note": "Clip length in ms (default 4000; range ~500–15000)."
+          "note": "Clip length in ms (default 4000; range ~500\u201315000)."
         },
         {
           "func": "RecordMicDataClip",
@@ -114,7 +156,7 @@
         }
       ],
       "tips": [
-        "Clips land under cache micdata — see docs/development/mic-systems-overview.md and tools/ear_puller.py.",
+        "Clips land under cache micdata \u2014 see docs/development/mic-systems-overview.md and tools/ear_puller.py.",
         "Web: http://ROBOT:8889/cache/micdata/"
       ]
     },
@@ -131,19 +173,21 @@
           "note": "Seconds between mood pushes (smaller = more traffic)."
         }
       ],
-      "tips": ["Open WebViz → Mood and Subscribe."]
+      "tips": [
+        "Open WebViz \u2192 Mood and Subscribe."
+      ]
     },
     {
       "id": "play-anim-once",
       "title": "Play a canned animation (anim process)",
       "process": "anim",
       "blurb": "Fire a named animation from console (useful smoke test of anim stack).",
-      "where": "Anim :8889 → Animations → PlayAnimation",
+      "where": "Anim :8889 \u2192 Animations \u2192 PlayAnimation",
       "steps": [
         {
           "func": "PlayAnimation",
           "args": "anim_idle_01 1",
-          "note": "Args: name numLoops — change name to any known anim; ListAnimations dumps names."
+          "note": "Args: name numLoops \u2014 change name to any known anim; ListAnimations dumps names."
         }
       ],
       "tips": [
@@ -158,7 +202,7 @@
       "process": "engine"
     },
     "Vision.General.VisionModes": {
-      "blurb": "Per-VisionMode force-enable toggles (Faces, MirrorMode, Markers, …). Enabling also Dev-subscribes so the mode is scheduled.",
+      "blurb": "Per-VisionMode force-enable toggles (Faces, MirrorMode, Markers, \u2026). Enabling also Dev-subscribes so the mode is scheduled.",
       "process": "engine"
     },
     "Vision.MirrorMode": {
@@ -174,7 +218,7 @@
       "process": "anim"
     },
     "Face.ParameterizedFace": {
-      "blurb": "Procedural face drawing, AA, glow, custom eye overlays. Anim process (:8889). UI path often Face → ParameterizedFace.",
+      "blurb": "Procedural face drawing, AA, glow, custom eye overlays. Anim process (:8889). UI path often Face \u2192 ParameterizedFace.",
       "process": "anim"
     },
     "Animations": {
@@ -187,179 +231,389 @@
       "process": "engine",
       "blurb": "Force-enable VisionMode::Faces (face detection).",
       "category": "Vision.General.VisionModes",
-      "related": ["MirrorMode", "DisplayEyeContactInMirrorMode", "DisplayDetectionsInMirrorMode"],
-      "tags": ["vision", "faces", "highlight"]
+      "related": [
+        "MirrorMode",
+        "DisplayEyeContactInMirrorMode",
+        "DisplayDetectionsInMirrorMode"
+      ],
+      "tags": [
+        "vision",
+        "faces",
+        "highlight"
+      ]
     },
     "MirrorMode": {
       "process": "engine",
-      "blurb": "Force-enable VisionMode::MirrorMode — camera on the face LCD.",
+      "blurb": "Force-enable VisionMode::MirrorMode \u2014 camera on the face LCD.",
       "category": "Vision.General.VisionModes",
-      "related": ["Faces", "DisplayDetectionsInMirrorMode", "DisplayEyeContactInMirrorMode"],
-      "tags": ["vision", "mirror", "highlight"]
+      "related": [
+        "Faces",
+        "DisplayDetectionsInMirrorMode",
+        "DisplayEyeContactInMirrorMode"
+      ],
+      "tags": [
+        "vision",
+        "mirror",
+        "highlight"
+      ]
     },
     "Markers": {
       "process": "engine",
       "blurb": "Force-enable marker / fiducial detection.",
       "category": "Vision.General.VisionModes",
-      "related": ["MirrorMode", "DisplayDetectionsInMirrorMode", "DisplayMarkerNamesScale"],
-      "tags": ["vision", "markers"]
+      "related": [
+        "MirrorMode",
+        "DisplayDetectionsInMirrorMode",
+        "DisplayMarkerNamesScale"
+      ],
+      "tags": [
+        "vision",
+        "markers"
+      ]
     },
     "DisplayEyeContactInMirrorMode": {
       "process": "engine",
-      "blurb": "With MirrorMode, draw eye-contact / face debug (often the ‘boxes’).",
+      "blurb": "With MirrorMode, draw eye-contact / face debug (often the \u2018boxes\u2019).",
       "category": "Vision.General",
-      "requires": ["MirrorMode"],
-      "related": ["Faces", "DisplayDetectionsInMirrorMode"],
-      "tags": ["vision", "mirror", "faces", "highlight"]
+      "requires": [
+        "MirrorMode"
+      ],
+      "related": [
+        "Faces",
+        "DisplayDetectionsInMirrorMode"
+      ],
+      "tags": [
+        "vision",
+        "mirror",
+        "faces",
+        "highlight"
+      ]
     },
     "DisplayDetectionsInMirrorMode": {
       "process": "engine",
       "blurb": "Draw detected objects, faces, and markers into the MirrorMode image.",
       "category": "Vision.MirrorMode",
-      "requires": ["MirrorMode"],
-      "related": ["Faces", "Markers", "DisplayEyeContactInMirrorMode"],
-      "tags": ["vision", "mirror", "highlight"]
+      "requires": [
+        "MirrorMode"
+      ],
+      "related": [
+        "Faces",
+        "Markers",
+        "DisplayEyeContactInMirrorMode"
+      ],
+      "tags": [
+        "vision",
+        "mirror",
+        "highlight"
+      ]
     },
     "DisplayExposureInMirrorMode": {
       "process": "engine",
       "blurb": "Overlay exposure / AE info on the mirror image.",
       "category": "Vision.MirrorMode",
-      "requires": ["MirrorMode"],
-      "tags": ["vision", "mirror"]
+      "requires": [
+        "MirrorMode"
+      ],
+      "tags": [
+        "vision",
+        "mirror"
+      ]
     },
     "DisplayMarkerNamesScale": {
       "process": "engine",
       "blurb": "Scale for marker name labels in mirror (0 = off).",
       "category": "Vision.MirrorMode",
-      "requires": ["MirrorMode", "Markers"],
-      "tags": ["vision", "mirror", "markers"]
+      "requires": [
+        "MirrorMode",
+        "Markers"
+      ],
+      "tags": [
+        "vision",
+        "mirror",
+        "markers"
+      ]
     },
     "MirrorModeGamma": {
       "process": "engine",
       "blurb": "Gamma for the mirrored camera image.",
       "category": "Vision.MirrorMode",
-      "tags": ["vision", "mirror"]
+      "tags": [
+        "vision",
+        "mirror"
+      ]
     },
     "MirrorModeFaceDebugFontScale": {
       "process": "engine",
       "blurb": "Font scale for face debug text in mirror mode.",
       "category": "Vision.MirrorMode",
-      "tags": ["vision", "mirror", "faces"]
+      "tags": [
+        "vision",
+        "mirror",
+        "faces"
+      ]
     },
     "SendDebugImages": {
       "process": "engine",
       "blurb": "Send debug image streams from vision (bandwidth heavy).",
       "category": "Vision.General",
-      "tags": ["vision", "debug"]
+      "tags": [
+        "vision",
+        "debug"
+      ]
     },
     "ProcFace_CustomEyes": {
       "process": "anim",
       "blurb": "Composite a loaded eye overlay image onto procedural eyes. Requires LoadFaceOverlay first (and a valid overlay selection).",
       "category": "Face.ParameterizedFace",
-      "requires": ["ProcFace_CustomEyeOverlay"],
-      "related": ["ProcFace_CustomEyeOpacity", "LoadFaceOverlay"],
-      "tags": ["face", "procedural", "highlight"]
+      "requires": [
+        "ProcFace_CustomEyeOverlay"
+      ],
+      "related": [
+        "ProcFace_CustomEyeOpacity",
+        "LoadFaceOverlay"
+      ],
+      "tags": [
+        "face",
+        "procedural",
+        "highlight"
+      ]
     },
     "ProcFace_CustomEyeOverlay": {
       "process": "anim",
-      "blurb": "Which overlay asset to load: 0–7 built-ins under faceOverlays/, 8 = Custom → /data/data/customFaceOverlay.jpg.",
+      "blurb": "Which overlay asset to load: 0\u20137 built-ins under faceOverlays/, 8 = Custom \u2192 /data/data/customFaceOverlay.jpg.",
       "category": "Face.ParameterizedFace",
-      "related": ["ProcFace_CustomEyes", "LoadFaceOverlay", "ProcFace_CustomEyeOpacity"],
-      "tags": ["face", "procedural", "highlight"]
+      "related": [
+        "ProcFace_CustomEyes",
+        "LoadFaceOverlay",
+        "ProcFace_CustomEyeOpacity"
+      ],
+      "tags": [
+        "face",
+        "procedural",
+        "highlight"
+      ]
     },
     "ProcFace_CustomEyeOpacity": {
       "process": "anim",
-      "blurb": "Opacity when blending the custom eye overlay (0–1).",
+      "blurb": "Opacity when blending the custom eye overlay (0\u20131).",
       "category": "Face.ParameterizedFace",
-      "related": ["ProcFace_CustomEyes"],
-      "tags": ["face", "procedural"]
+      "related": [
+        "ProcFace_CustomEyes"
+      ],
+      "tags": [
+        "face",
+        "procedural"
+      ]
     },
     "LoadFaceOverlay": {
       "process": "anim",
       "blurb": "Console function: load the file selected by ProcFace_CustomEyeOverlay into the procedural face drawer.",
       "category": "Face.ParameterizedFace",
-      "related": ["ProcFace_CustomEyes", "ProcFace_CustomEyeOverlay"],
-      "tags": ["face", "procedural", "func", "highlight"]
+      "related": [
+        "ProcFace_CustomEyes",
+        "ProcFace_CustomEyeOverlay"
+      ],
+      "tags": [
+        "face",
+        "procedural",
+        "func",
+        "highlight"
+      ]
     },
     "ProcFace_HotspotRender": {
       "process": "anim",
       "blurb": "Render eye glow / hotspot on procedural face.",
       "category": "Face.ParameterizedFace",
-      "tags": ["face", "procedural"]
+      "tags": [
+        "face",
+        "procedural"
+      ]
     },
     "ProcFace_EnableAntiAliasing": {
       "process": "anim",
       "blurb": "Full-image antialiasing on procedural face.",
       "category": "Face.ParameterizedFace",
-      "tags": ["face", "procedural"]
+      "tags": [
+        "face",
+        "procedural"
+      ]
     },
     "MicData_ClipRecordTime_ms": {
       "process": "anim",
       "blurb": "Duration of RecordMicDataClip (ms).",
       "category": "MicData",
-      "related": ["RecordMicDataClip"],
-      "tags": ["mic", "highlight"]
+      "related": [
+        "RecordMicDataClip"
+      ],
+      "tags": [
+        "mic",
+        "highlight"
+      ]
     },
     "RecordMicDataClip": {
       "process": "anim",
       "blurb": "Console function: record raw + processed mic for MicData_ClipRecordTime_ms.",
       "category": "MicData",
-      "related": ["MicData_ClipRecordTime_ms"],
-      "tags": ["mic", "func", "highlight"]
+      "related": [
+        "MicData_ClipRecordTime_ms"
+      ],
+      "tags": [
+        "mic",
+        "func",
+        "highlight"
+      ]
     },
     "PlayAnimation": {
       "process": "anim",
-      "blurb": "Console function: play animation by name (args: name [numLoops]).",
-      "category": "Animations",
-      "related": ["ListAnimations", "AbortCurrentAnimation"],
-      "tags": ["anim", "func"]
+      "blurb": "Console function (anim process): play animation by name. Args: name, optional numLoops.",
+      "status": "live",
+      "evidence": "animProcess/.../animProcessMessages.cpp CONSOLE_FUNC PlayAnimation",
+      "related": [
+        "ListAnimations",
+        "AbortCurrentAnimation"
+      ],
+      "tags": [
+        "anim",
+        "func"
+      ]
     },
     "ListAnimations": {
       "process": "anim",
-      "blurb": "Console function: dump animation names to the result box.",
-      "category": "Animations",
-      "tags": ["anim", "func"]
+      "blurb": "Console function: list animation names into the result box.",
+      "status": "live",
+      "related": [
+        "PlayAnimation",
+        "AbortCurrentAnimation"
+      ],
+      "tags": [
+        "anim",
+        "func"
+      ]
     },
     "AbortCurrentAnimation": {
       "process": "anim",
-      "blurb": "Console function: stop current animation.",
-      "category": "Animations",
-      "tags": ["anim", "func"]
+      "blurb": "Console function: stop the currently playing animation.",
+      "status": "live",
+      "related": [
+        "PlayAnimation"
+      ],
+      "tags": [
+        "anim",
+        "func"
+      ]
     },
     "MoodManager_WebVizPeriod_s": {
       "process": "engine",
       "blurb": "How often mood state is pushed to WebViz Mood tab.",
-      "tags": ["webviz", "mood"]
+      "tags": [
+        "webviz",
+        "mood"
+      ]
     },
     "WebvizUpdatePeriod": {
       "process": "engine",
       "blurb": "Period used by some WebViz CPU-related updates.",
-      "tags": ["webviz"]
+      "tags": [
+        "webviz"
+      ]
     },
     "ProfilerLogOutput": {
       "process": "both",
       "blurb": "Profiler logging level (WebViz CpuProfile may set this).",
-      "tags": ["perf"]
+      "tags": [
+        "perf"
+      ]
     },
     "RenderZOffset": {
       "process": "engine",
       "blurb": "Intended Z offset (mm) for QuadTreeProcessor debug render quads.",
       "status": "dead",
-      "statusNote": "Registered CONSOLE_VAR but never read after definition — changing it has no effect on this tree.",
-      "evidence": "engine/navMap/quadTree/quadTreeProcessor.cpp (kRenderZOffset); UI id strips Hungarian k → RenderZOffset (consolevarlist_8888)",
+      "statusNote": "Registered CONSOLE_VAR but never read after definition \u2014 changing it has no effect on this tree.",
+      "evidence": "engine/navMap/quadTree/quadTreeProcessor.cpp (kRenderZOffset); UI id strips Hungarian k \u2192 RenderZOffset (consolevarlist_8888)",
       "category": "QuadTreeProcessor",
-      "related": ["RenderBorder3DLines", "RenderBordersFrom", "RenderSeeds"],
-      "tags": ["navmap", "debug", "dead"]
+      "related": [
+        "RenderBorder3DLines",
+        "RenderBordersFrom",
+        "RenderSeeds"
+      ],
+      "tags": [
+        "navmap",
+        "debug",
+        "dead"
+      ]
     },
     "RenderBorder3DLines": {
       "process": "engine",
       "blurb": "Intended to render nav-map borders as 3D lines instead of quads.",
       "status": "dead",
-      "statusNote": "Registered CONSOLE_VAR but never referenced outside its declaration — orphan flag.",
+      "statusNote": "Registered CONSOLE_VAR but never referenced outside its declaration \u2014 orphan flag.",
       "evidence": "engine/navMap/quadTree/quadTreeProcessor.cpp (kRenderBorder3DLines); UI id RenderBorder3DLines",
       "category": "QuadTreeProcessor",
-      "related": ["RenderZOffset", "RenderBordersFrom"],
-      "tags": ["navmap", "debug", "dead"]
+      "related": [
+        "RenderZOffset",
+        "RenderBordersFrom"
+      ],
+      "tags": [
+        "navmap",
+        "debug",
+        "dead"
+      ]
+    },
+    "IgnoreAnimWhitelist": {
+      "process": "engine",
+      "blurb": "When true, allows playing animations that are normally blocked while on the charger (animator testing).",
+      "status": "live",
+      "evidence": "engine/actions/animActions.cpp (kIgnoreAnimWhitelist)",
+      "tags": [
+        "animation",
+        "engine"
+      ]
+    },
+    "EyeDartFocusValue_pix": {
+      "process": "engine",
+      "blurb": "Focus / amplitude scale (pixels) for keep-alive eye dart motion driven by the animation component.",
+      "status": "live",
+      "evidence": "engine/components/animationComponent.cpp (kEyeDartFocusValue_pix)",
+      "tags": [
+        "animation",
+        "eyes"
+      ]
+    },
+    "ShouldPreCacheSprites": {
+      "process": "engine",
+      "blurb": "If true, pre-cache animation sprite assets when loading canned anims (memory vs hitch tradeoff).",
+      "status": "live",
+      "evidence": "cannedAnimLib/cannedAnims/animation.cpp (kShouldPreCacheSprites)",
+      "tags": [
+        "animation",
+        "perf"
+      ]
+    },
+    "PlayAnimationByName": {
+      "process": "engine",
+      "blurb": "Console function: play a named animation. Args: animName, optional numLoops, optional renderInEyeHue.",
+      "status": "live",
+      "evidence": "engine/robot.cpp CONSOLE_FUNC PlayAnimationByName",
+      "related": [
+        "AddAnimation"
+      ],
+      "tags": [
+        "animation",
+        "func"
+      ]
+    },
+    "AddAnimation": {
+      "process": "anim",
+      "blurb": "Console function: add/load an animation file (anim process).",
+      "status": "live",
+      "related": [
+        "PlayAnimation",
+        "ListAnimations"
+      ],
+      "tags": [
+        "anim",
+        "func"
+      ]
     }
   }
 }

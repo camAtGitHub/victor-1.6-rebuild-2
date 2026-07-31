@@ -3,7 +3,8 @@
  * Runs after C++ injects category HTML into consolevarsui.html (classic) or
  * consolevars-explorer.html. Explorer chrome (#cvRecipes, #cvSearch, #cvProcessBadge)
  * is optional — missing nodes are skipped; catalog load + row decoration always run.
- * Catalog: prefer consolevars/index.json shards; fall back to consolevars-catalog.json.
+ * Catalog: prefer /cvcatalog/index.json shards; fall back to /consolevars-catalog.json.
+ * Never use /consolevars/* for static catalog (handler steals those URLs).
  */
 (function () {
   "use strict";
@@ -11,9 +12,10 @@
   var catalog = null;
   var processHint = guessProcess();
   var DEAD_STATUSES = { dead: 1, orphan: 1, noop: 1 };
-  // Root-relative so fetch works from /consolevars (no trailing slash) and
-  // does not resolve to /consolevars/consolevars/...
-  var CATALOG_INDEX = "/consolevars/index.json";
+  // IMPORTANT: must NOT live under /consolevars/ — CivetWeb registers a
+  // prefix handler for "/consolevars" that also steals "/consolevars/*"
+  // (e.g. /consolevars/index.json returns the HTML page, not JSON).
+  var CATALOG_INDEX = "/cvcatalog/index.json";
   var CATALOG_FALLBACK = "/consolevars-catalog.json";
 
   function guessProcess() {
@@ -31,13 +33,17 @@
     return Array.prototype.slice.call((root || document).querySelectorAll(sel));
   }
 
-  /** Resolve shard path to a root-absolute URL under /consolevars/. */
+  /** Resolve shard path to a root-absolute URL under /cvcatalog/. */
   function shardUrl(path) {
     if (!path) return null;
     if (/^https?:\/\//i.test(path)) return path;
     if (path.indexOf("/") === 0) return path;
-    if (path.indexOf("consolevars/") === 0) return "/" + path;
-    return "/consolevars/" + String(path).replace(/^\//, "");
+    // Migrate old index paths that still said consolevars/
+    if (path.indexOf("consolevars/") === 0) {
+      path = "cvcatalog/" + path.slice("consolevars/".length);
+    }
+    if (path.indexOf("cvcatalog/") === 0) return "/" + path;
+    return "/cvcatalog/" + String(path).replace(/^\//, "");
   }
 
   function fetchJson(url) {
@@ -765,7 +771,7 @@
       catalog = c;
       if (!c) {
         setClassicCatalogStatus(
-          "Catalog not loaded (check /consolevars/index.json). Raw controls still work.",
+          "Catalog not loaded (check /cvcatalog/index.json). Raw controls still work.",
           true
         );
         var root = $("#cvRecipes");
