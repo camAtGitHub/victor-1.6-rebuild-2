@@ -38,7 +38,10 @@
     "vars/engine-dirstream-trigger.json",
     "vars/anim-speech-noise.json",
     "vars/engine-led4.json",
-    "vars/engine-cliff-obs.json"
+    "vars/engine-cliff-obs.json",
+    "vars/anim-os-display-dev.json",
+    "vars/engine-mood-stats.json",
+    "vars/engine-calib.json"
   ],
   "categories": [
     "categories/vision.json",
