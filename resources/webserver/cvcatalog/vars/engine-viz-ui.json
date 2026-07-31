@@ -1,0 +1,127 @@
+{
+  "vars": {
+    "AcceptMessagesFromUI": {
+      "process": "engine",
+      "blurb": "When true (default), the engine processes inbound Game→Engine messages on the classic UI socket (Unity/dev UI). When false, almost all messages from that connection are ignored — only console-var get/set/list still work so you can turn this back on.",
+      "detail": "UiMessageHandler::ShouldHandleMessagesFromConnection returns this flag only for UiConnectionType::UI. SDK UDP/TCP already return false (hard-coded). Switchboard and Gateway always accept. When handling is off, HandleProcessedMessage still allows SetDebugConsoleVarMessage, GetDebugConsoleVarMessage, and GetAllDebugConsoleVarMessage so a UI client can re-enable itself. Outbound Engine→Game and pings are unaffected; this only gates application handling of most inbound UI traffic.",
+      "howTo": "Set false to freeze UI-driven control while debugging without disconnecting. Keep true for normal sim/Unity work. Use console-var messages if you need to re-enable from the same UI link.",
+      "category": "UiComms",
+      "related": [
+        "PingSendFreq_ms",
+        "PrintUiMessageLatency",
+        "SdkStatusSendFreq"
+      ],
+      "evidence": "engine/cozmoAPI/comms/uiMessageHandler.cpp:60,208-222,331-361,522-530",
+      "status": "live",
+      "tags": ["ui", "comms", "safety"]
+    },
+    "LogMessageLatencyOnce": {
+      "process": "engine",
+      "blurb": "One-shot debug dump: when true, the next latency-info pass prints average/min/max timings for Wi‑Fi RTT, external send queue, send queue, robot recv queue, and (if samples exist) UI/Unity engine latency to the UiComms log channel, then automatically clears itself back to false.",
+      "detail": "Registered under Network.Stats only when REMOTE_CONSOLE_ENABLED. CozmoEngine::UpdateLatencyInfo runs from the engine update path but only every 10th call into that function, and only if Util::kNetConnStatsUpdate (console NetConnStatsUpdate) is true. Stats come from network connection gauges plus robot message-handler queue times and UiMessageHandler latency for UiConnectionType::UI. Not a continuous logger — it is a pulse button that self-resets after one print batch.",
+      "howTo": "1) Ensure NetConnStatsUpdate is true so network gauges refresh. 2) Have traffic/pings flowing (UI or reliable connections). 3) Set LogMessageLatencyOnce true. 4) Wait up to ~10 engine latency samples for logs tagged CozmoEngine.LatencyStats. Flag returns to false itself.",
+      "category": "Network.Stats",
+      "related": [
+        "NetConnStatsUpdate",
+        "NetStat2LatencyAvg",
+        "PrintUiMessageLatency"
+      ],
+      "requires": ["NetConnStatsUpdate"],
+      "evidence": "engine/cozmoEngine.cpp:481,502-541; lib/util/source/anki/util/transport/connectionStats.cpp:23",
+      "status": "live",
+      "statusNote": "Self-clears after one successful print batch; no-op if NetConnStatsUpdate is false or REMOTE_CONSOLE is off at compile time.",
+      "tags": ["ui", "network", "latency", "debug"]
+    },
+    "PingSendFreq_ms": {
+      "process": "engine",
+      "blurb": "How often (milliseconds) the engine sends an Engine→Game Ping on every connected UI/SDK/switchboard/gateway socket that still has devices. Default 1000 ms. Set to 0 to stop sending pings entirely.",
+      "detail": "UiMessageHandler::Update compares basestation time to _lastPingTime_ms. When elapsed > this value (and value > 0), it builds ExternalInterface::Ping with the socket’s next counter and current timeSent_ms, then DeliverToGame for each active connection type. Clients that reply with isResponse=true feed ISocketComms::HandlePingResponse (latency stats + last-ping clock). Separate from the disconnect timeout on ISocketComms (default 5 s without a ping response on non-sim builds). Stopping pings can make clients look “dead” to timeout logic if they rely on this heartbeat.",
+      "howTo": "Leave at 1000 for normal heartbeats. Raise to reduce chatty traffic. Set 0 only if you intentionally want no engine-originated pings (watch disconnect timeouts).",
+      "category": "UiComms",
+      "related": [
+        "PrintUiMessageLatency",
+        "AcceptMessagesFromUI",
+        "LogMessageLatencyOnce"
+      ],
+      "evidence": "engine/cozmoAPI/comms/uiMessageHandler.cpp:61,546-576; engine/cozmoAPI/comms/iSocketComms.cpp:44-65,70-91",
+      "status": "live",
+      "tags": ["ui", "comms", "ping", "latency"]
+    },
+    "PrintUiMessageLatency": {
+      "process": "engine",
+      "blurb": "When true, periodically logs UI/SDK ping round-trip latency statistics (mean, min, max, std-dev, sample count) on channel UiComms as ping replies arrive. Default false.",
+      "detail": "ISocketComms::HandlePingResponse computes latency_ms = now − ping.timeSent_ms, adds it to a rolling StatsAccumulator (max 20 samples), and every 10th sample while this flag is on prints UiMessageLatency. Requires the engine to be sending pings (PingSendFreq_ms > 0) and the peer to answer with isResponse pings. Shared path for any connection type using ISocketComms (UI UDP, etc.), not only Unity.",
+      "howTo": "1) Connect a UI/SDK client. 2) Keep PingSendFreq_ms > 0. 3) Set PrintUiMessageLatency true. 4) Watch logs for UiComms / UiMessageLatency after enough ping replies.",
+      "category": "UiComms",
+      "related": [
+        "PingSendFreq_ms",
+        "LogMessageLatencyOnce",
+        "AcceptMessagesFromUI"
+      ],
+      "evidence": "engine/cozmoAPI/comms/iSocketComms.cpp:23-26,70-91; engine/cozmoAPI/comms/uiMessageHandler.cpp:374-382",
+      "status": "live",
+      "tags": ["ui", "comms", "latency", "logging"]
+    },
+    "SdkStatusSendFreq": {
+      "process": "engine",
+      "blurb": "Registered as how often (engine update ticks) to push SDK status strings outward (default 1; comment says 0 = never), but nothing in this tree reads the variable.",
+      "detail": "CONSOLE_VAR kSdkStatusSendFreq sits next to the live UiComms knobs. UiMessageHandler::Update always calls UpdateSdk(), and UpdateSdk() is an empty stub with a TODO about SDK DAS messages. SdkStatus still stores Action/etc. strings via SetSdkStatus, and _updateCount is incremented every Update, but neither is wired to this frequency. Changing the console value has no runtime effect.",
+      "category": "UiComms",
+      "related": [
+        "AcceptMessagesFromUI",
+        "PingSendFreq_ms"
+      ],
+      "evidence": "engine/cozmoAPI/comms/uiMessageHandler.cpp:62 (registration only),550,643-651; engine/cozmoAPI/comms/sdkStatus.h; engine/actions/actionContainers.cpp:650-655",
+      "status": "dead",
+      "statusNote": "rg finds only the CONSOLE_VAR line for kSdkStatusSendFreq. UpdateSdk() body is empty — intended periodic send never implemented.",
+      "tags": ["ui", "sdk", "dead", "orphan"]
+    },
+    "SendAnythingToViz": {
+      "process": "engine",
+      "blurb": "Master enable for the engine’s Viz UDP debug stream. When true (default) and a Viz client is connected under a dev-cheats build, VizManager sends paths, poses, segments, image chunks, and other debug draw messages. When false, every SendMessage returns immediately — no Viz traffic.",
+      "detail": "Gate is at VizManager::SendMessage: requires ANKI_DEV_CHEATS, _isConnected, and kSendAnythingToViz. Connection is established via RedirectViz (dev) to ip:VIZ_SERVER_PORT (5252) or sim controllers. Image chunks additionally require EnableImageSend / _sendImages inside SendImageChunk before they hit SendMessage. Turning this off is the fastest way to silence all Viz protocol spam without disconnecting; WebViz is a separate path.",
+      "howTo": "1) Run a Viz listener (e.g. Webots viz controller) and RedirectViz if needed. 2) Leave this true to see draw/image messages. 3) Set false to mute the entire Viz UDP feed while keeping other debug tools.",
+      "category": "VizDebug",
+      "related": [
+        "Viz",
+        "VizConeOfFocus",
+        "SaveImageFrequency"
+      ],
+      "evidence": "engine/viz/vizManager.cpp:39,43-58,82-111,751-758; engine/cozmoEngine.cpp:646-665; clad/vizSrc/clad/types/vizTypes.clad:11",
+      "status": "live",
+      "statusNote": "Compile-time ANKI_DEV_CHEATS must be on; shipping builds always no-op SendMessage regardless of this flag.",
+      "tags": ["viz", "debug", "udp", "dev-cheats"]
+    },
+    "Viz": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::Viz so the vision system JPEG-compresses each processed camera frame for external display (Viz debug client and/or SDK image streaming). Off by default as a console force; product code enables the mode when image sending is requested.",
+      "detail": "SetupVisionModeConsoleVars registers every VisionMode enum name as a bool under Vision.General.VisionModes. Flipping this true calls EnableMode(Viz) and DevOnly_SelfSubscribeVisionMode so the scheduler actually runs it. In VisionSystem::Update, Viz mode compresses the RGB cache at _vizImageBroadcastSize into compressedDisplayImg. VisionComponent then SendCompressedImage(..., \"camera\"): CLAD ImageChunks to the game interface + VizManager::SendImageChunk when Viz is connected, and/or protobuf chunks when SDK streaming is on. Also used by EnableImageSending and SDK EnableImageStreamingRequest. Costs CPU and bandwidth — leave off unless you need camera feed off-robot.",
+      "howTo": "1) For Viz display: connect Viz (RedirectViz) and enable image send on VizManager if needed; set Viz true or trigger EnableImageSending. 2) For SDK: use EnableImageStreaming so Viz mode + proto chunks enable together. 3) Pair with SendAnythingToViz if using the UDP Viz path. 4) Turn off when done to save CPU.",
+      "category": "Vision.General.VisionModes",
+      "related": [
+        "SendAnythingToViz",
+        "MirrorMode",
+        "SaveImages",
+        "SaveImageFrequency"
+      ],
+      "evidence": "clad/src/clad/types/visionModes.clad:31,96; engine/components/visionComponent.cpp:1555-1678,2742-2745,2836-2889,2959-2961; engine/vision/visionSystem.cpp:1904-1912; engine/components/sdkComponent.cpp:484-491",
+      "status": "live",
+      "tags": ["viz", "vision", "visionmode", "camera", "sdk"]
+    },
+    "VizConeOfFocus": {
+      "process": "engine",
+      "blurb": "When true, the LookAroundInPlace behavior draws a 3D “focus cone” in Viz as three line segments from the robot: center (white) and left/right edges (yellow) based on its configured angle of focus. Default false. Visualization only — does not change where the robot turns.",
+      "detail": "On BeginStateMachine, if the behavior JSON param behavior_AngleOfFocus_deg is non-zero, erases prior segments labeled BehaviorLookInPlace.FocusCone and draws 200 mm rays at the initial body heading ± half the focus angle, raised 20 mm in Z. Requires VizManager connected and SendAnythingToViz (plus ANKI_DEV_CHEATS) for the draws to leave the robot. Only runs when LookAroundInPlace actually starts its state machine; idle freeplay without that behavior shows nothing.",
+      "howTo": "1) Enable SendAnythingToViz and connect a Viz client. 2) Set VizConeOfFocus true. 3) Activate a LookAroundInPlace behavior that defines a non-zero angle of focus. 4) Inspect the FocusCone segments in Viz.",
+      "category": "Behavior.LookAroundInPlace",
+      "related": [
+        "SendAnythingToViz",
+        "Viz"
+      ],
+      "requires": ["SendAnythingToViz"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/behaviorLookAroundInPlace.cpp:37,128-130,242-277,484-490",
+      "status": "live",
+      "tags": ["viz", "behavior", "debug", "lookaround"]
+    }
+  }
+}
