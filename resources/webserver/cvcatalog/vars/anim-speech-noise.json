@@ -1,0 +1,277 @@
+{
+  "vars": {
+    "DefaultDetectThreshold": {
+      "process": "anim",
+      "blurb": "Starting sensitivity threshold for Amazon Pryon Lite “Alexa” wake-word decoders (range 0–1000, default 250). Higher values make “Alexa” harder to trigger; lower values make it more sensitive (and more false positives).",
+      "detail": "Registered as kDefaultDetectThreshold under category SpeechRecognizer.Alexa. Each SpeechRecognizerPryonLite instance copies this value into its member _detectThreshold in the constructor, then InitRecognizer / SetDetectionThreshold push it into PryonLiteDecoder (phrase “ALEXA”). The playback recognizer explicitly forces threshold 1 after create, so this default mainly seeds the mic Alexa recognizer. Changing the console var does not hot-reload an already-constructed decoder — you need a new Pryon instance (e.g. locale/model re-init) for a new construction to re-read it. Does not affect “Hey Vector” (Picovoice).",
+      "howTo": "1) Set before Alexa is (re)initialized, or re-run a model/locale update that recreates the Pryon decoder. 2) Say “Alexa” and compare miss/false-trigger rate. 3) Leave ~250 for stock-like behavior.",
+      "related": [
+        "ForceRunNotchDetector",
+        "PlaybackRecognizerSampleCountThreshold",
+        "SaveRawMicInput"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/speechRecognizer/speechRecognizerPryonLite.cpp:48,70,118-136,160-172; speechRecognizerSystem.cpp:531 (playback forces 1)",
+      "category": "SpeechRecognizer.Alexa",
+      "status": "partial",
+      "statusNote": "Live only for newly constructed PryonLite recognizers. Runtime console changes alone do not call SetDetectionThreshold on existing decoders.",
+      "tags": ["alexa", "speech", "wake-word", "threshold", "tuning"]
+    },
+    "ForceRunNotchDetector": {
+      "process": "anim",
+      "blurb": "Forces the Alexa speaker “notch” detector on even when the product path would leave it off. 0 = normal (only run analysis when the notch detector is activated for GB/AU Alexa). 1 = always accumulate FFT power spectra. 2 = same as 1, and also evaluate HasNotch() every mic update (extra CPU / log noise).",
+      "detail": "Category SpeechRecognizer.Alexa. UpdateNotch (from mic processing) passes analyzeSamples = (_notchDetectorActive || force≠0). Product code only sets _notchDetectorActive true while Alexa is Active on UK/AU locales (self-barge-in / speaker notch). Any non-zero force also enables the ignoreReason.notch branch when an Alexa wake word fires, so false Alexa detections that look like speaker notches can be dropped. Mode 2 calls HasNotch every tick (with SaveNotches/NotchPower side effects if those are set).",
+      "howTo": "0 for product-like. 1 to always build spectra while testing notch logic on US or when Alexa is idle. 2 only when you need continuous HasNotch debug (watch CPU).",
+      "related": [
+        "NotchPower",
+        "SaveNotches",
+        "PlaybackRecognizerSampleCountThreshold",
+        "AlexaEnabledInUK",
+        "AlexaEnabledInAU"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/speechRecognizer/speechRecognizerSystem.cpp:156-158,337-345,489-501; micDataSystem.cpp:842-850; micData/notchDetector.cpp",
+      "category": "SpeechRecognizer.Alexa",
+      "status": "live",
+      "tags": ["alexa", "notch", "debug", "aec", "tuning"]
+    },
+    "Microphones": {
+      "process": "anim",
+      "blurb": "Not a settable console variable. The inventory dump lists bare “Microphones” next to other category/tab names (Actions, Audio, SpeechRecognizer, …). Real mic knobs live under categories such as “MicData” and “Audio.Microphone”.",
+      "detail": "No CONSOLE_VAR registers as kMicrophones / Microphones. The string is used as a LOG_CHANNEL in micDataProcessor, micDataSystem, micDataInfo, and some engine sound-reaction behaviors — not as a tunable. Treat this dump line as category-label leakage (same pattern as dump ids Alexa, SpeechRecognizer, VisionComponent).",
+      "related": [
+        "NoiseFloorMin",
+        "NoiseFloorRange",
+        "SaveNotches",
+        "MicData_SpeakerNoiseDisablesMics"
+      ],
+      "evidence": "resources/webserver/.docs/consolevarlist_8889 (peer category-like block with Actions/Audio/Microphones/SpeechRecognizer/*); no CONSOLE_VAR Microphones (rg); LOG_CHANNEL Microphones in animProcess/src/cozmoAnim/micData/*",
+      "category": "Microphones",
+      "status": "dead",
+      "statusNote": "Dump id only — not registered. Do not expect consolevarset key=Microphones to change behavior.",
+      "tags": ["mic", "orphan", "dump-artifact"]
+    },
+    "NoiseFloorMin": {
+      "process": "anim",
+      "blurb": "Lower edge of the ambient noise-floor scale sent to the audio engine (default 1.5, range 0–10). Raw mic noise floor is log10’d, then this value is subtracted so quieter rooms map near 0.",
+      "detail": "Category Audio.Microphone. MicrophoneAudioClient::ProcessMessage on each MicDirection message: norm = clamp((log10(latestNoiseFloor) − NoiseFloorMin) / NoiseFloorRange, 0..1), then sets global Wwise/game parameter Robot_Vic_Environment_Ambient_Volume. That lets robot sound mix react to how loud the room is. latestNoiseFloor comes from Signal Essence VAD / mic processing, not from this var.",
+      "howTo": "Raise Min if the ambient parameter stays pegged high in quiet rooms. Lower Min if quiet rooms never register as ambient. Tune together with NoiseFloorRange so the full 0–1 range matches your environment.",
+      "related": ["NoiseFloorRange"],
+      "evidence": "animProcess/src/cozmoAnim/audio/microphoneAudioClient.cpp:30-61; micDataProcessor.cpp:500-514,642 (noise floor source)",
+      "category": "Audio.Microphone",
+      "status": "live",
+      "tags": ["mic", "audio", "noise-floor", "wwise", "tuning"]
+    },
+    "NoiseFloorRange": {
+      "process": "anim",
+      "blurb": "Width of the ambient noise-floor scale after subtracting NoiseFloorMin (default 5.5, range 0–10). Divides the shifted log-noise into a 0–1 value capped at 1 for the audio engine ambient-volume parameter.",
+      "detail": "Paired with NoiseFloorMin in MicrophoneAudioClient. Smaller range = reaches full ambient sooner as the room gets louder; larger range = more headroom before the parameter saturates. Does not change recognition or mic hardware — only Robot_Vic_Environment_Ambient_Volume.",
+      "related": ["NoiseFloorMin"],
+      "evidence": "animProcess/src/cozmoAnim/audio/microphoneAudioClient.cpp:30-61",
+      "category": "Audio.Microphone",
+      "status": "live",
+      "tags": ["mic", "audio", "noise-floor", "wwise", "tuning"]
+    },
+    "NotchPower": {
+      "process": "anim",
+      "blurb": "Decision threshold for the Alexa speaker-notch detector (default −0.41, range −1..0). Compares log-power in a low band the speaker cannot produce well vs a band it can; if the difference is ≥ this value, the spectrum is treated as “human / not a speaker notch” and HasNotch returns false.",
+      "detail": "Category Alexa (registration string). HasNotch averages recent FFT power: band A indices 3–8 vs band B indices 8–16, then diff = log10(sumA)/|A| − log10(sumB)/|B|. powerful = (diff >= NotchPower); return !powerful so a “notch-like” (speaker-ish) spectrum makes HasNotch true and can suppress an Alexa wake-word. Only matters when notch analysis runs (_notchDetectorActive for GB/AU Alexa Active, or ForceRunNotchDetector ≠ 0).",
+      "howTo": "With ForceRunNotchDetector=2 and Alexa active, tweak while watching NotchDetector.HasNotch.Debug logs (ANKI_DEV_CHEATS). More negative → harder to call a spectrum a notch (fewer suppresses). Closer to 0 → easier to flag speaker-like spectra.",
+      "related": [
+        "ForceRunNotchDetector",
+        "SaveNotches",
+        "PlaybackRecognizerSampleCountThreshold"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/micData/notchDetector.cpp:40,79-136; speechRecognizerSystem.cpp:489-501",
+      "category": "Alexa",
+      "status": "live",
+      "tags": ["alexa", "notch", "tuning", "aec"]
+    },
+    "OfflineCheckFreq_ms": {
+      "process": "anim",
+      "blurb": "How often (ms) backpack-light logic re-checks whether the robot has a valid IP / is “online.” Default 5000. Also runs immediately when a trigger word is detected (force path).",
+      "detail": "Category Backpacklights. UpdateOfflineCheck uses OSState IP validity: first time invalid → stamps _offlineAtTime_ms; valid again → clears the stamp. Offline backpack animation only appears after OfflineTimeBeforeLights_ms of continuous offline stamp. Faster checks detect outages sooner at slight CPU/IP query cost.",
+      "related": ["OfflineTimeBeforeLights_ms"],
+      "evidence": "animProcess/src/cozmoAnim/backpackLights/animBackpackLightComponent.cpp:37-38,59-71,142-145,546-565",
+      "category": "Backpacklights",
+      "status": "live",
+      "tags": ["backpack", "network", "offline", "timing"]
+    },
+    "OfflineTimeBeforeLights_ms": {
+      "process": "anim",
+      "blurb": "How long (ms) the robot must stay without a valid IP before critical backpack lights switch to the Offline animation. Default 120000 (2 minutes).",
+      "detail": "After UpdateOfflineCheck stamps _offlineAtTime_ms, UpdateCriticalBackpackLightConfig compares now − stamp to this duration (priority after streaming / low-battery / overheat cases). On trigger-word detect while already offline, the stamp is forced to 1 so Offline lights can appear immediately instead of waiting the full timeout.",
+      "howTo": "Lower for faster offline feedback while debugging network. Raise to avoid brief Wi‑Fi blips flashing Offline lights.",
+      "related": ["OfflineCheckFreq_ms"],
+      "evidence": "animProcess/src/cozmoAnim/backpackLights/animBackpackLightComponent.cpp:37-38,59-71,142-145",
+      "category": "Backpacklights",
+      "status": "live",
+      "tags": ["backpack", "network", "offline", "timing"]
+    },
+    "PlaybackRecognizerSampleCountThreshold": {
+      "process": "anim",
+      "blurb": "If an “Alexa” mic detection ends within this many audio samples of the last Alexa playback-recognizer hit, the mic hit is treated as self-trigger (Vector hearing itself) and ignored. Default 5000 samples (~312 ms at 16 kHz); console range 1000–10000.",
+      "detail": "Category SpeechRecognizer.AlexaPlayback. When Alexa mic wake word fires, ignoreReason.playback = (endSampleIndex − _playbackTrigerSampleIdx) ≤ threshold. _playbackTrigerSampleIdx is updated from the Alexa component mic sample index when the playback path runs. Works together with the notch ignore flag. Does not change “Hey Vector.”",
+      "howTo": "Increase if Alexa speech still re-triggers the wake word. Decrease if legitimate back-to-back “Alexa” after TTS is wrongly dropped.",
+      "related": [
+        "ForceRunNotchDetector",
+        "NotchPower",
+        "AlexaPlaybackRecognizerModel"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/speechRecognizer/speechRecognizerSystem.cpp:147-160,445,486-501",
+      "category": "SpeechRecognizer.AlexaPlayback",
+      "status": "live",
+      "tags": ["alexa", "speech", "barge-in", "playback", "tuning"]
+    },
+    "SaveNotches": {
+      "process": "anim",
+      "blurb": "When true, every HasNotch() evaluation that has enough FFT history writes a CSV of log10 average power bins under the Alexa cache folder for offline analysis. Default false.",
+      "detail": "Category MicData. Files: /data/data/com.anki.victor/cache/alexa/notch<N>.csv (incrementing N). Only runs when HasNotch is called with enough data — product path is Alexa wake-word ignore checks (GB/AU active or ForceRunNotchDetector); mode 2 of ForceRunNotchDetector calls HasNotch every UpdateNotch. Can fill cache quickly; turn off after capture.",
+      "howTo": "1) Optionally set ForceRunNotchDetector to 1 or 2. 2) Enable SaveNotches. 3) Play speaker audio / say Alexa. 4) Pull notch*.csv from the path below.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/alexa/notch*.csv"
+        ],
+        "notes": "Directory may need to exist; open() is to that path under cache/alexa/."
+      },
+      "related": ["NotchPower", "ForceRunNotchDetector"],
+      "evidence": "animProcess/src/cozmoAnim/micData/notchDetector.cpp:32,90-105",
+      "category": "MicData",
+      "status": "live",
+      "tags": ["alexa", "notch", "debug", "capture", "paths"]
+    },
+    "SaveRawMicInput": {
+      "process": "anim",
+      "blurb": "When true on a cheats build, continuously appends de-interleaved channel-0 mic samples (16-bit PCM) to speechRecognizerRaw.pcm in the robot cache while UpdateNotch runs. Default false. Turning false closes the file.",
+      "detail": "Category SpeechRecognizer.Alexa. On first true, opens /data/data/com.anki.victor/cache/speechRecognizerRaw.pcm (create/truncate). Each UpdateNotch writes one sample per multi-channel frame (channel 0 only). Gated by ANKI_DEV_CHEATS at the write site; registration is not cheats-gated. Unrelated to MicData_CollectRawTriggers / intent WAV captures (those use MicData paths).",
+      "howTo": "1) ANKI_DEV_CHEATS build. 2) Set true. 3) Capture some audio. 4) Set false to close. 5) Pull the PCM (raw s16le mono at mic rate).",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/speechRecognizerRaw.pcm"
+        ],
+        "notes": "Hardcoded path in speechRecognizerSystem::UpdateNotch. Grows without bound while true — turn off promptly."
+      },
+      "related": [
+        "ForceRunNotchDetector",
+        "MicData_CollectRawTriggers",
+        "MicData_SaveRawFullIntent"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/speechRecognizer/speechRecognizerSystem.cpp:156,348-366",
+      "category": "SpeechRecognizer.Alexa",
+      "status": "live",
+      "statusNote": "Write path only under ANKI_DEV_CHEATS. Can grow a large PCM file; stop by setting false.",
+      "tags": ["alexa", "mic", "debug", "capture", "paths", "dev-cheats"]
+    },
+    "SpeechRecognizer": {
+      "process": "anim",
+      "blurb": "Not a settable console variable. The inventory dump lists bare “SpeechRecognizer” among category/tab labels. Real knobs use dotted groups such as SpeechRecognizer.Vector, SpeechRecognizer.Alexa, and SpeechRecognizer.AlexaPlayback.",
+      "detail": "No CONSOLE_VAR id SpeechRecognizer / kSpeechRecognizer. SuppressTriggerResponse uses category string \"SpeechRecognizer\"; other vars use SpeechRecognizer.* groups. LOG_CHANNEL \"SpeechRecognizer\" appears in speech recognizer sources. Same dump-artifact pattern as Microphones and Alexa bare names.",
+      "related": [
+        "SuppressTriggerResponse",
+        "VectorRecognizerModel",
+        "VectorRecognizerModelSensitivity",
+        "DefaultDetectThreshold",
+        "ForceRunNotchDetector"
+      ],
+      "evidence": "resources/webserver/.docs/consolevarlist_8889 category-like block; micDataSystem.cpp:59 category \"SpeechRecognizer\"; speechRecognizerSystem.cpp CONSOLE_GROUP_VECTOR/ALEXA; no CONSOLE_VAR named SpeechRecognizer",
+      "category": "SpeechRecognizer",
+      "status": "dead",
+      "statusNote": "Dump id only — not registered as a var. Use the SpeechRecognizer.* children.",
+      "tags": ["speech", "orphan", "dump-artifact"]
+    },
+    "SuppressTriggerResponse": {
+      "process": "anim",
+      "blurb": "When true on a cheats build, wake-word detections still go to WebViz / logging helpers but product responses are skipped: no “Hey Vector” stream kickoff and no Alexa NotifyOfWakeWord. Default false. Use to stress-test recognition without starting cloud streams or Alexa.",
+      "detail": "Registered under ANKI_DEV_CHEATS, category SpeechRecognizer. In MicDataSystem::Init Vector callback and SetAlexaState Alexa callback: after SendTriggerDetectionToWebViz, if this flag is set, return before VoiceTriggerWordDetection / Alexa notify. Does not stop the recognizer from running or mic audio from flowing.",
+      "howTo": "1) Cheats build. 2) Set true. 3) Say “Hey Vector” / “Alexa” — expect WebViz speechrecognizersys activity without earcon/stream/Alexa UX.",
+      "related": [
+        "VectorRecognizerModel",
+        "ForceRunNotchDetector",
+        "SaveRawMicInput"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/micData/micDataSystem.cpp:57-59,145-151,809-818",
+      "category": "SpeechRecognizer",
+      "status": "live",
+      "statusNote": "ANKI_DEV_CHEATS only (registration and early-return both under cheats).",
+      "tags": ["speech", "wake-word", "debug", "dev-cheats"]
+    },
+    "VectorRecognizerModel": {
+      "process": "anim",
+      "blurb": "Dev enum of legacy Sensory/THF “Hey Vector” model slots (enUS size tiers, alt enUS, enUK, enAU, frFR, deDE). Default enUS_500kb. Changing the list alone does nothing until console function “Update Vector Recognizer” runs — and on this rebuild the Vector engine is Picovoice, whose model reload path is stubbed.",
+      "detail": "Registered only under ANKI_DEV_CHEATS, category SpeechRecognizer.Vector. Labels mirror old Truly Hands Free assets (kThfRecognizerModelStr). UpdateRecognizerHelper may call SetLocaleDevOnly and queue path updates, but UpdateRecognizerModel for SpeechRecognizerPicovoice is commented out and always returns true — it does not load THF nets or change the Picovoice .ppn (hardcoded default/custom paths in speechRecognizerPicovoice.cpp). Treat as leftover tooling for stock Anki Sensory models, not a live Picovoice model picker.",
+      "howTo": "Do not rely on this for wake-word model swaps on rebuild firmware. For Picovoice, use the asset/custom ppn and sensitivity2 file paths instead (see speechRecognizerPicovoice.cpp). If testing the console path: set enum → call “Update Vector Recognizer” → inspect logs (paths may clear/warn).",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/persistent/picovoice/custom_1-5-0.ppn",
+          "/data/data/com.anki.victor/persistent/picovoice/sensitivity2"
+        ],
+        "assets": [
+          "/anki/data/assets/cozmo_resources/assets/picovoice/hey_vector.ppn",
+          "/anki/data/assets/cozmo_resources/assets/picovoice/porcupine_params.pv"
+        ],
+        "notes": "These Picovoice paths are what Init() actually uses; VectorRecognizerModel does not select them."
+      },
+      "requires": ["Update Vector Recognizer"],
+      "related": ["VectorRecognizerModelSensitivity", "SuppressTriggerResponse"],
+      "enumLabels": [
+        "enUS_1mb",
+        "enUS_500kb",
+        "enUS_250kb",
+        "enUS_Alt_1mb",
+        "enUS_Alt_500kb",
+        "enUS_Alt_250kb",
+        "enUK_1mb",
+        "enUK_500kb",
+        "enAU_1mb",
+        "enAU_500kb",
+        "frFR",
+        "deDE"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/speechRecognizer/speechRecognizerSystem.cpp:64-142,195-208,246-276,303-329,618-640; speechRecognizerPicovoice.cpp:22-26,101-156",
+      "category": "SpeechRecognizer.Vector",
+      "status": "partial",
+      "statusNote": "ANKI_DEV_CHEATS. Enum + Update Vector Recognizer exist, but Picovoice UpdateRecognizerModel is a no-op stub (THF load code commented). Rebuild wake word is not driven by this enum.",
+      "tags": ["speech", "wake-word", "picovoice", "legacy-thf", "dev-cheats"]
+    },
+    "VectorRecognizerModelSensitivity": {
+      "process": "anim",
+      "blurb": "Dev enum of legacy THF search-file sensitivity slots: default, then 1–20. Intended to pick a Sensory search grammar sensitivity when “Update Vector Recognizer” runs. Does not control Picovoice sensitivity on this rebuild.",
+      "detail": "ANKI_DEV_CHEATS, category SpeechRecognizer.Vector. Index 0 means “use the model entry’s default searchFileIndex (−1)”; nonzero indexes pass that search file id into UpdateTriggerForLocale. Because Picovoice model update is stubbed, this does not change wake-word aggressiveness. Live Picovoice sensitivity is float 0–1 from /data/data/com.anki.victor/persistent/picovoice/sensitivity2 (default 0.60 in code).",
+      "howTo": "For rebuild: write a single float line (0..1) to sensitivity2 and re-init the Picovoice recognizer (anim restart). Ignore this enum unless debugging leftover THF console plumbing.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/persistent/picovoice/sensitivity2"
+        ],
+        "notes": "Picovoice reads this file at Init; VectorRecognizerModelSensitivity does not."
+      },
+      "requires": ["Update Vector Recognizer"],
+      "related": ["VectorRecognizerModel"],
+      "enumLabels": [
+        "default",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/speechRecognizer/speechRecognizerSystem.cpp:108-142,199-206,246-267,618-640; speechRecognizerPicovoice.cpp:25-26,119-135",
+      "category": "SpeechRecognizer.Vector",
+      "status": "partial",
+      "statusNote": "ANKI_DEV_CHEATS. Legacy THF search-index selector; Picovoice sensitivity is a separate file, not this enum.",
+      "tags": ["speech", "wake-word", "picovoice", "legacy-thf", "dev-cheats", "sensitivity"]
+    }
+  }
+}
