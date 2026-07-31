@@ -1,0 +1,175 @@
+{
+  "vars": {
+    "DistanceToDriveForwards_mm": {
+      "process": "engine",
+      "blurb": "How far (mm) the on-robot self-test drives straight off the charger when the DriveForwards step runs (default 120). Speed is separate (DriveSpeed_mmps). After the move, the test fails if the robot is still on charger contacts or battery voltage is too low.",
+      "detail": "Used only by BehaviorSelfTestDriveForwards (factory/dev self-test suite, category SelfTest). Creates a DriveStraightAction with shouldPlayAnimation=false and SetCanMoveOnCharger(true), then checks IsOnChargerContacts and battery. Despite a stale comment in selfTestConfig.h about “trigger front cliff sensors,” this path does not wait on CliffEvent — it is an off-charger clearance drive. No effect in normal freeplay.",
+      "category": "SelfTest",
+      "related": [
+        "DriveSpeed_mmps",
+        "DriveBackwardsDist_mm",
+        "DriveBackwardsSpeed_mmps"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.h:127-129; selfTestConfig.cpp:48; behaviorSelfTestDriveForwards.cpp:28-36,41-64",
+      "status": "live",
+      "statusNote": "Live only while the SelfTest DriveForwards behavior is active; ignored in freeplay.",
+      "tags": ["selftest", "drive", "factory", "charger"]
+    },
+    "DistanceToDriveOverCliff_mm": {
+      "process": "engine",
+      "blurb": "Final leg length (mm, default 50) of the factory playpen cliff-sensor test: after front and back cliffs have fired, the robot drives this far so all four cliff sensors are back on solid ground, then logs ground-level cliff readings and marks success.",
+      "detail": "BehaviorPlaypenDriveForwards third segment uses DriveStraightAction(this distance) with DEFAULT_PATH_MOTION_PROFILE (not CliffSpeed_mmps). Also used when estimating how long to record wheel mic audio (distance / default path speed). Only meaningful during playpen DriveForwards; fails with BACK_CLIFFS_NOT_UNDETECTED if cliffs never clear.",
+      "category": "Playpen",
+      "related": [
+        "DistanceToTriggerFrontCliffs_mm",
+        "DistanceToTriggerBackCliffs_mm",
+        "CliffSpeed_mmps",
+        "TimeToWaitForCliffEvent_ms",
+        "CliffSensorThreshold"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:194-196; playpenConfig.cpp:124; behaviorPlaypenDriveForwards.cpp:47-49,165-202",
+      "status": "live",
+      "statusNote": "Live only while factory playpen DriveForwards is active; ignored in normal operation.",
+      "tags": ["playpen", "cliff", "factory", "drive"]
+    },
+    "DistanceToTriggerBackCliffs_mm": {
+      "process": "engine",
+      "blurb": "How far (mm, default 80) the playpen cliff test drives after the front cliffs have already fired, expecting the rear pair of cliff sensors to trip next and cancel the drive.",
+      "detail": "Second DriveStraightAction in BehaviorPlaypenDriveForwards at CliffSpeed_mmps. Action is expected to end CANCELLED_WHILE_RUNNING (RobotStopped on cliff); then the behavior waits TimeToWaitForCliffEvent_ms for CliffEvent confirming both back sensors and neither front. Also feeds mic-record duration (distance/speed). Too short → BACK_CLIFFS_NOT_DETECTED; too long only matters if cliffs never fire.",
+      "category": "Playpen",
+      "related": [
+        "DistanceToTriggerFrontCliffs_mm",
+        "DistanceToDriveOverCliff_mm",
+        "CliffSpeed_mmps",
+        "TimeToWaitForCliffEvent_ms",
+        "CliffSensorThreshold"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:191-192; playpenConfig.cpp:123; behaviorPlaypenDriveForwards.cpp:47-49,119-162",
+      "status": "live",
+      "statusNote": "Live only while factory playpen DriveForwards is active; ignored in normal operation.",
+      "tags": ["playpen", "cliff", "factory", "drive"]
+    },
+    "DistanceToTriggerFrontCliffs_mm": {
+      "process": "engine",
+      "blurb": "How far (mm, default 140) the playpen cliff test drives first, expecting both front cliff sensors to trip and stop the robot on the playpen drop-off section.",
+      "detail": "First DriveStraightAction in BehaviorPlaypenDriveForwards, parallel with head-to-zero and lift-up, at CliffSpeed_mmps. Expected ActionResult is CANCELLED_WHILE_RUNNING; anything else → FRONT_CLIFFS_NOT_DETECTED. After cancel, waits TimeToWaitForCliffEvent_ms for CliffEvent with both FL/FR and not BL/BR. Also used in mic raw record-time estimate. Adjust if fixture geometry or thresholds change.",
+      "category": "Playpen",
+      "related": [
+        "DistanceToTriggerBackCliffs_mm",
+        "DistanceToDriveOverCliff_mm",
+        "CliffSpeed_mmps",
+        "TimeToWaitForCliffEvent_ms",
+        "CliffSensorThreshold"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:187-189; playpenConfig.cpp:122; behaviorPlaypenDriveForwards.cpp:47-94",
+      "status": "live",
+      "statusNote": "Live only while factory playpen DriveForwards is active; ignored in normal operation.",
+      "tags": ["playpen", "cliff", "factory", "drive"]
+    },
+    "DriveBackwardsDist_mm": {
+      "process": "engine",
+      "blurb": "Requested reverse distance (mm, default 100) at the start of the self-test: drive backward on the charger so cliff sensors are not sitting on the charger’s white stripe before later checks.",
+      "detail": "BehaviorSelfTestInitChecks issues DriveStraightAction(-DriveBackwardsDist_mm, DriveBackwardsSpeed_mmps) with SetCanMoveOnCharger(true). Pose does not update while on charger, so the straight-drive would never finish by distance; a WaitAction of DriveBackwardsTime_sec (1 s default, not this var) then cancels the drive. Practical reverse distance is roughly speed×time (~40 mm at defaults), not necessarily the full 100 mm. Not used by ScreenAndBackpack (that path uses DistToDriveOnCharger_mm).",
+      "category": "SelfTest",
+      "related": [
+        "DriveBackwardsSpeed_mmps",
+        "DistanceToDriveForwards_mm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.h:81-89; selfTestConfig.cpp:29; behaviorSelfTestInitChecks.cpp:41-65",
+      "status": "live",
+      "statusNote": "Live only in SelfTest InitChecks. Distance is the action request; on-charger cancel is time-based so travel may be shorter than this value.",
+      "tags": ["selftest", "drive", "factory", "charger", "cliff"]
+    },
+    "DriveBackwardsSpeed_mmps": {
+      "process": "engine",
+      "blurb": "Wheel speed in mm/s (default 40) for self-test reverse/align drives on or toward the charger: InitChecks reverse-on-charger, and ScreenAndBackpack drive-back-onto-charger after the button is released.",
+      "detail": "InitChecks pairs this with DriveBackwardsDist_mm (and a 1 s wait cancel). ScreenAndBackpack uses this speed with DistToDriveOnCharger_mm until charger contacts are seen. Lower speeds give gentler alignment on the fixture; higher may overshoot before cancel/contact. Freeplay ignores this var.",
+      "category": "SelfTest",
+      "related": [
+        "DriveBackwardsDist_mm",
+        "DistanceToDriveForwards_mm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.h:84-85; selfTestConfig.cpp:30; behaviorSelfTestInitChecks.cpp:43-44; behaviorSelfTestScreenAndBackpack.cpp:110-113",
+      "status": "live",
+      "statusNote": "Live only while SelfTest InitChecks or ScreenAndBackpack is active.",
+      "tags": ["selftest", "drive", "factory", "charger"]
+    },
+    "EnableVisualCliffExtension": {
+      "process": "engine",
+      "blurb": "When true (default), after Vector finishes a freeplay cliff reaction and is clear of the drop-off, ReactToCliff looks at the cliff and waits for overhead edge vision so the navigation map can extend cliff marks along the table edge. When false, that look-and-wait step is skipped entirely.",
+      "detail": "Gates TransitionToVisualExtendCliffs in BehaviorReactToCliff (category Behavior.ReactToCliff). If disabled, the function returns immediately after recovery backup / motor calibration paths that would otherwise enter visual extend. When enabled: lower lift, turn toward the remembered cliff pose, optionally back up if closer than MinViewingDistanceToCliff_mm, then WaitForImagesAction for OverheadEdges. MapComponent processes those edges into cliff geometry. Disabling reduces post-cliff head/body motion and vision cost; enabling helps path planning avoid more of the same edge.",
+      "category": "Behavior.ReactToCliff",
+      "related": [
+        "MinViewingDistanceToCliff_mm",
+        "MaxNumCliffReactAttemptsBeforeGivingUp"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToCliff.cpp:103-105,440-447,462,492-527; engine/navMap/mapComponent.cpp:1398-1515",
+      "status": "live",
+      "tags": ["cliff", "reactToCliff", "vision", "overheadEdges", "navmap", "freeplay"]
+    },
+    "MaxNumCliffReactAttemptsBeforeGivingUp": {
+      "process": "engine",
+      "blurb": "How many failed cliff reaction animations/backups are allowed in one ReactToCliff activation before the robot gives up and runs the StuckOnEdge / ask-for-help path (default 2). Counter increments each time a reaction attempt is started.",
+      "detail": "Checked in TransitionToPlayingCliffReaction: if numCliffReactAttempts > this value, TransitionToStuckOnEdge. Increments when streamline mode skips the anim and goes straight to recovery backup, and again when a cliff-react action is delegated. Separate from MaxNumRobotStopsBeforeGivingUp (RobotStopped messages). Raising lets the robot thrash longer on a difficult edge; lowering forces help sooner. Only affects freeplay ReactToCliff, not playpen/self-test.",
+      "category": "Behavior.ReactToCliff",
+      "related": [
+        "EnableVisualCliffExtension",
+        "MinViewingDistanceToCliff_mm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToCliff.cpp:99-101,317-324,326-329,360",
+      "status": "live",
+      "tags": ["cliff", "reactToCliff", "freeplay", "stuckOnEdge"]
+    },
+    "MinViewingDistanceToCliff_mm": {
+      "process": "engine",
+      "blurb": "Minimum distance (mm, default 80) from the robot to the remembered cliff look-at pose before visual cliff extension. If closer, ReactToCliff backs up the shortfall at the configured cliff backup speed so overhead edge detection has a usable view.",
+      "detail": "Only used inside TransitionToVisualExtendCliffs when EnableVisualCliffExtension is true. After turning toward the cliff, ComputeDistanceBetween(cliff pose, robot pose); if dist < this, DriveStraightAction(-(min−dist), cliffBackupSpeed_mmps) then a second TurnTowardsPose. Does not change the initial emergency backup distances from behavior JSON. Larger values force a longer standoff for edge vision; smaller allow closer observation (risk of poorer geometry / more of the cliff in FOV).",
+      "category": "Behavior.ReactToCliff",
+      "related": [
+        "EnableVisualCliffExtension",
+        "MaxNumCliffReactAttemptsBeforeGivingUp"
+      ],
+      "requires": ["EnableVisualCliffExtension"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToCliff.cpp:107,492-521",
+      "status": "live",
+      "statusNote": "Read only when EnableVisualCliffExtension is true and visual-extend runs after a successful cliff recovery.",
+      "tags": ["cliff", "reactToCliff", "vision", "drive", "freeplay"]
+    },
+    "PlaypenCalibTarget": {
+      "process": "engine",
+      "blurb": "Which physical camera-calibration target the factory playpen camera-calibration step expects (integer, default 2 = QBERT). On that behavior’s start it writes this value into the live CalibTargetType console var so vision uses the matching marker layout.",
+      "detail": "PlaypenConfig u32 under category Playpen. Comment in playpenConfig.h: 1 = INVERTED_BOX, 2 = QBERT (enum CalibTargetType also has 0 = CHECKERBOARD). BehaviorPlaypenCameraCalibration calls NativeAnkiUtilConsoleSetValueWithString(\"CalibTargetType\", value). Does not itself run calibration — it only selects the target type for the subsequent Calibration vision path. On non-factory (FACTORY_TEST=0) builds, QBERT/INVERTED_BOX layouts may be empty; see CalibTargetType / Calibration docs. Not used by cliff-drive playpen steps.",
+      "category": "Playpen",
+      "enumLabels": [
+        "0 CHECKERBOARD (not the playpen default)",
+        "1 INVERTED_BOX",
+        "2 QBERT (default)"
+      ],
+      "related": [
+        "CalibTargetType",
+        "Calibration"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:175-176; playpenConfig.cpp:118; behaviorPlaypenCameraCalibration.cpp:62-70; engine/vision/cameraCalibrator.h:40-43",
+      "status": "live",
+      "statusNote": "Live when playpen CameraCalibration activates (sets CalibTargetType). End-to-end calibration success still depends on factory target + FACTORY_TEST build.",
+      "tags": ["playpen", "calibration", "camera", "factory"]
+    },
+    "TimeToWaitForCliffEvent_ms": {
+      "process": "engine",
+      "blurb": "Milliseconds to wait after a playpen cliff drive is cancelled by RobotStopped before requiring a CliffEvent message (default CLIFF_EVENT_DELAY_MS+100 = 600 ms). Covers the delay between stop and confirmed cliff flags from the robot process.",
+      "detail": "Used three times in BehaviorPlaypenDriveForwards: after front-cliff cancel, after back-cliff cancel, and after the final overshoot drive. If the expected CliffEvent / state has not arrived when the timer fires, the test fails (FRONT/BACK_CLIFFS_NOT_DETECTED or BACK_CLIFFS_NOT_UNDETECTED). CLIFF_EVENT_DELAY_MS is 500 in shared cozmoConfig. Raise if factory fixtures show intermittent event-race fails; lower only if events arrive promptly and you want a tighter suite.",
+      "category": "Playpen",
+      "related": [
+        "DistanceToTriggerFrontCliffs_mm",
+        "DistanceToTriggerBackCliffs_mm",
+        "DistanceToDriveOverCliff_mm",
+        "CliffSensorThreshold",
+        "CliffSpeed_mmps"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:201-202; playpenConfig.cpp:126; behaviorPlaypenDriveForwards.cpp:81-94,137-161,180-201; robot/include/anki/cozmo/shared/cozmoConfig.h:332",
+      "status": "live",
+      "statusNote": "Live only while factory playpen DriveForwards is active; ignored in normal operation.",
+      "tags": ["playpen", "cliff", "factory", "timing"]
+    }
+  }
+}
