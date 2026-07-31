@@ -1,0 +1,77 @@
+{
+  "vars": {
+    "HoughAccumThreshold": {
+      "process": "engine",
+      "blurb": "Minimum votes / points needed before visual cliff-edge refinement will even try (default 20). Used twice: as a gate on how many valid camera edge points must remain after obstacle filtering, and as the OpenCV probabilistic Hough accumulator threshold when fitting a line through those points.",
+      "detail": "When the camera reports overhead ground-plane edge chains (VisionMode OverheadEdges), MapComponent projects border points onto the ground, drops any that ray-hit prox/observable/unrecognized obstacles, then only continues if the surviving point count is at least this value and there is at least one cliff-sensor cliff on the nav map. The same value is passed to cv::HoughLinesP as the vote threshold for accepting a candidate line segment. Lower = more willing to fit lines from sparse edges (noisier); higher = only strong, dense edges refine the newest cliff pose and insert a visual cliff strip into the memory map. Only matters when vision overhead edges are processed together with existing sensor cliffs (comment assumes edge processing often follows a new drop-sensor cliff).",
+      "category": "MapComponent.VisualEdgeDetection",
+      "related": [
+        "HoughAngleResolution_deg",
+        "HoughMinLineLength_mm",
+        "HoughMaxLineGap_mm",
+        "MaxPixelsUsedForHoughTransform"
+      ],
+      "evidence": "engine/navMap/mapComponent.cpp:88,1551,1692-1696",
+      "status": "live",
+      "tags": ["navmap", "cliff", "hough", "vision", "edges"]
+    },
+    "HoughAngleResolution_deg": {
+      "process": "engine",
+      "blurb": "Angular step size in degrees for the probabilistic Hough line search used to fit a table/drop-off edge from camera edge points (default 2.0°). Converted to radians and passed to OpenCV as the rho-theta angle resolution.",
+      "detail": "Inside RefineNewCliffPose, border edge points (1 mm ≈ 1 pixel) are stamped into a binary image, then cv::HoughLinesP is run with rho=1 pixel and theta = DEG_TO_RAD(this value). Coarser steps (larger numbers) yield fewer candidate orientations and less CPU, but may miss the true edge angle; finer steps produce more candidate segments that are later scored by how many known cliffs they pass near. Comment notes setting this too low can flood the pipeline with lines. Affects only visual refinement of cliff poses / visual cliff insertion, not the cliff IR sensors themselves.",
+      "category": "MapComponent.VisualEdgeDetection",
+      "related": [
+        "HoughAccumThreshold",
+        "HoughMinLineLength_mm",
+        "HoughMaxLineGap_mm",
+        "MaxPixelsUsedForHoughTransform"
+      ],
+      "evidence": "engine/navMap/mapComponent.cpp:87,1674-1696",
+      "status": "live",
+      "tags": ["navmap", "cliff", "hough", "vision", "edges"]
+    },
+    "HoughMaxLineGap_mm": {
+      "process": "engine",
+      "blurb": "Largest allowed gap in millimeters between successive edge points that still count as one continuous Hough line (default 10 mm). Larger gaps split detections into separate fragments instead of one long edge.",
+      "detail": "Passed to cv::HoughLinesP as maxLineGap. Because the binary image uses 1 mm = 1 pixel, this is both a world length and a pixel gap. Comment: a 10 mm gap discards highly fragmented edge detections (e.g. irregular patterned textures) that would otherwise chain into weak lines. Raising it glues sparse/broken camera edges into longer candidates (more false long edges possible); lowering requires denser continuous point chains. Used only when refining a new cliff-sensor cliff with vision overhead-edge points.",
+      "category": "MapComponent.VisualEdgeDetection",
+      "related": [
+        "HoughMinLineLength_mm",
+        "HoughAccumThreshold",
+        "HoughAngleResolution_deg"
+      ],
+      "evidence": "engine/navMap/mapComponent.cpp:90,1688-1696",
+      "status": "live",
+      "tags": ["navmap", "cliff", "hough", "vision", "edges"]
+    },
+    "HoughMinLineLength_mm": {
+      "process": "engine",
+      "blurb": "Shortest line segment the visual-edge Hough fit will accept, in millimeters (default 40). Shorter candidate edges from the camera are ignored when refining a cliff pose.",
+      "detail": "Passed to cv::HoughLinesP as minLineLength with 1 mm ≈ 1 pixel on the temporary binary image. Comment: real edges often show ~60 mm of points, and requiring about two-thirds (~40 mm) keeps only strong candidates. Raising it demands longer, cleaner edges (fewer refinements, fewer false cliffs); lowering accepts shorter fragments (more lines, noisier map inserts). Works with HoughMaxLineGap_mm and HoughAccumThreshold; after Hough, candidates are further filtered by proximity to the newest and older cliff centers.",
+      "category": "MapComponent.VisualEdgeDetection",
+      "related": [
+        "HoughMaxLineGap_mm",
+        "HoughAccumThreshold",
+        "HoughAngleResolution_deg"
+      ],
+      "evidence": "engine/navMap/mapComponent.cpp:89,1683-1696",
+      "status": "live",
+      "tags": ["navmap", "cliff", "hough", "vision", "edges"]
+    },
+    "MaxPixelsUsedForHoughTransform": {
+      "process": "engine",
+      "blurb": "Hard cap on binary-image size (rows × cols) for the visual-edge Hough step (default 160000, about 400×400). If the bounding box of edge points in world millimeters exceeds this pixel budget, cliff pose refinement is aborted for that frame.",
+      "detail": "RefineNewCliffPose builds a zeroed OpenCV image covering min–max of the valid edge points (1 mm = 1 pixel). Before filling white pixels and calling HoughLinesP, it checks rows*cols against this limit; on overflow it logs MapComponent.RefineNewCliffPose.BinaryImageTooLarge and returns false, so no refined pose / visual cliff strip is inserted. Protects CPU and memory when edge points scatter over a large area. Lower values fail more often on wide edge clouds; higher allows larger scenes at more cost. Does not change Hough line parameters themselves—only whether the transform runs.",
+      "category": "MapComponent.VisualEdgeDetection",
+      "related": [
+        "HoughAccumThreshold",
+        "HoughAngleResolution_deg",
+        "HoughMinLineLength_mm",
+        "HoughMaxLineGap_mm"
+      ],
+      "evidence": "engine/navMap/mapComponent.cpp:94,1648-1663",
+      "status": "live",
+      "tags": ["navmap", "cliff", "hough", "vision", "performance", "edges"]
+    }
+  }
+}
