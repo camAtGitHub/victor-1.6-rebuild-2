@@ -1,0 +1,296 @@
+{
+  "vars": {
+    "CropScheduler_MaxMarkerDetectionDist_mm": {
+      "process": "engine",
+      "blurb": "Maximum ground distance (mm) at which marker crop scheduling still expects a charger-height marker to be findable (default 500, range 1–1000). When the projected marker range along the ground is farther than this, vertical crop computation returns out-of-bounds and that frame’s height-crop path is skipped.",
+      "detail": "Used only inside CropScheduler::GetCurrentCropY when Markers is running without full-frame / full-height modes: geometry projects where a charger marker would sit, then rejects if x_M exceeds this distance. Returning -1 means the ground plane / crop helper will not narrow the vertical ROI for that pose (detection may still run full height depending on other flags). Does not change horizontal left/middle/right cycling. Tune higher if you dock from farther away; lower to avoid wasting crop budget on unreachable ground.",
+      "category": "Vision.CropScheduler",
+      "related": [
+        "Markers",
+        "Markers_FullFrame",
+        "Markers_FullHeight",
+        "MarkerDetector_CropWidthFraction",
+        "MarkerDetector_VizCropScheduler"
+      ],
+      "evidence": "engine/vision/cropScheduler.cpp:33,150-177",
+      "status": "live",
+      "tags": ["vision", "markers", "crop", "charger"]
+    },
+    "DisplayDebugEnrollmentImages": {
+      "process": "engine",
+      "blurb": "Face-recognition debug flag (default false). When gathering enrollment crops, saves them as small square thumbnails (EnrollmentThumbnailSize, default 64px) instead of recognition-resolution ROIs. Intended to drive on-screen enrollment/match galleries; most OpenCV Display paths no-op on the robot.",
+      "detail": "Registration: Vision.FaceRecognition. Live side effect with GatherDebugEnrollmentImages: SetEnrollmentImage allocates thumbnail-sized buffers when this is true. DisplayEnrollmentImages (tiled UserN galleries pushed to debugImages) is present but the only call site is commented out, so that path never runs. DisplayMatchImages still runs when this and FaceRecognitionExtraDebug are both true and pushes a FaceRecognitionMatches debug image (sent if SendDebugImages is on). CloseDisplayWindow on erase/rename still runs but ImageBase::Display/CloseDisplayWindow warn NoDisplay on non-OSX builds.",
+      "category": "Vision.FaceRecognition",
+      "related": [
+        "GatherDebugEnrollmentImages",
+        "EnrollmentThumbnailSize",
+        "FaceRecognitionExtraDebug",
+        "SendDebugImages"
+      ],
+      "requires": ["GatherDebugEnrollmentImages"],
+      "evidence": "coretech/vision/engine/faceRecognizer_okao.cpp:92-93,657-659,1016-1017,1429-1437,1631-1634,1831-1833,2520-2523; coretech/vision/engine/faceRecognizer_okao.h:154-156; coretech/vision/engine/image.cpp:251-257",
+      "status": "partial",
+      "statusNote": "Main DisplayEnrollmentImages call is commented out; on-robot Display windows are no-ops. Thumbnail sizing + optional FaceRecognitionMatches debug image still apply.",
+      "tags": ["vision", "faces", "enroll", "debug"]
+    },
+    "DisplayMarkerNames": {
+      "process": "engine",
+      "blurb": "When true, after each detected cube/charger marker is drawn as a camera quad in Viz, also draws the marker’s short code name (MARKER_ prefix stripped) at the top-left of its bounding rect. Off by default. Visualization only — does not change detection or BlockWorld.",
+      "detail": "VisionComponent::UpdateVisionMarkers always DrawCameraQuad’s observed markers; this flag adds DrawCameraText with the code name in the same color (red known / blue unknown). Distinct from DisplayMarkerNamesScale under Vision.MirrorMode, which labels markers on the face LCD mirror image. Needs markers actually detected (Markers mode scheduled or force-on) and a Viz client to see camera overlays.",
+      "category": "Vision.General",
+      "related": [
+        "Markers",
+        "VisualizeObservedMarkersIn3D",
+        "DisplayMarkerNamesScale",
+        "MirrorMode"
+      ],
+      "evidence": "engine/components/visionComponent.cpp:91-92,1065-1076",
+      "status": "live",
+      "tags": ["vision", "markers", "viz", "debug"]
+    },
+    "DisplayUndistortedImages": {
+      "process": "engine",
+      "blurb": "When true, every vision-system update undistorts the full RGB camera frame using the current calibration and appends a debug image named “undistorted”. Off by default. Costly CPU work; used to check lens correction.",
+      "detail": "Runs at the end of VisionSystem::Update regardless of VisionMode set. Requires a calibrated camera (DEV_ASSERT if not). Result lands in processingResult.debugImages; VisionComponent forwards those when SendDebugImages is true. Independent of SendUndistortedImages (which is registered but unused) and of ImageSaver’s removeDistortion option used when saving photos.",
+      "category": "Vision.General",
+      "related": [
+        "SendDebugImages",
+        "SendUndistortedImages",
+        "SaveImages"
+      ],
+      "evidence": "engine/vision/visionSystem.cpp:129,1915-1921; engine/components/visionComponent.cpp:2720-2732",
+      "status": "live",
+      "tags": ["vision", "calibration", "debug", "performance"]
+    },
+    "DrawCalibImages": {
+      "process": "engine",
+      "blurb": "When true during checkerboard camera calibration, builds RGB debug frames with OpenCV chessboard corners drawn and names them CalibImage0, CalibImage1, …. Off by default. Does not change the calibration math.",
+      "detail": "CameraCalibrator::ComputeCalibrationFromCheckerboard only. Dots that were found get drawChessboardCorners; images still appear in the list when dots are missing (gray converted to BGR without corners). Needs VisionMode::Calibration on the checkerboard path and stored calibration images (store path is limited on non-factory builds — see Calibration VisionMode docs). Debug images go out when SendDebugImages is enabled.",
+      "category": "Vision.Calibration",
+      "related": [
+        "Calibration",
+        "CalibTargetType",
+        "SendDebugImages",
+        "MinNumCalibImages"
+      ],
+      "requires": ["Calibration"],
+      "evidence": "engine/vision/cameraCalibrator.cpp:44,141-153",
+      "status": "live",
+      "tags": ["vision", "calibration", "debug"]
+    },
+    "GatherDebugEnrollmentImages": {
+      "process": "engine",
+      "blurb": "When true, face enrollment stores cropped face ROIs in memory for each album entry (new user and updates). Off by default. Enables later SaveAllRecognitionImages (dev) and match-debug tiles; does not by itself write files to disk.",
+      "detail": "On RegisterNewUser and successful UpdateExistingAlbumEntry, calls SetEnrollmentImage to crop the detection square from the recognition gray/RGB buffer into _enrollmentImages. RemoveUser erases those entries when this flag is on. Crop resolution: full detection rect unless DisplayDebugEnrollmentImages forces thumbnail size. Header documents optional SaveAllRecognitionImages filename pattern prefix_faceId_albumEntry_timestamp.jpg under ANKI_DEV_CHEATS.",
+      "category": "Vision.FaceRecognition",
+      "related": [
+        "DisplayDebugEnrollmentImages",
+        "EnrollmentThumbnailSize"
+      ],
+      "evidence": "coretech/vision/engine/faceRecognizer_okao.cpp:92,1016-1017,1393-1397,1416-1437,1625-1628; coretech/vision/engine/faceRecognizer_okao.h:154-156,3451-3469",
+      "status": "live",
+      "tags": ["vision", "faces", "enroll", "debug"]
+    },
+    "GoHome_VisualVerification_SaveImages": {
+      "process": "engine",
+      "blurb": "When true, during Go Home’s pre-dock visual verification step, temporarily turns on RobustChargerObservation_SaveImages so that wait-for-images action streams full-resolution PNG frames of the charger search to the robot cache. Off by default.",
+      "detail": "TransitionToCheckPreTurnPosition sets kRobustChargerObservation_SaveImages true (if REMOTE_CONSOLE_ENABLED) before delegating observeChargerBehavior, then clears it in the completion callback. Robust charger observation, when that flag is on, configures ImageSaverParams Stream mode, quality -1 (PNG), Full image size, path under Scope::Cache / robustChargerObsImages. Use only for docking debug — can fill disk quickly.",
+      "category": "Behaviors.BehaviorGoHome",
+      "related": [
+        "RobustChargerObservation_SaveImages",
+        "SaveImages"
+      ],
+      "paths": {
+        "robot": [
+          "<cache>/robustChargerObsImages/"
+        ],
+        "notes": "Cache root from DataPlatform Scope::Cache (robot cache). PNGs streamed while observe-charger wait runs during Go Home visual verification."
+      },
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/basicWorldInteractions/behaviorGoHome.cpp:52-53,478-488; engine/aiComponent/behaviorComponent/behaviors/victor/behaviorRobustChargerObservation.cpp:40,230-236",
+      "status": "live",
+      "statusNote": "Only effective when REMOTE_CONSOLE_ENABLED (sets sibling console var). Fills cache with PNGs.",
+      "tags": ["behavior", "gohome", "charger", "save", "danger"]
+    },
+    "ImageHistogramSubsample": {
+      "process": "engine",
+      "blurb": "Pixel step used when building the brightness histogram for multi-frame image composites (default 4). Higher = faster histogram, coarser percentile estimate used to stretch the composite toward full brightness.",
+      "detail": "ImageCompositor::GetCompositeImage averages summed frames then FillFromImage(outImg, kImageHistogramSubsample) and scales so the configured percentile maps to 255. Used when Markers_Composite (or any path that calls GetCompositeImage) produces a composite for marker detection in hard lighting. Subsample ≤ 0 is clamped to 1 inside the histogram helper.",
+      "category": "Vision.ImageCompositor",
+      "related": [
+        "Markers_Composite",
+        "Markers"
+      ],
+      "requires": ["Markers_Composite"],
+      "evidence": "coretech/vision/engine/imageCompositor.cpp:31,60-90; coretech/vision/engine/imageBrightnessHistogram.cpp:39-46",
+      "status": "live",
+      "tags": ["vision", "markers", "composite", "performance"]
+    },
+    "ImageMeanSampleInc": {
+      "process": "engine",
+      "blurb": "Row/column step when computing the mean gray level for VisionMode::Stats (default 10, range 1–32). Larger steps sample fewer pixels → cheaper mean, slightly noisier statistic.",
+      "detail": "When Stats is scheduled/enabled, VisionSystem::ComputeMean walks the gray ImageCache with this increment in both axes and stores imageMean on the processing result. Count accounts for partial last rows/cols. Does not affect auto-exposure histograms (those use separate sampling). Stats default schedule is configured in visionScheduleMediator_config.json.",
+      "category": "VisionSystem.Statistics",
+      "related": [
+        "Stats"
+      ],
+      "requires": ["Stats"],
+      "evidence": "engine/vision/visionSystem.cpp:114,515-536,1559-1563; resources/config/engine/visionScheduleMediator_config.json:154",
+      "status": "live",
+      "tags": ["vision", "stats", "performance"]
+    },
+    "NeuralNetRunner_SaveImages": {
+      "process": "engine",
+      "blurb": "Enum: 0 Off (default), 1 Save Resized, 2 Save Original Size (enum label). When a neural-net model starts work on a color frame, optionally writes a PNG under the neural-nets cache for offline debugging / hard-example mining.",
+      "detail": "Read in NeuralNetRunner::StartProcessingIfIdle. Value 2 saves imageCache GetRGB(Half) to <cachePath>/half/<timestamp>.png (comment says original; code uses Half). Value 1 saves after resize to the model’s processing width/height under <cachePath>/resized/<timestamp>.png. cachePath is Scope::Cache / vision / neural_nets from VisionSystem::Init. Requires an initialized runner and color frames; only fires when a net actually starts a job (People/Hands/etc. modes).",
+      "category": "Vision.NeuralNetRunner",
+      "enumLabels": [
+        "Off",
+        "Save Resized",
+        "Save Original Size"
+      ],
+      "related": [
+        "People",
+        "Hands",
+        "SaveImages"
+      ],
+      "paths": {
+        "robot": [
+          "<cache>/vision/neural_nets/half/<timestamp>.png",
+          "<cache>/vision/neural_nets/resized/<timestamp>.png"
+        ],
+        "notes": "Enum 2 → half/; enum 1 → resized/ after model input resize. Can fill storage if left on."
+      },
+      "evidence": "coretech/vision/engine/neuralNetRunner.cpp:69,230-248; engine/vision/visionSystem.cpp:179-183,335-354",
+      "status": "live",
+      "statusNote": "Enum value 2 is labeled Original Size but code saves ImageCacheSize::Half.",
+      "tags": ["vision", "neuralnets", "save", "danger"]
+    },
+    "SaveImageFrequency": {
+      "process": "engine",
+      "blurb": "How often DevLogging writes Viz ImageChunk messages into the engineToViz rolling log (default 0 = never log image chunks). Camera ~15 fps: 15 ≈ one logged image per second, 75 ≈ one every five seconds. Range 0–75.",
+      "detail": "In DevLoggingSystem::LogMessage for MessageViz, ImageChunk tags are dropped unless frequency ≠ 0 and imageId % frequency == 0. Other Viz messages are always logged. Does not control VisionMode::SaveImages disk PNGs — only the binary dev log stream under the session’s loggingBaseDirectory/engineToViz. Keeping this >0 grows logs quickly.",
+      "category": "DevLogging",
+      "related": [
+        "SaveImages",
+        "Viz"
+      ],
+      "evidence": "engine/debug/devLoggingSystem.cpp:39-42,352-365,94-110",
+      "status": "live",
+      "tags": ["devlogging", "viz", "save", "performance"]
+    },
+    "SaveImages": {
+      "process": "engine",
+      "blurb": "VisionMode console toggle under Vision.General.VisionModes. Force-enables VisionMode::SaveImages and DevOnly-subscribes it so the vision scheduler runs the save path even if no behavior requested it. Saving still requires ImageSaver parameters (path, mode Stream/SingleShot, quality, etc.) — the toggle alone with default Off params does not write files.",
+      "detail": "SetupVisionModeConsoleVars registers every VisionMode enum name as a bool, including SaveImages. When flipped on, EnableMode + DevOnly_SelfSubscribeVisionMode. VisionSystem saves when mode is enabled and ImageSaver::WantsToSave (mode ≠ Off), writing RGB (optional undistort/median/sharpen/scale) under the configured path; default empty path becomes <cache>/camera/images. Behaviors (DevImageCapture, TakeAPhoto, RobustChargerObservation) and ExternalInterface::SaveImages / SetSaveImageParameters set those params. Also used when neural-net results arrive if save conditions match. Turning the mode off without clearing saver params can leave stale configuration until the next SetParams.",
+      "howTo": "1) Prefer a capture behavior or GameToEngine SaveImages message with path/mode. 2) Or set saver params then flip this true so the mode is scheduled. 3) Files appear under the path (default cache/camera/images). 4) Set mode Off or turn the console bool off when done.",
+      "category": "Vision.General.VisionModes",
+      "related": [
+        "NeuralNetRunner_SaveImages",
+        "GoHome_VisualVerification_SaveImages",
+        "RobustChargerObservation_SaveImages",
+        "SaveImageFrequency"
+      ],
+      "paths": {
+        "robot": [
+          "<cache>/camera/images/"
+        ],
+        "notes": "Default when path empty in SetSaveImageParameters. Behaviors may choose other cache subdirs."
+      },
+      "evidence": "engine/components/visionComponent.cpp:2837-2883,2597-2627; engine/vision/visionSystem.cpp:1393-1400,1815-1820,1879-1900; engine/vision/imageSaver.cpp:147-196,202-296; clad/src/clad/types/visionModes.clad:27",
+      "status": "live",
+      "statusNote": "Console bool only enables the VisionMode; disk writes need ImageSaver mode ≠ Off via message/behavior/params.",
+      "tags": ["vision", "save", "visionmode"]
+    },
+    "SendUndistortedImages": {
+      "process": "engine",
+      "blurb": "Registered under Vision.General (default false) with the apparent intent of streaming undistorted camera frames, but no code reads the variable after registration.",
+      "detail": "Only CONSOLE_VAR declaration found in visionComponent.cpp. Undistortion for display uses DisplayUndistortedImages; undistortion when saving uses ImageSaverParams.removeDistortion on SaveImages paths. Changing this console control has no runtime effect.",
+      "category": "Vision.General",
+      "related": [
+        "DisplayUndistortedImages",
+        "SaveImages"
+      ],
+      "evidence": "engine/components/visionComponent.cpp:81 (registration only; no other references in tree)",
+      "status": "dead",
+      "statusNote": "rg finds only the CONSOLE_VAR line — never read.",
+      "tags": ["vision", "dead", "orphan"]
+    },
+    "SimulateDroppedFrameFraction": {
+      "process": "engine",
+      "blurb": "Registered 0–1 float under Vision.General (default 0) with a comment that values >0 would randomly drop that fraction of frames for testing. No code reads it; comment says DO NOT COMMIT > 0.",
+      "detail": "Only the CONSOLE_VAR_RANGED declaration exists. Dropped-frame statistics elsewhere in vision_config are separate. Setting this does nothing on current firmware.",
+      "category": "Vision.General",
+      "evidence": "engine/components/visionComponent.cpp:87-88 (registration only; no other references in tree)",
+      "status": "dead",
+      "statusNote": "rg finds only the CONSOLE_VAR line — never read.",
+      "tags": ["vision", "dead", "orphan", "testing"]
+    },
+    "TrackerWebVizUpdatePeriod_s": {
+      "process": "engine",
+      "blurb": "Seconds between Held-in-Palm tracker pushes to WebViz module “heldinpalm” (default 60). Lower values refresh the palm/held debug panel more often; higher reduces WebViz traffic.",
+      "detail": "HeldInPalmTracker::UpdateDependent checks BaseStationTimer; when now exceeds _nextUpdateTime_s it advances by this period and CreateWebVizSender for heldinpalm + PopulateWebVizJson. Independent of the cliff/off-treads logic that runs every tick. Does not change detection thresholds — only UI update rate when a client is subscribed.",
+      "category": "HeldInPalm.Tracker",
+      "evidence": "engine/aiComponent/behaviorComponent/heldInPalmTracker.cpp:41,131-145",
+      "status": "live",
+      "tags": ["webviz", "heldinpalm", "debug"]
+    },
+    "UseVisionOnlyWhileOnTreads": {
+      "process": "engine",
+      "blurb": "When true, VisionComponent is paused as soon as the robot leaves OnTreads (picked up, falling, etc.) and unpaused when it returns to OnTreads. Default false — vision usually keeps running off treads.",
+      "detail": "Robot::CheckAndUpdateTreadsState: on confirmed OffTreadsState transition away from OnTreads, if this flag is set and previous state was OnTreads, calls GetVisionComponent().Pause(true). When new state is OnTreads, Pause(false). Useful to save CPU when carried; can surprise you if you expect faces/markers while held.",
+      "category": "Robot",
+      "evidence": "engine/robot.cpp:102,539-542,572-576",
+      "status": "live",
+      "tags": ["robot", "vision", "powersave"]
+    },
+    "VisionCliffPadding_mm": {
+      "process": "engine",
+      "blurb": "How far in front of a refined visual-cliff pose (mm, default 20) the map inserts a rectangular cliff polygon, together with EdgeLineLengthToInsert_mm for the lateral span. Larger padding marks more ground ahead of the edge as cliff.",
+      "detail": "MapComponent::AddVisionOverheadEdges, after RefineNewCliffPose succeeds, Inserts a FastPolygon of four points: ±padding in x and ±EdgeLineLengthToInsert_mm in y in the cliff pose frame. Transform merges with sensor cliffs without wiping isFromCliffSensor. Only affects vision-derived cliff nodes, not prox/sensor cliffs alone.",
+      "category": "MapComponent.VisualEdgeDetection",
+      "related": [
+        "EdgeLineLengthToInsert_mm",
+        "VisionTimeout_ms"
+      ],
+      "evidence": "engine/navMap/mapComponent.cpp:92,1596-1604",
+      "status": "live",
+      "tags": ["navmap", "cliff", "vision"]
+    },
+    "VisionSystemSimulatedDelay_ms": {
+      "process": "engine",
+      "blurb": "Artificial sleep (ms) at the start of each VisionSystem::Update (default 0). Used to stress-test vision latency and drop handling. Any value >0 blocks the vision thread for that many milliseconds every frame.",
+      "detail": "std::this_thread::sleep_for after early checks, before CLAHE/detectors. Will tank frame rate and can trigger “no image” warnings if large. Dev-only hazard — leave at 0 on robots you care about.",
+      "category": "Vision.General",
+      "evidence": "engine/vision/visionSystem.cpp:116-117,1541-1543",
+      "status": "live",
+      "statusNote": "danger: blocks vision thread; can starve perception.",
+      "tags": ["vision", "testing", "danger", "performance"]
+    },
+    "VisionTimeout_ms": {
+      "process": "engine",
+      "blurb": "How long (ms) InterestingEdge and NotInterestingEdge nav-map cells remain before TimeoutObjects clears them (default 120000 = 2 minutes). Older vision edge data is removed so the map forgets stale visual borders.",
+      "detail": "MapComponent::TimeoutObjects runs about every TimeoutUpdatePeriod_ms. visionTooOld = now − this value; TransformContent nulls nodes of type InterestingEdge or NotInterestingEdge with lastObserved ≤ visionTooOld. Separate from ProxTimeout_ms, CliffTimeout_ms, UnrecognizedTimeout_ms. Does not expire vision-derived MemoryMapData_Cliff cells (those use CliffTimeout).",
+      "category": "MapComponent",
+      "related": [
+        "VisionCliffPadding_mm",
+        "TimeoutUpdatePeriod_ms"
+      ],
+      "evidence": "engine/navMap/mapComponent.cpp:77,492-525",
+      "status": "live",
+      "tags": ["navmap", "timeout", "vision"]
+    },
+    "VisualizeObservedMarkersIn3D": {
+      "process": "engine",
+      "blurb": "When true, for each observed marker, estimates a 3D pose relative to the camera and draws GenericQuad wireframes in the 3D Viz world (OBSERVED_QUAD color). Off by default. Extra CPU for pose estimation — debug only.",
+      "detail": "VisionComponent::VisualizeObservedMarkerIn3D filters BlockWorld for block/charger types sharing the marker code, ComputeObjectPose from image corners vs canonical 3D corners, then DrawGenericQuad. Fails soft with warnings if pose origin is not the camera. Complements 2D camera quads and DisplayMarkerNames; needs Viz 3D view to see results.",
+      "category": "Vision.General",
+      "related": [
+        "DisplayMarkerNames",
+        "Markers"
+      ],
+      "evidence": "engine/components/visionComponent.cpp:90,1078-1080,825-873",
+      "status": "live",
+      "tags": ["vision", "markers", "viz", "debug"]
+    }
+  }
+}
