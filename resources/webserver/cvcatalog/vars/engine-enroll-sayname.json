@@ -1,0 +1,178 @@
+{
+  "vars": {
+    "ConfidenceThreshold": {
+      "process": "engine",
+      "blurb": "Music-beat detector (not face recognition): minimum beat confidence for the latest sample to count as a possible or definite beat (default 0.18, range 0.01–1). Raise it if Vector locks onto noise as music; lower it if real tracks never clear the gate.",
+      "detail": "Registered under BeatDetectorComponent. IsPossibleBeatDetected requires every beat in PossibleBeatWindow_sec to exceed 0.5× this value and the latest beat to exceed the full threshold (plus enough history and steady tempo). IsBeatDetected uses the full BeatHistoryWindowSize_sec history: either every beat is above this threshold, or the latest beat alone clears HighConfidenceThreshold. WebViz beatdetector ‘aboveThresh’ also compares to this value. Unrelated to FaceRecognitionThreshold / OKAO scores despite the generic dump id.",
+      "category": "BeatDetectorComponent",
+      "related": [
+        "HighConfidenceThreshold",
+        "BeatHistoryWindowSize_sec",
+        "PossibleBeatWindow_sec",
+        "MinNumBeatsInHistory",
+        "TempoSteadyThreshold_bpm",
+        "FakeBeatConfidence"
+      ],
+      "evidence": "engine/components/mics/beatDetectorComponent.cpp:29-35,172-179,209-214,318",
+      "status": "live",
+      "tags": ["beat", "dance", "mic", "threshold"]
+    },
+    "HighConfidenceThreshold": {
+      "process": "engine",
+      "blurb": "Music-beat detector: very high confidence level (default 0.75, range 0.01–20) that lets a single latest beat count as a definite beat even when older samples are weak. Short-circuits the ‘all history above ConfidenceThreshold’ rule.",
+      "detail": "Only used in BeatDetectorComponent::IsBeatDetected: confidence is high enough if latest.confidence > this OR every beat in the full history exceeds ConfidenceThreshold. Still needs MinNumBeatsInHistory and steady tempo. Console upper range 20 is far above typical 0–1-ish scores; values near 0.75–1.0 match product intent. Not related to face enrollment confidence.",
+      "category": "BeatDetectorComponent",
+      "related": [
+        "ConfidenceThreshold",
+        "BeatHistoryWindowSize_sec",
+        "MinNumBeatsInHistory",
+        "FakeBeatConfidence"
+      ],
+      "evidence": "engine/components/mics/beatDetectorComponent.cpp:34-35,194-225,353",
+      "status": "live",
+      "tags": ["beat", "dance", "mic", "threshold"]
+    },
+    "DeletionTimeout_ms": {
+      "process": "engine",
+      "blurb": "How long (ms, default 10×60×1000 = 10 minutes) an unnamed face can go unobserved before FaceWorld deletes it from the in-memory face list. Named (enrolled) faces are never removed by this timer.",
+      "detail": "Each FaceWorld::Update pass compares vision’s last processed image timestamp to face.GetTimeStamp(). If the face has an empty name and lastProcImageTime > timeout + face timestamp, RemoveFace runs (with a DAS event when the face had a stable session ID). Does not erase OKAO album enrollment data for permanent users—only the live FaceWorld tracking entry for session-only/unnamed people who wandered off. Shortening it forgets strangers sooner; lengthening keeps temporary IDs around for longer multi-person play.",
+      "category": "Vision.FaceWorld",
+      "related": [
+        "NumTimesToSeeFrontalToBeStable",
+        "TimeUnobservedBeforeReLoggingToDAS_ms",
+        "HeadCenterPointThreshold_mm"
+      ],
+      "evidence": "engine/faceWorld.cpp:46-50,690-714",
+      "status": "live",
+      "tags": ["faces", "faceworld", "timeout", "session"]
+    },
+    "EnableEnrollmentAfterFull": {
+      "process": "engine",
+      "blurb": "When true, OKAO can keep replacing weaker face-feature samples for a named person after that album entry’s enrollment slots are full (default false). When false, a named person’s initial enrollment data is frozen once slots fill—unless an active enroll-this-ID session is running.",
+      "detail": "UpdateExistingAlbumEntry: enrollEvenIfFull = !isNamedFace || this flag || (enrollmentCount>0 && enrollmentID set). Session-only (unnamed) faces always allow post-full updates. Named faces need this flag or an explicit enrollment ID with remaining count. When full and allowed, OKAO verifies the new feature and may replace the lowest-scoring existing data entry. Also gated by TimeBetweenFaceEnrollmentUpdates_sec and _enrollmentCount. Comment at registration: without this, initial enrollment is the permanent record.",
+      "category": "Vision.FaceRecognition",
+      "related": [
+        "TimeBetweenFaceEnrollmentUpdates_sec",
+        "EnableMergingOfSessionOnlyAlbumEntries",
+        "FaceRecognitionExtraDebug",
+        "GatherDebugEnrollmentImages"
+      ],
+      "evidence": "coretech/vision/engine/faceRecognizer_okao.cpp:78-81,1265-1381",
+      "status": "live",
+      "tags": ["vision", "faces", "enrollment", "okao"]
+    },
+    "EnableMergingOfSessionOnlyAlbumEntries": {
+      "process": "engine",
+      "blurb": "When true, merging two face IDs also copies session-only album feature samples from the mergee into the keeper’s session-only album entry (default false). Off by product choice: mixing very different features into one OKAO entry hurt recognition quality.",
+      "detail": "FaceRecognizer::MergeFaces only enters this path when both keep and merge enrollment records have a session-only album entry ≥ 0. It walks merge’s session-only data features and UpdateExistingAlbumEntry’s them into keep’s session-only entry. Higher-level MergeWith album-entry bookkeeping still runs either way. Code comment at registration: no longer believed to be a good idea for OKAO. Leave false unless deliberately experimenting with session-ID merges.",
+      "category": "Vision.FaceRecognition",
+      "related": [
+        "EnableEnrollmentAfterFull",
+        "FaceRecognitionExtraDebug",
+        "FaceRecognitionThreshold"
+      ],
+      "evidence": "coretech/vision/engine/faceRecognizer_okao.cpp:64-68,2206-2218",
+      "status": "live",
+      "statusNote": "Live but default-off experimental path; stock comment discourages enabling.",
+      "tags": ["vision", "faces", "enrollment", "merge", "okao"]
+    },
+    "EnrollmentThumbnailSize": {
+      "process": "engine",
+      "blurb": "Pixel size of square debug thumbnails stored when DisplayDebugEnrollmentImages is on (default 64). Only affects in-memory enrollment/match debug image buffers—not the features used for recognition.",
+      "detail": "SetEnrollmentImage: if DisplayDebugEnrollmentImages, allocates k×k for each album/data entry crop; otherwise uses full detection-rect resolution. DisplayEnrollmentImages and DisplayMatchImages tile layouts also use this size for gallery cells. Needs GatherDebugEnrollmentImages to actually capture crops. On-robot OpenCV Display windows are largely no-ops; useful mainly with SendDebugImages / host tools. Changing size mid-session can make existing buffers mismatch until re-enroll updates them.",
+      "category": "Vision.FaceRecognition",
+      "related": [
+        "DisplayDebugEnrollmentImages",
+        "GatherDebugEnrollmentImages",
+        "FaceRecognitionExtraDebug",
+        "SendDebugImages"
+      ],
+      "requires": ["GatherDebugEnrollmentImages", "DisplayDebugEnrollmentImages"],
+      "evidence": "coretech/vision/engine/faceRecognizer_okao.cpp:90,1429-1437,1470-1471,1571-1576; coretech/vision/engine/faceRecognizer_okao.h:156",
+      "status": "live",
+      "statusNote": "Live for debug buffer sizing only; recognition/enrollment scores ignore this dimension.",
+      "tags": ["vision", "faces", "enrollment", "debug"]
+    },
+    "MaxTimeToWaitForRecognition_sec": {
+      "process": "engine",
+      "blurb": "Seconds TurnTowardsFace will wait for a tracked face’s temporary (negative) ID to become a real recognition ID before giving up and finishing the turn (default 3 s). Affects whether Vector gets a chance to say the person’s name after turning.",
+      "detail": "When MightSayName and the observed face still has ID < 0, the action enters WaitingForRecognition and records _startedWaitingForRecognition. Each tick exits that state if face ID becomes > 0 or elapsed time exceeds this console var; on timeout it still tries CreateNameAnimationAction then may SUCCESS without a name, and sends DAS turn_towards_face.recognition_timeout. Used by InteractWithFaces / ObservingLookAtFaces paths that pass a SayNameProbabilityTable. Longer waits help slow OKAO; shorter avoids stalling the action queue.",
+      "category": "TurnTowardsFace",
+      "related": [
+        "SayNameMinProb",
+        "SayNameProbDecayFactor",
+        "SayNameSpacing_sec",
+        "FaceRecognitionThreshold"
+      ],
+      "evidence": "engine/actions/basicActions.cpp:58,2538-2577,2402-2434",
+      "status": "live",
+      "tags": ["faces", "actions", "sayname", "timeout"]
+    },
+    "RequireKnownUser": {
+      "process": "engine",
+      "blurb": "When true (default), ‘leave a voice message’ only records if the spoken recipient name is already an enrolled face name. When false, Vector will try to record for any non-empty recipient string (still subject to mailbox full / other errors).",
+      "detail": "BehaviorLeaveAMessage::DoesRequireKnownUser returns (JSON requireKnownUser AND this console var). On activation, if recipient is non-empty and DoesRequireKnownUser is false or VisionComponent::IsNameTaken(recipient), StartRecordingMessage runs; otherwise InvalidMessage → unknown-recipient TTS. JSON config can also set requireKnownUser; both must be true for the strict path. Console alone cannot force-require if JSON set requireKnownUser false.",
+      "category": "VoiceMessage",
+      "related": [],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/messaging/behaviorLeaveAMessage.cpp:61-65,91-92,161-189,229-231",
+      "status": "live",
+      "tags": ["voicemessage", "messaging", "enrollment", "behavior"]
+    },
+    "SayNameMinProb": {
+      "process": "engine",
+      "blurb": "Floor on the per-name probability that TurnTowardsFace will still say someone’s name after repeated greetings (default 0.1, range 0–1). Stops the decay from driving the chance to zero.",
+      "detail": "SayNameProbabilityTable starts each new name at prob=1. Each time UpdateShouldSayName returns true (and enough spacing has passed), prob is multiplied by SayNameProbDecayFactor then clamped with max(this min, prob). Shared table on AIWhiteboard; used by InteractWithFaces and ObservingLookAtFaces when they construct TurnTowardsFace with the table. Set to 1.0 to keep saying names whenever spacing allows; set near 0 to nearly silence repeats after the first few.",
+      "category": "SayNameProbability",
+      "related": [
+        "SayNameProbDecayFactor",
+        "SayNameSpacing_sec",
+        "MaxTimeToWaitForRecognition_sec"
+      ],
+      "evidence": "engine/sayNameProbabilityTable.cpp:31-32,59-74; engine/sayNameProbabilityTable.h:38-40; engine/actions/basicActions.cpp:2402-2407",
+      "status": "live",
+      "tags": ["sayname", "faces", "behavior", "probability"]
+    },
+    "SayNameProbDecayFactor": {
+      "process": "engine",
+      "blurb": "Multiplier applied to a name’s say-probability after Vector actually greets that person (default 0.75, range 0–1). Higher values = slower decay (more frequent re-greets); lower = fewer repeats.",
+      "detail": "On a successful should-say decision in SayNameProbabilityTable::UpdateShouldSayName: prob *= factor, then clamped by SayNameMinProb. Comment in code: higher is slower decay. Only applied when the random roll succeeds and spacing has elapsed—not on every face sighting. Pair with SayNameSpacing_sec to control both cooldown and long-run frequency.",
+      "category": "SayNameProbability",
+      "related": [
+        "SayNameMinProb",
+        "SayNameSpacing_sec"
+      ],
+      "evidence": "engine/sayNameProbabilityTable.cpp:27-29,69-74",
+      "status": "live",
+      "tags": ["sayname", "faces", "behavior", "probability"]
+    },
+    "SayNameSpacing_sec": {
+      "process": "engine",
+      "blurb": "Minimum seconds between saying the same person’s name via the probability table (default 10). Even with probability 1.0, Vector will not re-say that name until this gap has passed.",
+      "detail": "UpdateShouldSayName compares BaseStationTimer now − lastTimeSaid_sec to this value. enoughTimePassed is required before the random draw against current prob. On a say, lastTimeSaid_sec is updated to now. Per-name in the LUT; different people do not share one global timer. Table lives on AIWhiteboard for freeplay face interaction paths.",
+      "category": "SayNameProbability",
+      "related": [
+        "SayNameMinProb",
+        "SayNameProbDecayFactor",
+        "MaxTimeToWaitForRecognition_sec"
+      ],
+      "evidence": "engine/sayNameProbabilityTable.cpp:34-35,53-74; engine/aiComponent/aiWhiteboard.cpp:107",
+      "status": "live",
+      "tags": ["sayname", "faces", "behavior", "timing"]
+    },
+    "UnrecognizedTimeout_ms": {
+      "process": "engine",
+      "blurb": "How long (ms, default 20×1000 = 20 s) a memory-map cell marked ObstacleUnrecognized may sit without a fresh observation before TimeoutObjects clears it. Not a face-recognition timeout despite the generic name.",
+      "detail": "MapComponent::TimeoutObjects (every TimeoutUpdatePeriod_ms) computes unrecognizedTooOld = now − this value and nulls nodes whose type is ObstacleUnrecognized and lastObserved ≤ that stamp. Parallel timeouts exist for vision edges (VisionTimeout_ms), prox obstacles (ProxTimeout_ms), and cliffs (CliffTimeout_ms). Shorter values forget anonymous map obstacles sooner ( freer path planning through old clutter); longer keeps unknown obstacles as barriers. Unrelated to face DeletionTimeout_ms or recognition wait.",
+      "category": "MapComponent",
+      "related": [
+        "VisionTimeout_ms",
+        "ProxTimeout_ms",
+        "CliffTimeout_ms",
+        "TimeoutUpdatePeriod_ms"
+      ],
+      "evidence": "engine/navMap/mapComponent.cpp:78,492-527; engine/navMap/memoryMap/memoryMapTypes.h:43",
+      "status": "live",
+      "tags": ["navmap", "timeout", "obstacle"]
+    }
+  }
+}
