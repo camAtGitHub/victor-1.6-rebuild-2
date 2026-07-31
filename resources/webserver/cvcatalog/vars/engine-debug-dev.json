@@ -1,0 +1,210 @@
+{
+  "vars": {
+    "AcousticTestMode": {
+      "process": "engine",
+      "blurb": "When true, forces the engine boot base behavior to AcousticTestMode (Alexa acoustic-lab style freeplay: on-charger Alexa test path, off-charger ModeSelector) and tells the anim process that acoustic-test “frozen on charger” mode is on. Default false. Compile-time ALEXA_ACOUSTIC_TEST builds hard-wire this without needing the console var.",
+      "detail": "Registered only when !ALEXA_ACOUSTIC_TEST under category “Alexa”. BehaviorsBootLoader UpdateDependent (after robot sync) reads the flag: if true and boot is not already AcousticTestMode, SetNewBehavior(AcousticTestMode). On any edge of enterAcousticTestMode it sends RobotInterface::AcousticTestEnabled to anim, which freezes anim streamer / Alexa / stream-state managers as if stuck on charger for lab testing. Behavior JSON: resources/config/.../devBehaviors/acousticTestMode.json (DispatcherStrictPriority → OnChargerInternal Alexa queue or ModeSelector).",
+      "howTo": "1) Ensure engine has finished sync with anim. 2) Set AcousticTestMode true. 3) Watch boot stack switch to AcousticTestMode and anim “frozen on charger” paths. Set false to leave (boot may need a normal base behavior reset depending on stage).",
+      "paths": {
+        "assets": [
+          "resources/config/engine/behaviorComponent/behaviors/devBehaviors/acousticTestMode.json"
+        ]
+      },
+      "related": [],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviorsBootLoader.cpp:46-47,59,257-270; animProcess/src/cozmoAnim/animProcessMessages.cpp:612-623; clad robot AcousticTestEnabled; resources/config/engine/behaviorComponent/behaviors/devBehaviors/acousticTestMode.json",
+      "category": "Alexa",
+      "status": "live",
+      "tags": ["alexa", "acoustic-test", "boot", "dev"]
+    },
+    "DebugActivationState": {
+      "process": "engine",
+      "blurb": "When true, every behavior activation-state change (NotInitialized → InActivatableScope → Activated, etc.) prints a Behaviors-channel debug line naming the behavior and new state. Off by default. Does not change which behaviors run — logging only.",
+      "detail": "IBehavior::SetActivationState_DevOnly checks this before PRINT_CH_DEBUG. Useful when hunting scope/activation bugs or confirming stack enter/leave order. Pair with DebugBehaviorStack for full stack dumps. Under ANKI_DEV_CHEATS the current state is also stored for asserts; the console flag only gates the print.",
+      "related": ["DebugBehaviorStack"],
+      "evidence": "engine/aiComponent/behaviorComponent/iBehavior.cpp:29,176-185",
+      "category": "Behaviors.ActivationState",
+      "status": "live",
+      "tags": ["behaviors", "debug", "logging"]
+    },
+    "DebugBehaviorStack": {
+      "process": "engine",
+      "blurb": "When true, the behavior system dumps the full active behavior stack to logs after each successful Delegate, CancelDelegates, or CancelSelf. Off by default. Pure diagnostics — no control-flow change.",
+      "detail": "BehaviorSystemManager calls _behaviorStack->DebugPrintStack with labels AfterDelegation / AfterCancelDelegates / AfterCancelSelf. High volume during freeplay. Use briefly when tracing who delegated to whom.",
+      "related": ["DebugActivationState", "EnableDebugTransitionPrintouts"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviorSystemManager.cpp:55-56,315-317,343-345,376-378",
+      "category": "Behaviors.BehaviorSystemManager",
+      "status": "live",
+      "tags": ["behaviors", "stack", "debug", "logging"]
+    },
+    "DebugConditionFactory": {
+      "process": "engine",
+      "blurb": "When true, logs every inject and remove of a custom BEI condition (named runtime predicates used by behaviors). Off by default. Does not alter condition evaluation.",
+      "detail": "BEIConditionFactory::InjectCustomBEICondition / RemoveCustomCondition print Behaviors-channel debug when this is on. Custom conditions are temporary named IBEICondition instances (timers, test hooks). Helps verify condition lifetime when debugging InternalStatesBehavior or other custom-condition users.",
+      "related": ["DebugInternalStatesBehavior"],
+      "evidence": "engine/aiComponent/beiConditions/beiConditionFactory.cpp:88-89,122-126,152-156",
+      "category": "Behaviors.ConditionFactory",
+      "status": "live",
+      "tags": ["bei", "conditions", "debug", "logging"]
+    },
+    "DebugDemoLocaleIndex": {
+      "process": "engine",
+      "blurb": "Integer mirror of the PR-demo “locale menu” index (0=en-US/Fahrenheit, 1=en-GB, 2=en-AU, 3=en-US/Canada Celsius). Default 0. Setting this console var alone does nothing — no code reads it for decisions.",
+      "detail": "Registered under RobotSettings with REMOTE_CONSOLE_ENABLED. InitDependent seeds it from current locale + temp_is_fahrenheit. Console function DebugDemoSetLocaleIndex applies locale and temperature unit via HandleRobotSettingChangeRequest, then writes the index back into this var for UI display. Treat as a status field, not a control.",
+      "howTo": "To change demo locale/temp units, call console function DebugDemoSetLocaleIndex with localeIndex 0–3. Do not expect consolevarset DebugDemoLocaleIndex=N to reconfigure the robot.",
+      "related": [],
+      "evidence": "engine/components/settingsCommManager.cpp:152-178,249-269 (writes only; no reads of kDebugDemoLocaleIndex for logic)",
+      "category": "RobotSettings",
+      "status": "dead",
+      "statusNote": "CONSOLE_VAR is only written (init mirror + after DebugDemoSetLocaleIndex). rg shows no readers; changing the var without the console function is a no-op.",
+      "tags": ["prdemo", "locale", "settings", "mirror", "dead"]
+    },
+    "DebugInternalStatesBehavior": {
+      "process": "engine",
+      "blurb": "When true while an InternalStatesBehavior (state-machine style behavior such as HighLevelAI) is loading its JSON state list, prints each state name as it is registered. Off by default. Does not change transitions at runtime.",
+      "detail": "Only consulted during LoadStateFromConfig in the constructor path. Turning it on after all InternalStatesBehavior instances are built will not retroactively log. Useful at engine start when validating state config names.",
+      "related": ["DebugConditionFactory", "DebugBehaviorStack"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/internalStatesBehavior.cpp:44-45,194-196",
+      "category": "Behaviors.InternalStatesBehavior",
+      "status": "partial",
+      "statusNote": "Read only while states are loaded from config (construct/init), not on later state transitions.",
+      "tags": ["behaviors", "internal-states", "debug", "logging"]
+    },
+    "DebugTrackLocking": {
+      "process": "engine",
+      "blurb": "When true, each MovementComponent update compares engine’s animation-track lock counts (head/lift/body) against the locks reported by the robot firmware and logs a warning on mismatch. Off by default. Does not change locking policy.",
+      "detail": "Detects desync where engine thinks a motor track is locked but the robot status bits disagree (or vice versa). Category “Robot”. Use when animations or actions leave motors stuck or unexpectedly free.",
+      "evidence": "engine/components/movementComponent.cpp:49,173-201",
+      "category": "Robot",
+      "status": "live",
+      "tags": ["movement", "tracks", "debug", "logging"]
+    },
+    "DevDispatchAfterShake": {
+      "process": "engine",
+      "blurb": "Unsigned count used only by the DevDispatchAfterShake / DevBaseBehavior path: set to N (>0) to fake that the robot has already been shaken N times, so Webots/sim can advance the shake-to-dispatch ladder without physical motion. Auto-resets to 0 after one consume. Default 0.",
+      "detail": "REMOTE_CONSOLE_ENABLED only, category DevBaseBehavior. BehaviorDispatchAfterShake::BehaviorUpdate, when activated and not delegated, copies this into countShaken and clears the var. Real shake detection uses head accel > ~16000 and kShakeTime dwell. Boot loader comments note mac/Webots onboarding DevDoNothing stage pairs with this for continuing work.",
+      "howTo": "1) Boot with dev base / DispatchAfterShake active (sim). 2) Set DevDispatchAfterShake to the desired shake count (e.g. 1–N matching configured behaviors). 3) On next BehaviorUpdate tick the count is applied and the var clears.",
+      "related": [],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDispatchAfterShake.cpp:36-39,150-154; engine/aiComponent/behaviorComponent/behaviorsBootLoader.cpp:283-288; simulator/game/uiGameController.cpp:1884",
+      "category": "DevBaseBehavior",
+      "status": "live",
+      "tags": ["dev", "sim", "shake", "onboarding"]
+    },
+    "DevForceBeginConfirmHabitat": {
+      "process": "engine",
+      "blurb": "When true, BehaviorConfirmHabitat always reports WantsToBeActivated (skips charger-platform, pending/active user-intent, and JSON on-treads-time gates). Default false. Dev/test shortcut to run habitat confirmation immediately.",
+      "detail": "Category Habitat. Production activation still requires not on charger platform, no pending/active user intent, and onTreadsTimeCondition from JSON (e.g. put-down dwell). Forcing true only affects the wants-to-activate gate — the behavior still runs its search-for-charger / cliff / prox confirmation logic once activated.",
+      "howTo": "Set true while freeplay can promote ConfirmHabitat; clear when done so normal habitat gating resumes.",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/habitat/behaviorConfirmHabitat.cpp:91-93,145-149",
+      "category": "Habitat",
+      "status": "live",
+      "tags": ["habitat", "dev", "activation"]
+    },
+    "DevIsStorageFull": {
+      "process": "engine",
+      "blurb": "When true, PhotographyManager pretends photo storage is full even if slots remain. Default false. Forces take-photo / photo-related interruptions to treat storage as full for UX testing.",
+      "detail": "IsPhotoStorageFull() returns kDevIsStorageFull || (_photoInfos.size() >= kMaxSlots). Max slots come from photography JSON (default 20). Callers include BehaviorTakeAPhotoCoordinator and BehaviorCoordinateGlobalInterrupts. Does not delete photos or fill disk.",
+      "related": [],
+      "evidence": "engine/components/photographyManager.cpp:45,253-255; engine/aiComponent/behaviorComponent/behaviors/photoTaking/behaviorTakeAPhotoCoordinator.cpp:109; behaviorCoordinateGlobalInterrupts.cpp:337",
+      "category": "Photography",
+      "status": "live",
+      "tags": ["photography", "dev", "storage"]
+    },
+    "EnableDebugTransitionPrintouts": {
+      "process": "engine",
+      "blurb": "When true (and remote console enabled), HeldInPalm tracker logs detailed reasons for entering/leaving “held in palm” (cliffs, charger, off-treads state, motor recency, surface validity). Off by default. Logging only — does not change palm detection thresholds.",
+      "detail": "Category HeldInPalm.Tracker. Logs cover: drop conditions while already in palm; ground→palm vs held→palm transitions; periodic insufficient cliff-duration / invalid surface messages; max cliffs since pickup. High volume if left on.",
+      "related": ["DebugBehaviorStack"],
+      "evidence": "engine/aiComponent/behaviorComponent/heldInPalmTracker.cpp:43,179-196,266-297,340-355,379-382",
+      "category": "HeldInPalm.Tracker",
+      "status": "live",
+      "tags": ["heldinpalm", "debug", "logging", "cliffs"]
+    },
+    "EnableUserDefinedBehaviorTree": {
+      "process": "engine",
+      "blurb": "Master switch for the experimental user-defined behavior tree (map sensor/condition types to player-chosen behaviors). Default false. When false, UserDefinedBehaviorTreeRouter/Selector refuse to activate even if their conditions fire.",
+      "detail": "UserDefinedBehaviorTreeComponent::IsEnabled() returns this flag. Router WantsToBeActivated and OnBehaviorActivated both bail when disabled. Component still loads condition→behavior mappings and variable snapshots at init; the flag only gates runtime activation. Config loaded via RobotDataLoader::LoadUserDefinedBehaviorTreeConfig.",
+      "howTo": "1) Set true. 2) Ensure user-defined router is reachable in the behavior tree. 3) Trigger a customizable condition; router/selector can map or edit behaviors.",
+      "evidence": "engine/aiComponent/behaviorComponent/userDefinedBehaviorTreeComponent/userDefinedBehaviorTreeComponent.cpp:30,98-100; behaviors/userDefinedBehaviorTree/behaviorUserDefinedBehaviorTreeRouter.cpp:54-62,88-92; behaviorUserDefinedBehaviorSelector.cpp:55-56",
+      "category": "UserDefinedBehaviorTree",
+      "status": "live",
+      "tags": ["behaviors", "user-defined", "feature-gate"]
+    },
+    "PeriodicDebugDASLogging": {
+      "process": "engine",
+      "blurb": "When true (ANKI_DEV_CHEATS builds), every ~5 seconds BatteryComponent emits a DAS event battery.periodic_log with raw/filtered mV, battery temp, on-contacts, disconnect/charge flags, calm mode, and CPU temp. Default false. For battery-life lab logging.",
+      "detail": "Does not change charging policy. When turned off, the next-report timer resets to “now” so re-enabling does not burst historical samples. Category BatteryComponent.",
+      "statusNote": "Only compiled under ANKI_DEV_CHEATS; absent from non-cheats builds.",
+      "evidence": "engine/components/battery/batteryComponent.cpp:81-84,293-313",
+      "category": "BatteryComponent",
+      "status": "live",
+      "tags": ["battery", "das", "debug", "dev-cheats"]
+    },
+    "PlayGetInAfterDevWakeWord": {
+      "process": "engine",
+      "blurb": "When true, the EnableDevTriggerWord console function pushes a wake-word response that plays VC_ListeningGetIn before listening. When false (default), that get-in animation is omitted (AnimationTrigger::Count). Only applies when you run EnableDevTriggerWord.",
+      "detail": "UserIntentComponent::SetupConsoleFuncs (ANKI_DEV_CHEATS) registers EnableDevTriggerWord, which PushResponseToTriggerWord with anim chosen by this flag and streaming chosen by StreamAfterDevWakeWord. Lets developers force a trigger-word response stack from any behavior for mic/intent testing.",
+      "howTo": "1) Set PlayGetInAfterDevWakeWord (and optionally StreamAfterDevWakeWord). 2) Call console function EnableDevTriggerWord. 3) Say/simulate the wake word.",
+      "requires": ["EnableDevTriggerWord"],
+      "related": ["StreamAfterDevWakeWord"],
+      "evidence": "engine/aiComponent/behaviorComponent/userIntentComponent.cpp:65-66,1191-1210",
+      "category": "UserIntentComponent",
+      "status": "partial",
+      "statusNote": "Only read when console function EnableDevTriggerWord runs; flipping the bool alone does nothing until that func pushes a trigger response.",
+      "tags": ["voice", "wake-word", "dev", "intent"]
+    },
+    "StreamAfterDevWakeWord": {
+      "process": "engine",
+      "blurb": "When true, EnableDevTriggerWord enables mic streaming + stream lights after the dev wake-word response; when false (default), streaming is disabled for that push. Companion to PlayGetInAfterDevWakeWord.",
+      "detail": "Maps to StreamAndLightEffect::StreamingEnabled vs StreamingDisabled in PushResponseToTriggerWord from EnableDevTriggerWord. Same SetupConsoleFuncs path under ANKI_DEV_CHEATS / UserIntentComponent.",
+      "howTo": "Set before calling EnableDevTriggerWord. True = stream after trigger (cloud intent path more like production); false = light/anim without streaming.",
+      "requires": ["EnableDevTriggerWord"],
+      "related": ["PlayGetInAfterDevWakeWord"],
+      "evidence": "engine/aiComponent/behaviorComponent/userIntentComponent.cpp:65-66,1191-1210",
+      "category": "UserIntentComponent",
+      "status": "partial",
+      "statusNote": "Only applied when EnableDevTriggerWord runs; not a global streaming override.",
+      "tags": ["voice", "wake-word", "streaming", "dev", "intent"]
+    },
+    "StressTestThreadedPrintsDuringLoad": {
+      "process": "engine",
+      "blurb": "When true at the start of RobotDataLoader::LoadNonConfigData, starts a multi-thread log spam stress test that runs until load finishes (then Stop). Default false. Used to validate logging under concurrent prints during asset/behavior load — not for normal use.",
+      "detail": "REMOTE_CONSOLE_ENABLED path uses ThreadedPrintStressTester. Must be true when LoadNonConfigData begins; toggling mid-load or after load has no effect. Thread count comes from StressTest_numThreads (default 5). Workers randomly PRINT_CH_DEBUG/INFO/WARNING on Unfiltered/Unnamed channels. Can flood logs and hurt load performance (danger).",
+      "howTo": "1) Set StressTest_numThreads if desired. 2) Set this true before engine data load (or restart engine with var persisted). 3) Watch Loading channel for Start/Stop stress messages. Leave false in production.",
+      "requires": [],
+      "related": ["StressTest_numThreads"],
+      "evidence": "engine/robotDataLoader.cpp:54,134-136,255-257; engine/threadedPrintStressTester.h:29-59",
+      "category": "RobotDataLoader",
+      "status": "partial",
+      "statusNote": "Only checked at begin/end of LoadNonConfigData. After load completes, the tester is stopped; enabling later is a no-op until next load.",
+      "tags": ["loading", "stress-test", "logging", "danger"]
+    },
+    "StressTest_numThreads": {
+      "process": "engine",
+      "blurb": "How many worker threads ThreadedPrintStressTester spawns when StressTestThreadedPrintsDuringLoad starts (default 5). Read only at Start() — change before enabling the stress flag / before load.",
+      "detail": "Each worker sleeps 0–10 ms randomly then prints debug/info/warning until Stop. Category RobotDataLoader. Ignored unless the stress-test path runs under REMOTE_CONSOLE_ENABLED.",
+      "related": ["StressTestThreadedPrintsDuringLoad"],
+      "requires": ["StressTestThreadedPrintsDuringLoad"],
+      "evidence": "engine/threadedPrintStressTester.h:29,42-59; engine/robotDataLoader.cpp:134-136",
+      "category": "RobotDataLoader",
+      "status": "partial",
+      "statusNote": "Only read when stressTester.Start() runs at load begin. Changing after Start does not resize the pool.",
+      "tags": ["loading", "stress-test", "threads"]
+    },
+    "TestOnlyLoggingEnabled": {
+      "process": "engine",
+      "blurb": "When true (ANKI_DEV_CHEATS / remote console), each touch-sensor update appends a CSV line of raw value, pressed flag, baseline, confirmed press, and charger-mode-check to /data/misc/touch.csv on the robot. Default false. Dev capture for touch baseline tuning.",
+      "detail": "TouchSensorComponent update under ANKI_DEV_CHEATS opens the file once (w+) and fprintf each sample. Separate from pre/post-touch ring buffers used by other touch debug paths. Can fill storage if left on (danger).",
+      "howTo": "1) Set true. 2) Touch the backpack sensor. 3) Pull /data/misc/touch.csv. Set false when finished.",
+      "paths": {
+        "robot": [
+          "/data/misc/touch.csv"
+        ],
+        "notes": "Opened with fopen w+ on first sample after enable; remains open for process lifetime of that path."
+      },
+      "evidence": "engine/components/sensors/touchSensorComponent.cpp:105-106,520-532",
+      "category": "Touch",
+      "status": "live",
+      "tags": ["touch", "debug", "logging", "paths", "dev-cheats"]
+    }
+  }
+}
