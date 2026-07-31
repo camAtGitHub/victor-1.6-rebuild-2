@@ -1,0 +1,145 @@
+{
+  "vars": {
+    "CustomEyeColorEnabled": {
+      "process": "engine",
+      "category": "RobotSettings",
+      "blurb": "Staging switch for “use freeform hue/saturation instead of a named preset eye color.” Flipping this alone does nothing to the face — it is only packaged when you run DebugSetCustomEyeColor.",
+      "detail": "Custom eye color is a robot setting (JSON keys enabled/hue/saturation) under SettingsManager / SettingsCommManager. When enabled is true, ApplySettingEyeColor takes hue and saturation from the custom object and sends SetFaceHue + SetFaceSaturation to the anim path, which recolors the procedural face. When false, a named preset (or rebuild specials like RAINBOW_EYES / REBUILD_EYES / MYSTERY_EYES) supplies the values instead. Choosing a preset via the normal eye-color path forces custom enabled back to false so the two modes do not fight. Console vars are also refreshed from the live setting via RefreshConsoleVars so the UI mirrors cloud/app state.",
+      "howTo": "1) Set CustomEyeColorEnabled true. 2) Set CustomEyeColorHue and CustomEyeColorSaturation (each 0–1). 3) Call console function DebugSetCustomEyeColor. To return to a named palette color, use DebugSetEyeColor (or the app) instead — that clears custom mode.",
+      "requires": ["DebugSetCustomEyeColor"],
+      "related": [
+        "CustomEyeColorHue",
+        "CustomEyeColorSaturation",
+        "DebugSetCustomEyeColor",
+        "EyeColor",
+        "DebugSetEyeColor"
+      ],
+      "evidence": "engine/components/settingsCommManager.cpp:51-53,80-94,384-390; engine/components/settingsManager.cpp:322,446-450,628-671,888-893",
+      "status": "partial",
+      "statusNote": "Console var is only a staging buffer. Eyes change only after DebugSetCustomEyeColor (or an app/SDK UpdateSettings with custom_eye_color). Leaving Enabled true without calling the function does not recolor the face.",
+      "tags": ["settings", "eyes", "color", "face", "jdocs"]
+    },
+    "CustomEyeColorHue": {
+      "process": "engine",
+      "category": "RobotSettings",
+      "blurb": "Staging hue for custom eye color, 0.0–1.0 around the color wheel (e.g. ~0 red, ~0.33 green, ~0.66 blue). Does not recolor eyes until DebugSetCustomEyeColor runs with CustomEyeColorEnabled true.",
+      "detail": "Registered as CONSOLE_VAR_RANGED in the RobotSettings group. When DebugSetCustomEyeColor fires, this value is written into the custom_eye_color setting JSON under key \"hue\". ApplySettingEyeColor validates 0–1, then RobotInterface::SetFaceHue(hue) is sent. With custom mode off, hue comes from eye_color_config presets (or dynamic rebuild modes) instead. RefreshConsoleVars copies the saved setting back into this console var so the slider shows the active value.",
+      "howTo": "Set CustomEyeColorEnabled true, pick Hue and Saturation, then call DebugSetCustomEyeColor. Invalid values outside 0–1 are rejected at validate time.",
+      "requires": ["CustomEyeColorEnabled", "DebugSetCustomEyeColor"],
+      "related": [
+        "CustomEyeColorEnabled",
+        "CustomEyeColorSaturation",
+        "DebugSetCustomEyeColor"
+      ],
+      "evidence": "engine/components/settingsCommManager.cpp:81,86-91; engine/components/settingsManager.cpp:646-656,888-892",
+      "status": "partial",
+      "statusNote": "Staging only until DebugSetCustomEyeColor; same pipeline as CustomEyeColorEnabled.",
+      "tags": ["settings", "eyes", "color", "hue"]
+    },
+    "CustomEyeColorSaturation": {
+      "process": "engine",
+      "category": "RobotSettings",
+      "blurb": "Staging saturation for custom eye color, 0.0–1.0 (0 = washed out / grayish, 1 = full chroma). Applied with hue only after DebugSetCustomEyeColor when custom mode is enabled.",
+      "detail": "Packaged into custom_eye_color JSON key \"saturation\" by DebugSetCustomEyeColor. SettingsManager validates the range, then sends RobotInterface::SetFaceSaturation. Anim receives setFaceSaturation and tints the face. Some preset paths (e.g. Xray hardware boost, rainbow/rebuild threads) adjust saturation separately; custom mode uses this value as-is. Outside 0–1 fails validation.",
+      "howTo": "Pair with CustomEyeColorEnabled and CustomEyeColorHue, then run DebugSetCustomEyeColor.",
+      "requires": ["CustomEyeColorEnabled", "DebugSetCustomEyeColor"],
+      "related": [
+        "CustomEyeColorEnabled",
+        "CustomEyeColorHue",
+        "DebugSetCustomEyeColor"
+      ],
+      "evidence": "engine/components/settingsCommManager.cpp:82,86-91; engine/components/settingsManager.cpp:646-656,888-893; animProcess/src/cozmoAnim/animProcessMessages.cpp:260-265",
+      "status": "partial",
+      "statusNote": "Staging only until DebugSetCustomEyeColor; same pipeline as CustomEyeColorEnabled.",
+      "tags": ["settings", "eyes", "color", "saturation"]
+    },
+    "AdjustEyeDistByYaw": {
+      "process": "engine",
+      "category": "Vision.FaceDetectorCommon",
+      "blurb": "When true (default), face-pose math widens the measured pixel distance between the eyes by dividing by cos(head yaw), so a face turned left/right is not treated as farther away than it is.",
+      "detail": "In SetFacePoseFromParts, left/right eye landmarks give an intra-eye distance in pixels. That distance is used with a fixed real-world interpupillary distance (62 mm) and the camera calibration to estimate how far the head is in front of the camera (GetTranslation). If the person yaws away from the camera, foreshortening shrinks the projected eye spacing and would make the head look farther; dividing by cos(yaw) undoes that when this flag is on. Off = use raw pixel eye spacing only. Affects head/eye pose estimates and the same intraEyeDist value later checked for enrollment.",
+      "related": [
+        "FarDistanceBetweenEyesMin",
+        "UseUndistortionForFacePose"
+      ],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:71,925-942,713-727",
+      "status": "live",
+      "tags": ["vision", "faces", "pose", "enrollment"]
+    },
+    "FarDistanceBetweenEyesMin": {
+      "process": "engine",
+      "category": "Vision.FaceTracker",
+      "blurb": "Minimum pixel spacing between the two eye centers (default 16) required before a tracked face is allowed to contribute face-enrollment samples. Faces that look too small/far fail this gate.",
+      "detail": "IsEnrollable also requires high tracker confidence, frontal OKAO pose, and face.IsFacingCamera() (head angles within LookingStraightMaxAngle). Only when all of those hold and intraEyeDist ≥ this value does recognition get enableEnrollment for that frame. The same constant is returned by GetMinEyeDistanceForEnrollment() (no other in-repo callers found). Larger values force people closer before Meet Victor / enrollment can bank features; smaller values allow enrollment from farther away (riskier features). Intra-eye distance may already be yaw-adjusted if AdjustEyeDistByYaw is on.",
+      "related": [
+        "AdjustEyeDistByYaw",
+        "FarDistanceBetweenEyesMax",
+        "CloseDistanceBetweenEyesMin",
+        "CloseDistanceBetweenEyesMax"
+      ],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:42,1453-1484,1291-1314",
+      "status": "live",
+      "tags": ["vision", "faces", "enrollment", "threshold"]
+    },
+    "FarDistanceBetweenEyesMax": {
+      "process": "engine",
+      "category": "Vision.FaceTracker",
+      "blurb": "Registered default 32 px as a “far face” interpupillary-distance upper bound under FaceEnrollParams, but nothing in the tracker or enrollment path reads this variable.",
+      "detail": "Lives next to FarDistanceBetweenEyesMin and the Close* pair in FaceEnrollParams; naming suggests an intended distance band for multi-distance enrollment, but IsEnrollable and GetMinEyeDistanceForEnrollment only use the Min of the Far pair. Changing this console var has no runtime effect today.",
+      "related": [
+        "FarDistanceBetweenEyesMin",
+        "CloseDistanceBetweenEyesMin",
+        "CloseDistanceBetweenEyesMax"
+      ],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:42-43 (registration only; no reads in tree)",
+      "status": "dead",
+      "statusNote": "CONSOLE_VAR only; rg finds no uses of kFarDistanceBetweenEyesMax beyond the definition.",
+      "tags": ["vision", "faces", "enrollment", "orphan"]
+    },
+    "CloseDistanceBetweenEyesMin": {
+      "process": "engine",
+      "category": "Vision.FaceTracker",
+      "blurb": "Registered default 64 px for a “close face” eye-spacing floor, but no code reads it. Does not gate tracking or enrollment.",
+      "detail": "Part of FaceEnrollParams with CloseDistanceBetweenEyesMax (64–128) implying a near-range band, complementary to the Far* 16–32 band. Only FarDistanceBetweenEyesMin is wired into IsEnrollable. Safe to ignore for live tuning.",
+      "related": [
+        "CloseDistanceBetweenEyesMax",
+        "FarDistanceBetweenEyesMin",
+        "FarDistanceBetweenEyesMax"
+      ],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:40 (registration only; no reads in tree)",
+      "status": "dead",
+      "statusNote": "CONSOLE_VAR only; kCloseDistanceBetweenEyesMin is never referenced after registration.",
+      "tags": ["vision", "faces", "enrollment", "orphan"]
+    },
+    "CloseDistanceBetweenEyesMax": {
+      "process": "engine",
+      "category": "Vision.FaceTracker",
+      "blurb": "Registered default 128 px for a “close face” eye-spacing ceiling, but no code reads it.",
+      "detail": "Sibling of CloseDistanceBetweenEyesMin. No enrollment, pose, or recognition branch compares against this max. Dead console surface leftover from an unfinished multi-distance enroll band.",
+      "related": [
+        "CloseDistanceBetweenEyesMin",
+        "FarDistanceBetweenEyesMin",
+        "FarDistanceBetweenEyesMax"
+      ],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:41 (registration only; no reads in tree)",
+      "status": "dead",
+      "statusNote": "CONSOLE_VAR only; kCloseDistanceBetweenEyesMax is never referenced after registration.",
+      "tags": ["vision", "faces", "enrollment", "orphan"]
+    },
+    "CenterTolerance": {
+      "process": "engine",
+      "category": "Playpen",
+      "blurb": "How many pixels (default 50) the factory playpen camera-calibration principal point (center_x / center_y) may differ from the expected stock values before the test fails as out of range.",
+      "detail": "Used only by BehaviorPlaypenCameraCalibration after a calibration compute finishes. Physical robots compare against approximate V2 intrinsics center (303, 196) on a 640×360 image; simulator uses (319, 179). If either axis is outside expected ± this tolerance (or focal length / resolution fail their own checks), the playpen result is CALIBRATION_VALUES_OOR. Does nothing in normal freeplay — only when the factory playpen calibration behavior is running. Sibling tolerances: FocalLengthTolerance, RadialDistortionTolerance, TangentialDistortionTolerance.",
+      "related": [
+        "FocalLengthTolerance",
+        "RadialDistortionTolerance",
+        "TangentialDistortionTolerance"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:157-158; playpenConfig.cpp:111; behaviorPlaypenCameraCalibration.cpp:43-48,262-282",
+      "status": "live",
+      "statusNote": "Live only inside factory playpen camera calibration. Widening it can pass bad cameras; tightening can false-fail good units. Irrelevant to custom eye color or face enrollment.",
+      "tags": ["playpen", "factory", "camera", "calibration"]
+    }
+  }
+}
