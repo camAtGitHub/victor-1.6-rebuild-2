@@ -65,7 +65,10 @@
     "vars/engine-cliff-drive.json",
     "vars/engine-enroll-sayname.json",
     "vars/engine-timers-cooldowns.json",
-    "vars/engine-firmware-jdocs.json"
+    "vars/engine-firmware-jdocs.json",
+    "vars/engine-distance-search.json",
+    "vars/engine-photo-tracker-calib.json",
+    "vars/engine-driving-anim-fft.json"
   ],
   "categories": [
     "categories/vision.json",
