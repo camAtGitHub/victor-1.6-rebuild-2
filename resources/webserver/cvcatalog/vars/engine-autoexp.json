@@ -1,0 +1,151 @@
+{
+  "vars": {
+    "AutoExp": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::AutoExp so the engine continuously re-tunes camera exposure time and gain from the live image histogram. When this mode is off (and nothing else subscribed it), the camera keeps its last exposure settings.",
+      "detail": "Each vision tick where AutoExp is scheduled, VisionSystem::UpdateCameraParams builds a brightness histogram, computes an adjustment fraction toward a target brightness, then applies that to exposure time and/or gain. Default schedule from vision_config is about every 5th frame. The default AE strategy is MinTime (keep shutter short, raise gain if needed for less motion blur). Turn on AutoExp_MinGain instead for less grainy photos. AutoExp_Cycling walks a list of target brightnesses for extreme lighting. Console toggles for VisionModes also DevOnly-subscribe so the mode runs even if the normal schedule left it off.",
+      "category": "Vision.General.VisionModes",
+      "related": [
+        "AutoExp_Cycling",
+        "AutoExp_MinGain",
+        "Exposure_TargetPercentile",
+        "Exposure_TargetValue",
+        "WhiteBalance",
+        "DisplayExposureInMirrorMode"
+      ],
+      "evidence": "engine/components/visionComponent.cpp:2836-2878,2207-2209; engine/vision/visionSystem.cpp:577-695,1849-1860; clad/src/clad/types/visionModes.clad (AutoExp); resources/config/engine/vision_config.json (InitialModeSchedules AutoExp:5)",
+      "status": "live",
+      "tags": ["vision", "autoexposure", "camera", "visionmode"]
+    },
+    "AutoExp_Cycling": {
+      "process": "engine",
+      "blurb": "Modifier for AutoExp: instead of one fixed brightness target, walk a short list of targets (from vision config, default 5 → 100 → 250 on a 0–255 scale). Helps find readable exposure when lighting is extreme or when searching for hard-to-see markers/charger.",
+      "detail": "Requires AutoExp to be on (or also force-enabled). Each AE update advances the cycle iterator; the mode is marked processed after one full pass through the list, or earlier if something is detected and metering locks exposure. While cycling, illumination detection is skipped. When metering regions exist (markers/faces/etc.), cycling is forced off so detections drive exposure. Used by robust charger observation and some visually-verify paths. Config key: ImageQuality.CyclingTargetValues.",
+      "category": "Vision.General.VisionModes",
+      "requires": ["AutoExp"],
+      "related": [
+        "AutoExp",
+        "AutoExp_MinGain",
+        "Exposure_TargetPercentile",
+        "Exposure_TargetValue"
+      ],
+      "evidence": "engine/vision/visionSystem.cpp:601-690,1831; coretech/vision/engine/cameraParamsController.cpp:535-551,59; clad/src/clad/types/visionModes.clad:62-64; resources/config/engine/vision_config.json:39; engine/aiComponent/behaviorComponent/behaviors/victor/behaviorRobustChargerObservation.cpp:219",
+      "status": "live",
+      "tags": ["vision", "autoexposure", "cycling", "visionmode"]
+    },
+    "AutoExp_MinGain": {
+      "process": "engine",
+      "blurb": "Modifier for AutoExp: prefer keeping camera gain low and lengthening exposure time when the image needs to get brighter (or the reverse when darkening). Default AutoExp without this is MinTime — short shutter first, then raise gain.",
+      "detail": "MinGain means less sensor noise/grain (better for still photos) at the cost of more motion blur if the robot or scene moves during a longer exposure. Photo-taking behavior forces this mode High while active. Switching between MinGain and MinTime tries to preserve the product of exposure×gain so the image does not jump in brightness.",
+      "category": "Vision.General.VisionModes",
+      "requires": ["AutoExp"],
+      "related": ["AutoExp", "AutoExp_Cycling"],
+      "evidence": "engine/vision/visionSystem.cpp:581-590,692-693; coretech/vision/engine/cameraParamsController.cpp:341-471; coretech/vision/engine/cameraParamsController.h:52-56; clad/src/clad/types/visionModes.clad:65; engine/aiComponent/behaviorComponent/behaviors/photoTaking/behaviorTakeAPhotoCoordinator.cpp:78",
+      "status": "live",
+      "tags": ["vision", "autoexposure", "gain", "photos", "visionmode"]
+    },
+    "BrightColors": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::BrightColors: scan the color camera image for highly saturated / colorful patches and publish them as BrightColors salient points (for AI and viz overlays).",
+      "detail": "BrightColorDetector divides the RGB image into a 3×3 grid of ROIs. Each cell gets a colorfulness score from red–green and yellow–blue channel statistics (std + 0.3×mean of absolute differences). Score above a hard-coded threshold (~59) emits a SalientPoint with a max-saturated average color and a unit-square polygon. Needs a color image; grayscale frames log a warning and skip. Results feed SalientPointsComponent and can be drawn in MirrorMode/viz. There are no separate console knobs for the score threshold.",
+      "category": "Vision.General.VisionModes",
+      "related": ["MirrorMode", "DisplayDetectionsInMirrorMode"],
+      "evidence": "engine/vision/visionSystem.cpp:926-932,1670-1683; coretech/vision/engine/brightColorDetector.cpp:48-150; engine/components/visionComponent.cpp:1201-1257; clad/src/clad/types/visionModes.clad (BrightColors)",
+      "status": "live",
+      "tags": ["vision", "color", "salient", "visionmode"]
+    },
+    "ClaheClipLimit": {
+      "process": "engine",
+      "blurb": "OpenCV CLAHE (contrast-limited adaptive histogram equalization) clip limit used when the vision pipeline preprocesses grayscale frames for marker detection (default 32). Higher = stronger local contrast boost; lower = gentler / more like plain equalization.",
+      "detail": "CLAHE is applied in VisionSystem::ApplyCLAHE before marker detection, controlled by the UseCLAHE enum (default WhenDark). Clip limit is passed to cv::CLAHE::setClipLimit. Changes are picked up on the next frame that actually runs CLAHE (compared against the last applied value). Does not change the raw camera stream — only the contrast-enhanced copy used for fiducial/marker search (and related marker paths).",
+      "category": "Vision.PreProcessing",
+      "related": [
+        "ClaheTileSize",
+        "ClaheWhenDarkThreshold",
+        "UseCLAHE_u8",
+        "PostClaheSmooth",
+        "Markers"
+      ],
+      "evidence": "engine/vision/visionSystem.cpp:85,379-382,1053-1072,1546-1556",
+      "status": "live",
+      "tags": ["vision", "clahe", "markers", "preprocessing"]
+    },
+    "ClaheTileSize": {
+      "process": "engine",
+      "blurb": "CLAHE tile grid size N for an N×N grid of local histograms (default 4). Smaller tiles adapt contrast more locally (can amplify noise); larger tiles are smoother across the frame.",
+      "detail": "Passed to cv::CLAHE::setTilesGridSize(cv::Size(N,N)). Updated live when the console value differs from the last applied size. Only matters when CLAHE actually runs (see ClaheWhenDarkThreshold / UseCLAHE mode). Pair with ClaheClipLimit when tuning hard-to-read markers in uneven lighting.",
+      "category": "Vision.PreProcessing",
+      "related": ["ClaheClipLimit", "ClaheWhenDarkThreshold", "UseCLAHE_u8", "Markers"],
+      "evidence": "engine/vision/visionSystem.cpp:86,379-381,1053-1058",
+      "status": "live",
+      "tags": ["vision", "clahe", "markers", "preprocessing"]
+    },
+    "ClaheWhenDarkThreshold": {
+      "process": "engine",
+      "blurb": "Average gray level (0–255, default 80) below which CLAHE is turned on when marker preprocessing is in WhenDark mode (the default UseCLAHE setting). Bright scenes skip CLAHE to save work and avoid over-enhancing.",
+      "detail": "WhenDark samples the (scaled) grayscale image every 3rd pixel, sums brightness, and compares to threshold × sample count — equivalent to comparing mean brightness to this value, with early-out once the sum exceeds the limit. If the image is brighter than the threshold, CLAHE is skipped for that frame. Only affects the WhenDark enum value; On/Both/Alternating ignore this threshold. Does not control camera auto-exposure.",
+      "category": "Vision.PreProcessing",
+      "related": ["ClaheClipLimit", "ClaheTileSize", "UseCLAHE_u8", "Markers"],
+      "evidence": "engine/vision/visionSystem.cpp:87,1010-1039; engine/vision/visionSystem.h:257-263",
+      "status": "live",
+      "tags": ["vision", "clahe", "markers", "threshold"]
+    },
+    "DebayerGamma": {
+      "process": "engine",
+      "blurb": "Gamma used when converting raw Bayer camera data to RGB/gray (default ~1.7 on Vector, ~2.1 on Xray builds; console range 0.1–4). Affects overall brightness curve of every processed color image after debayer.",
+      "detail": "Stored in VisionComponent as a ranged console var under Vision.Debayer. At vision init, Debayer::Instance().SetGamma is called with this value and rebuilds the debayer op map. Changing the slider alone does not reapply — call the ResetGamma console function so SetGamma runs again. Wrong gamma makes the world look washed out or crushed and can bias auto-exposure and color features that read the debayered image.",
+      "category": "Vision.Debayer",
+      "howTo": "1) Set DebayerGamma. 2) Run console function ResetGamma (same Vision.Debayer group). Confirm in camera/MirrorMode that brightness curve changed.",
+      "requires": ["ResetGamma"],
+      "related": ["ResetGamma", "AutoExp"],
+      "evidence": "engine/components/visionComponent.cpp:129-135,234; coretech/vision/engine/debayer.cpp:54-60; coretech/vision/engine/debayer.h:166",
+      "status": "partial",
+      "statusNote": "Value is applied at VisionComponent init and only reapplied when ResetGamma is invoked — editing the var mid-session without ResetGamma is a no-op.",
+      "tags": ["vision", "debayer", "gamma", "camera"]
+    },
+    "Exposure_TargetPercentile": {
+      "process": "engine",
+      "blurb": "When set above 0 (range 0–1, default 0 = off), overrides the built-in auto-exposure histogram percentile from vision_config (normally 0.50). AE tries to drive the brightness at this percentile toward Exposure_TargetValue (or config TargetValue).",
+      "detail": "CameraParamsController::ComputeAdjustmentFraction checks if this console var is > 0; if so, both the percentile and the target value come from console vars instead of the values loaded at init from ImageQuality.TargetPercentile / TargetValue. At 0, production config wins (default median / mid-gray). Example: percentile 0.9 with a moderate target brightens so that even the bright end of the histogram lands near the target (different behavior than changing TargetValue alone). Only used when AutoExp is actually computing new params. During AutoExp_Cycling, the cycling target list still supplies the target brightness, but this percentile still selects which histogram bin is compared.",
+      "category": "Vision.PreProcessing",
+      "requires": ["AutoExp"],
+      "related": [
+        "Exposure_TargetValue",
+        "AutoExp",
+        "AutoExp_Cycling",
+        "LinearizeForAutoExposure"
+      ],
+      "evidence": "coretech/vision/engine/cameraParamsController.cpp:40-41,522-558; engine/vision/visionSystem.cpp:213-233; resources/config/engine/vision_config.json:37-38",
+      "status": "live",
+      "tags": ["vision", "autoexposure", "histogram", "tuning"]
+    },
+    "Exposure_TargetValue": {
+      "process": "engine",
+      "blurb": "Desired 0–255 brightness level for the AE histogram percentile when console overrides are active (default 128). Only takes effect if Exposure_TargetPercentile is set greater than 0; otherwise config TargetValue (also 128) is used.",
+      "detail": "adjustmentFraction ≈ targetValue / currentPercentileValue, then clamped by MaxChangeFraction from config. Overexposed frames can force a hard drop (see MaxFractionOverexposed). While AutoExp_Cycling is active, target brightness comes from the cycling list, not this var. Raising the target makes the camera open up (longer exposure and/or more gain depending on MinTime vs MinGain); lowering closes it down.",
+      "category": "Vision.PreProcessing",
+      "requires": ["AutoExp", "Exposure_TargetPercentile"],
+      "related": [
+        "Exposure_TargetPercentile",
+        "AutoExp",
+        "AutoExp_Cycling",
+        "AutoExp_MinGain"
+      ],
+      "evidence": "coretech/vision/engine/cameraParamsController.cpp:41,522-558; resources/config/engine/vision_config.json:37",
+      "status": "live",
+      "statusNote": "Ignored for the target-value path unless Exposure_TargetPercentile > 0 (console override gate). Cycling mode uses CyclingTargetValues instead of this value.",
+      "tags": ["vision", "autoexposure", "histogram", "tuning"]
+    },
+    "Exposure_ms": {
+      "process": "engine",
+      "blurb": "Fixed camera exposure time in milliseconds for the factory Playpen test (default 31). Not a general runtime AE control — only applied when the playpen factory behavior starts and deliberately turns auto-exposure and white balance off.",
+      "detail": "PlaypenConfig::kExposure_ms is wrapped as a console var under category Playpen. BehaviorPlaypenTest builds CameraParams from this exposure plus Playpen gain, then VisionComponent::SetAndDisableCameraControl pushes those params to the camera service and disables AutoExp/WhiteBalance modes. Outside playpen, changing this value does nothing to normal freeplay AE (use AutoExp + Exposure_Target* or SetCameraSettings instead).",
+      "category": "Playpen",
+      "related": ["AutoExp"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:149; playpenConfig.cpp:108; behaviorPlaypenTest.cpp:177-180; engine/components/visionComponent.cpp:2217-2242",
+      "status": "partial",
+      "statusNote": "Live only inside BehaviorPlaypenTest activation path; idle freeplay ignores this var.",
+      "tags": ["vision", "playpen", "factory", "exposure"]
+    }
+  }
+}
