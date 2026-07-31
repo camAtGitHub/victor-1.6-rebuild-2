@@ -1,0 +1,34 @@
+{
+  "vars": {
+    "ArtificialPlanningDelay_ms": {
+      "process": "engine",
+      "blurb": "Console knob under XYPlanner that was meant to inject an artificial delay (milliseconds) into path planning. Registered as a ranged int 0–3900 with default 0, but nothing in the planner ever reads the value — changing it does not slow or delay path computation.",
+      "detail": "kArtificialPlanningDelay_ms is declared with CONSOLE_VAR_RANGED next to the XYPlanner worker that runs BidirectionalAStar on a background thread (or synchronously when constructed that way). StartPlanner measures real wall time with high_resolution_clock and logs planning duration, but never sleeps and never references this variable. Likely leftover from stress/timing tests that were never wired up or were removed.",
+      "category": "XYPlanner",
+      "related": [],
+      "evidence": "engine/xyPlanner.cpp:39 (registration only; no other references in tree)",
+      "status": "dead",
+      "statusNote": "Only CONSOLE_VAR_RANGED registration at xyPlanner.cpp:39. rg finds no reads of kArtificialPlanningDelay_ms or ArtificialPlanningDelay anywhere else.",
+      "tags": ["planner", "xyplanner", "path", "dead", "orphan"]
+    },
+    "Benchmark": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::Benchmark so each vision tick runs the Vision::Benchmark harness: timed micro-ops on the camera RGB buffer (scalar subtract, squared-diff, normalize RGB, frame diff, frame ratio). Not a product feature — CPU stress / implementation comparison for developers. Off by default; behaviors do not subscribe to this mode.",
+      "detail": "SetupVisionModeConsoleVars creates a bool console var named after every VisionMode enum string under Vision.General.VisionModes. Flipping Benchmark true calls EnableMode(Benchmark) and DevOnly_SelfSubscribeVisionMode so the schedule actually runs it. VisionSystem::Update then calls _benchmark->Update(imageCache). Inside Update (when ANKI_DEV_CHEATS is built in), console siblings VisionBenchmark_EnableAllModes / DisableAllModes / ToggleMode select which ops run, ScaleMultiplier picks ImageCache resolution, and PrintFrequency_ms was applied at construct for profiler log spacing. Without ANKI_DEV_CHEATS, Update returns RESULT_OK immediately (no work). CycleCompletesInOneFrame is true for this mode.",
+      "howTo": "1) Set Benchmark true so the mode is subscribed and processed. 2) Optionally pulse VisionBenchmark_EnableAllModes or ToggleMode (1–5) to choose ops. 3) Tune VisionBenchmark_ScaleMultiplier (1/2/4/8). 4) Watch Benchmark channel / vision profiler if compiled with ANKI_VISION_PROFILER. 5) Turn Benchmark off when done — it costs CPU and does not feed navigation or AI.",
+      "category": "Vision.General.VisionModes",
+      "related": [
+        "VisionBenchmark_EnableAllModes",
+        "VisionBenchmark_DisableAllModes",
+        "VisionBenchmark_ToggleMode",
+        "VisionBenchmark_ScaleMultiplier",
+        "VisionBenchmark_PrintFrequency_ms",
+        "VisionBenchmark_DisplayImages"
+      ],
+      "evidence": "clad/src/clad/types/visionModes.clad:26,91; engine/components/visionComponent.cpp:2836-2881; engine/vision/visionSystem.cpp:167,1865-1876; coretech/vision/engine/benchmark.cpp:44-122; coretech/vision/engine/benchmark.h:7-10,43-49",
+      "status": "live",
+      "statusNote": "Work inside Benchmark::Update is gated on ANKI_DEV_CHEATS; without it the mode still schedules but is a no-op. Timing prints also need ANKI_VISION_PROFILER (see VisionBenchmark_PrintFrequency_ms).",
+      "tags": ["vision", "benchmark", "visionmode", "dev", "performance"]
+    }
+  }
+}
