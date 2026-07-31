@@ -1,0 +1,208 @@
+{
+  "vars": {
+    "BeatHistoryWindowSize_sec": {
+      "process": "engine",
+      "blurb": "How many seconds of recent music-beat detections the engine keeps (default 10 s, range 1–60). Older beats are dropped every tick. Definite “beat detected” for dance-to-the-beat looks at this entire window.",
+      "detail": "BeatDetectorComponent receives beat events from the anim process (or injects fakes via FakeBeat_bpm). UpdateDependent pops entries older than now − this window. IsBeatDetected() requires enough beats, steady tempo, and confidence over that full retained history. IsPossibleBeatDetected() uses a shorter PossibleBeatWindow_sec slice instead. Shorter history makes “lost the beat” happen sooner after music stops; longer history is more forgiving of gaps but slower to clear a false lock.",
+      "category": "BeatDetectorComponent",
+      "related": [
+        "MinNumBeatsInHistory",
+        "TempoSteadyThreshold_bpm",
+        "PossibleBeatWindow_sec",
+        "FakeBeat_bpm",
+        "ConfidenceThreshold",
+        "HighConfidenceThreshold"
+      ],
+      "evidence": "engine/components/mics/beatDetectorComponent.cpp:29-38,115-119,194-225",
+      "status": "live",
+      "tags": ["beat", "dance", "mic", "timing"]
+    },
+    "DurationOfAudioToRecord_ms": {
+      "process": "engine",
+      "blurb": "Factory sound-check only: how long (milliseconds, default 2000) to record raw mics while a test tone animation plays so FFT can verify speaker + mics. Also used as a wait after head/lift motion in the IMU drift check so a prior recording can finish.",
+      "detail": "Registered twice via WRAP_EXTERN_CONSOLE_VAR: SelfTestConfig (category SelfTest) and PlaypenConfig (category Playpen), same symbol name so the console system keeps the first registration and logs a duplicate warning for the second. BehaviorSelfTestSoundCheck / BehaviorPlaypenSoundCheck call StartRecordingMicsRaw with this duration (and runFFT true), then wait that long (self-test) or play soundTestAnim (playpen). Drift-check behaviors only WaitAction this long after posing the head/lift. Self-test writes under /data/beep; playpen appends \"beep\" to the factory logger path. Does not affect freeplay mic capture or wake-word.",
+      "howTo": "Only meaningful while running factory SelfTest or Playpen sound/drift steps. Change before activating those behaviors.",
+      "paths": {
+        "robot": [
+          "/data/beep"
+        ],
+        "notes": "Self-test StartRecordingMicsRaw path is hardcoded \"/data/beep\". Playpen uses factory logger GetLogName()+\"beep\"."
+      },
+      "category": "SelfTest / Playpen",
+      "related": [
+        "HeadAngleToPlaySound",
+        "SoundVolume",
+        "FFTExpectedFreq_hz",
+        "FFTFreqTolerance_hz"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.h:143; selfTestConfig.cpp:37; behaviorSelfTestSoundCheck.cpp:61-67; behaviorSelfTestDriftCheck.cpp:41; playpen/playpenConfig.h:215; playpenConfig.cpp:97; behaviorPlaypenSoundCheck.cpp:63-65; behaviorPlaypenDriftCheck.cpp:42",
+      "status": "live",
+      "statusNote": "Factory SelfTest/Playpen only. Dual registration under SelfTest and Playpen; one dump id. Ignored in normal freeplay.",
+      "tags": ["selftest", "playpen", "factory", "audio", "mic", "fft"]
+    },
+    "FakeBeatConfidence": {
+      "process": "engine",
+      "blurb": "Confidence value stamped on every synthetic beat when FakeBeat_bpm is greater than zero (default 0.50, console range 0–100). Real mic beats ignore this.",
+      "detail": "Only read inside BeatDetectorComponent::UpdateDependent while faking: each injected BeatInfo gets confidence = FakeBeatConfidence. Product thresholds (ConfidenceThreshold ~0.18, HighConfidenceThreshold ~0.75) still apply when deciding possible/definite beat, so values around 0.5–1.0 are typical; the upper console bound of 100 is far above normal scale and would always pass confidence gates. Changing FakeBeat_bpm clears the queue so new fakes use the current confidence.",
+      "requires": ["FakeBeat_bpm"],
+      "related": [
+        "FakeBeat_bpm",
+        "ConfidenceThreshold",
+        "HighConfidenceThreshold",
+        "MinNumBeatsInHistory"
+      ],
+      "evidence": "engine/components/mics/beatDetectorComponent.cpp:51-54,96-111,141-225",
+      "category": "BeatDetectorComponent",
+      "status": "live",
+      "statusNote": "Only applied while FakeBeat_bpm > 0. Does not alter confidence of real anim-process beats.",
+      "tags": ["beat", "dance", "dev", "fake"]
+    },
+    "FakeBeat_bpm": {
+      "process": "engine",
+      "blurb": "When greater than 0, engine invents a steady beat at this tempo (BPM) instead of using the anim process mic beat detector. Default −1 disables faking. Use to test dance-to-the-beat without playing music.",
+      "detail": "UpdateDependent: if FakeBeat_bpm > 0, injects BeatInfo every 60/bpm seconds with tempo_bpm = this value and confidence = FakeBeatConfidence; changing the BPM clears _recentBeats. InitDependent’s subscription to RobotToEngine beatDetectorState only calls OnBeat when FakeBeat_bpm < 0, so real beats are ignored while faking. Set back to −1 to resume live detection (queue is not auto-cleared on disable until the history window ages out).",
+      "howTo": "1) Set FakeBeatConfidence if you need a specific confidence. 2) Set FakeBeat_bpm e.g. 120. 3) Wait until MinNumBeatsInHistory is filled. 4) Confirm dance/WebViz beatdetector shows possible/definite beat. 5) Set −1 to stop.",
+      "related": [
+        "FakeBeatConfidence",
+        "BeatHistoryWindowSize_sec",
+        "MinNumBeatsInHistory",
+        "TempoSteadyThreshold_bpm"
+      ],
+      "evidence": "engine/components/mics/beatDetectorComponent.cpp:51-54,82-113",
+      "category": "BeatDetectorComponent",
+      "status": "live",
+      "tags": ["beat", "dance", "dev", "fake"]
+    },
+    "HeadAngleToPlaySound": {
+      "process": "engine",
+      "blurb": "Factory sound-check only: head pitch (radians, default DEG_TO_RAD(2) ≈ 0.035 rad, nearly level) Vector moves to before playing the speaker/mic test animation and recording mics.",
+      "detail": "SelfTestConfig and PlaypenConfig each define and WRAP_EXTERN_CONSOLE_VAR this name (categories SelfTest and Playpen; console keeps first registration). BehaviorSelfTestSoundCheck / BehaviorPlaypenSoundCheck OnBehaviorActivated move the head with MoveHeadToAngleAction(this value) in parallel with lift to LOWDOCK, then TransitionToPlayingSound. Does not change freeplay head poses or other self-test head angles (e.g. HeadAngleForDriftCheck).",
+      "category": "SelfTest / Playpen",
+      "related": [
+        "SoundVolume",
+        "DurationOfAudioToRecord_ms",
+        "HeadAngleForDriftCheck"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.h:137; selfTestConfig.cpp:35; behaviorSelfTestSoundCheck.cpp:38-44; playpen/playpenConfig.h:209; playpenConfig.cpp:95; behaviorPlaypenSoundCheck.cpp:38-44",
+      "status": "live",
+      "statusNote": "Factory SelfTest/Playpen sound check only. Dual registration; one dump id.",
+      "tags": ["selftest", "playpen", "factory", "head", "audio"]
+    },
+    "MasterVolumeLevel": {
+      "process": "engine",
+      "blurb": "Staging enum for master speaker volume: MUTE, LOW, MEDIUM_LOW, MEDIUM, MEDIUM_HIGH, HIGH (index 0–5). Changing the list alone does not change robot volume — you must call console function DebugSetMasterVolume.",
+      "detail": "CONSOLE_VAR_ENUM under RobotSettings, kept in sync with settings.proto Volume. DebugSetMasterVolume packages the current enum into HandleRobotSettingChangeRequest(master_volume) and can update the settings jdoc. RefreshConsoleVars copies the live SettingsManager master_volume back into this var so the UI matches app/cloud. demoEngine.html sets the enum then posts consolefunccall DebugSetMasterVolume. Unrelated to factory SoundVolume (0–1 float used only in SelfTest/Playpen).",
+      "howTo": "1) Set MasterVolumeLevel to the desired step. 2) Call DebugSetMasterVolume. Confirm volume on speaker output / settings jdoc.",
+      "requires": ["DebugSetMasterVolume"],
+      "related": [
+        "DebugSetMasterVolume",
+        "SoundVolume"
+      ],
+      "enumLabels": [
+        "MUTE",
+        "LOW",
+        "MEDIUM_LOW",
+        "MEDIUM",
+        "MEDIUM_HIGH",
+        "HIGH"
+      ],
+      "evidence": "engine/components/settingsCommManager.cpp:47-66,375-379; resources/webserver/demoEngine.html:57-66,161-169",
+      "category": "RobotSettings",
+      "status": "partial",
+      "statusNote": "Staging buffer only. Volume applies after DebugSetMasterVolume (or app/SDK UpdateSettings master_volume). RefreshConsoleVars mirrors saved setting into this enum.",
+      "tags": ["settings", "volume", "audio", "jdocs"]
+    },
+    "MinNumBeatsInHistory": {
+      "process": "engine",
+      "blurb": "Minimum number of beat events that must be present before the engine will claim a possible or definite beat (default 6, range 2–50). Fewer hits → no dance-ready beat lock.",
+      "detail": "IsPossibleBeatDetected counts beats only inside PossibleBeatWindow_sec; IsBeatDetected counts the full BeatHistoryWindowSize_sec queue. Both require count ≥ this minimum before checking tempo steadiness and confidence. Lower values lock onto music faster (and false positives); higher values demand a longer consistent stream. With FakeBeat_bpm, wait until enough injected beats accumulate.",
+      "related": [
+        "BeatHistoryWindowSize_sec",
+        "PossibleBeatWindow_sec",
+        "TempoSteadyThreshold_bpm",
+        "FakeBeat_bpm"
+      ],
+      "evidence": "engine/components/mics/beatDetectorComponent.cpp:40-42,166-169,203-207",
+      "category": "BeatDetectorComponent",
+      "status": "live",
+      "tags": ["beat", "dance", "threshold"]
+    },
+    "MinTimeLookInMicDirection_s": {
+      "process": "engine",
+      "blurb": "Minimum seconds (default 0.5, range 0–2) Vector must keep looking in the mic / wake-word direction before FindFaceAndThen is allowed to accept a newly seen face and turn toward it. Prevents instant snap-away if a face flashes the first frames.",
+      "detail": "Category Behaviors.FindFaceAndThen. On TransitionToLookingInMicDirection, after raising the head, stateMinTime_s = now + this value. In LookForFaceInMicDirection, a recent face only triggers TransitionToTurningTowardsFace when currentTime ≥ stateMinTime_s (and face is new/different). Body-detector extensions and the overall look timeout (config timeUntilCancelFaceLooking_s) are separate. Does not change mic direction estimation itself — only the dwell before reacting to a face in that pose.",
+      "related": [],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/simpleFaceBehaviors/behaviorFindFaceAndThen.cpp:64,285-296,409-421",
+      "category": "Behaviors.FindFaceAndThen",
+      "status": "live",
+      "tags": ["face", "mic", "behavior", "timing"]
+    },
+    "PossibleBeatWindow_sec": {
+      "process": "engine",
+      "blurb": "Seconds of recent beats used for the weaker “possible beat” lock (default 9 s, range 1–10). Shorter than the full history window so Vector can start reacting before a full definite beat is proven.",
+      "detail": "IsPossibleBeatDetected returns true if IsBeatDetected is already true; otherwise it only considers beats with time ≥ now − this window. Within that slice it requires MinNumBeatsInHistory, latest confidence > ConfidenceThreshold, all confidences > half that threshold, and min/max tempo within TempoSteadyThreshold_bpm. Comment in code: potential beats use this shorter window. Must stay ≤ BeatHistoryWindowSize_sec for the queue to still hold those samples (defaults 9 ≤ 10).",
+      "related": [
+        "BeatHistoryWindowSize_sec",
+        "MinNumBeatsInHistory",
+        "TempoSteadyThreshold_bpm",
+        "ConfidenceThreshold"
+      ],
+      "evidence": "engine/components/mics/beatDetectorComponent.cpp:48-49,141-190",
+      "category": "BeatDetectorComponent",
+      "status": "live",
+      "tags": ["beat", "dance", "timing"]
+    },
+    "SoundVolume": {
+      "process": "engine",
+      "blurb": "Factory only: linear speaker volume 0–1 (default 1.0) forced via SetRobotVolume during SelfTest / Playpen entry and during the dedicated speaker+mic sound check. Not the product MasterVolumeLevel enum.",
+      "detail": "WRAP_EXTERN under SelfTest and Playpen (same dump id; first registration wins). BehaviorSelfTest and BehaviorPlaypenTest set volume at activation; sound-check behaviors set it again immediately before StartRecordingMicsRaw and soundTestAnim. Bypasses SettingsManager so tests can restore prior volume afterward (self-test comment). Freeplay app volume uses MasterVolumeLevel + DebugSetMasterVolume / settings jdoc instead.",
+      "category": "SelfTest / Playpen",
+      "related": [
+        "HeadAngleToPlaySound",
+        "DurationOfAudioToRecord_ms",
+        "MasterVolumeLevel",
+        "DebugSetMasterVolume"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.h:140; selfTestConfig.cpp:36; behaviorSelfTest.cpp:161-166; behaviorSelfTestSoundCheck.cpp:55-56; playpen/playpenConfig.h:212; playpenConfig.cpp:96; behaviorPlaypenTest.cpp:158; behaviorPlaypenSoundCheck.cpp:57-58",
+      "status": "live",
+      "statusNote": "Factory SelfTest/Playpen only. Dual registration. Unrelated to RobotSettings MasterVolumeLevel.",
+      "tags": ["selftest", "playpen", "factory", "volume", "audio"]
+    },
+    "TempoSteadyThreshold_bpm": {
+      "process": "engine",
+      "blurb": "How much the highest and lowest recent tempo estimates may differ (BPM, default 5, range 1–25) and still count as a “steady” beat for possible and definite detection.",
+      "detail": "IsPossibleBeatDetected and IsBeatDetected both take minmax tempo over their respective beat sets and require IsNear(max, min, this threshold). Tighter values demand more stable BPM estimates from the anim beat detector (or FakeBeat_bpm, which is perfectly steady). Wider values tolerate jittery tempo tracking at the cost of accepting noisier “music.”",
+      "related": [
+        "MinNumBeatsInHistory",
+        "PossibleBeatWindow_sec",
+        "BeatHistoryWindowSize_sec",
+        "FakeBeat_bpm"
+      ],
+      "evidence": "engine/components/mics/beatDetectorComponent.cpp:44-46,181-188,216-223",
+      "category": "BeatDetectorComponent",
+      "status": "live",
+      "tags": ["beat", "dance", "tempo", "threshold"]
+    },
+    "VoiceStyle": {
+      "process": "engine",
+      "blurb": "Debug TTS processing style for the console SayText function only: Default_Processed (index 0) or Unprocessed (index 1). Does not change normal freeplay or cloud speech voice by itself.",
+      "detail": "CONSOLE_VAR_ENUM under TextToSpeech, kept in sync with AudioMetaData::SwitchState::Robot_Vic_External_Processing (clad audio switch types). SayText reads the enum, maps 0→Default_Processed / 1→Unprocessed, and CreateUtterance with Immediate trigger, plus DurationScalar and PitchScalar. Product TTS paths use their own style selection and ignore this enum. Invalid enum logs Robot.SayText.InvalidVoiceStyleEnum.",
+      "howTo": "1) Set VoiceStyle. 2) Optionally set DurationScalar / PitchScalar. 3) Call console function SayText with text (underscores become spaces). Listen for processed vs raw voice.",
+      "requires": ["SayText"],
+      "related": [
+        "SayText",
+        "DurationScalar",
+        "PitchScalar"
+      ],
+      "enumLabels": [
+        "Default_Processed",
+        "Unprocessed"
+      ],
+      "evidence": "engine/robot.cpp:177-234",
+      "category": "TextToSpeech",
+      "status": "partial",
+      "statusNote": "Only consumed by console SayText. Freeplay/cloud TTS does not read this enum.",
+      "tags": ["tts", "debug", "voice", "audio"]
+    }
+  }
+}
