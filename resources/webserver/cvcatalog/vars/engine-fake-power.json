@@ -1,0 +1,76 @@
+{
+  "vars": {
+    "AskForHelp_PowerSave": {
+      "process": "engine",
+      "blurb": "When true, the AskForHelp (stuck-on-edge / needs-human) reaction may put Vector into engine power-save mode while he is sitting still, and temporarily leave power-save if the gyro detects motion so cliff sensors can be checked again. Default false: AskForHelp never requests or removes power-save.",
+      "detail": "Only consulted while BehaviorAskForHelp is activated (BehaviorUpdate). When enabled, UpdatePowerSaveRequests: if motors are not moving and no power-save request is pending, (1) while already in power-save, sustained gyro motion > ~5 °/s for 0.15 s calls SmartRemovePowerSaveModeRequest and schedules a 2 s delay before re-requesting; (2) while not in power-save and not in syscon calm mode, after that delay with no gyro motion, SmartRequestPowerSaveMode. AskForHelp itself still plays distressed stuck animations regardless of this flag — power-save is an optional battery/thermal optimization for long stuck periods.",
+      "howTo": "1) Set true. 2) Get the robot into AskForHelp / stuck-on-edge (e.g. force cliff stuck reactions). 3) Leave him still: power-save should engage after the quiet window. 4) Physically move/jostle him: power-save should drop briefly so sensors can re-evaluate. Set false to restore stock behavior (no power-save from this behavior).",
+      "category": "Behaviors.AskForHelp",
+      "related": [
+        "PowerSave_CalmMode",
+        "PowerSave_Camera",
+        "ForceCalmMode"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorAskForHelp.cpp:37,68-117",
+      "status": "live",
+      "tags": ["behavior", "ask-for-help", "powersave", "stuck", "dev"]
+    },
+    "FakeDisconnectedBattery": {
+      "process": "engine",
+      "blurb": "Dev fake: while Vector is on the charger contacts, pretends the battery is electrically disconnected from the charger (the real “battery disconnected” status bit). Default false. Off the contacts this toggle does nothing. Used to exercise full-charge / cooldown / disconnected-battery reporting without waiting for real thermal or charge-complete disconnect.",
+      "detail": "BatteryComponent::NotifyOfRobotState: if this flag is true and IsOnChargerContacts(), forces _battDisconnected = true (OR’d after the real IS_BATTERY_DISCONNECTED flag and raw-voltage < 3 V checks). Disconnect state gates voltage filter updates, DAS cooldown/full messaging, IsBatteryDisconnectedFromCharger, IsChargingStalledBecauseTooHot (charging && disconnected), and the “fully charged” path (disconnected && !charging → BatteryLevel::Full). BatteryStatus CLAD to the robot is updated when the disconnected bit changes. Does not change hardware charging — only engine’s software model of disconnect.",
+      "howTo": "1) Place robot on charger contacts. 2) Set FakeDisconnectedBattery true. 3) Observe BatteryLevel / WebViz battery / IsBatteryDisconnectedFromCharger. 4) Clear flag to restore real disconnect status. Pair with real charging bit behavior: if syscon still reports charging, you get “stalled because hot” style state; if not charging, level may go Full.",
+      "category": "BatteryComponent",
+      "related": [
+        "FakeLowBattery",
+        "FakeLowBatteryAfterOffChargerTimeout_sec"
+      ],
+      "evidence": "engine/components/battery/batteryComponent.cpp:70-71,136-145,183-216,268-274; engine/components/battery/batteryComponent.h:99,108",
+      "status": "live",
+      "tags": ["battery", "charger", "dev", "fake", "disconnect"]
+    },
+    "FakeLowBattery": {
+      "process": "engine",
+      "blurb": "Dev fake: immediately treats the battery as low while Vector is off the charger contacts. Also overrides the raw battery voltage reading to a fixed 3.5 V (and resets the voltage filter). Default false. On contacts, voltage is still forced to 3.5 V but the low-battery status is not forced by this flag.",
+      "detail": "In BatteryComponent::NotifyOfRobotState: when true, _batteryVoltsRaw = 3.5f and the low-pass filter is Reset on enter/exit of the fake. Separately, isLowBattery is forced true only if !IsOnChargerContacts(). That drives BatteryLevel::Low, BatteryStatus CLAD, DAS level-change, suggested charger time, and any behavior/condition that checks GetBatteryLevel / IsBatteryLow (find-home, charge UX, enroll-face gates, etc.). Independent of FakeLowBatteryAfterOffChargerTimeout_sec (timed low without voltage override). Does not drain hardware.",
+      "howTo": "1) Remove robot from charger. 2) Set FakeLowBattery true. 3) Confirm low-battery reactions (home/charge behaviors, app battery UI). 4) Set false; voltage filter resets so filtered volts recover from real samples. To fake low after a delay instead, use FakeLowBatteryAfterOffChargerTimeout_sec.",
+      "category": "BatteryComponent",
+      "related": [
+        "FakeLowBatteryAfterOffChargerTimeout_sec",
+        "FakeDisconnectedBattery"
+      ],
+      "evidence": "engine/components/battery/batteryComponent.cpp:62-64,119-127,218-241",
+      "status": "live",
+      "tags": ["battery", "dev", "fake", "low-battery"]
+    },
+    "FakeLowlightCondition": {
+      "process": "engine",
+      "blurb": "When true, RobustChargerObservation always takes the “low light” charger-search vision path (image compositing + bright face LCD + lowlight search animations) even if the camera says the room is not dark. Default false: lowlight is decided from real illumination / image-quality sensors.",
+      "detail": "IsLowLightVision() returns (real lowlight OR this flag). Real lowlight = IlluminationState::Darkened, or Unknown illumination with ImageQuality::TooDark. That boolean is latched once at TransitionToObserveCharger. Lowlight path: LowlightChargerSearchGetin, LCD to 20 mA, WaitForImages on Markers_Composite, LowlightChargerSearchLoop/Getout, then restore 5 mA LCD. Non-lowlight path uses AutoExp_Cycling wait and normal charger-docking search anims. Only matters while BehaviorRobustChargerObservation is running (go-home / charger observation).",
+      "howTo": "1) Set true before or while freeplay will search for the charger in “robust” observation. 2) Trigger find-home / charger observation. 3) Expect compositing + max LCD brightness + lowlight anims in a bright room. 4) Set false to restore automatic lighting choice.",
+      "category": "Behaviors.RobustChargerObservation",
+      "related": [
+        "RobustChargerObservation_SaveImages"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/victor/behaviorRobustChargerObservation.cpp:49,151-170,180-228",
+      "status": "live",
+      "tags": ["behavior", "charger", "vision", "lowlight", "dev", "fake"]
+    },
+    "ForceCalmMode": {
+      "process": "engine",
+      "blurb": "When true, immediately pins the robot body (syscon) into calm power mode and keeps power-save’s normal calm-mode toggle from fighting you. When false (default), calm mode is only driven by power-save entry/exit (if PowerSave_CalmMode is on) or other real callers. Edge-triggered: each flip sends one CalmPowerMode message to the robot process.",
+      "detail": "PowerStateManager::UpdateDependent watches kForceCalmMode vs last value; on change sends EngineToRobot CalmPowerMode(enable). Robot supervisor Process_calmPowerMode → PowerModeManager::EnableActiveMode(!enable) (HAL POWER_MODE_CALM vs ACTIVE). While ForceCalmMode is true, TogglePowerSaveSetting(CalmMode) skips sending CalmPowerMode so Enter/ExitPowerSave will not flip body calm underneath the force. Other power-save knobs (camera, LCD, CPU, prox map) still apply. Calm mode slows RobotState rate, stubs some sensors (e.g. prox map skip), and changes battery filter sample period. Turning the flag off sends CalmPowerMode(false) once — it does not automatically re-enter calm if power-save still wants it until the next power-save calm toggle.",
+      "howTo": "1) Set ForceCalmMode true to force body calm for battery/sensor testing. 2) Confirm CALM_POWER_MODE / quieter sensors. 3) Set false to release. Prefer this over PowerSave_CalmMode when you want calm without a full power-save request stack.",
+      "category": "PowerSave",
+      "related": [
+        "PowerSave_CalmMode",
+        "PowerSave_Camera",
+        "PowerSave_ThrottleCPU",
+        "AskForHelp_PowerSave"
+      ],
+      "evidence": "engine/components/powerStateManager.cpp:47,102-107,283-289; robot/supervisor/src/messages.cpp:187-190",
+      "status": "live",
+      "tags": ["power", "powersave", "syscon", "calm", "dev", "force"]
+    }
+  }
+}
