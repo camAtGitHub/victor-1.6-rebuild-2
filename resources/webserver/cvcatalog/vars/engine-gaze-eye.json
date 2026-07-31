@@ -1,0 +1,215 @@
+{
+  "vars": {
+    "BlinkAmountThreshold": {
+      "process": "engine",
+      "category": "Vision.EyeContact",
+      "blurb": "How open the detected eyes must be (blink-amount scale 0–1, default 0.73) before Vector counts someone as making eye contact. Used as a secondary gate after the gaze-angle average already looks near the camera.",
+      "detail": "In EyeContact::SecondaryContraints, at least one of blinkAmountLeft or blinkAmountRight must be below this threshold (OR). The face detector fills blink amounts; the code comment says the intent is to reject blinking faces. Also requires head pitch/yaw inside Pitch/Yaw angle thresholds and head within DistanceFromCameraThresholdSq_mm. Only matters once enough history samples are inliers and the gaze average is inside EyeContactDistanceSq. Eye contact feeds FaceWorld::IsMakingEyeContact (keep-face-alive focus, track-face criteria, ConditionEyeContact, ReactToGazeDirection surface path when UseEyeContact is true).",
+      "related": [
+        "EyeContactDistanceSq",
+        "UseEyeContact",
+        "HistorySize",
+        "MinNumberOfInliers",
+        "InlierDistanceSq"
+      ],
+      "evidence": "coretech/vision/engine/eyeContact.cpp:32,144-160; coretech/vision/engine/faceTrackerImpl_okao.cpp:693-710; engine/faceWorld.cpp:721-734,1159-1177",
+      "status": "live",
+      "tags": ["vision", "eye-contact", "faces", "blink", "threshold"]
+    },
+    "EyeColor": {
+      "process": "engine",
+      "category": "RobotSettings",
+      "blurb": "Staging list of named procedural eye-color presets (teal, orange, yellow, lime, sapphire, purple, green, plus rebuild specials Rainbow / Rebuild / Mystery). Changing the list alone does not recolor the face — you must run the console function DebugSetEyeColor.",
+      "detail": "CONSOLE_VAR_ENUM under RobotSettings; must stay in sync with settings.proto EyeColor / kEyeColors string. DebugSetEyeColor packages the enum index into a robot setting change (eye_color) via SettingsCommManager → SettingsManager, which validates and ApplySettingEyeColor (disables custom hue mode, loads hue/sat from eye_color_config or starts special threads for RAINBOW_EYES / REBUILD_EYES / MYSTERY_EYES). RefreshConsoleVars copies the live saved setting back into this enum so the UI mirrors app/cloud. Same setting path as voice EyeColor behaviors and SDK UpdateSettings.",
+      "howTo": "1) Pick a preset in this list. 2) Call DebugSetEyeColor. For freeform hue/sat use CustomEyeColor* + DebugSetCustomEyeColor instead (that path turns custom mode on and overrides presets).",
+      "paths": {
+        "assets": [
+          "resources/config/engine/eye_color_config.json"
+        ],
+        "robot": [
+          "/data/data/rebuild/eye_color_config.json"
+        ],
+        "notes": "If the rebuild path exists, RobotDataLoader loads that file instead of the packaged eye_color_config.json for preset hue/sat."
+      },
+      "requires": ["DebugSetEyeColor"],
+      "related": [
+        "DebugSetEyeColor",
+        "CustomEyeColorEnabled",
+        "CustomEyeColorHue",
+        "CustomEyeColorSaturation",
+        "DebugSetCustomEyeColor"
+      ],
+      "enumLabels": [
+        "TIP_OVER_TEAL",
+        "OVERFIT_ORANGE",
+        "UNCANNY_YELLOW",
+        "NON_LINEAR_LIME",
+        "SINGULARITY_SAPPHIRE",
+        "FALSE_POSITIVE_PURPLE",
+        "CONFUSION_MATRIX_GREEN",
+        "RAINBOW_EYES",
+        "REBUILD_EYES",
+        "MYSTERY_EYES"
+      ],
+      "evidence": "engine/components/settingsCommManager.cpp:68-77,381-382; engine/components/settingsManager.cpp:321-322,424-450,628-701; engine/robotDataLoader.cpp:1075-1080",
+      "status": "partial",
+      "statusNote": "Staging buffer only. Face color changes after DebugSetEyeColor (or app/SDK settings update), not when the enum is moved alone.",
+      "tags": ["settings", "eyes", "color", "face", "jdocs"]
+    },
+    "EyeContactDistanceSq": {
+      "process": "engine",
+      "category": "Vision.EyeContact",
+      "blurb": "How close the averaged eye-gaze angles must sit to “looking at the camera” (squared distance in degrees², default 64 ≈ within about 8° of (0,0)). Smaller = stricter eye contact; larger = more faces count as looking at Vector.",
+      "detail": "After history has enough inliers (MinNumberOfInliers), DetermineMakingEyeContact takes the L2 norm squared of the average (leftRight_deg, upDown_deg) gaze point. Eye contact is true only if that distance < this threshold, the history buffer is initialized, and SecondaryContraints pass (head pose cone, blink gate, near distance). Gaze angles come from OKAO gaze/blink on each face track. Does not use millimeter space — pure angular gaze from the face detector.",
+      "related": [
+        "BlinkAmountThreshold",
+        "InlierDistanceSq",
+        "MinNumberOfInliers",
+        "HistorySize",
+        "UseEyeContact"
+      ],
+      "evidence": "coretech/vision/engine/eyeContact.cpp:26,130-141; coretech/vision/engine/faceTrackerImpl_okao.cpp:665,693-710,1277",
+      "status": "live",
+      "tags": ["vision", "eye-contact", "faces", "threshold"]
+    },
+    "GazeDirectionExpireThreshold_ms": {
+      "process": "engine",
+      "category": "Vision.GazeDirection",
+      "blurb": "How long (milliseconds, default 1000) without a fresh face update before that face’s ground-plane gaze tracker is deleted. After expiry, stable “looking over there” points stop until the face is seen again and the history re-fills.",
+      "detail": "FaceWorld::AddOrUpdateGazeDirection runs only when FeatureType::GazeDirection is enabled and the face HasEyes. Each update stores the face timestamp; if GetExpired(now) is true (now − lastUpdated > this ms), the GazeDirection entry is erased from FaceWorld’s map. Behaviors that poll AnyStableGazeDirection / GetGazeDirectionPose will no longer see that face until re-tracked and IsStable again. Separate from the eye-contact expire threshold (Vision.EyeContact kExpireThreshold).",
+      "related": [
+        "GazeDirectionHistorySize",
+        "GazeDirectionMinNumberOfInliers",
+        "RenderGazeDirectionPoints"
+      ],
+      "evidence": "coretech/vision/engine/gazeDirection.cpp:23,137-139; engine/faceWorld.cpp:483-484,645-672",
+      "status": "live",
+      "tags": ["vision", "gaze", "faces", "timeout"]
+    },
+    "GazeDirectionHistorySize": {
+      "process": "engine",
+      "category": "Vision.GazeDirection",
+      "blurb": "How many past ground-plane gaze samples (default 6) are kept per face when deciding whether someone is steadily looking at a point on the floor/surface.",
+      "detail": "GazeDirection constructor resizes the ring buffer to this value. Each face update projects head pose to a ground-plane point (or marks the sample excluded if looking above the horizon). After the buffer has been filled once (_initialized), averages and inlier counts use these samples. Raising size needs more frames before stable output and smoother averages; lowering reacts faster but is noisier. Because resize happens only at object construction, changing this while faces are already tracked does not grow/shrink existing buffers — only new GazeDirection entries (new face IDs after erase) pick up a new size. Wrap logic also reads the live console value, so mid-session changes can desync index vs vector capacity until history is cleared/recreated.",
+      "related": [
+        "GazeDirectionMinNumberOfInliers",
+        "GazeDirectionInlierXThreshold_mm",
+        "GazeDirectionInlierYThreshold_mm",
+        "GazeDirectionInlierZThreshold_mm",
+        "GazeDirectionExpireThreshold_ms"
+      ],
+      "evidence": "coretech/vision/engine/gazeDirection.cpp:21,34-39,47-67",
+      "status": "partial",
+      "statusNote": "Buffer length is fixed when each GazeDirection is constructed (first time a face ID enters FaceWorld’s map). Runtime changes apply cleanly only to newly created entries after expire/clear.",
+      "tags": ["vision", "gaze", "history", "faces"]
+    },
+    "GazeDirectionInlierXThreshold_mm": {
+      "process": "engine",
+      "category": "Vision.GazeDirection",
+      "blurb": "Maximum absolute X (forward/back, mm, default 300) a sample may differ from the current average ground-gaze point and still count as an inlier. Wider = more tolerant of depth scatter when calling a gaze “stable.”",
+      "detail": "FindInliers uses an L1 box test: |dx| < X, |dy| < Y, |dz| < Z on included ground-plane points only. Inlier set is re-averaged for the reported stable point. Together with Y/Z thresholds and MinNumberOfInliers, this is the stability gate for ReactToGazeDirection and FaceWorld stable gaze pose. X is usually the loosest axis (default 300 mm) because ground intersections stretch with head angle.",
+      "related": [
+        "GazeDirectionInlierYThreshold_mm",
+        "GazeDirectionInlierZThreshold_mm",
+        "GazeDirectionMinNumberOfInliers",
+        "GazeDirectionHistorySize"
+      ],
+      "evidence": "coretech/vision/engine/gazeDirection.cpp:24,107-129,181-183",
+      "status": "live",
+      "tags": ["vision", "gaze", "threshold", "inlier"]
+    },
+    "GazeDirectionInlierYThreshold_mm": {
+      "process": "engine",
+      "category": "Vision.GazeDirection",
+      "blurb": "Maximum absolute Y (left/right, mm, default 100) from the average ground-gaze point for a sample to stay an inlier. Tighter than X by default so side-to-side jitter fails stability sooner.",
+      "detail": "Same FindInliers box as X/Z. Only samples already marked include (successful ground-plane intersection with face normal below the horizon) are considered. Lower Y makes “looking left then right” less likely to produce a stable pose; higher Y allows more lateral wander while still declaring stable.",
+      "related": [
+        "GazeDirectionInlierXThreshold_mm",
+        "GazeDirectionInlierZThreshold_mm",
+        "GazeDirectionMinNumberOfInliers"
+      ],
+      "evidence": "coretech/vision/engine/gazeDirection.cpp:25,119-127",
+      "status": "live",
+      "tags": ["vision", "gaze", "threshold", "inlier"]
+    },
+    "GazeDirectionInlierZThreshold_mm": {
+      "process": "engine",
+      "category": "Vision.GazeDirection",
+      "blurb": "Maximum absolute Z (height, mm, default 20) from the average for an inlier. Ground-plane intersections should sit near z≈0, so this mainly rejects bad projections or numeric junk.",
+      "detail": "Part of the three-axis inlier box in FindInliers. Default 20 mm is much tighter than X/Y because true ground hits cluster near the plane. Raising it can keep mis-projected points in the average; lowering it drops more samples and can prevent IsStable.",
+      "related": [
+        "GazeDirectionInlierXThreshold_mm",
+        "GazeDirectionInlierYThreshold_mm",
+        "GazeDirectionMinNumberOfInliers",
+        "GazeDirectionSecondPointTranslationY_mm"
+      ],
+      "evidence": "coretech/vision/engine/gazeDirection.cpp:26,119-127",
+      "status": "live",
+      "tags": ["vision", "gaze", "threshold", "inlier"]
+    },
+    "GazeDirectionMinNumberOfInliers": {
+      "process": "engine",
+      "category": "Vision.GazeDirection",
+      "blurb": "How many history samples must agree (inliers) before a face’s ground gaze is marked stable (default 2). Must also have filled the history buffer once.",
+      "detail": "IsStable returns (_numberOfInliers > this value) && _initialized. FaceWorld copies GetGazeDirectionAverage into the TrackedFace pose only when stable. ReactToGazeDirection activates via AnyStableGazeDirection. Raising the bar (e.g. 4 with history 6) demands a tighter cluster; lowering to 0/1 makes almost any filled history “stable” and can fire look-over-there reactions on noisy head pose.",
+      "related": [
+        "GazeDirectionHistorySize",
+        "GazeDirectionInlierXThreshold_mm",
+        "GazeDirectionInlierYThreshold_mm",
+        "GazeDirectionInlierZThreshold_mm",
+        "GazeDirectionShiftOutputPointX_mm"
+      ],
+      "evidence": "coretech/vision/engine/gazeDirection.cpp:22,181-183; engine/faceWorld.cpp:662-669,1205-1209; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorReactToGazeDirection.cpp:94",
+      "status": "live",
+      "tags": ["vision", "gaze", "stability", "faces"]
+    },
+    "GazeDirectionSecondPointTranslationY_mm": {
+      "process": "engine",
+      "category": "Vision.GazeDirection",
+      "blurb": "How far (mm, default 1500) along the head’s local Y the second ray point is placed when intersecting gaze with the ground plane. Larger spacing keeps the ray math numerically stable.",
+      "detail": "GetPointFromHeadPose builds a second point by translating {0, this value, 0} in the head pose frame, then finds the line–ground (z=0) intersection with alpha parameterization. Comment: 500 was too small (z coords too close → instability); 1500 was chosen. If head and second point have nearly equal z, or alpha ≤ 1 (gaze above horizon / “behind”), the sample is excluded from the average (include=false). Changing this shifts where “looking down” hits the floor, especially at steep head angles — tune carefully; not a simple “look farther” slider.",
+      "related": [
+        "GazeDirectionInlierZThreshold_mm",
+        "GazeDirectionShiftOutputPointX_mm",
+        "GazeDirectionHistorySize"
+      ],
+      "evidence": "coretech/vision/engine/gazeDirection.cpp:28-31,142-178",
+      "status": "live",
+      "tags": ["vision", "gaze", "geometry", "ground-plane"]
+    },
+    "GazeDirectionShiftOutputPointX_mm": {
+      "process": "engine",
+      "category": "Vision.GazeDirection",
+      "blurb": "Extra forward offset (mm, default 100) added to the X of both the average and current reported ground-gaze points. Nudges the “look over there” target slightly ahead of the raw intersection.",
+      "detail": "GetGazeDirectionAverage and GetCurrentGazeDirection add Point3f(this, 0, 0) after computing the history result. FaceWorld stores the average (with this shift) as the face’s gaze pose when stable; viz of current points uses the same shift. Behaviors that turn toward the pose (ReactToGazeDirection surface path) aim slightly farther forward. Does not change inlier math — only the output point.",
+      "related": [
+        "GazeDirectionMinNumberOfInliers",
+        "GazeDirectionSecondPointTranslationY_mm",
+        "RenderGazeDirectionPoints",
+        "FaceDirectedAtRobotMinXThres_mm",
+        "FaceDirectedAtRobotMaxXThres_mm"
+      ],
+      "evidence": "coretech/vision/engine/gazeDirection.cpp:27,186-193; engine/faceWorld.cpp:666-668,1036-1045",
+      "status": "live",
+      "tags": ["vision", "gaze", "offset", "behavior"]
+    },
+    "UseEyeContact": {
+      "process": "engine",
+      "category": "Vision.GazeDirection",
+      "blurb": "When true (default), the surface “look over there” reaction treats active eye contact as “looking at Vector” even if the projected gaze point is outside the small FaceDirectedAtRobot X/Y box. When false, only the box decides “looking at me.”",
+      "detail": "Only read in BehaviorReactToGazeDirection::TransitionToCheckForPointOnSurface (searchForFaces false path / ReactToGazeDirectionSurface and similar). If gaze translation is inside [MinX,MaxX]×[MinY,MaxY] OR (IsMakingEyeContact within MaxTimeSinceTrackedFaceUpdated_ms AND this flag), Vector plays GazingLookAtVectorReaction instead of turning toward the surface point. Eye-contact detection itself (Vision.EyeContact vars, keep-face-alive, etc.) always runs; this flag only couples that signal into the gaze-direction surface reaction. Face-search mode (searchForFaces true) does not use this var.",
+      "related": [
+        "FaceDirectedAtRobotMinXThres_mm",
+        "FaceDirectedAtRobotMaxXThres_mm",
+        "FaceDirectedAtRobotMinYThres_mm",
+        "FaceDirectedAtRobotMaxYThres_mm",
+        "EyeContactDistanceSq",
+        "BlinkAmountThreshold",
+        "MaxTimeSinceTrackedFaceUpdated_ms"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorReactToGazeDirection.cpp:37,165-184; engine/faceWorld.cpp:1159-1177",
+      "status": "live",
+      "tags": ["vision", "gaze", "eye-contact", "behavior"]
+    }
+  }
+}
