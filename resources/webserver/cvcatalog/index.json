@@ -59,7 +59,10 @@
     "vars/engine-fake-power.json",
     "vars/engine-body-look.json",
     "vars/engine-viz-ui.json",
-    "vars/engine-gaze-eye.json"
+    "vars/engine-gaze-eye.json",
+    "vars/engine-hough.json",
+    "vars/engine-palm-touch.json",
+    "vars/engine-cliff-drive.json"
   ],
   "categories": [
     "categories/vision.json",
