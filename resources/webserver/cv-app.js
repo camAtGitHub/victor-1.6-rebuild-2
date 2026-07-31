@@ -244,29 +244,74 @@
     return row.querySelector("label");
   }
 
+  function appendTextBlock(pop, className, label, text) {
+    if (text == null || text === "") return;
+    var p = document.createElement("p");
+    p.className = className;
+    if (label) {
+      var strong = document.createElement("strong");
+      strong.textContent = label;
+      p.appendChild(strong);
+      p.appendChild(document.createTextNode(" "));
+    }
+    // Preserve intentional newlines in long explainers
+    p.appendChild(document.createTextNode(String(text)));
+    if (String(text).indexOf("\n") >= 0) {
+      p.style.whiteSpace = "pre-wrap";
+    }
+    pop.appendChild(p);
+  }
+
+  function appendPathsBlock(pop, paths) {
+    if (!paths || typeof paths !== "object") return;
+    var box = document.createElement("div");
+    box.className = "cv-paths";
+    var title = document.createElement("p");
+    title.className = "cv-paths-title";
+    title.innerHTML = "<strong>Paths</strong>";
+    box.appendChild(title);
+
+    function list(label, arr) {
+      if (!arr || !arr.length) return;
+      var p = document.createElement("p");
+      p.className = "cv-paths-list";
+      p.appendChild(document.createTextNode(label + ": "));
+      var code = document.createElement("code");
+      code.textContent = arr.join(", ");
+      p.appendChild(code);
+      box.appendChild(p);
+    }
+    list("On robot", paths.robot);
+    list("Assets", paths.assets);
+    if (paths.notes) {
+      var n = document.createElement("p");
+      n.className = "cv-paths-notes";
+      n.textContent = paths.notes;
+      box.appendChild(n);
+    }
+    if (box.childNodes.length > 1) pop.appendChild(box);
+  }
+
   function buildPopover(meta) {
     var pop = document.createElement("div");
     pop.className = "cv-popover";
     pop.setAttribute("hidden", "");
     pop.setAttribute("role", "tooltip");
 
-    if (meta.blurb) {
-      var p = document.createElement("p");
-      p.className = "cv-blurb";
-      p.textContent = meta.blurb;
-      pop.appendChild(p);
-    }
+    appendTextBlock(pop, "cv-blurb", null, meta.blurb);
+    appendTextBlock(pop, "cv-detail", null, meta.detail);
+    appendTextBlock(pop, "cv-howto", "How to:", meta.howTo);
+    appendPathsBlock(pop, meta.paths);
     if (meta.statusNote) {
-      var sn = document.createElement("p");
-      sn.className = "cv-status-note";
-      sn.textContent = meta.statusNote;
-      pop.appendChild(sn);
+      appendTextBlock(
+        pop,
+        "cv-status-note",
+        meta.status ? "Status (" + meta.status + "):" : "Status:",
+        meta.statusNote
+      );
     }
     if (meta.evidence) {
-      var ev = document.createElement("p");
-      ev.className = "cv-evidence";
-      ev.textContent = "Evidence: " + meta.evidence;
-      pop.appendChild(ev);
+      appendTextBlock(pop, "cv-evidence", "Evidence:", meta.evidence);
     }
     if (meta.requires && meta.requires.length) {
       var req = document.createElement("p");
@@ -324,7 +369,8 @@
         row.classList.add("cv-highlight");
       }
 
-      var hasBlurb = !!(meta.blurb || meta.statusNote || meta.evidence ||
+      var hasBlurb = !!(meta.blurb || meta.detail || meta.howTo || meta.paths ||
+        meta.statusNote || meta.evidence ||
         (meta.requires && meta.requires.length) ||
         (meta.related && meta.related.length));
       var dead = isDeadStatus(meta.status);

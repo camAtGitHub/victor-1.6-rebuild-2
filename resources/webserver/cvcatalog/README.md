@@ -27,8 +27,12 @@ Any static path starting with `/consolevars` is stolen by the UI handler (includ
 
 ## Rules for agents
 
+**Full mapping workflow (plain-English blurbs, paths, progress):** see **`AGENTS.md`** in this folder.
+
 1. Catalog keys = exact UI / dump ids (`resources/webserver/.docs/consolevarlist_*`).
-2. Prefer documenting unknown clusters; WebViz-covered surfaces are lower priority.
-3. `status: dead` only with evidence; never disable the control in UI.
-4. Register new shard files in `index.json`.
-5. Keep shards small (~20–80 vars).
+2. Diff dumps vs `vars/*.json` to find unmapped names; do **not** delete dump lines when done.
+3. Prefer documenting unknown clusters; WebViz-covered surfaces are lower priority.
+4. Write for a reader who knows **no** other vars; record robot/asset **paths** when relevant.
+5. `status: dead` only with evidence; never disable the control in UI.
+6. Register new shard files in `index.json`.
+7. Keep shards small (~20–80 vars).

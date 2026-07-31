@@ -2,43 +2,84 @@
   "vars": {
     "ProcFace_CustomEyes": {
       "process": "anim",
-      "blurb": "Composite a loaded eye overlay image onto procedural eyes. Requires LoadFaceOverlay first (and a valid overlay selection).",
+      "blurb": "Turns on (or off) painting an extra picture on top of Vector’s drawn eyes. When off, eyes look like the normal procedural face. When on, the last image loaded by LoadFaceOverlay is blended over the eyes.",
+      "detail": "This is the master switch for the overlay. It does not pick the file by itself. You must first choose ProcFace_CustomEyeOverlay, run LoadFaceOverlay so the JPEG is loaded into memory, then enable this. Strength of the blend is ProcFace_CustomEyeOpacity (0 = invisible, 1 = full strength).",
+      "howTo": "1) Set ProcFace_CustomEyeOverlay. 2) Call LoadFaceOverlay. 3) Enable ProcFace_CustomEyes. 4) Optionally adjust ProcFace_CustomEyeOpacity.",
+      "requires": ["ProcFace_CustomEyeOverlay", "LoadFaceOverlay"],
+      "related": ["ProcFace_CustomEyeOpacity"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFaceDrawer.cpp",
       "category": "Face.ParameterizedFace",
-      "requires": ["ProcFace_CustomEyeOverlay"],
-      "related": ["ProcFace_CustomEyeOpacity", "LoadFaceOverlay"],
+      "status": "live",
       "tags": ["face", "procedural", "highlight"]
     },
     "ProcFace_CustomEyeOverlay": {
       "process": "anim",
-      "blurb": "Which overlay asset to load: 0–7 built-ins under faceOverlays/, 8 = Custom → /data/data/customFaceOverlay.jpg.",
+      "blurb": "Chooses which picture will be loaded for the eye overlay. Options 0–7 are built-in images (pride flags, frog, galaxy, and similar). Option 8, labeled Custom, uses a JPEG you place on the robot at /data/data/customFaceOverlay.jpg.",
+      "detail": "This control only selects a path. It does not load the image until you call LoadFaceOverlay, and the face will not show it until ProcFace_CustomEyes is enabled. Built-in files live under the robot’s cozmo_resources faceOverlays folder; Custom always points at the fixed robot path below.",
+      "howTo": "Built-in: pick 0–7 → Call LoadFaceOverlay → enable ProcFace_CustomEyes. Custom: copy a JPEG to /data/data/customFaceOverlay.jpg on the robot → set this to Custom (index 8) → Call LoadFaceOverlay → enable ProcFace_CustomEyes.",
+      "paths": {
+        "robot": [
+          "/data/data/customFaceOverlay.jpg"
+        ],
+        "assets": [
+          "/anki/data/assets/cozmo_resources/assets/faceOverlays/trans.jpg",
+          "/anki/data/assets/cozmo_resources/assets/faceOverlays/lesbian.jpg",
+          "/anki/data/assets/cozmo_resources/assets/faceOverlays/gay.jpg",
+          "/anki/data/assets/cozmo_resources/assets/faceOverlays/pan.jpg",
+          "/anki/data/assets/cozmo_resources/assets/faceOverlays/frog.jpg",
+          "/anki/data/assets/cozmo_resources/assets/faceOverlays/all.jpg",
+          "/anki/data/assets/cozmo_resources/assets/faceOverlays/galaxy.jpg"
+        ],
+        "notes": "Enum order: Trans, Lesbian, Gay, Bi, Pan, Frog, All, Galaxy, Custom. Index 8 (Custom) uses /data/data/customFaceOverlay.jpg only."
+      },
+      "requires": ["LoadFaceOverlay"],
+      "related": ["ProcFace_CustomEyes", "ProcFace_CustomEyeOpacity"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFaceDrawer.cpp (kFaceOverlays[], kProcFace_CustomEyeOverlay)",
       "category": "Face.ParameterizedFace",
-      "related": ["ProcFace_CustomEyes", "LoadFaceOverlay", "ProcFace_CustomEyeOpacity"],
-      "tags": ["face", "procedural", "highlight"]
+      "status": "live",
+      "tags": ["face", "procedural", "highlight", "paths"]
     },
     "ProcFace_CustomEyeOpacity": {
       "process": "anim",
-      "blurb": "Opacity when blending the custom eye overlay (0–1).",
+      "blurb": "How strongly the eye overlay picture is blended on top of the procedural eyes. 0 means the overlay is invisible; 1 means full strength.",
+      "detail": "Only matters when ProcFace_CustomEyes is on and an overlay has been loaded. It does not change which file is selected.",
+      "related": ["ProcFace_CustomEyes", "ProcFace_CustomEyeOverlay"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFaceDrawer.cpp",
       "category": "Face.ParameterizedFace",
-      "related": ["ProcFace_CustomEyes"],
+      "status": "live",
       "tags": ["face", "procedural"]
     },
     "LoadFaceOverlay": {
       "process": "anim",
-      "blurb": "Console function: load the file selected by ProcFace_CustomEyeOverlay into the procedural face drawer.",
+      "blurb": "Loads the image chosen by ProcFace_CustomEyeOverlay into memory so it can be drawn on the eyes. Click Call after changing the overlay list (or after replacing the custom JPEG on disk).",
+      "detail": "Without this step, changing ProcFace_CustomEyeOverlay does nothing visible. For Custom, ensure /data/data/customFaceOverlay.jpg exists and is a readable JPEG before calling. Then enable ProcFace_CustomEyes to composite.",
+      "howTo": "Set ProcFace_CustomEyeOverlay → Call this function → enable ProcFace_CustomEyes.",
+      "paths": {
+        "robot": ["/data/data/customFaceOverlay.jpg"],
+        "assets": ["/anki/data/assets/cozmo_resources/assets/faceOverlays/"],
+        "notes": "Which path is loaded depends on the current ProcFace_CustomEyeOverlay index."
+      },
+      "requires": ["ProcFace_CustomEyeOverlay"],
+      "related": ["ProcFace_CustomEyes", "ProcFace_CustomEyeOpacity"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFaceDrawer.cpp CONSOLE_FUNC LoadFaceOverlay",
       "category": "Face.ParameterizedFace",
-      "related": ["ProcFace_CustomEyes", "ProcFace_CustomEyeOverlay"],
-      "tags": ["face", "procedural", "func", "highlight"]
+      "status": "live",
+      "tags": ["face", "procedural", "func", "highlight", "paths"]
     },
     "ProcFace_HotspotRender": {
       "process": "anim",
-      "blurb": "Render eye glow / hotspot on procedural face.",
+      "blurb": "When enabled, draws a soft bright “hotspot” / glow on the procedural eyes so they look more lit.",
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFaceDrawer.cpp",
       "category": "Face.ParameterizedFace",
+      "status": "live",
       "tags": ["face", "procedural"]
     },
     "ProcFace_EnableAntiAliasing": {
       "process": "anim",
-      "blurb": "Full-image antialiasing on procedural face.",
+      "blurb": "When enabled, smooths the edges of the procedural face image (full-image antialiasing). Can look cleaner but costs a bit more CPU on the anim process.",
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFaceDrawer.cpp",
       "category": "Face.ParameterizedFace",
+      "status": "live",
       "tags": ["face", "procedural"]
     }
   }
