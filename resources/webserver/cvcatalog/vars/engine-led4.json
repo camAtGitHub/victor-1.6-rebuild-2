@@ -1,0 +1,177 @@
+{
+  "vars": {
+    "LED4_s1_red": {
+      "process": "engine",
+      "category": "CubeLightDesign",
+      "blurb": "Red (0–255) for stage 1 (“on”) of cube LED 4 — the RIGHT corner LED (array index 3). Part of the live cube-light designer under DevDesignCubeLights.",
+      "detail": "Cube light patterns use two color stages that loop: stage 1 (s1) is held for LED4_s1_hold_ms, then fades toward stage 2 over LED4_s1_transition_s2_ms, then stage 2 holds, then fades back. This channel is packed into onColors[3] via ColorRGBA. Defaults to 0 (no red). Sibling vars LED1/LED2/LED3 control the other three corners (BACK/LEFT/FRONT).",
+      "howTo": "1) Activate the DevDesignCubeLights behavior. 2) Connect a light cube (BLE). 3) Set s1/s2 colors and timings for LED1–LED4. Pattern re-applies whenever any value changes. Optional: call SaveLights to write the pattern to cache as DevLights/DevLights_H:M:S.",
+      "status": "live",
+      "statusNote": "Only applied while DevDesignCubeLights is activated and a light cube is connected. Vars are registered under ANKI_DEV_CHEATS; changing them with freeplay/other cube anims running does nothing until the design behavior owns the cube.",
+      "requires": ["DevDesignCubeLights behavior active", "connected light cube"],
+      "related": [
+        "LED4_s1_green", "LED4_s1_blue", "LED4_s1_alpha",
+        "LED4_s2_red", "LED4_s1_hold_ms", "LED4_s1_transition_s2_ms",
+        "LED4_s1_hold_offset_ms", "Rotate", "SaveLights"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevDesignCubeLights.cpp:86,226-227,171-206; robot/clad/src/clad/types/ledTypes.clad:70-95",
+      "tags": ["cube", "lights", "design", "dev", "LED4", "color"]
+    },
+    "LED4_s1_green": {
+      "process": "engine",
+      "category": "CubeLightDesign",
+      "blurb": "Green (0–255) for stage 1 of cube LED 4 (RIGHT corner). Combined with red/blue/alpha into the stage-1 on color.",
+      "detail": "Written into onColors[3] each tick the design behavior rebuilds the pattern. Default 0. See LED4_s1_red for the full two-stage loop and activation requirements.",
+      "howTo": "Same as other LED4_* vars: DevDesignCubeLights active + connected cube; edit and the pattern hot-reloads when values differ from the last applied lights.",
+      "status": "live",
+      "statusNote": "Only applied while DevDesignCubeLights is activated and a light cube is connected.",
+      "requires": ["DevDesignCubeLights behavior active", "connected light cube"],
+      "related": ["LED4_s1_red", "LED4_s1_blue", "LED4_s1_alpha", "LED4_s2_green"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevDesignCubeLights.cpp:87,226-227",
+      "tags": ["cube", "lights", "design", "dev", "LED4", "color"]
+    },
+    "LED4_s1_blue": {
+      "process": "engine",
+      "category": "CubeLightDesign",
+      "blurb": "Blue (0–255) for stage 1 of cube LED 4 (RIGHT corner). Combined with red/green/alpha into the stage-1 on color.",
+      "detail": "Written into onColors[3]. Default 0. Stage 1 is the “on” half of the cube LED state machine (onColors / onPeriod_ms / transitionOffPeriod_ms).",
+      "howTo": "Activate DevDesignCubeLights with a connected cube, then set this with the other LED4_s1_* channels.",
+      "status": "live",
+      "statusNote": "Only applied while DevDesignCubeLights is activated and a light cube is connected.",
+      "requires": ["DevDesignCubeLights behavior active", "connected light cube"],
+      "related": ["LED4_s1_red", "LED4_s1_green", "LED4_s1_alpha", "LED4_s2_blue"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevDesignCubeLights.cpp:88,226-227",
+      "tags": ["cube", "lights", "design", "dev", "LED4", "color"]
+    },
+    "LED4_s1_alpha": {
+      "process": "engine",
+      "category": "CubeLightDesign",
+      "blurb": "Alpha (0–255, default 255) packed into stage 1’s ColorRGBA for cube LED 4. Does not change visible cube brightness — Block::SetLEDs ignores alpha.",
+      "detail": "Still stored in onColors[3] and included if you SaveLights the pattern to JSON, but engine/block.h documents that alpha is ignored when driving cube LEDs. RGB channels control what you see.",
+      "status": "partial",
+      "statusNote": "Read and written into the pattern RGBA word, but cube LED path ignores alpha (Block::SetLEDs note). No visible effect on the physical cube.",
+      "requires": ["DevDesignCubeLights behavior active", "connected light cube"],
+      "related": ["LED4_s1_red", "LED4_s1_green", "LED4_s1_blue", "LED4_s2_alpha"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevDesignCubeLights.cpp:89,226-227; engine/block.h:135-145",
+      "tags": ["cube", "lights", "design", "dev", "LED4", "alpha"]
+    },
+    "LED4_s1_hold_ms": {
+      "process": "engine",
+      "category": "CubeLightDesign",
+      "blurb": "How long (ms) cube LED 4 stays solid at stage-1 color before transitioning toward stage 2. Range 0–7650 (MAX_SEG_LEN). Maps to onPeriod_ms[3].",
+      "detail": "One segment of the loop: hold s1 → blend s1→s2 → hold s2 → blend s2→s1. Zero means no solid hold at s1 (immediate transition if transition times are non-zero). Converted to LED frames when sent to the cube.",
+      "howTo": "With DevDesignCubeLights + connected cube: set hold and transition times so the pulse/fade rhythm looks right; pair with LED4_s2_hold_ms for the other plateau.",
+      "status": "live",
+      "statusNote": "Only applied while DevDesignCubeLights is activated and a light cube is connected.",
+      "requires": ["DevDesignCubeLights behavior active", "connected light cube"],
+      "related": [
+        "LED4_s2_hold_ms", "LED4_s1_transition_s2_ms", "LED4_s2_transition_s1_ms",
+        "LED4_s1_hold_offset_ms"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevDesignCubeLights.cpp:96,251; engine/components/cubes/cubeLights/cubeLightAnimation.h:36",
+      "tags": ["cube", "lights", "design", "dev", "LED4", "timing"]
+    },
+    "LED4_s1_hold_offset_ms": {
+      "process": "engine",
+      "category": "CubeLightDesign",
+      "blurb": "Phase offset (ms, 0–30600) for cube LED 4’s animation timeline so it starts later than the other corners. Maps to offset[3].",
+      "detail": "Useful for chase/wave patterns: e.g. offset LED1–LED4 by successive amounts while colors/timings match. Only one offset var exists per LED (named s1_hold_offset); there is no separate s2 offset. Converted to LED frames with the other timing fields.",
+      "howTo": "Set non-zero offsets on some of LED1–LED4 while sharing the same hold/transition values to stagger the four corners.",
+      "status": "live",
+      "statusNote": "Only applied while DevDesignCubeLights is activated and a light cube is connected.",
+      "requires": ["DevDesignCubeLights behavior active", "connected light cube"],
+      "related": [
+        "LED4_s1_hold_ms", "LED1_s1_hold_offset_ms", "LED2_s1_hold_offset_ms",
+        "LED3_s1_hold_offset_ms", "Rotate"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevDesignCubeLights.cpp:100,284; engine/components/cubes/cubeLights/cubeLightAnimation.h:40",
+      "tags": ["cube", "lights", "design", "dev", "LED4", "timing", "phase"]
+    },
+    "LED4_s1_transition_s2_ms": {
+      "process": "engine",
+      "category": "CubeLightDesign",
+      "blurb": "Fade duration (ms, 0–7650) from stage 1 color to stage 2 for cube LED 4. Maps to transitionOffPeriod_ms[3] (s1 → s2).",
+      "detail": "After LED4_s1_hold_ms, the LED blends from s1 RGB toward s2 RGB over this many milliseconds, then enters the s2 hold. Zero = hard cut from s1 to s2. Naming: “transition_s2” means the transition that lands on stage 2.",
+      "howTo": "Raise for soft pulses; set 0 with non-zero holds for hard blinks. Pair with LED4_s2_transition_s1_ms for the return fade.",
+      "status": "live",
+      "statusNote": "Only applied while DevDesignCubeLights is activated and a light cube is connected.",
+      "requires": ["DevDesignCubeLights behavior active", "connected light cube"],
+      "related": ["LED4_s1_hold_ms", "LED4_s2_hold_ms", "LED4_s2_transition_s1_ms"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevDesignCubeLights.cpp:98,268; engine/components/cubes/cubeLights/cubeLightAnimation.h:39",
+      "tags": ["cube", "lights", "design", "dev", "LED4", "timing"]
+    },
+    "LED4_s2_red": {
+      "process": "engine",
+      "category": "CubeLightDesign",
+      "blurb": "Red (0–255) for stage 2 (“off”/second color) of cube LED 4. Not forced off — any color is allowed; default 0 is black.",
+      "detail": "Packed into offColors[3]. The ObjectLights field names on/off are historical: both stages are full RGB targets in a two-state loop. Stage 2 is held for LED4_s2_hold_ms after the s1→s2 transition.",
+      "howTo": "Set a second color (or leave 0 for blink-to-off). Requires DevDesignCubeLights + connected cube.",
+      "status": "live",
+      "statusNote": "Only applied while DevDesignCubeLights is activated and a light cube is connected.",
+      "requires": ["DevDesignCubeLights behavior active", "connected light cube"],
+      "related": ["LED4_s2_green", "LED4_s2_blue", "LED4_s2_alpha", "LED4_s1_red", "LED4_s2_hold_ms"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevDesignCubeLights.cpp:91,241-242",
+      "tags": ["cube", "lights", "design", "dev", "LED4", "color"]
+    },
+    "LED4_s2_green": {
+      "process": "engine",
+      "category": "CubeLightDesign",
+      "blurb": "Green (0–255) for stage 2 of cube LED 4 (RIGHT). Combined into offColors[3] with red/blue/alpha.",
+      "detail": "Default 0. See LED4_s2_red for stage-2 role in the two-state loop.",
+      "status": "live",
+      "statusNote": "Only applied while DevDesignCubeLights is activated and a light cube is connected.",
+      "requires": ["DevDesignCubeLights behavior active", "connected light cube"],
+      "related": ["LED4_s2_red", "LED4_s2_blue", "LED4_s2_alpha", "LED4_s1_green"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevDesignCubeLights.cpp:92,241-242",
+      "tags": ["cube", "lights", "design", "dev", "LED4", "color"]
+    },
+    "LED4_s2_blue": {
+      "process": "engine",
+      "category": "CubeLightDesign",
+      "blurb": "Blue (0–255) for stage 2 of cube LED 4 (RIGHT). Combined into offColors[3].",
+      "detail": "Default 0. Stage 2 is the second plateau of the LED state machine (offColors / offPeriod_ms / transitionOnPeriod_ms).",
+      "status": "live",
+      "statusNote": "Only applied while DevDesignCubeLights is activated and a light cube is connected.",
+      "requires": ["DevDesignCubeLights behavior active", "connected light cube"],
+      "related": ["LED4_s2_red", "LED4_s2_green", "LED4_s2_alpha", "LED4_s1_blue"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevDesignCubeLights.cpp:93,241-242",
+      "tags": ["cube", "lights", "design", "dev", "LED4", "color"]
+    },
+    "LED4_s2_alpha": {
+      "process": "engine",
+      "category": "CubeLightDesign",
+      "blurb": "Alpha (0–255, default 255) packed into stage 2’s ColorRGBA for cube LED 4. Like s1 alpha, ignored for visible cube output.",
+      "detail": "Stored in offColors[3] and can appear in SaveLights JSON, but Block::SetLEDs documents that alpha is ignored for cube LEDs.",
+      "status": "partial",
+      "statusNote": "Written into pattern RGBA; cube LED path ignores alpha. No visible effect on the physical cube.",
+      "requires": ["DevDesignCubeLights behavior active", "connected light cube"],
+      "related": ["LED4_s2_red", "LED4_s2_green", "LED4_s2_blue", "LED4_s1_alpha"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevDesignCubeLights.cpp:94,241-242; engine/block.h:135-145",
+      "tags": ["cube", "lights", "design", "dev", "LED4", "alpha"]
+    },
+    "LED4_s2_hold_ms": {
+      "process": "engine",
+      "category": "CubeLightDesign",
+      "blurb": "How long (ms) cube LED 4 stays solid at stage-2 color before fading back to stage 1. Range 0–7650. Maps to offPeriod_ms[3].",
+      "detail": "Second plateau of the loop. Zero skips the s2 hold (useful for pulse-to-color-then-return patterns when transitions are non-zero).",
+      "status": "live",
+      "statusNote": "Only applied while DevDesignCubeLights is activated and a light cube is connected.",
+      "requires": ["DevDesignCubeLights behavior active", "connected light cube"],
+      "related": ["LED4_s1_hold_ms", "LED4_s1_transition_s2_ms", "LED4_s2_transition_s1_ms"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevDesignCubeLights.cpp:97,259; engine/components/cubes/cubeLights/cubeLightAnimation.h:37",
+      "tags": ["cube", "lights", "design", "dev", "LED4", "timing"]
+    },
+    "LED4_s2_transition_s1_ms": {
+      "process": "engine",
+      "category": "CubeLightDesign",
+      "blurb": "Fade duration (ms, 0–7650) from stage 2 color back to stage 1 for cube LED 4. Maps to transitionOnPeriod_ms[3] (s2 → s1).",
+      "detail": "Closes the loop after LED4_s2_hold_ms. Zero = hard cut from s2 to s1. Naming: “transition_s1” means the transition that lands on stage 1.",
+      "status": "live",
+      "statusNote": "Only applied while DevDesignCubeLights is activated and a light cube is connected.",
+      "requires": ["DevDesignCubeLights behavior active", "connected light cube"],
+      "related": ["LED4_s1_transition_s2_ms", "LED4_s1_hold_ms", "LED4_s2_hold_ms"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevDesignCubeLights.cpp:99,276; engine/components/cubes/cubeLights/cubeLightAnimation.h:38",
+      "tags": ["cube", "lights", "design", "dev", "LED4", "timing"]
+    }
+  }
+}
