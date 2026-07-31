@@ -1,0 +1,179 @@
+{
+  "vars": {
+    "Calibration": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::Calibration for one vision tick so the engine tries to compute new camera intrinsics (focal length, principal point, distortion) from a physical calibration target. Default is off. After the mode is processed (or fails), the engine automatically turns it back off — it is one-shot, not a continuous loop.",
+      "detail": "When the mode is on, VisionSystem branches on CalibTargetType: 0 (CHECKERBOARD) runs ComputeCalibrationFromCheckerboard on previously stored gray frames; 1 (INVERTED_BOX) or 2 (QBERT) runs ComputeCalibrationFromSingleTarget using markers already found in this frame (Markers must have run first — DEV_ASSERT). Success pushes a CameraCalibration into the vision result; VisionComponent broadcasts EngineToGame CameraCalibration and the playpen path can write NV storage. On a normal non-factory build (FACTORY_TEST=0), QBERT/INVERTED_BOX 3D layouts are compiled out and only log NotInFactoryTest. Checkerboard needs stored images, but VisionComponent::UpdateForCalibration’s AddCalibrationImage path is fully commented out (VIC-7177), so SaveCalibrationImage / StoreNextImageForCameraCalibration set a flag that never stores. Toggling this alone on a consumer rebuild almost always fails compute; use only with factory firmware + real targets or after image-store is restored.",
+      "howTo": "1) Set CalibTargetType to match the physical target (0 checkerboard/dot board, 1 inverted box, 2 Qbert). 2) For marker targets: enable Markers (and have the board fully visible). 3) Flip Calibration true once (or call EnableComputingCameraCalibration / ComputeCameraCalibration message). 4) Watch logs for CalibValues / errors; successful results arrive as CameraCalibration. Do not expect end-to-end success on FACTORY_TEST=0 builds with the stock image-store disabled.",
+      "category": "Vision.General.VisionModes",
+      "related": [
+        "CalibTargetType",
+        "CheckerboardWidth",
+        "CheckerboardHeight",
+        "CheckerboardSquareSize_mm",
+        "NumMarkersNeededForCalibration",
+        "Markers"
+      ],
+      "evidence": "engine/components/visionComponent.cpp:757-761,937,1272-1297,207,2836-2882,2748-2801; engine/vision/visionSystem.cpp:1735-1765; clad/src/clad/types/visionModes.clad:18,84; engine/robotEventHandler.cpp:1637-1649",
+      "status": "partial",
+      "statusNote": "Mode enable/disable and one-shot clear are live. Actual successful calibration on this tree is blocked for checkerboard by commented image storage (VIC-7177) and for QBERT/INVERTED_BOX by FACTORY_TEST=0 empty layouts. Failures log ComputeCalibrationFailed / NotInFactoryTest.",
+      "tags": ["vision", "calibration", "camera", "visionmode", "factory", "danger"]
+    },
+    "CalibTargetType": {
+      "process": "engine",
+      "blurb": "Chooses which physical camera-calibration target the vision system expects when VisionMode::Calibration runs. Integer: 0 = CHECKERBOARD (asymmetric circle/dot board), 1 = INVERTED_BOX (three-sided marker box), 2 = QBERT (stepped “Q*bert-like” marker stack). Default is 0 (CHECKERBOARD).",
+      "detail": "Registered as u32 under Vision.Calibration; cast to CameraCalibrator::CalibTargetType. CHECKERBOARD calls ComputeCalibrationFromCheckerboard (uses stored images + CheckerboardWidth/Height/SquareSize_mm). QBERT and INVERTED_BOX call ComputeCalibrationFromSingleTarget with live ObservedMarkers and require Markers processed earlier that frame. PlaypenCameraCalibration overwrites this from PlaypenCalibTarget (default 2 = QBERT) when that factory behavior starts. On non-factory builds, single-target layouts are #if FACTORY_TEST only — selecting 1 or 2 still runs the switch but GetCalibTargetMarkersTo3dCoords_* only prints an error and leaves empty maps.",
+      "howTo": "Set before enabling Calibration. Match the board you have in front of the robot. For factory Qbert/inverted-box fixtures you need a FACTORY_TEST=1 build.",
+      "category": "Vision.Calibration",
+      "enumLabels": [
+        "0 CHECKERBOARD (asymmetric circle grid)",
+        "1 INVERTED_BOX (marker box)",
+        "2 QBERT (marker stack)"
+      ],
+      "related": [
+        "Calibration",
+        "CheckerboardWidth",
+        "CheckerboardHeight",
+        "CheckerboardSquareSize_mm",
+        "NumMarkersNeededForCalibration",
+        "Markers",
+        "PlaypenCalibTarget"
+      ],
+      "evidence": "engine/vision/visionSystem.cpp:119,1735-1757; engine/vision/cameraCalibrator.h:39-44; engine/vision/cameraCalibrator.cpp:226-278,557-672,709-806; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/behaviorPlaypenCameraCalibration.cpp:68-70; test/engine/testVisionSystem.cpp:50,152",
+      "status": "live",
+      "tags": ["vision", "calibration", "factory", "target"]
+    },
+    "CheckerboardWidth": {
+      "process": "engine",
+      "blurb": "Number of blob/circle centers along one axis of the asymmetric circle calibration grid used for CHECKERBOARD camera calibration. Default 11. Passed into OpenCV findCirclesGrid together with CheckerboardHeight.",
+      "detail": "ComputeCalibrationFromCheckerboard builds cv::Size boardSize(kCheckerboardHeight, kCheckerboardWidth) — OpenCV Size is (width, height), so this console “Width” becomes the OpenCV height (default boardSize = 4×11 with stock defaults). Used for findCirclesGrid, drawChessboardCorners, and CalcBoardCornerPositions. Only consulted when CalibTargetType is CHECKERBOARD and Calibration mode runs. Requires at least kMinNumCalibImages stored frames with dots found; image storage is currently disabled in VisionComponent (VIC-7177), so this tuning has no effect until store is restored.",
+      "category": "Vision.Calibration",
+      "related": [
+        "CheckerboardHeight",
+        "CheckerboardSquareSize_mm",
+        "CalibTargetType",
+        "Calibration"
+      ],
+      "requires": ["Calibration", "CalibTargetType"],
+      "evidence": "engine/vision/cameraCalibrator.cpp:46,101,127-148,169,512-525",
+      "status": "partial",
+      "statusNote": "Read only on checkerboard compute. End-to-end path cannot acquire images while UpdateForCalibration AddCalibrationImage remains commented (VIC-7177).",
+      "tags": ["vision", "calibration", "checkerboard", "opencv"]
+    },
+    "CheckerboardHeight": {
+      "process": "engine",
+      "blurb": "Number of blob/circle centers along the other axis of the asymmetric circle calibration grid. Default 4. Paired with CheckerboardWidth for OpenCV’s asymmetric-grid finder.",
+      "detail": "Placed in the first argument of cv::Size(boardSize), i.e. OpenCV width = CheckerboardHeight (default 4). Flags are CALIB_CB_ASYMMETRIC_GRID | CALIB_CB_CLUSTERING with a SimpleBlobDetector (areas/spacing from sibling blob vars not in this shard). Must match the printed board’s pattern count or findCirclesGrid fails and calibration aborts for lack of images with points.",
+      "category": "Vision.Calibration",
+      "related": [
+        "CheckerboardWidth",
+        "CheckerboardSquareSize_mm",
+        "CalibTargetType",
+        "Calibration"
+      ],
+      "requires": ["Calibration", "CalibTargetType"],
+      "evidence": "engine/vision/cameraCalibrator.cpp:47,101,114,127-148,512-525",
+      "status": "partial",
+      "statusNote": "Same as CheckerboardWidth: only for CHECKERBOARD path; image store currently dead (VIC-7177).",
+      "tags": ["vision", "calibration", "checkerboard", "opencv"]
+    },
+    "CheckerboardSquareSize_mm": {
+      "process": "engine",
+      "blurb": "Spacing scale for the 3D corner lattice of the asymmetric circle board when building objectPoints for OpenCV calibrateCamera. Default 0.05. Name says millimeters, but the stock default is the usual OpenCV-style meter-scale value (5 cm if interpreted as meters) — keep units consistent with how you treat extrinsics, not with the _mm suffix alone.",
+      "detail": "CalcBoardCornerPositions walks the board with corners at ((2*j + i%2)*squareSize, i*squareSize, 0) for asymmetric grid geometry. Intrinsics (fx/fy/cx/cy/distortion) are largely scale-invariant; this mainly scales recovered camera poses (tvecs) stored in _calibPoses. Only used when CHECKERBOARD calibration runs successfully through findCirclesGrid. Reprojection RMS must still be ≤ 0.5 px or the whole compute fails.",
+      "category": "Vision.Calibration",
+      "related": [
+        "CheckerboardWidth",
+        "CheckerboardHeight",
+        "CalibTargetType",
+        "Calibration"
+      ],
+      "requires": ["Calibration", "CalibTargetType"],
+      "evidence": "engine/vision/cameraCalibrator.cpp:48,169-170,512-525,213-220",
+      "status": "partial",
+      "statusNote": "Naming vs default unit is misleading (_mm vs 0.05). Path gated on checkerboard image store (VIC-7177).",
+      "tags": ["vision", "calibration", "checkerboard", "units"]
+    },
+    "NumMarkersNeededForCalibration": {
+      "process": "engine",
+      "blurb": "Minimum number of observed fiducial markers that must be present in the current vision result before single-target camera calibration (QBERT or INVERTED_BOX) will even attempt solve. Default 10. Below that, compute returns fail and logs NotEnoughMarkers.",
+      "detail": "Checked at the start of ComputeCalibrationFromSingleTarget only — not used for CHECKERBOARD. After the count check, markers are matched to known 3D corner quads for the chosen target; duplicates of the same code fail; required markers missing also fail. Factory builds populate those 3D maps; non-factory builds leave maps empty after a NotInFactoryTest error, so raising this number alone cannot complete calibration on a normal release binary. Sibling kSingleTargetReprojErr_pix (not in this shard) still gates final RMS acceptance.",
+      "category": "Vision.Calibration",
+      "related": [
+        "CalibTargetType",
+        "Calibration",
+        "Markers"
+      ],
+      "requires": ["Calibration", "CalibTargetType", "Markers"],
+      "evidence": "engine/vision/cameraCalibrator.cpp:52,249-256,261-278; engine/vision/visionSystem.cpp:1745-1756",
+      "status": "live",
+      "tags": ["vision", "calibration", "markers", "factory"]
+    },
+    "CalibMarkerSize_mm": {
+      "process": "engine",
+      "blurb": "Playpen factory only: printed size (mm) of the SDK-style marker drawn on the custom cube used to detect that the calibration target is in view. Default 14. Applied as both marker width and height when defining CustomType00 at the start of PlaypenCameraCalibration.",
+      "detail": "Wrapped PlaypenConfig::kCalibMarkerSize_mm under category Playpen. Used only in CustomObject::CreateCube(..., markerWidth_mm, markerHeight_mm) so BlockWorld can report RobotObservedObject when that marker is seen — that sets _seeingTarget and arms image-store / compute. It does not feed CameraCalibrator’s 3D marker layouts (those use hardcoded BLEACHER_CALIB_MARKER_SIZE_MM 14 / INVERTEDBOX 15 under FACTORY_TEST). Changing this after the behavior already activated has no effect until the behavior restarts and redefines the object. End-to-end playpen still depends on StoreNextImageForCameraCalibration actually adding frames (currently commented VIC-7177).",
+      "category": "Playpen",
+      "related": [
+        "CalibMarkerCubeSize_mm",
+        "MarkerToTriggerCalibration",
+        "CalibTargetType",
+        "Calibration"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:179; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.cpp:117; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/behaviorPlaypenCameraCalibration.cpp:72-80,321-329; engine/customObject.cpp:165-179",
+      "status": "partial",
+      "statusNote": "Only read when PlaypenCameraCalibration activates (factory/dev). Affects custom-object pose sizing for trigger detection, not the OpenCV 3D target model. Playpen compute also blocked by dead image store.",
+      "tags": ["playpen", "calibration", "factory", "markers"]
+    },
+    "CalibMarkerCubeSize_mm": {
+      "process": "engine",
+      "blurb": "Playpen factory only: edge length (mm) of the temporary custom cube registered so the robot can recognize the calibration fixture as an object. Default 20. Passed as CreateCube size_mm (all three axes).",
+      "detail": "PlaypenConfig::kCalibMarkerCubeSize_mm, console category Playpen. Together with CalibMarkerSize_mm and MarkerToTriggerCalibration, defines ObjectType::CustomType00 with the same marker on all faces. When that object is observed, the behavior clears the “waiting for target” timeout and later stores a frame / enables Calibration. Matches the order-of-magnitude of BLEACHER_CALIB_TARGET_FACE_SIZE_MM (20) used in factory 3D layouts, but the calibrator does not read this console var for world coordinates.",
+      "category": "Playpen",
+      "related": [
+        "CalibMarkerSize_mm",
+        "MarkerToTriggerCalibration",
+        "Calibration"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:182; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.cpp:119; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/behaviorPlaypenCameraCalibration.cpp:74-80; engine/vision/cameraCalibrator.cpp:29-30",
+      "status": "partial",
+      "statusNote": "Playpen activation only; not used by CameraCalibrator math.",
+      "tags": ["playpen", "calibration", "factory"]
+    },
+    "MarkerToTriggerCalibration": {
+      "process": "engine",
+      "blurb": "Playpen factory only: which custom SDK marker pattern must appear on the temporary custom cube so the playpen knows the calibration target is visible. Default Triangles2 (MARKER_SDK_2TRIANGLES). Set by name or enum index in the console.",
+      "detail": "CustomObjectMarker console specialization (min 0 … Count). CreateCube stamps this marker on every face of CustomType00. HandleRobotObservedObject sets _seeingTarget when objectType is CustomType00. On the Qbert factory target, MARKER_SDK_2TRIANGLES is also one of the faces in the FACTORY_TEST 3D map — the console default lines up with that fixture, but the calibrator still uses its compile-time map, not this var, for solve. Enum order matches clad CustomObjectMarker: Circles2–5, Diamonds2–5, Hexagons2–5, Triangles2–5.",
+      "howTo": "Only meaningful inside PlaypenCameraCalibration. 1) Point the head at the fixture. 2) Ensure this pattern matches a real marker on the board. 3) Wait for RobotObservedObject / target timer to clear. 4) Behavior then waits 0.5 s, disables CLAHE, stores image, enables Calibration.",
+      "category": "Playpen",
+      "enumLabels": [
+        "Circles2",
+        "Circles3",
+        "Circles4",
+        "Circles5",
+        "Diamonds2",
+        "Diamonds3",
+        "Diamonds4",
+        "Diamonds5",
+        "Hexagons2",
+        "Hexagons3",
+        "Hexagons4",
+        "Hexagons5",
+        "Triangles2",
+        "Triangles3",
+        "Triangles4",
+        "Triangles5"
+      ],
+      "related": [
+        "CalibMarkerSize_mm",
+        "CalibMarkerCubeSize_mm",
+        "Calibration",
+        "CalibTargetType"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:185; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.cpp:19-44,120; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/behaviorPlaypenCameraCalibration.cpp:72-80,321-329; clad/src/clad/types/customObjectMarkers.clad:10-34; engine/customObject.cpp:193-226",
+      "status": "partial",
+      "statusNote": "Playpen trigger only. Does not change CameraCalibrator marker-to-3D tables.",
+      "tags": ["playpen", "calibration", "factory", "markers", "enum"]
+    }
+  }
+}
