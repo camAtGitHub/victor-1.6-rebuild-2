@@ -1,0 +1,121 @@
+{
+  "vars": {
+    "BodyTurnSpeedThreshBlock_degs": {
+      "process": "engine",
+      "blurb": "Maximum body yaw rate (degrees per second, default 30) allowed while Vector still runs cube/charger marker detection. If the body was turning faster than this around the image timestamp, that vision pass skips DetectMarkers so motion-blurred fiducials are not trusted.",
+      "detail": "Used in VisionSystem when VisionMode::Markers is on and Markers_Off is not. WasRotatingTooFast is called with this body threshold and HeadTurnSpeedThreshBlock_degs (look-back 0). If either axis exceeds its limit, marker detection is skipped for that frame. Markers_FastRotation (or VisionComponent::EnableVisionWhileRotatingFast, which enables that mode) forces the gate off. Also exposed as VisionSystem::GetBodyTurnSpeedThresh_degPerSec(); docking asserts its own tighter body threshold is ≤ this value. Sibling of BodyTurnSpeedThreshFace/Pet with the same default.",
+      "category": "Vision.MarkerDetection",
+      "related": [
+        "HeadTurnSpeedThreshBlock_degs",
+        "Markers_FastRotation",
+        "Markers",
+        "BodyTurnSpeedThreshFace_degs",
+        "BodyTurnSpeedThreshPet_degs"
+      ],
+      "evidence": "engine/vision/visionSystem.cpp:90-91,1571-1601,2109-2112; engine/components/sensors/imuComponent.h:58-61,129-136; engine/components/dockingComponent.cpp:135-137",
+      "status": "live",
+      "tags": ["vision", "markers", "imu", "rotating-too-fast"]
+    },
+    "BodyTurnSpeedThreshFace_degs": {
+      "process": "engine",
+      "blurb": "Maximum body turn rate (degrees per second, default 30) allowed when Vector first accepts a brand-new face ID into FaceWorld. If the body was spinning faster than this at the camera frame’s timestamp, that new face is discarded so motion blur does not invent people.",
+      "detail": "Read only in FaceWorld::UpdateFace for IDs not already in _faceEntries. Existing tracked faces always update. Gate is skipped entirely when VisionComponent::IsVisionWhileRotatingFastEnabled() is true AND at least one of Body/Head face thresholds is > 0 (then wasRotatingTooFast is forced false). Unlike PetWorld, setting both face thresholds ≤ 0 does not cleanly disable the check when vision-while-rotating-fast is off — the IMU comparison still runs. Degrees are converted to radians for ImuHistory::WasRotatingTooFast. Unit tests set −1 on both face thresholds when faking frames without IMU.",
+      "category": "WasRotatingTooFast.Face.Body_deg/s",
+      "related": [
+        "HeadTurnSpeedThreshFace_degs",
+        "NumImuDataToLookBackFace",
+        "BodyTurnSpeedThreshBlock_degs",
+        "BodyTurnSpeedThreshPet_degs"
+      ],
+      "evidence": "engine/faceWorld.cpp:65-67,389-406; engine/components/sensors/imuComponent.h:58-61,129-136; test/engine/faceRecognitionTests.cpp:362-364",
+      "status": "live",
+      "tags": ["vision", "faces", "imu", "rotating-too-fast"]
+    },
+    "HeadAngleForDriftCheck": {
+      "process": "engine",
+      "blurb": "Head pitch used during the factory IMU drift-check step (default 0 rad ≈ level). Self-test and playpen drift behaviors move the head to this angle (after a full-up excursion), then hold still while yaw drift is measured.",
+      "detail": "Declared twice: SelfTestConfig and PlaypenConfig statics, both default DEG_TO_RAD(0). BehaviorSelfTestDriftCheck and BehaviorPlaypenDriftCheck each call MoveHeadToAngleAction with their own namespace’s value. WRAP_EXTERN_CONSOLE_VAR registers the same dump id under categories SelfTest and Playpen; ConsoleSystem keeps the first registration and ignores the duplicate, so the console only tunes one of the two C++ variables (static init order). Value is radians, not degrees — the console edits the raw float (0.0 = 0 rad). Only matters while SelfTestDriftCheck / PlaypenDriftCheck runs, not freeplay.",
+      "category": "SelfTest / Playpen",
+      "related": [
+        "IMUDriftDetectPeriod_ms",
+        "IMUDriftAngleThreshDeg"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.h:103; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.cpp:34; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/behaviorSelfTestDriftCheck.cpp:31-32; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:117; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.cpp:94; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/behaviorPlaypenDriftCheck.cpp:32-33; lib/util/source/anki/util/console/consoleSystem.cpp:148-162",
+      "status": "live",
+      "statusNote": "Dual SelfTest+Playpen registration of the same dump id; only first ConsoleVar binding is live. Units are radians.",
+      "tags": ["selftest", "playpen", "factory", "imu", "drift"]
+    },
+    "HeadTurnSpeedThreshBlock_degs": {
+      "process": "engine",
+      "blurb": "Maximum head pitch rate (degrees per second, default 10) allowed while marker detection still runs. Fast head nods at the image timestamp skip DetectMarkers so shaky frames do not produce bogus cube/charger codes.",
+      "detail": "Paired with BodyTurnSpeedThreshBlock_degs in VisionSystem’s Markers path: WasRotatingTooFast returns true if head OR body rate exceeds its limit (look-back 0). Markers_FastRotation bypasses the whole gate. Default 10°/s is tighter than the 30°/s body default — head motion alone can veto markers. Does not affect face/pet gates (those use *Face / *Pet siblings).",
+      "category": "Vision.MarkerDetection",
+      "related": [
+        "BodyTurnSpeedThreshBlock_degs",
+        "Markers_FastRotation",
+        "Markers",
+        "HeadTurnSpeedThreshFace_degs"
+      ],
+      "evidence": "engine/vision/visionSystem.cpp:90-91,1571-1601; engine/components/sensors/imuComponent.h:58-61,129-136; engine/components/sensors/imuComponent.cpp:156-184",
+      "status": "live",
+      "tags": ["vision", "markers", "imu", "rotating-too-fast"]
+    },
+    "HeadTurnSpeedThreshFace_degs": {
+      "process": "engine",
+      "blurb": "Maximum head tilt/pitch rate (degrees per second, default 10) allowed when first accepting a new face ID into FaceWorld. Fast head motion at detection time blocks that new ID so shaky frames do not spawn false people.",
+      "detail": "Same new-ID-only gate as BodyTurnSpeedThreshFace_degs. WasRotatingTooFast is true if either head or body rate exceeds its threshold. When VisionWhileRotatingFast is enabled and at least one of the face thresholds is > 0, FaceWorld skips the IMU gate for new faces. For tracked detections, NumImuDataToLookBackFace also widens the IMU window. Raising this value (or the body twin) allows more motion before rejecting a first sighting.",
+      "category": "WasRotatingTooFast.Face.Head_deg/s",
+      "related": [
+        "BodyTurnSpeedThreshFace_degs",
+        "NumImuDataToLookBackFace",
+        "HeadTurnSpeedThreshBlock_degs",
+        "HeadTurnSpeedThreshPet_degs"
+      ],
+      "evidence": "engine/faceWorld.cpp:65-67,389-406; engine/components/sensors/imuComponent.h:58-61,129-136; engine/components/sensors/imuComponent.cpp:156-184",
+      "status": "live",
+      "tags": ["vision", "faces", "imu", "rotating-too-fast"]
+    },
+    "IMUDriftAngleThreshDeg": {
+      "process": "engine",
+      "blurb": "How many degrees of yaw the robot may drift while sitting still during the factory IMU drift check before it fails (default 0.2°). Compared against absolute change in pose heading over IMUDriftDetectPeriod_ms.",
+      "detail": "SelfTestConfig and PlaypenConfig each own a static (default 0.2f degrees). BehaviorSelfTestDriftCheck::CheckDrift and BehaviorPlaypenDriftCheck::CheckDrift compute |Δ heading| in degrees; if greater than this threshold, self-test reports IMU_DRIFTING / playpen sets FactoryTestResultCode::IMU_DRIFTING. Playpen also logs driftRate_degPerSec = angleChange / period. Same dual WRAP_EXTERN_CONSOLE_VAR dump-id collision as HeadAngleForDriftCheck — console binds one registration only. Not used by freeplay RobotGyroDriftDetector (separate hardcoded constants).",
+      "category": "SelfTest / Playpen",
+      "related": [
+        "IMUDriftDetectPeriod_ms",
+        "HeadAngleForDriftCheck"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.h:108-109; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.cpp:41; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/behaviorSelfTestDriftCheck.cpp:66-74; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:122-123; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.cpp:101; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/behaviorPlaypenDriftCheck.cpp:71-91",
+      "status": "live",
+      "statusNote": "Dual SelfTest+Playpen registration; only first ConsoleVar is tunable. Factory/dev drift-check only.",
+      "tags": ["selftest", "playpen", "factory", "imu", "drift"]
+    },
+    "IMUDriftDetectPeriod_ms": {
+      "process": "engine",
+      "blurb": "How long the factory IMU drift check waits after recording the starting heading before measuring yaw change (default 2000 ms = 2 s). Longer = more sensitive to slow drift for a fixed angle threshold.",
+      "detail": "After head/lift settle, SelfTestDriftCheck and PlaypenDriftCheck store Z-axis pose angle, AddTimer(this period), then CheckDrift. Units are milliseconds. Same dual SelfTest/Playpen static + WRAP_EXTERN_CONSOLE_VAR registration under one dump id (first wins). Playpen uses the period both for the timer and to convert angle change into driftRate_degPerSec for NV storage / factory log. Only active during those drift-check behaviors.",
+      "category": "SelfTest / Playpen",
+      "related": [
+        "IMUDriftAngleThreshDeg",
+        "HeadAngleForDriftCheck"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.h:105-106; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.cpp:40; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/behaviorSelfTestDriftCheck.cpp:54-57,68-72; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:119-120; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.cpp:100; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/behaviorPlaypenDriftCheck.cpp:55-62,75,86-90",
+      "status": "live",
+      "statusNote": "Dual SelfTest+Playpen registration; only first ConsoleVar is tunable. Factory/dev drift-check only.",
+      "tags": ["selftest", "playpen", "factory", "imu", "drift"]
+    },
+    "NumImuDataToLookBackFace": {
+      "process": "engine",
+      "blurb": "How many IMU samples before the image timestamp to also check for too-fast motion when accepting a new face that is already marked “being tracked” (default 5). First-sight detections (not tracked yet) always use look-back 0.",
+      "detail": "Passed as the last argument to ImuHistory::WasRotatingTooFast only when face.IsBeingTracked() is true. For pure first detections look-back is forced to 0, so only samples bracketing t matter. Larger values are stricter (more history can fail the gate). Only applies on the new-face path in FaceWorld; ignored for updates of known IDs. Marker path does not pass a look-back (always 0). Pet sibling is NumImuDataToLookBackPet.",
+      "category": "WasRotatingTooFast.Face.NumToLookBack",
+      "related": [
+        "BodyTurnSpeedThreshFace_degs",
+        "HeadTurnSpeedThreshFace_degs",
+        "NumImuDataToLookBackPet"
+      ],
+      "evidence": "engine/faceWorld.cpp:67,397-401; engine/components/sensors/imuComponent.h:58-61,81-85; engine/components/sensors/imuComponent.cpp:85-148,156-213",
+      "status": "live",
+      "tags": ["vision", "faces", "imu", "rotating-too-fast"]
+    }
+  }
+}
