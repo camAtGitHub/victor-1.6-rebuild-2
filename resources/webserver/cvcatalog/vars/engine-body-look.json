@@ -1,0 +1,295 @@
+{
+  "vars": {
+    "HeadAngleDeg": {
+      "process": "engine",
+      "blurb": "Head angle (degrees, default 25) used when the Take A Photo coordinator raises Vector’s head before the focusing animation, for non-selfie photos or when the robot is already off the treads. Converted to radians for MoveHeadToAngleAction.",
+      "detail": "Category Behaviors.TakeAPhoto. On activation, if storage is not full and the take_a_photo intent is active: selfie + on-treads goes through drive-off-charger / FrameFaces; otherwise this console value is the sole head target before TransitionToFocusingAnimation. Does not affect selfie framing behaviors themselves.",
+      "howTo": "1) Trigger take_a_photo (not selfie, or pick robot up). 2) Change HeadAngleDeg. 3) Re-run the photo intent and watch head stop height.",
+      "category": "Behaviors.TakeAPhoto",
+      "related": ["ReadyToTakePhotoTimeout_sec", "TakingPhotoTimeout_sec"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/photoTaking/behaviorTakeAPhotoCoordinator.cpp:33-36,116-125",
+      "status": "live",
+      "tags": ["photo", "head", "behavior", "motor"]
+    },
+    "HeadAngleToSeeTarget_rad": {
+      "process": "engine",
+      "blurb": "Head pitch (radians, default ≈42° as DEG_TO_RAD(42)) that factory Playpen camera-calibration raises the head to so the full calibration target is in view. Default is about 0.73 rad.",
+      "detail": "PlaypenConfig static, wrapped as console under category Playpen. BehaviorPlaypenCameraCalibration runs a parallel MoveHeadToAngleAction(this) + lift-to-low-dock, then starts the “waiting for target” timer. Only matters when running playpen camera calibration on the factory fixture.",
+      "howTo": "Run playpen camera calibration; raise/lower this if the robot’s camera misses the QBERT/inverted-box target.",
+      "category": "Playpen",
+      "related": ["TimeoutWaitingForTarget_ms", "TimeoutForCalibration_ms", "PlaypenCalibTarget"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:166-167; playpenConfig.cpp:114; behaviorPlaypenCameraCalibration.cpp:92-98",
+      "status": "live",
+      "tags": ["playpen", "factory", "calibration", "head", "camera"]
+    },
+    "HeadCenterPointThreshold_mm": {
+      "process": "engine",
+      "blurb": "3D distance (mm, default 220) between estimated head centers inside which two detections are treated as the same face when face recognition is not available. Compared as squared length of the head-pose translation difference.",
+      "detail": "FaceWorld::AddOrUpdateFace only uses this branch when FaceTracker::IsRecognitionSupported() is false: match first by image-rect IoU, else by head-center distance ≤ this threshold. On production OKAO builds IsRecognitionSupported() is true, so IDs come from the recognizer and this threshold is never consulted. OpenCV / no-recognition builds still need it to keep face tracks stable by pose.",
+      "category": "Vision.FaceWorld",
+      "related": ["DeletionTimeout_ms", "NumTimesToSeeFrontalToBeStable"],
+      "evidence": "engine/faceWorld.cpp:52-53,303-347; coretech/vision/engine/faceTrackerImpl_okao.h:76 (IsRecognitionSupported true)",
+      "status": "partial",
+      "statusNote": "Code path is real but skipped on OKAO product (recognition supported). Effective only when recognition is disabled/unsupported.",
+      "tags": ["faces", "faceworld", "pose", "tracking"]
+    },
+    "HeadMovementDuration_s": {
+      "process": "engine",
+      "blurb": "How long (seconds, default 0.5, range 0.1–2.5) each head up/down move takes in the Dev Squawk Box test behavior’s automatic head cycle.",
+      "detail": "Category DevSquawkBoxBehavior. MoveHead() builds MoveHeadToAngleAction to ~42° then ~−20° (each with 10° tolerance), SetDuration(this), sequential compound. Only while that dev behavior is activated and head-motion looping is enabled via its console funcs. Changing the var affects the next queued head cycle.",
+      "howTo": "1) Activate DevSquawkBoxTest. 2) Start head motion via its console helpers. 3) Tune HeadMovementDuration_s and watch cycle speed.",
+      "category": "DevSquawkBoxBehavior",
+      "related": ["LiftMovementDuration_s", "TreadMovementSpeed_mmps"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevSquawkBoxTest.cpp:33-36,255-273",
+      "status": "live",
+      "tags": ["dev", "squawkbox", "head", "motor", "timing"]
+    },
+    "LiftMovementDuration_s": {
+      "process": "engine",
+      "blurb": "How long (seconds, default 0.5, range 0.1–2.5) each lift high/low move takes in the Dev Squawk Box test’s automatic lift cycle.",
+      "detail": "Same DevSquawkBoxBehavior group as HeadMovementDuration_s. MoveLift() sequences HIGH_DOCK then LOW_DOCK MoveLiftToHeightAction with SetDuration(this). Only while the behavior is active and lift looping is on.",
+      "category": "DevSquawkBoxBehavior",
+      "related": ["HeadMovementDuration_s", "TreadMovementSpeed_mmps"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevSquawkBoxTest.cpp:34,233-252",
+      "status": "live",
+      "tags": ["dev", "squawkbox", "lift", "motor", "timing"]
+    },
+    "LookingDownMaxAngle_deg": {
+      "process": "engine",
+      "blurb": "Registered face-enrollment pitch band edge (default −25°) under Vision.FaceTracker, but never read by any code path. Changing it has no effect.",
+      "detail": "Declared next to LookingUp/Down min/max and LookingStraightMax in FaceEnrollParams. Only LookingStraightMaxAngle_deg is used (to set TrackedFace::IsFacingCamera). Left/right looking-angle vars are already commented out; these down/up bounds look like unfinished enrollment pose bands.",
+      "category": "Vision.FaceTracker",
+      "related": [
+        "LookingDownMinAngle_deg",
+        "LookingUpMinAngle_deg",
+        "LookingUpMaxAngle_deg",
+        "LookingStraightMaxAngle_deg"
+      ],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:44-50; rg shows registration only (no other uses)",
+      "status": "dead",
+      "statusNote": "CONSOLE_VAR registered; zero read sites outside declaration.",
+      "tags": ["faces", "enroll", "orphan", "dead"]
+    },
+    "LookingDownMinAngle_deg": {
+      "process": "engine",
+      "blurb": "Registered face-enrollment pitch band edge (default −10°) under Vision.FaceTracker, but never read. No runtime effect.",
+      "detail": "Same FaceEnrollParams dead cluster as LookingDownMaxAngle_deg / LookingUp*. Only LookingStraightMaxAngle_deg feeds IsFacingCamera.",
+      "category": "Vision.FaceTracker",
+      "related": [
+        "LookingDownMaxAngle_deg",
+        "LookingUpMinAngle_deg",
+        "LookingUpMaxAngle_deg",
+        "LookingStraightMaxAngle_deg"
+      ],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:49; rg registration only",
+      "status": "dead",
+      "statusNote": "CONSOLE_VAR registered; never consumed.",
+      "tags": ["faces", "enroll", "orphan", "dead"]
+    },
+    "LookingStraightMaxAngle_deg": {
+      "process": "engine",
+      "blurb": "Max absolute head roll/pitch/yaw (degrees, default 25) for a detected face to count as looking straight at the camera. If |roll|, |pitch|, and |yaw| are all ≤ this, IsFacingCamera is set true; otherwise false.",
+      "detail": "OKAO face-direction angles (degrees) from parts; FaceTracker::SetFacePoseFromParts applies the three abs checks. IsFacingCamera gates enrollability (IsEnrollable also wants frontal pose + confidence + eye distance) and FaceWorld frontal stability counting. Tighter = fewer “looking at me” labels; looser = more faces marked frontal.",
+      "category": "Vision.FaceTracker",
+      "related": [
+        "LookingUpMinAngle_deg",
+        "LookingUpMaxAngle_deg",
+        "LookingDownMinAngle_deg",
+        "LookingDownMaxAngle_deg"
+      ],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:44,910-923,1470-1475; engine/faceWorld.cpp:489",
+      "status": "live",
+      "tags": ["faces", "enroll", "orientation", "vision"]
+    },
+    "LookingUpMaxAngle_deg": {
+      "process": "engine",
+      "blurb": "Registered face-enrollment pitch upper bound (default 45°) under Vision.FaceTracker, never read. No effect.",
+      "detail": "Dead sibling of LookingStraightMaxAngle_deg; intended up-looking enrollment band that was never wired.",
+      "category": "Vision.FaceTracker",
+      "related": ["LookingUpMinAngle_deg", "LookingStraightMaxAngle_deg"],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:48; rg registration only",
+      "status": "dead",
+      "statusNote": "CONSOLE_VAR registered; never consumed.",
+      "tags": ["faces", "enroll", "orphan", "dead"]
+    },
+    "LookingUpMinAngle_deg": {
+      "process": "engine",
+      "blurb": "Registered face-enrollment pitch lower bound for “looking up” (default 25°) under Vision.FaceTracker, never read. No effect.",
+      "detail": "Dead sibling; only LookingStraightMaxAngle_deg is used for IsFacingCamera.",
+      "category": "Vision.FaceTracker",
+      "related": ["LookingUpMaxAngle_deg", "LookingStraightMaxAngle_deg"],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:47; rg registration only",
+      "status": "dead",
+      "statusNote": "CONSOLE_VAR registered; never consumed.",
+      "tags": ["faces", "enroll", "orphan", "dead"]
+    },
+    "MaxPanAccel_radPerSec2": {
+      "process": "engine",
+      "blurb": "Max body pan acceleration (rad/s², default 10) applied to TurnTowardsPoseAction when ReactToGazeDirection turns toward a surface gaze point (not when the person is looking at the robot).",
+      "detail": "Category Vision.GazeDirection. For each surface-point turn cycle, SetPanAccel(this) on the turn-towards-gaze pose action while looping the left/right surface-turn animations. Does not change the “looking at robot” animation branch.",
+      "category": "Vision.GazeDirection",
+      "related": ["MaxPanSpeed_radPerSec", "NumberOfTurnsForSurfacePoint", "UseEyeContact"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorReactToGazeDirection.cpp:36,200-203",
+      "status": "live",
+      "tags": ["gaze", "turn", "body", "behavior"]
+    },
+    "MaxPanSpeed_radPerSec": {
+      "process": "engine",
+      "blurb": "Max body pan speed (rad/s, default MAX_BODY_ROTATION_SPEED ≈ 300°/s) for TurnTowardsPoseAction in ReactToGazeDirection’s surface-gaze turns.",
+      "detail": "Paired with MaxPanAccel_radPerSec2 via SetMaxPanSpeed. Same surface-point branch only. Cap is the shared robot body rotation limit from cozmoConfig.",
+      "category": "Vision.GazeDirection",
+      "related": ["MaxPanAccel_radPerSec2"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorReactToGazeDirection.cpp:35,200-202; robot/include/anki/cozmo/shared/cozmoConfig.h:312-313",
+      "status": "live",
+      "tags": ["gaze", "turn", "body", "behavior"]
+    },
+    "MotorCalibrationTimeout_ms": {
+      "process": "engine",
+      "blurb": "Milliseconds to wait for head and lift motor calibration to finish before failing factory/playpen motor calibration (default 4000). Playpen starts calibration then fails with MOTORS_UNCALIBRATED if both motors do not report done in time.",
+      "detail": "Two separate statics both named kMotorCalibrationTimeout_ms: PlaypenConfig (category Playpen) and SelfTestConfig (category SelfTest), each WRAP_EXTERN_CONSOLE_VAR’d. Playpen BehaviorPlaypenMotorCalibration uses PlaypenConfig::kMotorCalibrationTimeout_ms live. SelfTest BehaviorSelfTestMotorCalibration hardcodes AddTimer(5000, …) and does not read SelfTestConfig::kMotorCalibrationTimeout_ms — so the SelfTest console registration is currently a no-op for that behavior.",
+      "howTo": "For playpen: set before motor-calibration step; if head/lift finish late, increase. Self-test path ignores this var (fixed 5 s in code).",
+      "category": "Playpen",
+      "related": [],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:111-113; playpenConfig.cpp:92; behaviorPlaypenMotorCalibration.cpp:34-36; selfTest/selfTestConfig.h:97-99; selfTestConfig.cpp:32; behaviorSelfTestMotorCalibration.cpp:34-38",
+      "status": "live",
+      "statusNote": "Live for Playpen. SelfTest also registers the same dump id under category SelfTest but the self-test motor-calib behavior hardcodes 5000 ms.",
+      "tags": ["playpen", "selftest", "factory", "motors", "calibration", "timeout"]
+    },
+    "MoveLiftAboveProx": {
+      "process": "engine",
+      "blurb": "When true, freeplay Exploring raises the lift just above the prox sensor FOV before driving and when prepping the prox for sensing. Default false uses low-dock lift height instead when clearing lift-from-FOV.",
+      "detail": "Category BehaviorExploring. TransitionToDriving optionally prepends MoveLiftToHeightAction(JUST_ABOVE_PROX). PrepRobotForProx, if lift is in prox FOV and no object is found, delegates JUST_ABOVE_PROX vs LOW_DOCK based on this flag. Useful when testing prox-driven exploration without the lift occluding the sensor; changes exploring motion profile.",
+      "category": "BehaviorExploring",
+      "related": [],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/exploring/behaviorExploring.cpp:107,586-588,931-939",
+      "status": "live",
+      "tags": ["exploring", "prox", "lift", "freeplay"]
+    },
+    "NumLiftRaises": {
+      "process": "engine",
+      "blurb": "How many lift lower→raise→check-load cycles the LiftLoadTest dev behavior runs before finishing (default 50). Stops early if the test aborts.",
+      "detail": "Category LiftLoadTest. Each successful raise triggers CheckLiftLoad on the robot; on liftLoad response the raise counter increments (and load-detect count if hasLoad). When counter reaches this value, stats are written under cache liftLoadTest and the behavior completes. Requires the behavior to be activatable (SetLiftLoadTestAsActivatable) and on treads.",
+      "howTo": "1) Enable LiftLoadTest as activatable. 2) Set NumLiftRaises. 3) Activate the behavior with a known load/no-load setup. 4) Read results under robot cache liftLoadTest.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/liftLoadTest/"
+        ],
+        "notes": "RollingFileLogger path = Scope::Cache + \"liftLoadTest\" (typical on-robot cache root)."
+      },
+      "category": "LiftLoadTest",
+      "related": [],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorLiftLoadTest.cpp:55,103-105,144-158,182-196,330-336,361-368",
+      "status": "live",
+      "tags": ["dev", "lift", "load-test", "factory"]
+    },
+    "PitchAngleThreshold_rad": {
+      "process": "engine",
+      "blurb": "Max absolute head pitch (radians, default π/2 ≈ 90°) allowed for eye-contact to still be declared. Person’s head pitch must be inside this cone along with the yaw threshold and other eye-contact checks.",
+      "detail": "Vision.EyeContact SecondaryConstraints: |GetHeadPitch| < this AND |GetHeadYaw| < YawAngleThreshold_rad, plus blink-amount and near-camera gates. Default is extremely wide (essentially always true for OKAO pitch ranges). Tighten to require a more upright face before EyeContact is true (behaviors/gaze that use face.GetEyeContact).",
+      "category": "Vision.EyeContact",
+      "related": ["YawAngleThreshold_rad", "BlinkAmountThreshold", "EyeContactDistanceSq"],
+      "evidence": "coretech/vision/engine/eyeContact.cpp:29-30,144-160; faceTrackerImpl_okao.cpp:693-708,1277",
+      "status": "live",
+      "tags": ["eye-contact", "faces", "vision", "pitch"]
+    },
+    "PitchScalar": {
+      "process": "engine",
+      "blurb": "Pitch shift for the debug console SayText function only (−1…+1, default 0). Does not change normal freeplay or cloud TTS pitch by itself.",
+      "detail": "Category TextToSpeech (REMOTE_CONSOLE_ENABLED). SayText passes this with DurationScalar and VoiceStyle into TextToSpeechCoordinator::CreateUtterance (Immediate trigger). Anim Acapela provider clamps pitchScalar to [−1,1] and offsets base pitch. Product SayTextAction / cloud paths use their own pitch scalars and ignore this console var.",
+      "howTo": "1) Set PitchScalar (and optionally DurationScalar / VoiceStyle). 2) Call console function SayText with text (underscores become spaces). 3) Listen for higher/lower pitch.",
+      "requires": ["SayText"],
+      "related": ["DurationScalar", "VoiceStyle", "SayText"],
+      "evidence": "engine/robot.cpp:174-234; animProcess/src/cozmoAnim/textToSpeech/textToSpeechProvider_acapela.cpp:22-23,85-96; engine/components/textToSpeech/textToSpeechCoordinator.cpp:146-169",
+      "category": "TextToSpeech",
+      "status": "partial",
+      "statusNote": "Only consumed by console SayText. Freeplay/cloud TTS does not read this var.",
+      "tags": ["tts", "debug", "pitch", "audio"]
+    },
+    "PoseAngle": {
+      "process": "engine",
+      "blurb": "OKAO face-detector yaw/pose search set: Unspecified, Front (default), Half Profile, Profile, Rear. Controls which face orientations the detector is allowed to search for at init.",
+      "detail": "CONSOLE_VAR_ENUM under Vision.FaceDetectorCommon. Applied in FaceTracker::Impl::Init via OKAO_DT_SetAngle with RollAngle. Runtime changes do nothing until ReinitDetector is flipped true (Update Deinit+Init). Front is the product default; wider poses cost more CPU and can change false-positive profile.",
+      "howTo": "1) Set PoseAngle. 2) Set ReinitDetector = true. 3) Confirm Faces vision mode is running.",
+      "requires": ["ReinitDetector"],
+      "related": ["RollAngle", "SearchDensity", "MinFaceSize", "MaxFaceSize", "UseHeadTracking"],
+      "enumLabels": [
+        "Unspecified",
+        "Front",
+        "Half Profile",
+        "Profile",
+        "Rear"
+      ],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:79,268-273,1067-1074; okaoParamInterface.cpp:27-38; okaoParamInterface.h:24-32",
+      "category": "Vision.FaceDetectorCommon",
+      "status": "partial",
+      "statusNote": "Pushed into OKAO only at Init / ReinitDetector; mid-run edits alone are a no-op.",
+      "tags": ["faces", "okao", "detection", "pose"]
+    },
+    "RollAngle": {
+      "process": "engine",
+      "blurb": "OKAO face-detector in-plane roll search set (default Upper ±45°). Chooses which head-tilt angles the detector searches; wider sets (e.g. All) catch more orientations at higher cost.",
+      "detail": "CONSOLE_VAR_ENUM Vision.FaceDetectorCommon. Passed with PoseAngle to OKAO_DT_SetAngle at Init. Enum labels include discrete 30° steps, All/None, and combined upper bands (UpperPm45 default index). Apply via ReinitDetector like PoseAngle.",
+      "howTo": "1) Set RollAngle. 2) Set ReinitDetector = true. 3) Present faces at the roll angles you care about.",
+      "requires": ["ReinitDetector"],
+      "related": ["PoseAngle", "EnableAngleExtension", "UseHeadTracking"],
+      "enumLabels": [
+        "Upper (0)",
+        "Upper Right (30)",
+        "Upper Right (60)",
+        "Right (90)",
+        "Lower Right (120)",
+        "Lower Right (150)",
+        "Down (180)",
+        "Lower Left (210)",
+        "Lower Left (240)",
+        "Left (270)",
+        "Upper Left (300)",
+        "Upper Left (330)",
+        "All",
+        "None",
+        "Upper +- 45",
+        "Upper +- 60",
+        "Upper Left Right +- 15",
+        "Upper Left Right +- 45"
+      ],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:80,268-273,1067-1074; okaoParamInterface.cpp:41-65; okaoParamInterface.h:34-55",
+      "category": "Vision.FaceDetectorCommon",
+      "status": "partial",
+      "statusNote": "Pushed into OKAO only at Init / ReinitDetector.",
+      "tags": ["faces", "okao", "detection", "roll"]
+    },
+    "TreadMovementSpeed_mmps": {
+      "process": "engine",
+      "blurb": "Wheel speed (mm/s, default 200, range 20–MAX_WHEEL_SPEED) used when Dev Squawk Box drives the treads. While treads are moving, BehaviorUpdate re-applies if you change this live.",
+      "detail": "MoveTreads sets left=right=this speed (or 0 when stopped) via MoveComponent::DriveWheels. Dev harness only; not freeplay drive speeds.",
+      "category": "DevSquawkBoxBehavior",
+      "related": ["HeadMovementDuration_s", "LiftMovementDuration_s"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevSquawkBoxTest.cpp:36,224-228,277-283",
+      "status": "live",
+      "tags": ["dev", "squawkbox", "treads", "drive"]
+    },
+    "UseHeadTracking": {
+      "process": "engine",
+      "blurb": "When true, OKAO movie-mode pose extension may keep tracking the back of the head (“HEAD” pose) for continuity. Default false because that hurt facial-parts detection while tracking.",
+      "detail": "Category Vision.FaceDetectorMovie. Passed as bUseHeadTracking to OKAO_DT_MV_SetPoseExtension with EnablePoseExtension during Init. Omron note in code: HEAD outputs appear only with tracking + this true; prefer false when parts/landmarks matter. Requires ReinitDetector (or process restart) after change.",
+      "howTo": "1) Set UseHeadTracking. 2) Set ReinitDetector true. 3) Compare track hold vs parts quality.",
+      "requires": ["ReinitDetector"],
+      "related": ["EnablePoseExtension", "EnableAngleExtension", "PoseAngle", "RollAngle"],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:96-109,230-235,1067-1074; okaoVision/include/OkaoDtAPI.h:164-165",
+      "category": "Vision.FaceDetectorMovie",
+      "status": "partial",
+      "statusNote": "Applied only when the movie-mode detector is (re)initialized.",
+      "tags": ["faces", "okao", "tracking", "movie-mode"]
+    },
+    "YawAngleThreshold_rad": {
+      "process": "engine",
+      "blurb": "Max absolute head yaw (radians, default π/2 ≈ 90°) allowed for eye-contact. With PitchAngleThreshold_rad, defines the head-orientation cone for SecondaryConstraints.",
+      "detail": "Same EyeContact path as pitch: |GetHeadYaw| must be below this. Default is very permissive; lower it so only faces pointed more toward the camera can report eye contact.",
+      "category": "Vision.EyeContact",
+      "related": ["PitchAngleThreshold_rad", "EyeContactDistanceSq", "BlinkAmountThreshold"],
+      "evidence": "coretech/vision/engine/eyeContact.cpp:30,144-160",
+      "status": "live",
+      "tags": ["eye-contact", "faces", "vision", "yaw"]
+    }
+  }
+}
