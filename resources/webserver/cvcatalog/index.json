@@ -68,7 +68,10 @@
     "vars/engine-firmware-jdocs.json",
     "vars/engine-distance-search.json",
     "vars/engine-photo-tracker-calib.json",
-    "vars/engine-driving-anim-fft.json"
+    "vars/engine-driving-anim-fft.json",
+    "vars/engine-misc-a.json",
+    "vars/engine-misc-b.json",
+    "vars/engine-misc-c.json"
   ],
   "categories": [
     "categories/vision.json",
