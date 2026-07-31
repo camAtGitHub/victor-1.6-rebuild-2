@@ -1,0 +1,367 @@
+{
+  "vars": {
+    "DirectionMask": {
+      "process": "engine",
+      "blurb": "OKAO movie-mode flag: when true, new-face search uses a direction mask so faces that are not facing roughly toward the camera are less likely to be promoted into tracks. Default false (no direction mask).",
+      "detail": "Passed once into OKAO_DT_MV_SetDirectionMask during FaceTracker::Impl::Init when DetectionMode is Movie. Omron documents this as a mask for New Face Search. It does not run every frame — only at detector create/init. Runtime console changes need ReinitDetector so Update Deinit+Init re-applies DetectParams. Still-mode detection skips this call entirely.",
+      "howTo": "1) Set DirectionMask. 2) Flip ReinitDetector true. 3) Ensure Faces vision mode is running (movie detector).",
+      "category": "Vision.FaceDetectorMovie",
+      "related": [
+        "ReinitDetector",
+        "TrackingAccuracy",
+        "SteadinessPosition",
+        "SteadinessSize",
+        "TrackingSwapRatio",
+        "DetectionMode"
+      ],
+      "requires": ["ReinitDetector"],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:111,237-240,1067-1074; okaoVision/include/OkaoDtAPI.h:167-169",
+      "status": "partial",
+      "statusNote": "Applied only at OKAO Init (and after ReinitDetector). Changing the console var alone mid-run does not call SetDirectionMask again.",
+      "tags": ["vision", "faces", "okao", "tracking", "movie"]
+    },
+    "FocalLengthTolerance": {
+      "process": "engine",
+      "blurb": "Factory playpen only: how far (pixels, default 30) the computed camera focal lengths fx/fy may sit from the nominal physical calibration before the playpen fails the unit as CALIBRATION_VALUES_OOR.",
+      "detail": "PlaypenConfig::kFocalLengthTolerance, wrapped under category Playpen. After PlaypenCameraCalibration receives EngineToGame CameraCalibration, it checks fx and fy against hardcoded kApproxCalib (physical defaults ~362/364, simulator 296/296) using ± this tolerance. Does not change the OpenCV solve — only the post-compute acceptance gate. Center tolerance is a sibling var (not this id). Only meaningful while the playpen camera-calibration behavior is running.",
+      "category": "Playpen",
+      "related": [
+        "RadialDistortionTolerance",
+        "TangentialDistortionTolerance",
+        "TimeoutForCalibration_ms",
+        "TimeoutWaitingForTarget_ms",
+        "Calibration",
+        "CalibTargetType"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:155; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.cpp:110; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/behaviorPlaypenCameraCalibration.cpp:262-283",
+      "status": "partial",
+      "statusNote": "Read only inside HandleCameraCalibration on the playpen path. No effect in freeplay/consumer use.",
+      "tags": ["playpen", "calibration", "factory", "focal-length"]
+    },
+    "InlierDistanceSq": {
+      "process": "engine",
+      "blurb": "How close a single gaze sample must sit to the current average gaze (squared distance in degrees², default 100 ≈ within 10°) to count as an inlier when deciding whether someone is steadily looking at Vector.",
+      "detail": "EyeContact::FindInliers marks history entries with distance < this threshold, then re-averages only inliers. That cleaned average plus MinNumberOfInliers and EyeContactDistanceSq drive IsMakingEyeContact. Gaze samples are (leftRight_deg, upDown_deg) from OKAO. Larger = more noisy samples still count as “steady”; smaller = stricter consensus. Live every face eye-contact update (no reinit).",
+      "category": "Vision.EyeContact",
+      "related": [
+        "MinNumberOfInliers",
+        "EyeContactDistanceSq",
+        "HistorySize",
+        "BlinkAmountThreshold",
+        "UseEyeContact"
+      ],
+      "evidence": "coretech/vision/engine/eyeContact.cpp:24,109-122,130-141; coretech/vision/engine/faceTrackerImpl_okao.cpp:693-710,1277",
+      "status": "live",
+      "tags": ["vision", "eye-contact", "faces", "inlier", "threshold"]
+    },
+    "MaxCalibBlobPixelArea": {
+      "process": "engine",
+      "blurb": "Maximum blob area (pixels², default 800) OpenCV’s SimpleBlobDetector will accept when hunting asymmetric-circle dots for CHECKERBOARD camera calibration. Blobs larger than this are ignored.",
+      "detail": "Wired into cv::SimpleBlobDetector::Params::maxArea inside ComputeCalibrationFromCheckerboard together with MinCalibBlobPixelArea and MinCalibPixelDistBetweenBlobs. Only used on the checkerboard/dot-board path (CalibTargetType 0), not Qbert/inverted-box. On this tree, VisionComponent’s AddCalibrationImage path is commented (VIC-7177), so end-to-end checkerboard calibration cannot acquire frames until store is restored — tuning still applies if images are present in _calibImages.",
+      "category": "Vision.Calibration",
+      "related": [
+        "MinCalibBlobPixelArea",
+        "MinCalibPixelDistBetweenBlobs",
+        "MinNumCalibImages",
+        "CheckerboardWidth",
+        "CheckerboardHeight",
+        "CalibTargetType",
+        "Calibration"
+      ],
+      "requires": ["Calibration", "CalibTargetType"],
+      "evidence": "engine/vision/cameraCalibrator.cpp:41,109-113,127-128",
+      "status": "partial",
+      "statusNote": "Read on checkerboard compute only. Product image-store for calib frames is currently disabled (VIC-7177).",
+      "tags": ["vision", "calibration", "checkerboard", "opencv", "blob"]
+    },
+    "MinCalibBlobPixelArea": {
+      "process": "engine",
+      "blurb": "Minimum blob area (pixels², default 20) for dots on the asymmetric-circle calibration board. Smaller speckles are rejected as noise.",
+      "detail": "params.minArea for the SimpleBlobDetector used by findCirclesGrid in ComputeCalibrationFromCheckerboard. Pair with MaxCalibBlobPixelArea so real printed dots fall in range under the current lens distance and resolution. Checkerboard path only; same VIC-7177 image-store caveat as other checkerboard blob vars.",
+      "category": "Vision.Calibration",
+      "related": [
+        "MaxCalibBlobPixelArea",
+        "MinCalibPixelDistBetweenBlobs",
+        "MinNumCalibImages",
+        "CalibTargetType",
+        "Calibration"
+      ],
+      "requires": ["Calibration", "CalibTargetType"],
+      "evidence": "engine/vision/cameraCalibrator.cpp:42,109-113",
+      "status": "partial",
+      "statusNote": "Checkerboard compute only; blocked end-to-end by dead calib image store (VIC-7177).",
+      "tags": ["vision", "calibration", "checkerboard", "opencv", "blob"]
+    },
+    "MinCalibPixelDistBetweenBlobs": {
+      "process": "engine",
+      "blurb": "Minimum center-to-center distance (pixels, default 5) between accepted calibration-board blobs. Closer blob pairs are suppressed so one dot is not double-counted.",
+      "detail": "params.minDistBetweenBlobs for SimpleBlobDetector in ComputeCalibrationFromCheckerboard. Raise if noise creates clustered false dots; lower only if genuine printed dots are closer than 5 px in the stored image. Checkerboard path only.",
+      "category": "Vision.Calibration",
+      "related": [
+        "MaxCalibBlobPixelArea",
+        "MinCalibBlobPixelArea",
+        "MinNumCalibImages",
+        "CalibTargetType",
+        "Calibration"
+      ],
+      "requires": ["Calibration", "CalibTargetType"],
+      "evidence": "engine/vision/cameraCalibrator.cpp:43,109-113",
+      "status": "partial",
+      "statusNote": "Checkerboard compute only; image store currently dead (VIC-7177).",
+      "tags": ["vision", "calibration", "checkerboard", "opencv", "blob"]
+    },
+    "MinNumCalibImages": {
+      "process": "engine",
+      "blurb": "How many stored gray frames (default 1) must exist — and how many of those must actually yield circle-grid points — before CHECKERBOARD OpenCV calibrateCamera is allowed to run.",
+      "detail": "Two gates in ComputeCalibrationFromCheckerboard: (1) _calibImages.size() < this → NotEnoughImages fail; (2) after findCirclesGrid, imagePoints.size() < this → InsufficientImagesWithPoints fail. Default 1 matches single-shot playpen style; multi-view checkerboard calib would raise this. Unused by Qbert/inverted-box single-target path. Image acquisition is currently disabled in VisionComponent (VIC-7177), so raising this alone cannot gather more frames.",
+      "category": "Vision.Calibration",
+      "related": [
+        "MaxCalibBlobPixelArea",
+        "MinCalibBlobPixelArea",
+        "CheckerboardWidth",
+        "CheckerboardHeight",
+        "CalibTargetType",
+        "Calibration"
+      ],
+      "requires": ["Calibration", "CalibTargetType"],
+      "evidence": "engine/vision/cameraCalibrator.cpp:45,88-95,157-166",
+      "status": "partial",
+      "statusNote": "Logic live on checkerboard compute, but product cannot populate _calibImages while AddCalibrationImage is commented out.",
+      "tags": ["vision", "calibration", "checkerboard", "opencv"]
+    },
+    "MinNumberOfInliers": {
+      "process": "engine",
+      "blurb": "Minimum number of gaze-history samples that must agree with the average (default 3) before Vector can declare eye contact. With default HistorySize 6, this means at least half the buffer must be inliers.",
+      "detail": "EyeContact::DetermineMakingEyeContact requires _numberOfInliers > this value (strict greater-than), then checks EyeContactDistanceSq and SecondaryContraints (head cone, blink, near distance). Inliers are labeled with InlierDistanceSq. Do not confuse with GazeDirectionMinNumberOfInliers (separate ground-gaze stability gate). Live every eye-contact update.",
+      "category": "Vision.EyeContact",
+      "related": [
+        "InlierDistanceSq",
+        "EyeContactDistanceSq",
+        "HistorySize",
+        "BlinkAmountThreshold",
+        "GazeDirectionMinNumberOfInliers"
+      ],
+      "evidence": "coretech/vision/engine/eyeContact.cpp:25,69-71,130-141",
+      "status": "live",
+      "tags": ["vision", "eye-contact", "faces", "inlier", "threshold"]
+    },
+    "MinQualityThreshold": {
+      "process": "engine",
+      "blurb": "Minimum ToF proximity signal-quality score (default 0.01) required before the engine treats the forward range reading as a real obstacle. Below this, the scene is marked unobstructed (nothing solid close enough / signal too weak).",
+      "detail": "On each RobotState, ProxSensorComponent recomputes signalQuality and sets unobstructed if quality ≤ this OR distance ≥ MaxObsThreshold_mm. foundObject requires quality > this plus valid range status, distance in band, lift not in FOV, and body pitch not looking at floor/ceiling. Not a camera/photo var despite the shard name — it is the prox (distance sensor) quality floor. Whiskey robots skip this component path entirely.",
+      "category": "ProxSensorComponent",
+      "related": [],
+      "evidence": "engine/components/sensors/proxSensorComponent.cpp:95,171-181",
+      "status": "live",
+      "tags": ["sensors", "proximity", "tof", "obstacle"]
+    },
+    "RadialDistortionTolerance": {
+      "process": "engine",
+      "blurb": "Factory playpen only: allowed absolute error (default 0.15) on radial distortion coefficients k1, k2, and k3 (distCoeffs[0], [1], [4]) versus the nominal physical camera model. Outside range → DISTORTION_VALUES_OOR.",
+      "detail": "PlaypenConfig::kRadialDistortionTolerance under Playpen. After successful CameraCalibration message, HandleCameraCalibration range-checks three radial terms against kApproxCalib (± tolerance). Tangential terms use TangentialDistortionTolerance instead. Validation only — does not alter calibrateCamera. Higher = more lenient factory pass.",
+      "category": "Playpen",
+      "related": [
+        "TangentialDistortionTolerance",
+        "FocalLengthTolerance",
+        "TimeoutForCalibration_ms",
+        "Calibration"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:161; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.cpp:112; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/behaviorPlaypenCameraCalibration.cpp:285-315",
+      "status": "partial",
+      "statusNote": "Playpen HandleCameraCalibration only; unused outside factory camera-calib behavior.",
+      "tags": ["playpen", "calibration", "factory", "distortion"]
+    },
+    "ReadyToTakePhotoTimeout_sec": {
+      "process": "engine",
+      "blurb": "How long (seconds, default 3) the take-a-photo behavior will wait for the camera pipeline to report ready after the focusing animation if it was not ready immediately. On timeout the photo is aborted with an error log (no capture).",
+      "detail": "Category Behaviors.TakeAPhoto. TransitionToTakePhoto normally captures right away when PhotographyManager::IsReadyToTakePhoto is true (photo mode switch should finish during animations). If not, a WaitForLambdaAction polls readiness with this timeout; failure path logs NotReadyAfterTimeout and does not call CaptureCurrentImage. Does not change image processing — only the coordinator wait.",
+      "category": "Behaviors.TakeAPhoto",
+      "related": [
+        "TakingPhotoTimeout_sec",
+        "TakePhoto_UseRawPhotos"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/photoTaking/behaviorTakeAPhotoCoordinator.cpp:36,200-228",
+      "status": "live",
+      "tags": ["photography", "behavior", "timeout"]
+    },
+    "SingleTargetReprojErr_pix": {
+      "process": "engine",
+      "blurb": "Maximum allowed average reprojection error (pixels, default 1.5) after single-target (Qbert / inverted-box) camera calibration. If OpenCV’s RMS is higher, the result is discarded as fail.",
+      "detail": "End of ComputeCalibrationFromSingleTarget: after building CameraCalibration from cameraMatrix/distCoeffs, if rms > this value the function logs ReprojectionErrorTooHigh and returns RESULT_FAIL (no calibration published). Checkerboard path uses a separate hard-coded 0.5 px RMS gate, not this console var. Single-target 3D layouts are #if FACTORY_TEST — consumer FACTORY_TEST=0 builds cannot complete that path even if this threshold is raised.",
+      "category": "Vision.Calibration",
+      "related": [
+        "NumMarkersNeededForCalibration",
+        "CalibTargetType",
+        "Calibration",
+        "Markers"
+      ],
+      "requires": ["Calibration", "CalibTargetType", "Markers"],
+      "evidence": "engine/vision/cameraCalibrator.cpp:49,451-463",
+      "status": "partial",
+      "statusNote": "Gate is live in code, but single-target layouts empty on non-factory builds; factory playpen path also blocked by VIC-7177 image store notes elsewhere.",
+      "tags": ["vision", "calibration", "factory", "reprojection"]
+    },
+    "SteadinessPosition": {
+      "process": "engine",
+      "blurb": "OKAO movie tracking: position steadiness of the face rectangle (0–30, default 10). Higher values smooth/hold the box location more; lower values let the box jump more quickly with true motion.",
+      "detail": "Passed with SteadinessSize into OKAO_DT_MV_SetSteadinessParam at FaceTracker Init (Movie mode only). Omron: “steadiness parameters of the position and size of the Face rectangle during tracking.” Not re-applied until ReinitDetector. Tradeoff: high steadiness reduces jitter for UI/tracking consumers but can lag fast head motion.",
+      "howTo": "1) Set SteadinessPosition (and optionally SteadinessSize). 2) Set ReinitDetector true. 3) Exercise Faces tracking.",
+      "category": "Vision.FaceDetectorMovie",
+      "related": [
+        "SteadinessSize",
+        "TrackingSwapRatio",
+        "TrackingAccuracy",
+        "DirectionMask",
+        "ReinitDetector"
+      ],
+      "requires": ["ReinitDetector"],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:91,198-204,1067-1074; okaoVision/include/OkaoDtAPI.h:137-141",
+      "status": "partial",
+      "statusNote": "Pushed into OKAO only at Init / ReinitDetector.",
+      "tags": ["vision", "faces", "okao", "tracking", "movie"]
+    },
+    "SteadinessSize": {
+      "process": "engine",
+      "blurb": "OKAO movie tracking: size steadiness of the face rectangle (0–30, default 10). Higher = reported face scale changes more slowly; lower = scale follows depth/apparent size more tightly.",
+      "detail": "Second argument to OKAO_DT_MV_SetSteadinessParam with SteadinessPosition at FaceTracker Movie Init. Same reinit requirement as other FaceDetectorMovie DetectParams. Useful when face box oscillates in size on a mostly still person.",
+      "howTo": "1) Adjust SteadinessSize. 2) ReinitDetector true. 3) Re-test Faces.",
+      "category": "Vision.FaceDetectorMovie",
+      "related": [
+        "SteadinessPosition",
+        "TrackingSwapRatio",
+        "TrackingAccuracy",
+        "ReinitDetector"
+      ],
+      "requires": ["ReinitDetector"],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:92,198-204,1067-1074; okaoVision/include/OkaoDtAPI.h:137-141",
+      "status": "partial",
+      "statusNote": "Init-time only unless ReinitDetector rebuilds the detector.",
+      "tags": ["vision", "faces", "okao", "tracking", "movie"]
+    },
+    "TakePhoto_UseRawPhotos": {
+      "process": "engine",
+      "blurb": "When true, user photos skip median filtering and sharpening on save (still may undistort per photography_config). When false (default), uses config MedianFilterSize and SharpeningAmount (stock 3 and 0.5).",
+      "detail": "PhotographyManager::TakePhoto builds ImageSaverParams: if this flag is set, medianFilterSize=0 and sharpeningAmount=0; else values loaded from photography_config.json at init. Comment at registration: disables all smoothing and sharpening despite JSON, but still uses undistortion when RemoveDistortion is true. Affects the next TakePhoto() only (console can flip between shots). Files land under persistent photos/ (robot: …/persistent/photos/).",
+      "paths": {
+        "assets": [
+          "resources/config/engine/photography_config.json"
+        ],
+        "robot": [
+          "/data/data/com.anki.victor/persistent/photos/"
+        ],
+        "notes": "Persistent root matches other victor data (photos folder + photos.json). Config keys MedianFilterSize / SharpeningAmount / RemoveDistortion only apply when UseRawPhotos is false (distortion still follows RemoveDistortion)."
+      },
+      "category": "Photography",
+      "related": [
+        "ReadyToTakePhotoTimeout_sec",
+        "TakingPhotoTimeout_sec"
+      ],
+      "evidence": "engine/components/photographyManager.cpp:48,78-81,121-132,275-297; resources/config/engine/photography_config.json",
+      "status": "live",
+      "tags": ["photography", "image-processing", "paths"]
+    },
+    "TakingPhotoTimeout_sec": {
+      "process": "engine",
+      "blurb": "How long (seconds, default 6) the take-a-photo behavior waits for PhotographyManager to report the capture finished after starting TakePhoto. On timeout it cancels the photo and logs TakePhotoTimedOut.",
+      "detail": "CaptureCurrentImage sequences TakeAPictureCapture animation then WaitForLambdaAction(WasPhotoTaken(handle), this timeout). Success logs PhotoWasTaken; failure calls CancelTakePhoto. Independent of ReadyToTakePhotoTimeout_sec (that one waits for readiness before capture starts).",
+      "category": "Behaviors.TakeAPhoto",
+      "related": [
+        "ReadyToTakePhotoTimeout_sec",
+        "TakePhoto_UseRawPhotos"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/photoTaking/behaviorTakeAPhotoCoordinator.cpp:37,232-256",
+      "status": "live",
+      "tags": ["photography", "behavior", "timeout"]
+    },
+    "TangentialDistortionTolerance": {
+      "process": "engine",
+      "blurb": "Factory playpen only: allowed absolute error (default 0.05) on tangential distortion coefficients p1 and p2 (distCoeffs[2], [3]) versus the nominal model. Outside range → DISTORTION_VALUES_OOR.",
+      "detail": "PlaypenConfig::kTangentialDistortionTolerance. Same HandleCameraCalibration validation block as RadialDistortionTolerance, but only for the two tangential terms. Nominal physical kApproxCalib uses tiny values (~5e-5 / −1e-4). Also requires distCoeffs[5..7] exactly 0. Playpen/factory path only.",
+      "category": "Playpen",
+      "related": [
+        "RadialDistortionTolerance",
+        "FocalLengthTolerance",
+        "TimeoutForCalibration_ms",
+        "Calibration"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:164; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.cpp:113; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/behaviorPlaypenCameraCalibration.cpp:292-315",
+      "status": "partial",
+      "statusNote": "Playpen calibration validation only.",
+      "tags": ["playpen", "calibration", "factory", "distortion"]
+    },
+    "TimeoutForCalibration_ms": {
+      "process": "engine",
+      "blurb": "Factory playpen only: how long (ms, default 5000) to wait for a CameraCalibration result after enabling compute. On expiry the behavior logs any calib JPEG it can and fails with CALIBRATION_TIMED_OUT.",
+      "detail": "When one stored calib image is present, PlaypenCameraCalibration calls EnableComputingCameraCalibration(true) and AddTimer(this, …). Timer is removed on successful HandleCameraCalibration. Separate from TimeoutWaitingForTarget_ms (wait for fixture visibility). Does not change vision math — only the playpen watchdog.",
+      "category": "Playpen",
+      "related": [
+        "TimeoutWaitingForTarget_ms",
+        "FocalLengthTolerance",
+        "Calibration",
+        "CalibTargetType"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:173; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.cpp:116; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/behaviorPlaypenCameraCalibration.cpp:133-159,205-208",
+      "status": "partial",
+      "statusNote": "Playpen camera-calib behavior only.",
+      "tags": ["playpen", "calibration", "factory", "timeout"]
+    },
+    "TimeoutWaitingForTarget_ms": {
+      "process": "engine",
+      "blurb": "Factory playpen only: how long (ms, default 5000) after aiming the head at the fixture the robot may wait without seeing the trigger custom-object marker before failing NOT_SEEING_CALIB_TARGET_TIMEOUT.",
+      "detail": "Armed after MoveHead/Lift complete in OnBehaviorActivatedInternal. Cleared when HandleRobotObservedObject sees CustomType00 (_seeingTarget). Then the behavior can store a frame and start compute. Pair with CalibMarker* / MarkerToTriggerCalibration for what “seeing the target” means.",
+      "category": "Playpen",
+      "related": [
+        "TimeoutForCalibration_ms",
+        "CalibMarkerSize_mm",
+        "CalibMarkerCubeSize_mm",
+        "MarkerToTriggerCalibration"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:170; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.cpp:115; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/behaviorPlaypenCameraCalibration.cpp:92-98",
+      "status": "partial",
+      "statusNote": "Playpen camera-calib behavior only.",
+      "tags": ["playpen", "calibration", "factory", "timeout"]
+    },
+    "TrackingAccuracy": {
+      "process": "engine",
+      "blurb": "OKAO movie-mode tracking accuracy enum: Normal (0) or High (1). Default High. High tracks more carefully (generally better lock, more CPU); Normal is cheaper/less precise.",
+      "detail": "CONSOLE_VAR_ENUM mapped through Okao::ParamTraits<TrackingAccuracy> to TRACKING_ACCURACY_NORMAL / HIGH, then OKAO_DT_MV_SetAccuracy at FaceTracker Movie Init. Console string labels come from GetConsoleString. Requires ReinitDetector to apply after change. Still mode does not call SetAccuracy.",
+      "howTo": "1) Pick Normal or High. 2) Set ReinitDetector true. 3) Re-run Faces.",
+      "category": "Vision.FaceDetectorMovie",
+      "enumLabels": [
+        "0 Normal",
+        "1 High"
+      ],
+      "related": [
+        "TrackingSwapRatio",
+        "SteadinessPosition",
+        "SteadinessSize",
+        "DirectionMask",
+        "ReinitDetector"
+      ],
+      "requires": ["ReinitDetector"],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:95,218-221,1067-1074; coretech/vision/engine/okaoParamInterface.h:87-92; coretech/vision/engine/okaoParamInterface.cpp:110-117; okaoVision/include/OkaoDtAPI.h:155-157",
+      "status": "partial",
+      "statusNote": "Applied only at OKAO Init / ReinitDetector.",
+      "tags": ["vision", "faces", "okao", "tracking", "movie", "enum"]
+    },
+    "TrackingSwapRatio": {
+      "process": "engine",
+      "blurb": "OKAO movie-mode threshold (100–10000, default 400) for when the detector may swap which face identity a track follows when faces cross or compete. Higher = harder to swap tracks; lower = easier reassignment.",
+      "detail": "OKAO_DT_MV_SetTrackingSwapParam at FaceTracker Movie Init. Omron: “tracking swap ratio used when swapping Faces during tracking.” Units are library-specific (not a simple percent). Needs ReinitDetector for live console edits to take effect. Tune when two people close together steal each other’s track IDs.",
+      "howTo": "1) Change TrackingSwapRatio. 2) ReinitDetector true. 3) Test multi-face crossing.",
+      "category": "Vision.FaceDetectorMovie",
+      "related": [
+        "TrackingAccuracy",
+        "SteadinessPosition",
+        "SteadinessSize",
+        "DirectionMask",
+        "ReinitDetector"
+      ],
+      "requires": ["ReinitDetector"],
+      "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:93,206-209,1067-1074; okaoVision/include/OkaoDtAPI.h:143-145",
+      "status": "partial",
+      "statusNote": "Init-time only unless ReinitDetector rebuilds the detector.",
+      "tags": ["vision", "faces", "okao", "tracking", "movie"]
+    }
+  }
+}
