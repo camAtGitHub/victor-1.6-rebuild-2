@@ -53,7 +53,10 @@
     "vars/engine-pet.json",
     "vars/engine-onboarding-prdemo.json",
     "vars/engine-turn-imu.json",
-    "vars/engine-audio-beat.json"
+    "vars/engine-audio-beat.json",
+    "vars/engine-nav-render.json",
+    "vars/engine-debug-dev.json",
+    "vars/engine-fake-power.json"
   ],
   "categories": [
     "categories/vision.json",
