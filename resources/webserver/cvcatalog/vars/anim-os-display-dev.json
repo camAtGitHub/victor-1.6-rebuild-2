@@ -1,0 +1,248 @@
+{
+  "vars": {
+    "ButtonPressDurationForShutdown_ms": {
+      "process": "anim",
+      "blurb": "How long (in milliseconds) you must hold Vector’s backpack button before the anim process starts the shutdown animation. Default is 500 ms. Only applies when no face-info debug screen is active (ScreenName::None).",
+      "detail": "FaceInfoScreenManager watches button press/release events. If the button stays down longer than this value after the press was first noted, anim sends StartShutdownAnim to the engine and clears pending single/double-press bookkeeping so a long-hold does not also fire a short-press action. Short press and double press still use separate logic (wake-word fake / mute / pairing).",
+      "related": ["FakeButtonPressType"],
+      "evidence": "animProcess/src/cozmoAnim/faceDisplay/faceInfoScreenManager.cpp:182,1318-1331",
+      "category": "FaceInfoScreenManager",
+      "status": "live",
+      "tags": ["button", "shutdown", "display"]
+    },
+    "CpuProfiler": {
+      "process": "both",
+      "blurb": "Log-channel enable for the name “CpuProfiler”. When on, INFO/DEBUG lines tagged with that channel (CPU tick profiler output) are allowed through the channel filter; when off, they are filtered out.",
+      "detail": "This is not a master switch for the CPU profiler instrumentation itself. ChannelFilter loads channels from console_filter_config.json and registers each name as a bool console var under category Channels. On robot (vicos) CpuProfiler defaults to enabled. Companion profiler knobs live under category CpuProfiler (e.g. ProfilerLogSlowTicks, ProfilerLogOutput, maxProcessingTimePerDrop_ms).",
+      "paths": {
+        "assets": [
+          "resources/config/engine/console_filter_config.json"
+        ],
+        "notes": "vicos and osx sections both list channel CpuProfiler; anim process loads the filter at startup in cozmoAnimMain."
+      },
+      "related": ["MessageProfiler", "PerfMetric", "maxProcessingTimePerDrop_ms"],
+      "evidence": "lib/util/source/anki/util/logging/channelFilter.h:31-48; channelFilter.cpp:37-52; resources/config/engine/console_filter_config.json (channel CpuProfiler)",
+      "category": "Channels",
+      "status": "live",
+      "tags": ["logging", "channels", "profiler"]
+    },
+    "DevForceProcessState": {
+      "process": "anim",
+      "blurb": "Developer override for the microphone processing pipeline state. Values: 0 NormalOperation (no force), 1 None, 2 NoProcessingSingleMic, 3 SigEsBeamformingOff, 4 SigEsBeamformingOn. Compiled only with ANKI_DEV_CHEATS.",
+      "detail": "Each raw-mic processing tick, if this is > 0 (or differs from the last forced value), MicDataProcessor replaces the computed ProcessingState with the enum selection. That controls whether audio is raw-copied, lightly processed, or run through Signal Essence beamforming. Default in code is 4 (SigEsBeamformingOn), so a DEV_CHEATS build may always force beamforming-on until you set this to 0. Do not confuse with MicData_ForceEnableMicDataProc / ForceDisable, which only override the activity flag.",
+      "enumLabels": [
+        "NormalOperation",
+        "None",
+        "NoProcessingSingleMic",
+        "SigEsBeamformingOff",
+        "SigEsBeamformingOn"
+      ],
+      "related": ["maxProcessingTimePerDrop_ms"],
+      "evidence": "animProcess/src/cozmoAnim/micData/micDataProcessor.cpp:69-70,563-586",
+      "category": "MicData",
+      "status": "live",
+      "statusNote": "ANKI_DEV_CHEATS only. Default enum value 4 forces SigEsBeamformingOn every tick until set to 0.",
+      "tags": ["mic", "dev", "danger"]
+    },
+    "DisplayCPUThrottling": {
+      "process": "anim",
+      "blurb": "When true, draws a small red square in the top-left of Vector’s face if the OS reports CPU throttling. Default is false. ANKI_DEV_CHEATS only.",
+      "detail": "Read each face-display pass in AnimationStreamer. Calls OSState::IsCPUThrottling(); if true, fills a 20×20 red rectangle at (0,0). Code comment notes that as of 2018-06-21 the robot OS was not expected to thermal-throttle often, so the indicator is off by default. Harmless if throttling never happens — you simply never see the square.",
+      "related": ["DisplayHighTemperature", "DisplayMemoryPressure", "ThermalAlertTemp_C"],
+      "evidence": "animProcess/src/cozmoAnim/animation/animationStreamer.cpp:212,1457-1464",
+      "category": "AnimationStreamer.System",
+      "status": "live",
+      "tags": ["display", "thermal", "dev"]
+    },
+    "DisplayHighTemperature": {
+      "process": "anim",
+      "blurb": "When true (default), overlays the CPU temperature in red on the face if it is at or above ThermalAlertTemp_C. ANKI_DEV_CHEATS only.",
+      "detail": "Uses OSState::GetTemperature_C() (or FakeCpuTemperature_degC when SendFakeCpuTemperature is on). If tempC >= ThermalAlertTemp_C, draws text like \"90C\" near the top-left of the face image in red. Turn off to silence the overlay during hot-robot testing; pair with ThermalAlertTemp_C to change the trip point.",
+      "related": ["ThermalAlertTemp_C", "SendFakeCpuTemperature", "FakeCpuTemperature_degC", "DisplayCPUThrottling", "DisplayMemoryPressure"],
+      "evidence": "animProcess/src/cozmoAnim/animation/animationStreamer.cpp:207,1444-1454",
+      "category": "AnimationStreamer.System",
+      "status": "live",
+      "tags": ["display", "thermal", "dev"]
+    },
+    "DisplayMemoryPressure": {
+      "process": "anim",
+      "blurb": "When true (default), draws a colored square in the upper-right of the face when OS memory pressure is elevated, and prints available memory in MB. ANKI_DEV_CHEATS only.",
+      "detail": "Reads OSState::GetMemoryInfo(). If info.alert is above None, fills a rectangle at the top-right: red for Red alert, yellow otherwise. Black text shows availMem_kB/1024. Useful for catching memory spikes on-device without log digging.",
+      "related": ["DisplayHighTemperature", "DisplayCPUThrottling"],
+      "evidence": "animProcess/src/cozmoAnim/animation/animationStreamer.cpp:217,1468-1480",
+      "category": "AnimationStreamer.System",
+      "status": "live",
+      "tags": ["display", "memory", "dev"]
+    },
+    "FakeButtonPressType": {
+      "process": "anim",
+      "blurb": "One-shot simulator for backpack button events without touching the robot. 0 = NoOp, 1 = single press, 2 = double press. Resets itself to 0 after firing. ANKI_DEV_CHEATS only.",
+      "detail": "CheckForButtonEvent injects singlePressDetected or doublePressDetected then sets this back to NoOp. Single press on the normal face fakes a wake-word trigger (or cancels Alexa auth screens). Double press on charger can enter BLE pairing; off charger toggles mute. To fire again from the web UI, set it back to NoOp first if the control already shows 1 or 2, then choose the desired type.",
+      "howTo": "1) Ensure FaceInfoScreenManager is running (normal anim face). 2) Set to singlePressDetected or doublePressDetected. 3) Watch face/logs for wake word, mute, or pairing. 4) Set to NoOp before re-triggering the same value.",
+      "enumLabels": [
+        "NoOp",
+        "singlePressDetected",
+        "doublePressDetected"
+      ],
+      "related": ["ButtonPressDurationForShutdown_ms"],
+      "evidence": "animProcess/src/cozmoAnim/faceDisplay/faceInfoScreenManager.cpp:186,1334-1340,1371-1407",
+      "category": "FaceInfoScreenManager",
+      "status": "live",
+      "tags": ["button", "dev", "danger"]
+    },
+    "FakeCpuTemperature_degC": {
+      "process": "both",
+      "blurb": "Fake CPU temperature in degrees Celsius returned by OSState::GetTemperature_C() when SendFakeCpuTemperature is true. Default 20. Only meaningful on the robot (vicos) path.",
+      "detail": "Does nothing until SendFakeCpuTemperature is enabled. When both are set, GetTemperature_C skips the real sensor reading and returns this value. That feeds face thermal overlays (if DisplayHighTemperature is on), any other caller of GetTemperature_C, and related diagnostics. Use with ThermalAlertTemp_C to exercise the red face temp string without heating the robot.",
+      "requires": ["SendFakeCpuTemperature"],
+      "related": ["DisplayHighTemperature", "ThermalAlertTemp_C"],
+      "evidence": "osState/osState_vicos.cpp:61-62,424-426; osState/osState_mac.cpp:51-52,313-314",
+      "category": "OSState.Temperature",
+      "status": "live",
+      "tags": ["thermal", "dev", "fake"]
+    },
+    "FakeWallTimeIsSynced": {
+      "process": "both",
+      "blurb": "When true, WallTime::IsTimeSynced() always returns true, pretending the robot’s wall clock is NTP-synced even if the OS says it is not.",
+      "detail": "Short-circuits the cached OSState::IsWallTimeSynced() check. Features that refuse to run without a synced clock (or that wait for sync) will proceed. Opposite direction from OSState_FakeNoTime, which forces IsWallTimeSynced() false at the OSState layer — if both are set, WallTime’s fake-synced wins for WallTime::IsTimeSynced callers. Related console funcs: SetFakeWallTime24HourUTC, ClearFakeWallTime, PrintWallTimeToLog.",
+      "related": ["OSState_FakeNoTime", "OSState_FakeNoTimezone"],
+      "evidence": "osState/wallTime.cpp:127,229-231",
+      "category": "WallTime",
+      "status": "live",
+      "tags": ["time", "dev", "fake"]
+    },
+    "MaxPingTimesToTrackOverride": {
+      "process": "both",
+      "blurb": "When greater than 0, overrides how many reliable-connection ping round-trip samples are kept for network latency stats (range 0–1000). 0 means use the built-in default sample window.",
+      "detail": "On each ping reply, ReliableConnection applies SetMaxValuesToTrack: if this override is > 0 it uses that count; otherwise sMaxPingRoundTripsToTrack. Affects rolling RTT statistics used by network stats / NetStat* gauges when those paths run. Leave at 0 unless you are tuning latency measurement.",
+      "evidence": "lib/util/source/anki/util/transport/reliableConnection.cpp:27,320-327",
+      "category": "Network",
+      "status": "live",
+      "tags": ["network", "ping", "stats"]
+    },
+    "MessageProfiler": {
+      "process": "both",
+      "blurb": "Log-channel enable for the name “MessageProfiler”. When on, periodic message-rate reports from the MessageProfiler utility can appear in logs; when off, those channeled logs are filtered.",
+      "detail": "ChannelFilter bool under category Channels (see console_filter_config.json). Separate from MessageProfilerDuration (actual sampling timer, category CpuProfiler), which may not appear under this dump id. Enabling the channel only unmutes log output; it does not start profiling by itself.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/console_filter_config.json"
+        ],
+        "notes": "Channel defaults enabled on vicos. Actual profiler code: lib/util/.../messageProfiler.cpp (gated by ANKI_MESSAGE_PROFILER_ENABLED)."
+      },
+      "related": ["CpuProfiler", "PerfMetric"],
+      "evidence": "lib/util/source/anki/util/logging/channelFilter.h:31-48; lib/util/source/anki/util/messageProfiler/messageProfiler.cpp:13,20; resources/config/engine/console_filter_config.json",
+      "category": "Channels",
+      "status": "live",
+      "tags": ["logging", "channels", "profiler"]
+    },
+    "OSState_FakeNoTime": {
+      "process": "both",
+      "blurb": "When true, OSState::IsWallTimeSynced() always returns false on the robot, faking “wall clock not synced” regardless of adjtimex / NTP status.",
+      "detail": "Robot-only registration (osState_vicos). Useful for testing code paths that wait for time sync (settings, Alexa, features gated on WallTime). WallTime caches OSState periodically unless FakeWallTimeIsSynced forces success. Mac builds always report synced and do not register this var.",
+      "related": ["FakeWallTimeIsSynced", "OSState_FakeNoTimezone"],
+      "evidence": "osState/osState_vicos.cpp:59,793-797",
+      "category": "OSState.Timezone",
+      "status": "live",
+      "tags": ["time", "dev", "fake"]
+    },
+    "OSState_FakeNoTimezone": {
+      "process": "both",
+      "blurb": "When true, OSState::HasTimezone() always returns false on the robot, faking a missing local timezone even if /etc/localtime is set up correctly.",
+      "detail": "Skips real checks of the universal/local time files and symlink. Features that require a configured timezone will behave as if none is set. Registered only in osState_vicos (robot). Pair with FakeNoTime to simulate a freshly imaged / unconfigured clock environment.",
+      "related": ["OSState_FakeNoTime", "FakeWallTimeIsSynced"],
+      "evidence": "osState/osState_vicos.cpp:60,813-816",
+      "category": "OSState.Timezone",
+      "status": "live",
+      "tags": ["time", "timezone", "dev", "fake"]
+    },
+    "PerfMetric": {
+      "process": "both",
+      "blurb": "Log-channel enable for the name “PerfMetric”. When on, performance-metric dump/status log lines on that channel pass the filter; when off, they are suppressed.",
+      "detail": "Not the same as starting the PerfMetric recorder. Anim implements PerfMetricAnim (tick duration, sleep, message counts, layer counts) with an HTTP handler at /perfmetric when ANKI_PERF_METRIC_ENABLED and webServerConfig allowPerfMetricPage are on. This console id only toggles log visibility for channel PerfMetric via ChannelFilter.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/console_filter_config.json",
+          "resources/webserver/webServerConfig_anim.json"
+        ],
+        "notes": "allowPerfMetricPage in webServerConfig_anim.json gates the web UI; channel list is separate."
+      },
+      "related": ["CpuProfiler", "MessageProfiler"],
+      "evidence": "lib/util/source/anki/util/logging/channelFilter.h:31-48; animProcess/src/cozmoAnim/perfMetricAnim.cpp; resources/config/engine/console_filter_config.json",
+      "category": "Channels",
+      "status": "live",
+      "tags": ["logging", "channels", "profiler"]
+    },
+    "SaveModifiedConsoleVarsOnly": {
+      "process": "both",
+      "blurb": "When true (default), SaveConsoleVars writes only console variables that are not still at their default values into the process’s console-vars ini file. When false, every registered var is written.",
+      "detail": "Read inside NativeAnkiUtilConsoleSaveVarsWithContext when you call SaveConsoleVars (category Console). Anim process path is the cache file consoleVarsAnim.ini (via ANKI_CONSOLE_SYSTEM_INIT in cozmoAnimMain). Engine uses consoleVarsEngine.ini. Smaller ini files when true; full snapshots when false. Does not change live values by itself — only what gets persisted on save.",
+      "howTo": "1) Tweak vars as needed. 2) Optionally set this true/false. 3) Call SaveConsoleVars. 4) Call LoadConsoleVars later to restore.",
+      "paths": {
+        "robot": [
+          "consoleVarsAnim.ini (under anim DataPlatform Cache scope)",
+          "consoleVarsEngine.ini (under engine cache path)"
+        ],
+        "notes": "Exact absolute path depends on DataPlatform Scope::Cache on the robot image."
+      },
+      "evidence": "lib/util/source/anki/util/console/consoleSystem.cpp:34,1241; animProcess/src/cozmoAnim/cozmoAnimMain.cpp:152",
+      "category": "Console",
+      "status": "live",
+      "tags": ["console", "persist"]
+    },
+    "SendFakeCpuTemperature": {
+      "process": "both",
+      "blurb": "Master switch: when true, OSState::GetTemperature_C() returns FakeCpuTemperature_degC instead of the real CPU temperature sensor reading.",
+      "detail": "Checked after the normal cached temperature update path. On robot this lets you drive DisplayHighTemperature overlays and any other temperature consumers without heat. Set FakeCpuTemperature_degC first (or together), then enable this. Default false.",
+      "related": ["FakeCpuTemperature_degC", "DisplayHighTemperature", "ThermalAlertTemp_C"],
+      "requires": ["FakeCpuTemperature_degC"],
+      "evidence": "osState/osState_vicos.cpp:61,424-426; osState/osState_mac.cpp:51,313-314",
+      "category": "OSState.Temperature",
+      "status": "live",
+      "tags": ["thermal", "dev", "fake"]
+    },
+    "ShouldDisplayKeyframeNumber": {
+      "process": "anim",
+      "blurb": "When true, in manual animation playback mode the current keyframe number is drawn in green on the face image. Default false.",
+      "detail": "Only applies when kIsInManualUpdateMode is on (toggle via console function ToggleManualControlOfAnimStreamer). While streaming an animation under manual control, AnimationInterpolator messages are built for kCurrentManualFrameNumber; if this flag is set and a face frame exists, DrawText paints that frame index near (20,20). Useless during normal free-running playback.",
+      "howTo": "1) Call ToggleManualControlOfAnimStreamer. 2) Enable ShouldDisplayKeyframeNumber. 3) Use IncrementPlaybackFrame / kNumberOfFramesToIncrement to step frames and read the on-face number.",
+      "requires": ["ToggleManualControlOfAnimStreamer"],
+      "related": ["ShouldDisplayPlaybackTime"],
+      "evidence": "animProcess/src/cozmoAnim/animation/animationStreamer.cpp:203,2012-2053",
+      "category": "ManualAnimationPlayback",
+      "status": "live",
+      "tags": ["animation", "display", "dev"]
+    },
+    "ShouldDisplayPlaybackTime": {
+      "process": "anim",
+      "blurb": "When true, overlays the animation streamer’s relative playback time (seconds:ms) on the face. Turns red and adds estimated real time if the stream is lagging. Default false.",
+      "detail": "Draws _relativeStreamTime_ms as secs:ms in green at (20,20). Compares wall time since stream start to relative stream time; if drift exceeds 2× AnimTimeStepMS, color becomes red and real secs:ms is appended after a slash. Helps spot anim-process overload during long animations. Independent of manual keyframe mode.",
+      "related": ["ShouldDisplayKeyframeNumber"],
+      "evidence": "animProcess/src/cozmoAnim/animation/animationStreamer.cpp:382,1514-1537",
+      "category": "AnimationStreamer",
+      "status": "live",
+      "tags": ["animation", "display", "dev"]
+    },
+    "ThermalAlertTemp_C": {
+      "process": "anim",
+      "blurb": "Temperature threshold in °C at or above which DisplayHighTemperature paints the red temperature string on the face. Default 90.",
+      "detail": "Compared with OSState::GetTemperature_C() (or the fake temperature when SendFakeCpuTemperature is on). Only consulted when DisplayHighTemperature is true and ANKI_DEV_CHEATS is compiled in. Lower it (e.g. to 30) plus a fake temp to test the overlay without overheating.",
+      "related": ["DisplayHighTemperature", "SendFakeCpuTemperature", "FakeCpuTemperature_degC"],
+      "evidence": "animProcess/src/cozmoAnim/animation/animationStreamer.cpp:215,1444-1453",
+      "category": "AnimationStreamer.System",
+      "status": "live",
+      "tags": ["thermal", "display", "dev"]
+    },
+    "maxProcessingTimePerDrop_ms": {
+      "process": "anim",
+      "blurb": "Budget in milliseconds allotted to process one microphone audio “drop” on the raw mic thread. Range 5–32, default 5. Category CpuProfiler.",
+      "detail": "ProcessRawLoop multiplies this by expectedAudioDropsPerAnimLoop (7) to get the target max processing time for one anim loop’s worth of audio, then sleeps the remainder of that budget each iteration. Also feeds ANKI_CPU_TICK’s slow-tick threshold for MicDataProcessorRaw. Important caveat: the product is captured into a static const on first entry to ProcessRawLoop, so changing this console var after the raw mic thread has started does not update the sleep budget or tick threshold until process restart.",
+      "status": "partial",
+      "statusNote": "Read once into static maxProcTime_ms when ProcessRawLoop first runs; runtime console edits after that are ignored until anim restart.",
+      "related": ["DevForceProcessState", "CpuProfiler"],
+      "evidence": "animProcess/src/cozmoAnim/micData/micDataProcessor.cpp:85,684-741",
+      "category": "CpuProfiler",
+      "tags": ["mic", "profiler", "perf"]
+    }
+  }
+}
