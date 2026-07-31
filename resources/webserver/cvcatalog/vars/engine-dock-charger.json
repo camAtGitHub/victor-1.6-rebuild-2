@@ -1,0 +1,195 @@
+{
+  "vars": {
+    "AlignInsteadOfPickup": {
+      "process": "engine",
+      "blurb": "DockingTest-only: when true (default false), each pickup attempt drives to the cube’s lift-plate alignment pose and raises the lift to carry height instead of running a normal DriveToPickupObjectAction. Used to exercise align-then-scoop pickup without the combined drive-to-pickup action.",
+      "detail": "Only read by BehaviorDockingTestSimple (dev docking loop). On the DriveToAndPickup path (kDriveToAndPickupBlockOneAction true, JustPickup false), AlignInsteadOfPickup builds a sequential compound: DriveToAlignWithObjectAction(AlignmentType::LIFT_PLATE) then MoveLiftToHeightAction(CARRY). On success it manually SetCarryingObject so the place step can run. Ignored when JustPickup is true (straight PickupObjectAction) or when RollInsteadOfPickup sends the test into the roll branch. Does not change product freeplay pickup.",
+      "howTo": "1) Enable BehaviorDockingTestSimple. 2) Leave JustPickup and RollInsteadOfPickup false. 3) Set AlignInsteadOfPickup true. 4) Run attempts; logs will still record TestDockingMethod on other paths but align path does not call SetDockingMethod.",
+      "category": "DockingTest",
+      "related": [
+        "JustPickup",
+        "RollInsteadOfPickup",
+        "TestDockingMethod",
+        "MaxXAwayFromPreDock_mm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDockingTestSimple.cpp:75,502-542",
+      "status": "live",
+      "statusNote": "Only affects BehaviorDockingTestSimple; product pickup ignores this flag.",
+      "tags": ["docking", "docking-test", "dev", "pickup", "align"]
+    },
+    "BigGreetingDriveOffCharger": {
+      "process": "engine",
+      "blurb": "When true (default), the “big greeting after a long time” reaction drives Vector off the charger first if he is on the charger platform, then turns toward the face. When false, he greets in place on the dock (no drive-off).",
+      "detail": "BehaviorGreetAfterLongTime::OnBehaviorActivated: if IsOnChargerPlatform() and this flag and the configured drive-off-charger behavior wants activation, it delegates that child then continues to TurnTowardsFace; otherwise it calls TurnTowardsFace immediately. Does not invent a greeting by itself — only changes whether docked greets include an undock drive. Console group BehaviorBigGreeting (same tab as ForceNextBigGreeting).",
+      "category": "BehaviorBigGreeting",
+      "related": ["ForceNextBigGreeting"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/behaviorGreetAfterLongTime.cpp:65-68,189-196",
+      "status": "live",
+      "tags": ["greeting", "charger", "drive-off", "behavior"]
+    },
+    "ChargerMarkerLastObservedTimeThresh_ms": {
+      "process": "engine",
+      "blurb": "Factory self-test only: maximum age (milliseconds) of the charger’s fiducial marker relative to the latest processed camera image when measuring marker pose for the look-at-charger distance check. Default 500 ms. If the marker was last seen longer ago than this, the pose is treated as stale and the distance sample is rejected.",
+      "detail": "SelfTestConfig value (static default in selfTestConfig.h; WRAP_EXTERN_CONSOLE_VAR category SelfTest). BehaviorSelfTestLookAtCharger::GetExpectedObjectMarkerPoseWrtRobot finds the most recently observed marker on the expected object; if lastImageTimestamp − lastObservedTime > this threshold, it logs MarkerTooOld and returns false (no distance result). Does not change freeplay charger finding or docking — only the factory/self-test distance-to-marker path.",
+      "category": "SelfTest",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.h:152; selfTestConfig.cpp:51; behaviorSelfTestLookAtCharger.cpp:328-336",
+      "status": "live",
+      "statusNote": "Only consulted during SelfTest look-at-charger distance verification.",
+      "tags": ["selftest", "charger", "marker", "factory", "timing"]
+    },
+    "ChargerMaxObservationDistance_mm": {
+      "process": "engine",
+      "blurb": "Farthest distance (mm) at which a charger observation is accepted into the world model. Default 500 mm. Detections farther than this are dropped so distant/noisy charger markers do not create or update a home pose.",
+      "detail": "Charger::GetMaxObservationDistance_mm() returns this console value (category Charger). BlockWorld::FilterRawObservedObjects erases any object whose GetLastPoseUpdateDistance() exceeds that max. The same distance is also used when computing vision ROI padding for unobserved objects (scale marker size by distance / observationDistance). Cubes and other object types use their own GetMaxObservationDistance_mm overrides; this knob is charger-specific.",
+      "category": "Charger",
+      "related": ["Markers_ChargerOnly", "RobustChargerObservation_SaveImages"],
+      "evidence": "engine/charger.cpp:38,250-252; engine/blockWorld/blockWorld.cpp:1074-1080,1167-1174",
+      "status": "live",
+      "tags": ["charger", "blockworld", "vision", "distance"]
+    },
+    "DockingRotatingTooFastThresh_degPerSec": {
+      "process": "engine",
+      "blurb": "While actively docking, skip sending a closed-loop docking error signal if the body was rotating faster than this threshold (degrees per second) at the image timestamp. Default is RAD_TO_DEG(0.4) ≈ 22.9 °/s. Prevents using blurry/rotated-marker pose estimates to steer the dock.",
+      "detail": "DockingComponent::UpdateDockingErrorSignal: if IMU history WasBodyRotatingTooFast(t, this thresh), log RotatingTooFast and return without computing/sending DockingErrorSignal. Comment requires this thresh to stay ≤ VisionSystem marker body-turn gate (BodyTurnSpeedThreshBlock_degs, default 30 °/s) — DEV_ASSERT enforces that. Category string in UI: WasRotatingTooFast.Dock.Body_deg/s. Tighter than general marker detection so docking corrections are more conservative under turn.",
+      "category": "WasRotatingTooFast.Dock.Body_deg/s",
+      "related": ["BodyTurnSpeedThreshBlock_degs", "Markers_FastRotation"],
+      "evidence": "engine/components/dockingComponent.cpp:28-29,133-154; engine/vision/visionSystem.cpp:91,2109-2111",
+      "status": "live",
+      "tags": ["docking", "imu", "error-signal", "vision"]
+    },
+    "FakeLowBatteryAfterOffChargerTimeout_sec": {
+      "process": "engine",
+      "blurb": "Dev battery fake: if non-zero, force “low battery” status this many seconds after Vector leaves the charger contacts. Default 0 disables the timer. Useful for testing low-battery UX (find home, charge nuzzle, app FTUE charge timer) without waiting for a real drain.",
+      "detail": "BatteryComponent update: while not on charger contacts, if this timeout ≠ 0 and now > _fakeLowBatteryTime_sec, isLowBattery is forced true (BatteryLevel::Low). While on contacts, if the timeout is non-zero, the deadline is reset to now + timeout so the countdown only runs off-charger. Independent of kFakeLowBattery (immediate force while off contacts). Does not change measured voltage — only the logical low-battery flag and level enum.",
+      "howTo": "1) Set to e.g. 30. 2) Put robot on charger once so the deadline is seeded. 3) Remove from charger and wait 30 s. 4) Confirm low-battery reactions. Set back to 0 to stop faking.",
+      "category": "BatteryComponent",
+      "related": ["FakeLowBattery", "FakeDisconnectedBattery"],
+      "evidence": "engine/components/battery/batteryComponent.cpp:62-68,218-232",
+      "status": "live",
+      "tags": ["battery", "charger", "dev", "low-battery", "fake"]
+    },
+    "JustPickup": {
+      "process": "engine",
+      "blurb": "DockingTest-only: when true (default false), each attempt runs PickupObjectAction from the current pose without driving to a pre-dock pose first. Near-predock pose check is disabled. Stresses pure dock/lift tracking from wherever the robot already sits.",
+      "detail": "BehaviorDockingTestSimple PickupLow: if JustPickup, queues PickupObjectAction with SetDockingMethod(TestDockingMethod) and SetDoNearPredockPoseCheck(false). Takes precedence over the DriveToAndPickup / AlignInsteadOfPickup compound. Still followed by place-low on success. Ignored when RollInsteadOfPickup routes the attempt to the roll state before PickupLow.",
+      "category": "DockingTest",
+      "related": [
+        "TestDockingMethod",
+        "AlignInsteadOfPickup",
+        "RollInsteadOfPickup",
+        "MaxXAwayFromPreDock_mm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDockingTestSimple.cpp:73,474-495",
+      "status": "live",
+      "statusNote": "Only affects BehaviorDockingTestSimple.",
+      "tags": ["docking", "docking-test", "dev", "pickup"]
+    },
+    "MaxAngleAwayFromPreDock_deg": {
+      "process": "engine",
+      "blurb": "DockingTest-only: after each place, the robot’s reset pose heading is randomized within ± this many degrees of the pre-dock pose. Default 10°. Larger values exercise docking approach from worse starting angles.",
+      "detail": "In State::Reset, randA = uniform(−deg, +deg) converted to radians and applied with MaxX/MaxY offsets when driving back before the next attempt. Also printed into the attempt log line with the X/Y mm ranges. No effect outside BehaviorDockingTestSimple.",
+      "category": "DockingTest",
+      "related": [
+        "MaxXAwayFromPreDock_mm",
+        "MaxYAwayFromPreDock_mm",
+        "TestDockingMethod"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDockingTestSimple.cpp:71,221,616-619",
+      "status": "live",
+      "statusNote": "Only affects BehaviorDockingTestSimple reset randomization.",
+      "tags": ["docking", "docking-test", "dev", "pose"]
+    },
+    "MaxXAwayFromPreDock_mm": {
+      "process": "engine",
+      "blurb": "DockingTest-only: after each place, randomize start position along the pre-dock forward/back axis within ± this many millimeters. Default 50 mm.",
+      "detail": "State::Reset draws randX in [−MaxX, +MaxX] and combines with MaxY and MaxAngle to choose the next approach pose. Logged with Y and angle ranges. Only BehaviorDockingTestSimple.",
+      "category": "DockingTest",
+      "related": [
+        "MaxYAwayFromPreDock_mm",
+        "MaxAngleAwayFromPreDock_deg"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDockingTestSimple.cpp:69,221,616",
+      "status": "live",
+      "statusNote": "Only affects BehaviorDockingTestSimple reset randomization.",
+      "tags": ["docking", "docking-test", "dev", "pose"]
+    },
+    "MaxYAwayFromPreDock_mm": {
+      "process": "engine",
+      "blurb": "DockingTest-only: after each place, randomize lateral start offset within ± this many millimeters of the pre-dock pose. Default 250 mm. With random obstacles enabled, this must stay large enough that some samples fall outside the no-obstacle corridor in front of the marker.",
+      "detail": "State::Reset randY range. If kNumRandomObstacles > 0 and MaxY ≤ 40 mm (kNoObstaclesWithinXmmOfPreDockPose), the behavior errors YAwayTooSmall and cancels — obstacles need room beside the approach lane. When obstacles are on, Y is re-rolled until it is outside ±40 mm so the drive path can hit obstacle regions. Also used when sprinkling fixed custom obstacle objects around the pre-dock pose.",
+      "category": "DockingTest",
+      "related": [
+        "MaxXAwayFromPreDock_mm",
+        "MaxAngleAwayFromPreDock_deg",
+        "NumRandomObstacles"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDockingTestSimple.cpp:70,80-82,221,616-646",
+      "status": "live",
+      "statusNote": "Only affects BehaviorDockingTestSimple; too-small values can abort the test when obstacles are enabled.",
+      "tags": ["docking", "docking-test", "dev", "pose", "obstacles"]
+    },
+    "RobustChargerObservation_SaveImages": {
+      "process": "engine",
+      "blurb": "When true, the RobustChargerObservation behavior streams full-resolution PNG frames to the robot cache while it waits for composite/cycling-exposure vision. Default false. Use to debug hard charger-marker lighting without changing product docking logic.",
+      "detail": "In TransitionToObserveCharger, after building WaitForImagesAction (Markers_Composite in low light, AutoExp_Cycling otherwise), if this flag is set, ImageSaverParams Mode::Stream quality −1 (PNG) is attached with path Scope::Cache / robustChargerObsImages. BehaviorGoHome can temporarily force the flag true/false around visual verification when its own kGoHome_VisualVerification_SaveImages is on (REMOTE_CONSOLE_ENABLED). Turning this on during normal home-finding fills cache disk quickly.",
+      "howTo": "1) Set true before GoHome / RobustChargerObservation runs (or enable GoHome visual-verification save). 2) Trigger charger observation. 3) Pull PNGs from the cache folder. 4) Set false again.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/robustChargerObsImages/"
+        ],
+        "notes": "pathToResource(Scope::Cache, \"robustChargerObsImages\"); cache root is DataPlatformCachePath (product robot: com.anki.victor/cache)."
+      },
+      "category": "Behaviors.RobustChargerObservation",
+      "related": [
+        "Markers_Composite",
+        "Markers_ChargerOnly",
+        "ChargerMaxObservationDistance_mm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/victor/behaviorRobustChargerObservation.cpp:40,230-237; engine/aiComponent/behaviorComponent/behaviors/basicWorldInteractions/behaviorGoHome.cpp:52-53,478-489",
+      "status": "live",
+      "tags": ["charger", "vision", "debug", "paths", "save-images"]
+    },
+    "RollInsteadOfPickup": {
+      "process": "engine",
+      "blurb": "DockingTest-only: when true (default false), each attempt rolls the cube instead of picking it up. Uses ROLLING pre-action poses and RollObjectAction with TestDockingMethod (and optional deep roll). Place step is skipped; success goes straight to Reset.",
+      "detail": "Inactive state branches to State::Roll when this is true. DriveToObject(PreActionPose::ROLLING) then RollObjectAction with SetDockingMethod and EnableDeepRoll(kDoDeepRoll). Reset also requests ROLLING pre-action poses (and can fall back to currently seen marker if the roll did not expose the original face). Mutually exclusive with the pickup/align paths for the attempt body.",
+      "category": "DockingTest",
+      "related": [
+        "TestDockingMethod",
+        "JustPickup",
+        "AlignInsteadOfPickup",
+        "DoDeepRoll"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDockingTestSimple.cpp:74,307-373,410,664-678",
+      "status": "live",
+      "statusNote": "Only affects BehaviorDockingTestSimple.",
+      "tags": ["docking", "docking-test", "dev", "roll"]
+    },
+    "TestDockingMethod": {
+      "process": "engine",
+      "blurb": "DockingTest-only: which closed-loop docking method product actions use during the simple docking stress test. Integer matching DockingMethod: 0=BLIND, 1=TRACKER, 2=HYBRID (default), 3=HYBRID_BEELINE, 4=EVEN_BLINDER. Applied via SetDockingMethod on pickup/roll (and drive-to-pickup) actions.",
+      "detail": "Default (u8)DockingMethod::HYBRID_DOCKING = 2. Cast to DockingMethod on RollObjectAction, PickupObjectAction, and DriveToPickupObjectAction. AlignInsteadOfPickup compound does not call SetDockingMethod. Logged on every RecordAttempt line. BLIND uses only the first error signal; TRACKER continuously corrects; HYBRID blends; HYBRID_BEELINE is hybrid without squaring the path to the marker; EVEN_BLINDER needs only one error signal to finish. Invalid values beyond the enum are undefined — stick to 0–4.",
+      "howTo": "1) Enable BehaviorDockingTestSimple with a cube in view. 2) Set TestDockingMethod 0–4. 3) Optionally combine with JustPickup / RollInsteadOfPickup / Max* pose noise. 4) Read attempt logs for DockingMethod: N.",
+      "category": "DockingTest",
+      "related": [
+        "JustPickup",
+        "RollInsteadOfPickup",
+        "AlignInsteadOfPickup",
+        "DefaultDockingMethod",
+        "PickupDockingMethod",
+        "RollDockingMethod"
+      ],
+      "enumLabels": [
+        "0 BLIND_DOCKING",
+        "1 TRACKER_DOCKING",
+        "2 HYBRID_DOCKING",
+        "3 HYBRID_DOCKING_BEELINE",
+        "4 EVEN_BLINDER_DOCKING"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDockingTestSimple.cpp:68,346,478,523,562,1125,1175; robot/clad/src/clad/types/dockingSignals.clad:9-28",
+      "status": "live",
+      "statusNote": "Only affects BehaviorDockingTestSimple actions; product defaults use DefaultDockingMethod / PickupDockingMethod / etc.",
+      "tags": ["docking", "docking-test", "dev", "method"]
+    }
+  }
+}
