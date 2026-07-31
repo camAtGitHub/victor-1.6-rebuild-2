@@ -1,0 +1,87 @@
+{
+  "vars": {
+    "PowerSave_CalmMode": {
+      "process": "engine",
+      "blurb": "When true (default), entering engine power-save mode tells the robot body (syscon) to drop into calm power mode — a lower-power body state with slower state reports and stubbed sensor values. When false, power-save still runs other knobs in this group but leaves the body in active mode.",
+      "detail": "PowerStateManager only applies this at EnterPowerSave (when some system has RequestPowerSaveMode pending and the robot has been out of power-save for ≥10 s). Toggle sends EngineToRobot CalmPowerMode(enable); the robot supervisor maps that to PowerModeManager::EnableActiveMode(!enable), which drives HAL POWER_MODE_CALM vs ACTIVE. Motors still temporarily re-wake active mode while moving. Separate console ForceCalmMode can pin calm mode independently and skips this toggle while forced. ExitPowerSave reverses any setting that was actually enabled. Callers that request power-save include sleep, quiet mode, onboarding look-at-phone, AskForHelp (optional), and WebViz Power module.",
+      "category": "PowerSave",
+      "related": [
+        "PowerSave_Camera",
+        "PowerSave_LCDBacklight",
+        "PowerSave_ThrottleCPU",
+        "PowerSave_ProxSensorMap",
+        "ForceCalmMode"
+      ],
+      "evidence": "engine/components/powerStateManager.cpp:40,109-120,283-289,409-411,440-450; robot/supervisor/src/messages.cpp:187-190; robot/supervisor/src/powerModeManager.cpp:23-73",
+      "status": "live",
+      "tags": ["power", "powersave", "syscon", "calm"]
+    },
+    "PowerSave_Camera": {
+      "process": "engine",
+      "blurb": "When true (default), power-save mode turns off the camera/vision pipeline so the robot stops capturing frames (big power and CPU win). When false, power-save leaves the camera running. Other systems can temporarily keep the camera on via camera power-save exemptions without leaving full power-save.",
+      "detail": "On EnterPowerSave, if this flag is true and no camera exemption requesters are registered, PowerStateManager toggles PowerSaveSetting::Camera: VisionComponent is paused and camera state becomes ShouldDelete. Each Update tick while still in power-save, exemptions are re-checked — empty exemptions turn the camera power-save path on; any exemption turns it off (re-init path). How hard the camera is torn down depends on PowerSave_CameraStopCameraStream (soft PauseCamera vs DeleteCamera). Behaviors/code call RequestCameraPowerSaveExemption / RemoveCameraPowerSaveExemption when they need vision during quiet periods.",
+      "category": "PowerSave",
+      "related": [
+        "PowerSave_CameraStopCameraStream",
+        "PowerSave_CalmMode",
+        "PowerSave_ThrottleCPU"
+      ],
+      "evidence": "engine/components/powerStateManager.cpp:41,123-128,292-322,387-401,413-415; engine/components/powerStateManager.h:83-85,118-125",
+      "status": "live",
+      "tags": ["power", "powersave", "camera", "vision"]
+    },
+    "PowerSave_CameraStopCameraStream": {
+      "process": "engine",
+      "blurb": "Chooses how aggressively power-save kills the camera when PowerSave_Camera is on. Default false = soft path: disable image capture / pause the camera service so frames stop without full teardown. True = hard path: DeleteCamera when shutting down and InitCamera when waking the camera again.",
+      "detail": "Only consulted while camera state is ShouldDelete or ShouldInit (after PowerSave_Camera toggled camera power-save). Soft path calls VisionComponent::EnableImageCapture(false/true), which PauseCamera on CameraService. Hard path calls CameraService::DeleteCamera / InitCamera; code comments note Init can fail and will retry next tick, and VisionComponent may eventually show a fault if images never return. Off by default for safer cycling. Has no effect if PowerSave_Camera is false or the camera was never put into the power-save path (e.g. active exemptions).",
+      "category": "PowerSave",
+      "related": [
+        "PowerSave_Camera"
+      ],
+      "requires": ["PowerSave_Camera"],
+      "evidence": "engine/components/powerStateManager.cpp:42,131-178; engine/components/visionComponent.cpp:2809-2825",
+      "status": "live",
+      "statusNote": "True is the more aggressive path; InitCamera failures can leave vision down until retry/fault. Prefer default false unless testing full camera teardown.",
+      "tags": ["power", "powersave", "camera", "danger"]
+    },
+    "PowerSave_LCDBacklight": {
+      "process": "engine",
+      "blurb": "When true (default), entering power-save dims the face LCD backlight to the low current level (1 mA). Leaving power-save restores the normal 10 mA level. When false, power-save does not change face brightness.",
+      "detail": "Applied once at EnterPowerSave via TogglePowerSaveSetting(LCDBacklight): sends SetLCDBrightnessLevel(LCDLevel_1mA) to the robot/anim path. Exit undoes it with LCDLevel_10mA. Independent of behaviors that call RequestLCDBrightnessChange directly (e.g. go-home / find-home dimming), which always honor the requested level today. Dim face is a small but visible power save and a clear UX cue that the robot is quiet.",
+      "category": "PowerSave",
+      "related": [
+        "PowerSave_CalmMode",
+        "PowerSave_Camera",
+        "PowerSave_ThrottleCPU"
+      ],
+      "evidence": "engine/components/powerStateManager.cpp:43,49-50,325-337,417-418; engine/components/powerStateManager.h:37",
+      "status": "live",
+      "tags": ["power", "powersave", "lcd", "face"]
+    },
+    "PowerSave_ProxSensorMap": {
+      "process": "engine",
+      "blurb": "When true (default), power-save stops feeding the proximity (time-of-flight) sensor into the navigation map so map updates from range readings pause. When false, prox keeps updating the map even while other power-save features are on.",
+      "detail": "EnterPowerSave calls ProxSensorComponent::SetNavMapUpdateEnabled(false); exit re-enables it. That only gates the _mapEnabled flag used in the prox update path. Separately, when the body is in calm power mode the prox reading is considered meaningless and map update is skipped even if map updates are enabled — so CalmMode and this flag both affect mapping. Sensor hardware itself is not powered off by this var; only nav-map integration is.",
+      "category": "PowerSave",
+      "related": [
+        "PowerSave_CalmMode"
+      ],
+      "evidence": "engine/components/powerStateManager.cpp:45,354-360,425-426; engine/components/sensors/proxSensorComponent.h:61; engine/components/sensors/proxSensorComponent.cpp:196-201",
+      "status": "live",
+      "tags": ["power", "powersave", "prox", "navmap"]
+    },
+    "PowerSave_ThrottleCPU": {
+      "process": "engine",
+      "blurb": "When true (default), power-save locks the application CPU to fixed low clocks instead of automatic frequency scaling — mostly 200 MHz, briefly 400 MHz if the mic buffer backs up, and full automatic when Alexa is actively in use. When false, power-save does not change CPU frequency policy.",
+      "detail": "On enter, SetDesiredCPUFrequency(Manual400Mhz) then UpdateDependent (while still in power-save and this flag true) manages three states: (1) Alexa not idle → DesiredCPUFrequency::Automatic for responsiveness; (2) mic buffer fullness ≥ 0.6 → Manual400Mhz; (3) fullness ≤ 0.1 → Manual200MHz. OSState writes Linux CPU governor/frequency files on VicOS. ExitPowerSave restores Automatic. If you flip this false mid power-save, the update loop stops retuning but leaves the last frequency until something else sets it.",
+      "category": "PowerSave",
+      "related": [
+        "PowerSave_CalmMode",
+        "PowerSave_Camera"
+      ],
+      "evidence": "engine/components/powerStateManager.cpp:44,52-54,56-57,181-213,340-351,421-422; osState/osState.h:40-41; osState/osState_vicos.cpp:289-329",
+      "status": "live",
+      "tags": ["power", "powersave", "cpu", "performance", "mic", "alexa"]
+    }
+  }
+}

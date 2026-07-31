@@ -1,0 +1,248 @@
+{
+  "vars": {
+    "Left_EyeCenterX": {
+      "process": "anim",
+      "blurb": "Horizontal offset of the left eye (screen-left eye) in pixels from its nominal rest position. Positive moves it right on the LCD; negative left. Console range about −92…92 on Vector (half the 184 px face width).",
+      "detail": "Bound to s_faceDataOverride’s left-eye EyeCenterX via RegisterFaceWithConsoleVars. Only changes what you see when ProcFace_Display is Override individually or Override together, and only if this value differs from the baseline captured when override mode / ResetFace last baselined. In Normal mode the animation keyframe wins. “Left” means the eye on the left side of the screen, not Vector’s anatomical left. Under Override together, left-eye params (including this) are copied onto the right eye before draw.",
+      "howTo": "1) Set ProcFace_Display to Override individually (or Override together). 2) Optionally call ResetFace so the baseline matches the current animation face. 3) Nudge this value and watch the left eye slide horizontally.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Left_EyeCenterY", "Right_EyeCenterX", "ProcFace_CenterX", "ProcFace_NominalEyeSpacing", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:755-808 (RegisterFaceWithConsoleVars); proceduralFaceDrawer.cpp:448-453; animProcess/.../animationStreamer.cpp:1261-1308",
+      "category": "Face.Left",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "left-eye", "transform"]
+    },
+    "Left_EyeCenterY": {
+      "process": "anim",
+      "blurb": "Vertical offset of the left eye in pixels from its nominal rest height. Positive moves it down on the LCD; negative up. Console range about −48…48 on Vector (half the 96 px face height).",
+      "detail": "Same override-only path as Left_EyeCenterX: registered on s_faceDataOverride left-eye EyeCenterY, applied in Display Override modes when different from baseline. Combined with EyeCenterX, EyeScale, and EyeAngle into the per-eye warp matrix before the eye polygon is drawn.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Left_EyeCenterX", "Right_EyeCenterY", "ProcFace_CenterY", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:755-808; proceduralFaceDrawer.cpp:448-453; animationStreamer.cpp:1261-1308",
+      "category": "Face.Left",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "left-eye", "transform"]
+    },
+    "Left_EyeScaleX": {
+      "process": "anim",
+      "blurb": "Horizontal scale of the left eye. 1.0 is nominal width (~43 px on Vector); larger makes that eye wider; 0 collapses it. Console range 0…10.",
+      "detail": "Override-face left EyeScaleX. Applied only under ProcFace_Display Override modes when changed from baseline. Independent of whole-face ProcFace_ScaleX. Multiplies NominalEyeWidth when building the eye polygon and transform.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Left_EyeScaleY", "Right_EyeScaleX", "ProcFace_ScaleX", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:100,755-808; proceduralFaceDrawer.cpp:327-329,457-459; animationStreamer.cpp:1261-1308",
+      "category": "Face.Left",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "left-eye", "transform"]
+    },
+    "Left_EyeScaleY": {
+      "process": "anim",
+      "blurb": "Vertical scale of the left eye. 1.0 is nominal height (~57 px on Vector); larger makes that eye taller; 0 flattens it. Console range 0…10.",
+      "detail": "Same override path as Left_EyeScaleX. LookAt and blink code also touch EyeScaleY on the live face; under override you freeze/sculpt via console instead of those systems for any param that differs from baseline.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Left_EyeScaleX", "Right_EyeScaleY", "ProcFace_ScaleY", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:101,755-808; proceduralFaceDrawer.cpp:327-329,457-459; animationStreamer.cpp:1261-1308",
+      "category": "Face.Left",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "left-eye", "transform"]
+    },
+    "Left_EyeAngle": {
+      "process": "anim",
+      "blurb": "Rotation of the left eye alone, in degrees, around that eye’s center. Positive and negative tilt the eye shape (and its lids/hotspot) like a cocked eyebrow. Console range −360…360.",
+      "detail": "Maps to left-eye EyeAngle on the override ProceduralFace. Only visible under ProcFace_Display Override modes when different from baseline. Fed into GetTransformationMatrix with scale and center; does not rotate the whole face (use ProcFace_Angle_deg for that).",
+      "requires": ["ProcFace_Display"],
+      "related": ["Right_EyeAngle", "ProcFace_Angle_deg", "Left_EyeCenterX", "Left_EyeScaleX", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:102,755-808; proceduralFaceDrawer.cpp:457-461; animationStreamer.cpp:1261-1308",
+      "category": "Face.Left",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "left-eye", "transform"]
+    },
+    "Left_LowerInnerRadiusX": {
+      "process": "anim",
+      "blurb": "How rounded the lower-inner corner of the left eye is, as a fraction of half-eye width (0 = sharp corner, 1 = fully rounded to the eye midline). Console range 0…1.",
+      "detail": "“Inner” means toward the nose / face center — for the screen-left eye that is the lower-right corner of that eye’s polygon. Multiplied by halfEyeWidth for ellipse2Poly. Override-only (with ProcFace_Display Override modes) when changed from baseline. Pair with Left_LowerInnerRadiusY for the vertical radius of the same corner.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Left_LowerInnerRadiusY", "Left_LowerOuterRadiusX", "Right_LowerInnerRadiusX", "ProcFace_EllipseDelta", "ProcFace_Display"],
+      "evidence": "robot/clad/src/clad/types/proceduralFaceTypes.clad:19-20; cannedAnimLib/proceduralFace/proceduralFace.cpp:103; proceduralFaceDrawer.cpp:331-365; animationStreamer.cpp:1261-1308",
+      "category": "Face.Left",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "left-eye", "shape"]
+    },
+    "Left_LowerInnerRadiusY": {
+      "process": "anim",
+      "blurb": "Vertical radius of the lower-inner (toward-nose) corner of the left eye, as a fraction of half-eye height. 0 = sharp; 1 = very round. Console range 0…1.",
+      "detail": "Paired with Left_LowerInnerRadiusX. Both must be > 0 for a curved corner; if either is 0 the drawer places a hard corner vertex instead of an ellipse arc.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Left_LowerInnerRadiusX", "Left_UpperInnerRadiusY", "Right_LowerInnerRadiusY", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:104; proceduralFaceDrawer.cpp:340-365; animationStreamer.cpp:1261-1308",
+      "category": "Face.Left",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "left-eye", "shape"]
+    },
+    "Left_UpperInnerRadiusX": {
+      "process": "anim",
+      "blurb": "Horizontal rounding of the upper-inner (toward-nose) corner of the left eye, as a fraction of half-eye width. 0 = sharp; 1 = fully rounded. Console range 0…1.",
+      "detail": "For the screen-left eye this is the upper-right corner of that eye. Same override path as other radius params. Drawn with cv::ellipse2Poly using ProcFace_EllipseDelta as angular step.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Left_UpperInnerRadiusY", "Left_UpperOuterRadiusX", "Right_UpperInnerRadiusX", "ProcFace_EllipseDelta", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:105; proceduralFaceDrawer.cpp:338-360; animationStreamer.cpp:1261-1308",
+      "category": "Face.Left",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "left-eye", "shape"]
+    },
+    "Left_UpperInnerRadiusY": {
+      "process": "anim",
+      "blurb": "Vertical rounding of the upper-inner corner of the left eye, as a fraction of half-eye height. Console range 0…1.",
+      "detail": "Paired with Left_UpperInnerRadiusX. Both > 0 required for a curved arc; otherwise a hard corner.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Left_UpperInnerRadiusX", "Left_LowerInnerRadiusY", "Right_UpperInnerRadiusY", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:106; proceduralFaceDrawer.cpp:338-360; animationStreamer.cpp:1261-1308",
+      "category": "Face.Left",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "left-eye", "shape"]
+    },
+    "Left_UpperOuterRadiusX": {
+      "process": "anim",
+      "blurb": "Horizontal rounding of the upper-outer corner of the left eye (away from the nose — left side of the left eye on screen), as a fraction of half-eye width. Console range 0…1.",
+      "detail": "“Outer” = toward the edge of the face. Same override + ellipse2Poly path as other corner radii. Useful for soft vs squared upper lids on the outer edge.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Left_UpperOuterRadiusY", "Left_UpperInnerRadiusX", "Left_LowerOuterRadiusX", "Right_UpperOuterRadiusX", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:107; proceduralFaceDrawer.cpp:333-387; animationStreamer.cpp:1261-1308",
+      "category": "Face.Left",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "left-eye", "shape"]
+    },
+    "Left_UpperOuterRadiusY": {
+      "process": "anim",
+      "blurb": "Vertical rounding of the upper-outer corner of the left eye, as a fraction of half-eye height. Console range 0…1.",
+      "detail": "Paired with Left_UpperOuterRadiusX for the upper-left corner of the screen-left eye polygon.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Left_UpperOuterRadiusX", "Left_LowerOuterRadiusY", "Right_UpperOuterRadiusY", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:108; proceduralFaceDrawer.cpp:333-387; animationStreamer.cpp:1261-1308",
+      "category": "Face.Left",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "left-eye", "shape"]
+    },
+    "Left_LowerOuterRadiusX": {
+      "process": "anim",
+      "blurb": "Horizontal rounding of the lower-outer corner of the left eye (outer/lower-left of that eye on screen), as a fraction of half-eye width. Console range 0…1.",
+      "detail": "Same override path as other radii. Outer = away from nose. Zero either X or Y radius of this corner → sharp vertex instead of arc.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Left_LowerOuterRadiusY", "Left_LowerInnerRadiusX", "Left_UpperOuterRadiusX", "Right_LowerOuterRadiusX", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:109; proceduralFaceDrawer.cpp:335-378; animationStreamer.cpp:1261-1308",
+      "category": "Face.Left",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "left-eye", "shape"]
+    },
+    "Left_LowerOuterRadiusY": {
+      "process": "anim",
+      "blurb": "Vertical rounding of the lower-outer corner of the left eye, as a fraction of half-eye height. Console range 0…1.",
+      "detail": "Paired with Left_LowerOuterRadiusX for the lower-left corner of the screen-left eye.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Left_LowerOuterRadiusX", "Left_UpperOuterRadiusY", "Right_LowerOuterRadiusY", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:110; proceduralFaceDrawer.cpp:335-378; animationStreamer.cpp:1261-1308",
+      "category": "Face.Left",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "left-eye", "shape"]
+    },
+    "Left_UpperLidY": {
+      "process": "anim",
+      "blurb": "How far the upper eyelid of the left eye closes. 0 = fully open (lid at top of eye); 1 = fully closed (lid reaches the bottom). Console range 0…1.",
+      "detail": "Builds an upper-lid polygon that is filled black over the eye shape (negative space). Multiplied by NominalEyeHeight for pixel drop. Override-only under ProcFace_Display Override modes when changed from baseline. Combine with UpperLidAngle / UpperLidBend for squint, wink, or arched lids.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Left_UpperLidAngle", "Left_UpperLidBend", "Left_LowerLidY", "Right_UpperLidY", "ProcFace_Display"],
+      "evidence": "robot/clad/.../proceduralFaceTypes.clad:27; cannedAnimLib/proceduralFace/proceduralFace.cpp:111; proceduralFaceDrawer.cpp:419-446,547-555; animationStreamer.cpp:1261-1308",
+      "category": "Face.Left",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "left-eye", "lid"]
+    },
+    "Left_UpperLidAngle": {
+      "process": "anim",
+      "blurb": "Tilts the left eye’s upper lid line in degrees. Positive/negative angles make one side of the lid drop more than the other (asymmetric squint). Console range −45…45.",
+      "detail": "Used as tan(angle) to raise/lower the lid corners relative to each other, and as the rotation for the optional lid-bend ellipse. Override-only path with other Left_* sculpt params.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Left_UpperLidY", "Left_UpperLidBend", "Right_UpperLidAngle", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:112; proceduralFaceDrawer.cpp:422-437; animationStreamer.cpp:1261-1308",
+      "category": "Face.Left",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "left-eye", "lid"]
+    },
+    "Left_UpperLidBend": {
+      "process": "anim",
+      "blurb": "Curves the left upper lid. 0 = straight lid edge; positive bends the lid down into the eye (soft droop); negative bends up away from the eye (arched). Console range −1…1.",
+      "detail": "Non-zero values add an ellipse2Poly arc to the upper-lid polygon. Negative bend uses fillPoly (concave) instead of fillConvexPoly. Scale is fraction of NominalEyeHeight. Override-only under ProcFace_Display Override modes.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Left_UpperLidY", "Left_UpperLidAngle", "Left_LowerLidBend", "Right_UpperLidBend", "ProcFace_EllipseDelta", "ProcFace_Display"],
+      "evidence": "robot/clad/.../proceduralFaceTypes.clad:29; cannedAnimLib/proceduralFace/proceduralFace.cpp:113; proceduralFaceDrawer.cpp:432-445,547-555; animationStreamer.cpp:1261-1308",
+      "category": "Face.Left",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "left-eye", "lid"]
+    },
+    "Left_LowerLidY": {
+      "process": "anim",
+      "blurb": "How far the lower eyelid of the left eye closes. 0 = fully open (lid at bottom of eye); 1 = fully closed (lid reaches the top). Console range 0…1.",
+      "detail": "Mirror of UpperLidY for the bottom lid: polygon filled black over the eye. Useful for tired looks, blinks, or lower squint. Override-only when ProcFace_Display is in an Override mode and the value differs from baseline.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Left_LowerLidAngle", "Left_LowerLidBend", "Left_UpperLidY", "Right_LowerLidY", "ProcFace_Display"],
+      "evidence": "robot/clad/.../proceduralFaceTypes.clad:30; cannedAnimLib/proceduralFace/proceduralFace.cpp:114; proceduralFaceDrawer.cpp:390-417,557-564; animationStreamer.cpp:1261-1308",
+      "category": "Face.Left",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "left-eye", "lid"]
+    },
+    "Left_LowerLidAngle": {
+      "process": "anim",
+      "blurb": "Tilts the left eye’s lower lid line in degrees. Console range −45…45.",
+      "detail": "Same geometry role as UpperLidAngle but for the lower-lid polygon and its bend arc. Override-only path.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Left_LowerLidY", "Left_LowerLidBend", "Right_LowerLidAngle", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:115; proceduralFaceDrawer.cpp:393-408; animationStreamer.cpp:1261-1308",
+      "category": "Face.Left",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "left-eye", "lid"]
+    },
+    "Left_LowerLidBend": {
+      "process": "anim",
+      "blurb": "Curves the left lower lid. 0 = straight; positive bends up into the eye; negative bends down away from the eye. Console range −1…1.",
+      "detail": "Non-zero adds an ellipse arc to the lower-lid poly; negative bend uses non-convex fillPoly. Fraction of NominalEyeHeight. Override-only under ProcFace_Display Override modes.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Left_LowerLidY", "Left_LowerLidAngle", "Left_UpperLidBend", "Right_LowerLidBend", "ProcFace_EllipseDelta", "ProcFace_Display"],
+      "evidence": "robot/clad/.../proceduralFaceTypes.clad:32; cannedAnimLib/proceduralFace/proceduralFace.cpp:116; proceduralFaceDrawer.cpp:403-416,557-564; animationStreamer.cpp:1261-1308",
+      "category": "Face.Left",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "left-eye", "lid"]
+    },
+    "Left_Lightness": {
+      "process": "anim",
+      "blurb": "Brightness multiplier for the filled left-eye pixels only. 1 = full strength; 0 blacks out that eye; values between dim it. Console range −1…1 (product faces use about 0…1; −1 is an animation “unset” sentinel).",
+      "detail": "Applied in DrawEye after the global ProcFace_EyeLightnessMultiplier: each lit eye pixel is multiplied by this value. Only affects the display when ProcFace_Display is Override individually/together and this differs from the override baseline. Does not change hue (use ProcFace_Hue) or the CRT scanline path. Extreme negatives clamp toward black after cast.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Right_Lightness", "ProcFace_EyeLightnessMultiplier", "ProcFace_Hue", "ProcFace_Display"],
+      "evidence": "robot/clad/.../proceduralFaceTypes.clad:34; cannedAnimLib/proceduralFace/proceduralFace.cpp:118; proceduralFaceDrawer.cpp:674-724; animationStreamer.cpp:1261-1308",
+      "category": "Face.Left",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "left-eye", "brightness"]
+    },
+    "Left_HotSpotCenterX": {
+      "process": "anim",
+      "blurb": "Horizontal position of the soft bright “hotspot” (pupil-like glow) inside the left eye, as a fraction of eye width. 0 = eye center; −1 = left edge; +1 = right edge. Console range −1…1.",
+      "detail": "Only visible when ProcFace_HotspotRender is on (otherwise eyes are flat fill). The hotspot center is warped with the same eye transform as the polygon, so it moves/rotates with Left_EyeAngle and scale. Override-only for the sculpt value itself under ProcFace_Display Override modes. Falloff width is global ProcFace_HotspotFalloff.",
+      "howTo": "1) Enable ProcFace_HotspotRender. 2) Set ProcFace_Display to Override individually (or together). 3) Move this X (and Left_HotSpotCenterY) to place the bright core.",
+      "requires": ["ProcFace_Display", "ProcFace_HotspotRender"],
+      "related": ["Left_HotSpotCenterY", "Right_HotSpotCenterX", "ProcFace_HotspotRender", "ProcFace_HotspotFalloff", "ProcFace_Display"],
+      "evidence": "robot/clad/.../proceduralFaceTypes.clad:36-37; cannedAnimLib/proceduralFace/proceduralFace.cpp:120; proceduralFaceDrawer.cpp:570-625; animationStreamer.cpp:1261-1308",
+      "category": "Face.Left",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "left-eye", "hotspot"]
+    },
+    "Left_HotSpotCenterY": {
+      "process": "anim",
+      "blurb": "Vertical position of the left eye’s soft hotspot, as a fraction of eye height. 0 = center; −1 = top edge; +1 = bottom edge. Console range −1…1.",
+      "detail": "Paired with Left_HotSpotCenterX. Same requires: ProcFace_HotspotRender for the glow to paint, and ProcFace_Display Override modes for this console value to replace the animation’s hotspot when it differs from baseline.",
+      "requires": ["ProcFace_Display", "ProcFace_HotspotRender"],
+      "related": ["Left_HotSpotCenterX", "Right_HotSpotCenterY", "ProcFace_HotspotRender", "ProcFace_HotspotFalloff", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:121; proceduralFaceDrawer.cpp:570-625; animationStreamer.cpp:1261-1308",
+      "category": "Face.Left",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "left-eye", "hotspot"]
+    }
+  }
+}

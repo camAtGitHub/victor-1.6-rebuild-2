@@ -1,0 +1,102 @@
+{
+  "vars": {
+    "VisionBenchmark_DisableAllModes": {
+      "process": "engine",
+      "blurb": "One-shot switch: the next time vision runs the Benchmark mode, turns off every internal micro-benchmark operation (scalar subtract, squared-diff, normalize RGB, frame diff, frame ratio). After applying, the console value snaps back to false. Default at process start is the opposite — all ops are on when dev cheats are built in.",
+      "detail": "Does not turn off VisionMode::Benchmark itself; that is the separate console toggle named Benchmark under Vision.General.VisionModes. While modes are all clear, Benchmark::Update still runs if the vision mode is scheduled, but RUN_IF_ENABLED skips every method so almost no CPU work happens (only mode-flag handling and an RGB fetch at ScaleMultiplier). Pair with EnableAllModes or ToggleMode to re-enable specific ops.",
+      "howTo": "1) Enable console var Benchmark so VisionSystem calls Benchmark::Update. 2) Set this to true once. 3) On the next vision tick, all five internal Mode bits clear and this flag resets to false.",
+      "category": "Vision.Benchmark",
+      "related": [
+        "VisionBenchmark_EnableAllModes",
+        "VisionBenchmark_ToggleMode",
+        "VisionBenchmark_ScaleMultiplier",
+        "Benchmark"
+      ],
+      "requires": ["Benchmark"],
+      "evidence": "coretech/vision/engine/benchmark.cpp:36-37,85-90; coretech/vision/engine/benchmark.h:43-49,67-68; engine/vision/visionSystem.cpp:1865-1876",
+      "status": "live",
+      "tags": ["vision", "benchmark", "dev", "pulse"]
+    },
+    "VisionBenchmark_DisplayImages": {
+      "process": "engine",
+      "blurb": "When true, each micro-benchmark path asks to open named OpenCV display windows for intermediate result images (e.g. ScalarSubtraction_ForLoop, NormalizeRGB_OpenCV). Off by default. Registration comment: only useful when vision runs synchronously (desktop-style).",
+      "detail": "On this robot/VICOS tree, ImageBase::Display always logs ImageBase.Display.NoDisplay and returns without showing a window, so enabling this does not produce on-robot UI. It still runs Display on every enabled method path per vision frame, which can spam warnings. Historically meant for host/simulator builds with a real display.",
+      "category": "Vision.Benchmark",
+      "related": [
+        "VisionBenchmark_EnableAllModes",
+        "VisionBenchmark_ScaleMultiplier",
+        "Benchmark"
+      ],
+      "requires": ["Benchmark"],
+      "evidence": "coretech/vision/engine/benchmark.cpp:30,168-171,196-199,223-226,266-284,379-424,475-498,567-615; coretech/vision/engine/image.cpp:251-257",
+      "status": "partial",
+      "statusNote": "No-op display on robot (warning + return). Can flood logs if left on while Benchmark mode runs.",
+      "tags": ["vision", "benchmark", "debug", "danger"]
+    },
+    "VisionBenchmark_EnableAllModes": {
+      "process": "engine",
+      "blurb": "One-shot switch: the next Benchmark update turns on every internal micro-benchmark operation (all five Mode bits). Self-clears to false after apply. Matches the default at VisionSystem construct when ANKI_DEV_CHEATS is on.",
+      "detail": "Sets _enabledModes to all bits set (numeric max of the mode storage type). Logs Benchmark.Update.EnablingAllModes on the Benchmark channel. Ops then run each vision tick while VisionMode::Benchmark is enabled: ScalarSubtraction, SquaredDiffFromScalar, DiffWithPrevious, RatioWithPrevious, NormalizeRGB — each comparing for-loop / LUT / OpenCV-style implementations via Profiler TicToc.",
+      "howTo": "1) Enable Benchmark. 2) Set this true once (or leave defaults from boot). 3) Optionally set PrintFrequency_ms before engine start if you need timing prints and vision profiler is compiled in.",
+      "category": "Vision.Benchmark",
+      "related": [
+        "VisionBenchmark_DisableAllModes",
+        "VisionBenchmark_ToggleMode",
+        "VisionBenchmark_PrintFrequency_ms",
+        "Benchmark"
+      ],
+      "requires": ["Benchmark"],
+      "evidence": "coretech/vision/engine/benchmark.cpp:36,47-50,79-84,96-118; coretech/vision/engine/benchmark.h:43-49",
+      "status": "live",
+      "tags": ["vision", "benchmark", "dev", "pulse"]
+    },
+    "VisionBenchmark_PrintFrequency_ms": {
+      "process": "engine",
+      "blurb": "Intended minimum milliseconds between average timing log lines for the Benchmark profiler group (default 3000). Controls how often Tic/Toc stats for names like TotalBenchmarkUpdate or NormalizeRGB_ForLoop would print to the Benchmark log channel.",
+      "detail": "Read only once in Benchmark’s constructor via SetPrintFrequency; changing the console value after engine start does not update the profiler. Even when stored, Profiler::Tic/Toc only emit prints when ANKI_VISION_PROFILER is compiled on (CMake option VISION_PROFILER on cti_vision; default OFF). Without that define, timing is a no-op and this knob does nothing observable. Negative values disable timed prints (Profiler treats timeBetween < 0 as never).",
+      "category": "Vision.Benchmark",
+      "related": [
+        "VisionBenchmark_EnableAllModes",
+        "VisionBenchmark_ScaleMultiplier",
+        "Benchmark"
+      ],
+      "requires": ["Benchmark"],
+      "evidence": "coretech/vision/engine/benchmark.cpp:29,44-54; coretech/vision/engine/profiler.h:17-22,70-71; coretech/vision/engine/profiler.cpp:31-45,82-95; coretech/vision/CMakeLists.txt:15-18",
+      "status": "partial",
+      "statusNote": "Applied only at Benchmark construct; timing prints also need ANKI_VISION_PROFILER=1 (VISION_PROFILER CMake option).",
+      "tags": ["vision", "benchmark", "profiling"]
+    },
+    "VisionBenchmark_ScaleMultiplier": {
+      "process": "engine",
+      "blurb": "Downsamples the camera RGB buffer used by all Benchmark micro-ops (default 2 = half resolution). Same ImageCache scale rule as other vision detectors: valid values are 1, 2, 4, or 8. Higher = smaller image and cheaper benchmarks; lower = heavier CPU stress.",
+      "detail": "Each Update calls ImageCache::GetSize(scale) then GetRGB at that size; all five methods operate on that RGB. Unsupported values hit DEV_ASSERT in ImageCache::GetSize (falls through as Full only after assert). Does not affect production detectors — only the Benchmark harness path.",
+      "category": "Vision.Benchmark",
+      "related": [
+        "VisionBenchmark_EnableAllModes",
+        "VisionBenchmark_DisplayImages",
+        "Benchmark"
+      ],
+      "requires": ["Benchmark"],
+      "evidence": "coretech/vision/engine/benchmark.cpp:31,103-104; coretech/vision/engine/imageCache.cpp:218-244",
+      "status": "live",
+      "statusNote": "Use only 1, 2, 4, or 8 — other values assert in GetSize.",
+      "tags": ["vision", "benchmark", "performance", "danger"]
+    },
+    "VisionBenchmark_ToggleMode": {
+      "process": "engine",
+      "blurb": "One-shot numeric control: write a mode id to flip that single micro-benchmark on or off, then it resets to 0. 0 means do nothing. Modes: 1 ScalarSubtraction, 2 SquaredDiffFromScalar, 3 NormalizeRGB, 4 DiffWithPrevious, 5 RatioWithPrevious.",
+      "detail": "Casts the integer to Benchmark::Mode and calls EnableMode with the inverted current bit. Values outside 1–5 are not validated here; they still shift BitFlags bits for that enum value (modes were defined starting at 1 for the bit-shift helper). Self-clears to 0 after one Update so you can toggle again. Only processed when VisionMode::Benchmark is enabled so Update runs.",
+      "howTo": "1) Enable Benchmark. 2) Optionally DisableAllModes for a clean slate. 3) Set this to 1–5 to flip one op. 4) Value returns to 0 automatically.",
+      "category": "Vision.Benchmark",
+      "related": [
+        "VisionBenchmark_EnableAllModes",
+        "VisionBenchmark_DisableAllModes",
+        "Benchmark"
+      ],
+      "requires": ["Benchmark"],
+      "evidence": "coretech/vision/engine/benchmark.cpp:35,70-77; coretech/vision/engine/benchmark.h:43-51,80-82; lib/util/source/anki/util/bitFlags/bitFlags.h:56-62,87-97",
+      "status": "live",
+      "tags": ["vision", "benchmark", "dev", "pulse"]
+    }
+  }
+}

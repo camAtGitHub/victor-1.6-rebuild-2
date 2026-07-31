@@ -1,0 +1,76 @@
+{
+  "vars": {
+    "BPDB_finalHeadAngle_deg": {
+      "process": "engine",
+      "blurb": "Head pitch (degrees) Vector uses when glancing down after the put-down-block animation, to try to see the cube he just released. Default −20° (tilted down). Only runs if he still thinks he is carrying something after the drop animation.",
+      "detail": "Part of BehaviorPutDownBlock’s post-place look sequence (CreateLookAfterPlaceAction). When the put-down anim finishes and carrying state is still true, the robot runs a parallel action: MoveHeadToAngle(this value in radians) together with a short reverse (BPDB_verifyBackupDist_mm), then waits for a couple of marker vision frames. If he still believes he is carrying after that, code forcibly clears the carried object so he does not loop forever. This is separate from PutDownBlockAtPose, which has its own verify head-angle console vars. Change takes effect on the next PutDownBlock activation that reaches the look-after-place step.",
+      "category": "Behavior.PutDownBlock",
+      "related": [
+        "BPDB_verifyBackupDist_mm",
+        "BPDB_putDownBackupSpeed_mm",
+        "BPDB_kBackupDistanceMin_mm",
+        "BPDB_kBackupDistanceMax_mm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/basicCubeInteractions/behaviorPutDownBlock.cpp:26,102-112",
+      "status": "live",
+      "tags": ["behavior", "putdown", "cube", "head", "BPDB"]
+    },
+    "BPDB_kBackupDistanceMax_mm": {
+      "process": "engine",
+      "blurb": "More-negative end of the random reverse distance (mm) used when PutDownBlock first backs up before playing the drop animation. Default −75 mm (about 7.5 cm backward). Negative means drive reverse; more negative = farther backup.",
+      "detail": "On activation, PutDownBlock picks backupDistance = random in [BPDB_kBackupDistanceMin_mm, BPDB_kBackupDistanceMax_mm) via RandDblInRange, then DriveStraightAction(backupDistance, BPDB_putDownBackupSpeed_mm), then the PutDownBlockPutDown animation. Defaults are Min=−45 and Max=−75 so the RNG samples from the shorter reverse toward the longer one even though the signed “Max” is numerically smaller. There is no smart placement — comments note it just backs up blindly. Takes effect next time PutDownBlock activates (OnBehaviorActivated).",
+      "category": "Behavior.PutDownBlock",
+      "related": [
+        "BPDB_kBackupDistanceMin_mm",
+        "BPDB_putDownBackupSpeed_mm",
+        "BPDB_verifyBackupDist_mm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/basicCubeInteractions/behaviorPutDownBlock.cpp:30,64-75",
+      "status": "live",
+      "tags": ["behavior", "putdown", "cube", "drive", "BPDB"]
+    },
+    "BPDB_kBackupDistanceMin_mm": {
+      "process": "engine",
+      "blurb": "Less-negative end of the random reverse distance (mm) for PutDownBlock’s initial backup before the drop animation. Default −45 mm (about 4.5 cm backward). Negative = reverse.",
+      "detail": "Paired with BPDB_kBackupDistanceMax_mm: each activation draws one distance in that half-open range and drives straight at BPDB_putDownBackupSpeed_mm, then plays PutDownBlockPutDown. With stock defaults the backup length is between ~45 mm and ~75 mm reverse. If you set Min and Max such that the numeric min is not the less-negative value, the RNG still uses formula (max−min)*U + min — keep Min as the shorter reverse and Max as the longer reverse (more negative) to match the intended naming.",
+      "category": "Behavior.PutDownBlock",
+      "related": [
+        "BPDB_kBackupDistanceMax_mm",
+        "BPDB_putDownBackupSpeed_mm",
+        "BPDB_verifyBackupDist_mm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/basicCubeInteractions/behaviorPutDownBlock.cpp:29,64-75",
+      "status": "live",
+      "tags": ["behavior", "putdown", "cube", "drive", "BPDB"]
+    },
+    "BPDB_putDownBackupSpeed_mm": {
+      "process": "engine",
+      "blurb": "Wheel speed (mm/s, positive) for the initial reverse DriveStraight before the put-down animation. Default 100. Does not apply to the shorter verify reverse after the animation.",
+      "detail": "Used only in OnBehaviorActivated: DriveStraightAction(randomBackupDist, this speed). DriveStraight expects distance signed (negative = reverse) and speed positive. The later verify reverse in CreateLookAfterPlaceAction uses DriveStraightAction(BPDB_verifyBackupDist_mm) with the action’s default path speed, not this var. Higher values make the pre-drop shuffle snappier; very high speeds may look harsh or hit path/timeout limits.",
+      "category": "Behavior.PutDownBlock",
+      "related": [
+        "BPDB_kBackupDistanceMin_mm",
+        "BPDB_kBackupDistanceMax_mm",
+        "BPDB_verifyBackupDist_mm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/basicCubeInteractions/behaviorPutDownBlock.cpp:28,69-72; engine/actions/basicActions.h:186-189",
+      "status": "live",
+      "tags": ["behavior", "putdown", "cube", "drive", "speed", "BPDB"]
+    },
+    "BPDB_verifyBackupDist_mm": {
+      "process": "engine",
+      "blurb": "Short reverse distance (mm) during the post-drop glance: backs up while tilting the head to try to see the released cube. Default −30 mm. Negative = reverse. Only if he still thinks he is carrying after the put-down animation.",
+      "detail": "In CreateLookAfterPlaceAction, if CarryingComponent still reports carrying: run parallel MoveHeadToAngle(BPDB_finalHeadAngle_deg) + DriveStraightAction(this distance), then WaitForImagesAction(2 frames, Markers). After that sequence (and an optional face turn), if still “carrying,” the behavior force-clears carried state (COZMO-2192 workaround) so PutDownBlock cannot loop. Not used by PutDownBlockAtPose (that behavior has separate verify distance console vars). Speed for this drive is the DriveStraight default, not BPDB_putDownBackupSpeed_mm.",
+      "category": "Behavior.PutDownBlock",
+      "related": [
+        "BPDB_finalHeadAngle_deg",
+        "BPDB_putDownBackupSpeed_mm",
+        "BPDB_kBackupDistanceMin_mm",
+        "BPDB_kBackupDistanceMax_mm"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/basicCubeInteractions/behaviorPutDownBlock.cpp:27,82-113",
+      "status": "live",
+      "tags": ["behavior", "putdown", "cube", "drive", "verify", "BPDB"]
+    }
+  }
+}

@@ -13,6 +13,133 @@
       "category": "MicData",
       "related": ["MicData_ClipRecordTime_ms"],
       "tags": ["mic", "func", "highlight"]
+    },
+    "MicData_CollectRawTriggers": {
+      "process": "anim",
+      "blurb": "When true, each wake-word hit also saves the unprocessed four-channel mic audio for that short “trigger only” clip (not just the combined mono). Off by default so only the processed single-channel trigger WAV is written.",
+      "detail": "On non-shipping (ANKI_DEV_CHEATS) builds, every recognized wake word already creates a short capture job under triggersOnly/ that always records processed (beamformed/combined) audio plus ~170 ms after the trigger ends. Turning this on also enables MicDataType::Raw for that same job: four raw mic channels interlaced into a *_raw.wav next to the processed .wav. Caps at 100 files per folder (oldest overwritten). Shipping builds without cheats do not create trigger-only jobs, so this has no effect there.",
+      "howTo": "1) Use a build with ANKI_DEV_CHEATS. 2) Set true. 3) Say the wake word. 4) Pull files from the robot cache (see paths).",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/micdata/triggersOnly/"
+        ],
+        "notes": "HTTP browse: http://ROBOT_IP:8889/cache/micdata/triggersOnly/. Files look like miccapture_*/*.wav and *_raw.wav. Scripts: tools/ear_puller.py, project/victor/scripts/pull_micdata.sh."
+      },
+      "category": "MicData",
+      "related": [
+        "MicData_SaveRawFullIntent",
+        "MicData_SaveRawFullIntent_WakeWordless",
+        "RecordMicDataClip"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/micData/micDataProcessor.cpp:53,331-367; animProcess/src/cozmoAnim/micData/micDataInfo.cpp:33-34,206-231; docs/development/mic-systems-overview.md",
+      "status": "live",
+      "statusNote": "Only affects captures created under ANKI_DEV_CHEATS (trigger-only jobs). Registration is not cheats-gated, but the save path is.",
+      "tags": ["mic", "debug", "capture", "paths"]
+    },
+    "MicData_ForceDisableMicDataProc": {
+      "process": "anim",
+      "blurb": "When true (and ForceEnable is off), forces the voice-activity flag off so the wake-word recognizer is told “no activity” and can skip trigger recognition for that audio block. Default false. Does not stop raw mic hardware or Signal Essence beamforming — it only gates the activity flag used for recognition.",
+      "detail": "Under ANKI_DEV_CHEATS only. After VAD / quiet-time / robot-noise logic sets activityFlag, these force vars override it: if ForceEnable is true, activity is forced on; else if ForceDisable is true, activity is forced off (mutual exclusion: Enable wins). ProcessTriggerLoop passes (activeState != 0) into SpeechRecognizerSystem::Update — false means skip RecognizeTriggerWord work for that block. Default ForceEnable is true, so Disable does nothing until you turn ForceEnable off first.",
+      "howTo": "1) Set MicData_ForceEnableMicDataProc to false. 2) Set MicData_ForceDisableMicDataProc to true. 3) Confirm wake-word recognition no longer runs (CPU / logs).",
+      "category": "MicData",
+      "related": [
+        "MicData_ForceEnableMicDataProc",
+        "MicData_QuietTimeCooldown_ms",
+        "MicData_SpeakerNoiseDisablesMics"
+      ],
+      "requires": ["MicData_ForceEnableMicDataProc"],
+      "evidence": "animProcess/src/cozmoAnim/micData/micDataProcessor.cpp:65-66,551-561,789-795",
+      "status": "live",
+      "statusNote": "ANKI_DEV_CHEATS only. Ineffective while ForceEnable remains at default true (if/else priority).",
+      "tags": ["mic", "debug", "vad", "performance"]
+    },
+    "MicData_ForceEnableMicDataProc": {
+      "process": "anim",
+      "blurb": "When true (the default on cheats builds), always marks mic audio as “active” so wake-word recognition never skips a block for silence. When false, normal VAD + quiet-time + robot-noise activity logic applies (unless ForceDisable is on).",
+      "detail": "Under ANKI_DEV_CHEATS only. Overrides activityFlag after VAD: ForceEnable → activityFlag=1; else ForceDisable → 0. Default true means the quiet-time skip path is effectively bypassed for recognition — useful so motor/speaker/VAD edge cases do not drop “Hey Vector,” at the cost of always running the recognizer. Mutual exclusion with ForceDisable: if both are true, Enable wins (if/else).",
+      "howTo": "Leave true for max wake-word reliability in tests. Set false to restore VAD-gated recognition (then optionally enable ForceDisable to force all-off).",
+      "category": "MicData",
+      "related": [
+        "MicData_ForceDisableMicDataProc",
+        "MicData_QuietTimeCooldown_ms",
+        "MicData_SpeakerNoiseDisablesMics"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/micData/micDataProcessor.cpp:65-66,551-561,789-795",
+      "status": "live",
+      "statusNote": "ANKI_DEV_CHEATS only. Default true already forces activity on every block.",
+      "tags": ["mic", "debug", "vad", "performance"]
+    },
+    "MicData_QuietTimeCooldown_ms": {
+      "process": "anim",
+      "blurb": "How long (ms) voice activity must stay quiet before the system stops treating audio as “active” and can skip wake-word recognition for silence. Default 1000 ms; console range 500–10000. Comment in code: keep at least as long as the wake-word phrase (~500–750 ms).",
+      "detail": "Each 10 ms mic chunk runs a simple VAD (DoSVad). On any activity (including forced activity from motors or speaker noise), a countdown is reset to QuietTimeCooldown_ms / chunk length. While the countdown is non-zero, activityFlag stays 1 even if VAD itself is quiet — so the end of “Hey Vector” is not cut off by a brief dip in energy. When countdown hits 0, activityFlag can be 0 and ProcessTriggerLoop skips recognizer work for that block. Overridden afterward if ForceEnable (always on) or ForceDisable (always off) applies under cheats.",
+      "category": "MicData",
+      "related": [
+        "MicData_ForceEnableMicDataProc",
+        "MicData_ForceDisableMicDataProc",
+        "MicData_SpeakerNoiseDisablesMics"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/micData/micDataProcessor.cpp:56-58,497-537,789-795; docs/development/mic-systems-overview.md",
+      "status": "live",
+      "statusNote": "On typical cheats builds ForceEnable defaults true, so this cooldown has little practical effect until ForceEnable is turned off.",
+      "tags": ["mic", "vad", "performance", "tuning"]
+    },
+    "MicData_SaveRawFullIntent": {
+      "process": "anim",
+      "blurb": "When true, wake-word streaming also saves the full four-channel raw mic capture for the post-trigger intent stream (not only the processed mono WAV). Off by default. Applies to normal wake-word streams only — not blackjack/knowledge-graph wake-wordless streams.",
+      "detail": "CreateStreamJob for CloudMic::StreamType::Normal (after wake word) always enables processed file collect under ANKI_DEV_CHEATS. This flag additionally EnableDataCollect(Raw). Files go under triggeredCapture/, up to 100 entries. Raw is interlaced 4-channel *_raw.wav; processed is mono .wav. Wake-wordless intents use MicData_SaveRawFullIntent_WakeWordless instead.",
+      "howTo": "1) Set true on anim console. 2) Trigger a normal “Hey Vector” stream. 3) Pull /cache/micdata/triggeredCapture/.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/micdata/triggeredCapture/"
+        ],
+        "notes": "HTTP: http://ROBOT_IP:8889/cache/micdata/triggeredCapture/. Pair with MicData_CollectRawTriggers for short wake-word-only raw clips under triggersOnly/."
+      },
+      "category": "MicData",
+      "related": [
+        "MicData_SaveRawFullIntent_WakeWordless",
+        "MicData_CollectRawTriggers",
+        "RecordMicDataClip"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/micData/micDataProcessor.cpp:62,253-282; animProcess/src/cozmoAnim/micData/micDataInfo.cpp:33-34,206-231; docs/development/mic-systems-overview.md",
+      "status": "live",
+      "statusNote": "Registration and use are under ANKI_DEV_CHEATS only.",
+      "tags": ["mic", "debug", "capture", "paths", "intent"]
+    },
+    "MicData_SaveRawFullIntent_WakeWordless": {
+      "process": "anim",
+      "blurb": "Same as SaveRawFullIntent, but for wake-wordless cloud streams (Blackjack and Knowledge Graph stream types) instead of the normal “Hey Vector then talk” path. When true, those streams also write four-channel raw audio under triggeredCapture/.",
+      "detail": "CreateStreamJob switches on stream type: Normal → MicData_SaveRawFullIntent; Blackjack / KnowledgeGraph → this flag. Engine/cloud can start wake-wordless streaming via MicDataSystem::StartWakeWordlessStreaming, which calls CreateStreamJob with that type after earcon timing. Processed capture still defaults on under ANKI_DEV_CHEATS; this only adds raw. Same folder/cap as normal triggeredCapture jobs.",
+      "howTo": "1) Set true. 2) Trigger a knowledge-graph / blackjack (wake-wordless) stream from the product path. 3) Inspect triggeredCapture/ for *_raw.wav.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/micdata/triggeredCapture/"
+        ],
+        "notes": "Same directory as normal intent captures; distinguish by when you triggered the stream. HTTP: http://ROBOT_IP:8889/cache/micdata/triggeredCapture/."
+      },
+      "category": "MicData",
+      "related": [
+        "MicData_SaveRawFullIntent",
+        "MicData_CollectRawTriggers"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/micData/micDataProcessor.cpp:63,253-282; animProcess/src/cozmoAnim/micData/micDataSystem.cpp:206-241; animProcess/src/cozmoAnim/micData/micDataInfo.cpp:33-34,206-231",
+      "status": "live",
+      "statusNote": "Registration and use under ANKI_DEV_CHEATS. Only affects Blackjack/KnowledgeGraph stream types.",
+      "tags": ["mic", "debug", "capture", "paths", "intent"]
+    },
+    "MicData_SpeakerNoiseDisablesMics": {
+      "process": "anim",
+      "blurb": "When true (default), treat “speaker is playing robot audio” like motor noise: force voice-activity on, turn Signal Essence beamforming off, and clear mic direction estimates so Vector does not trust a DOA while the speaker is loud. When false, only physical robot motion counts as that noise; speaker playback alone does not disable beamforming/direction.",
+      "detail": "hasRobotNoise = robotIsMoving OR (speakerActive AND this flag). Speaker active includes a short cooldown after playback stops (speaker latency). Effects of hasRobotNoise: (1) VAD activity forced true so wake-word work is not skipped during robot sound; (2) processing state set to SigEsBeamformingOff when not in low-power; (3) winning/selected mic direction forced to “unknown.” Name says “disables mics” but hardware stays up — it disables beamforming/DOA trust and assumes activity while the speaker is noisy.",
+      "category": "MicData",
+      "related": [
+        "MicData_QuietTimeCooldown_ms",
+        "MicData_ForceEnableMicDataProc",
+        "MicData_ForceDisableMicDataProc"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/micData/micDataProcessor.cpp:54,472-519,540-546,644-649",
+      "status": "live",
+      "tags": ["mic", "audio", "doa", "beamforming", "tuning"]
     }
   }
 }

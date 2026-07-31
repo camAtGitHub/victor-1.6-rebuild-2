@@ -1,0 +1,170 @@
+{
+  "vars": {
+    "MarkerDetector_CropWidthFraction": {
+      "process": "engine",
+      "blurb": "How wide each crop window is when marker detection is not in full-frame mode (default 0.65 = 65% of image width). Range 0.5–1.0. Smaller crops are cheaper and cycle left/middle/right across frames; larger crops cover more of the scene per frame.",
+      "detail": "Used only when Markers runs and Markers_FullFrame is off. CropScheduler is reset when this value changes, with cycle Middle → Left → Middle → Right. Each position uses this fraction of image width (MiddlePlus sides would use 0.5×(1+fraction) if that cycling mode were selected — marker path uses Middle_Left_Middle_Right). Height can still be narrowed by head-angle geometry unless Markers_FullHeight is on. At 1.0, horizontal crops are full-width but the left/middle/right cycle still advances (effectively full-width every frame).",
+      "category": "Vision.MarkerDetection",
+      "related": [
+        "MarkerDetector_VizCropScheduler",
+        "MarkerDetector_ScaleMultiplier",
+        "Markers_FullFrame",
+        "Markers_FullWidth",
+        "Markers_FullHeight",
+        "Markers"
+      ],
+      "evidence": "engine/vision/visionSystem.cpp:94-95,1215-1248; engine/vision/cropScheduler.cpp:42-66,70-86,204-264",
+      "status": "live",
+      "tags": ["vision", "markers", "crop", "performance"]
+    },
+    "MarkerDetector_ScaleMultiplier": {
+      "process": "engine",
+      "blurb": "Downsamples the camera image before marker detection for speed (default 2 = half resolution). Valid values are powers of two that ImageCache supports: 1 (full), 2 (half), 4 (quarter), 8 (eighth). Higher = faster and coarser; markers must still be large enough to decode after scale.",
+      "detail": "imageCache.GetSize(scaleMultiplier) selects the gray working image for DetectMarkers, CLAHE when-dark brightness sampling, and image compositing. After detection, corner coordinates are scaled back toward the default display cache size. Unsupported subsample values hit DEV_ASSERT in ImageCache::GetSize — stick to 1/2/4/8.",
+      "category": "Vision.MarkerDetection",
+      "related": [
+        "Markers",
+        "MarkerDetector_CropWidthFraction",
+        "Markers_Composite"
+      ],
+      "evidence": "engine/vision/visionSystem.cpp:89,993,1111,1296-1307; coretech/vision/engine/imageCache.cpp:218-244",
+      "status": "live",
+      "statusNote": "Non-power-of-two values are unsupported (assert). Prefer 1, 2, 4, or 8.",
+      "tags": ["vision", "markers", "performance", "danger"]
+    },
+    "MarkerDetector_VizCropScheduler": {
+      "process": "engine",
+      "blurb": "When true, builds a debug image named CroppedMarkers showing the current crop ROI and any markers found inside it (red quads/rect). Off by default. Does not change which markers are accepted — visualization only.",
+      "detail": "For each image pointer run through Detect, converts the cropped ROI to RGB, draws detected marker quads and a red border matching the crop size, and appends to vision result debugImages. Comment in registration: may need extra Viz debug windows. Pair with crop-fraction / FullFrame toggles when tuning coverage vs cost.",
+      "category": "Vision.MarkerDetection",
+      "related": [
+        "MarkerDetector_CropWidthFraction",
+        "Markers_FullFrame",
+        "Markers_FullWidth",
+        "Markers_FullHeight",
+        "SendDebugImages"
+      ],
+      "evidence": "engine/vision/visionSystem.cpp:97-98,1264-1275",
+      "status": "live",
+      "tags": ["vision", "markers", "debug", "viz"]
+    },
+    "Markers_ChargerOnly": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::Markers_ChargerOnly. Marker detection keeps only charger fiducials (MARKER_CHARGER, MARKER_CHARGER_HOME, MARKER_CHARGER_HOME_EYES) and drops cube/other markers from results. Also restricts auto-exposure metering so only marker (charger) rects drive exposure, not faces/pets/etc.",
+      "detail": "Modifier for Markers: only meaningful when Markers is actually running DetectMarkers. After detection, non-charger codes are erased from observedMarkers; remaining charger quads still feed detectionRects for metering. UpdateMeteringRegions skips swapping/keeping non-Markers modes while this flag is on — so AE weights the charger region rather than faces or other detectors. Behaviors such as robust charger observation enable this for home-finding under tough lighting.",
+      "category": "Vision.General.VisionModes",
+      "related": [
+        "Markers",
+        "Markers_FullFrame",
+        "Markers_Composite",
+        "AutoExp"
+      ],
+      "requires": ["Markers"],
+      "evidence": "engine/vision/visionSystem.cpp:542-573,1278-1292; clad/src/clad/types/visionModes.clad:47; engine/components/visionComponent.cpp:2836-2882; engine/aiComponent/behaviorComponent/behaviors/victor/behaviorRobustChargerObservation.cpp:91-92",
+      "status": "live",
+      "tags": ["vision", "markers", "charger", "visionmode", "autoexposure"]
+    },
+    "Markers_Composite": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::Markers_Composite. Instead of (only) detecting on the live frame, the vision system averages a buffer of gray frames and periodically runs marker detection on the composite. Used to pull weak charger markers out of noise/motion blur. Needs multiple frames before a “cycle” completes.",
+      "detail": "Inside DetectMarkers, ComposeWith adds the scaled gray frame each tick. Every imageReadyPeriod frames (vision_config ImageCompositing, default 4), the composite is appended to the image list for _markerDetector->Detect. After ReadyPeriod × numImageReadyCyclesBeforeReset frames (default 4×2=8), the compositor resets and Markers_Composite is marked processed. Turning the mode off resets leftover composites. CycleCompletesInOneFrame is false — WaitForImagesAction-style waits need enough composite cycles. Parent Markers must be on for DetectMarkers to run.",
+      "howTo": "1) Ensure Markers is on (schedule or console). 2) Enable Markers_Composite. 3) Hold still on a dim/hard marker (e.g. charger). 4) Wait several vision frames for ready/reset periods. Tune ScaleMultiplier/crop as needed; composite uses the same scaled gray.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/vision_config.json"
+        ],
+        "notes": "ImageCompositing block: imageReadyPeriod (default 4), numImageReadyCyclesBeforeReset (default 2), percentileForMaxIntensity."
+      },
+      "category": "Vision.General.VisionModes",
+      "related": [
+        "Markers",
+        "Markers_ChargerOnly",
+        "Markers_FullFrame",
+        "MarkerDetector_ScaleMultiplier"
+      ],
+      "requires": ["Markers"],
+      "evidence": "engine/vision/visionSystem.cpp:283-295,1181-1206,1605-1609; clad/src/clad/types/visionModes.clad:52,112; resources/config/engine/vision_config.json:100-105; engine/components/visionComponent.cpp:2836-2882",
+      "status": "live",
+      "tags": ["vision", "markers", "composite", "visionmode", "charger"]
+    },
+    "Markers_FastRotation": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::Markers_FastRotation so marker detection still runs when the body/head were rotating “too fast” for the usual IMU gate. Default behavior skips DetectMarkers if recent turn rates exceed Head/Body turn thresholds (~10°/s head, ~30°/s body).",
+      "detail": "When Markers is on and Markers_Off is not, WasRotatingTooFast is consulted unless FastRotation is enabled (then wasRotatingTooFast is forced false). Intended mainly for unit tests and cases without usable IMU history, but also used when EnableVisionWhileRotatingFast turns the same mode on from VisionComponent. Does not change crop or scale — only removes the motion veto.",
+      "category": "Vision.General.VisionModes",
+      "related": [
+        "Markers",
+        "Markers_Off",
+        "HeadTurnSpeedThreshBlock_degs",
+        "BodyTurnSpeedThreshBlock_degs"
+      ],
+      "requires": ["Markers"],
+      "evidence": "engine/vision/visionSystem.cpp:90-91,1571-1599; clad/src/clad/types/visionModes.clad:51; engine/components/visionComponent.h:524-527; engine/components/visionComponent.cpp:2836-2882",
+      "status": "live",
+      "tags": ["vision", "markers", "imu", "visionmode"]
+    },
+    "Markers_FullFrame": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::Markers_FullFrame: every marker pass uses the entire image (no left/middle/right crop cycling, no head-angle vertical crop). Slower/more CPU than default crop scheduling, but better when markers can appear anywhere in frame.",
+      "detail": "When enabled, cropRect is set to full image width×height and FullFrame is marked processed. Subsumes Markers_FullHeight and Markers_FullWidth — those flags only matter when FullFrame is off. Default product path uses CropScheduler (CropWidthFraction + optional height from charger geometry). Behaviors such as FindCube and robust charger observation request FullFrame for reliability.",
+      "category": "Vision.General.VisionModes",
+      "related": [
+        "Markers",
+        "Markers_FullHeight",
+        "Markers_FullWidth",
+        "MarkerDetector_CropWidthFraction",
+        "MarkerDetector_VizCropScheduler"
+      ],
+      "requires": ["Markers"],
+      "evidence": "engine/vision/visionSystem.cpp:1224-1248; clad/src/clad/types/visionModes.clad:13,48; engine/components/visionComponent.cpp:2836-2882; engine/aiComponent/behaviorComponent/behaviors/basicWorldInteractions/behaviorFindCube.cpp:92",
+      "status": "live",
+      "tags": ["vision", "markers", "crop", "visionmode"]
+    },
+    "Markers_FullHeight": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::Markers_FullHeight. With FullFrame off, keeps horizontal crop cycling (left/middle/right) but uses full image height — ignores head-angle–based vertical cropping that otherwise trims to ground/charger distance.",
+      "detail": "DetectMarkers sets useVariableHeight = !Markers_FullHeight. When FullHeight is on, cropY stays 0 and crop uses full nrows. When off, CropScheduler::GetCurrentCropY projects charger-top geometry so only the lower portion of the image is searched (and can return OOB if ground plane is not visible). Ignored entirely if Markers_FullFrame is also on (full rectangle already).",
+      "category": "Vision.General.VisionModes",
+      "related": [
+        "Markers",
+        "Markers_FullFrame",
+        "Markers_FullWidth",
+        "MarkerDetector_CropWidthFraction"
+      ],
+      "requires": ["Markers"],
+      "evidence": "engine/vision/visionSystem.cpp:1229-1248; engine/vision/cropScheduler.cpp:107-200,234; clad/src/clad/types/visionModes.clad:49; engine/components/visionComponent.cpp:2836-2882",
+      "status": "live",
+      "tags": ["vision", "markers", "crop", "visionmode"]
+    },
+    "Markers_FullWidth": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::Markers_FullWidth. With FullFrame off, disables left/middle/right horizontal cycling so each pass uses full image width, but still allows vertical crop from head angle / ground-plane geometry unless FullHeight is also on.",
+      "detail": "useHorizontalCycling = !Markers_FullWidth. Full width still pairs with CropWidthFraction only when horizontal cycling is on; with FullWidth, GetCropRect uses CropPosition::Full for width (fraction 1.0). Useful when markers may be off-center but you still want height cropping for speed. Subsumed by Markers_FullFrame.",
+      "category": "Vision.General.VisionModes",
+      "related": [
+        "Markers",
+        "Markers_FullFrame",
+        "Markers_FullHeight",
+        "MarkerDetector_CropWidthFraction"
+      ],
+      "requires": ["Markers"],
+      "evidence": "engine/vision/visionSystem.cpp:1229-1248; engine/vision/cropScheduler.cpp:70-86,204-254; clad/src/clad/types/visionModes.clad:50; engine/components/visionComponent.cpp:2836-2882",
+      "status": "live",
+      "tags": ["vision", "markers", "crop", "visionmode"]
+    },
+    "Markers_Off": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::Markers_Off — a deliberate “disable markers” override. When Markers is scheduled/enabled, this flag makes the vision system skip DetectMarkers entirely (still records Markers + Markers_Off as processed). Used when face work needs the CPU budget and markers would only distract.",
+      "detail": "CLAD comment calls this gross (VIC-6838): a mode that disables another mode. Gate order: if Markers is enabled and Markers_Off is enabled, detection is not run. Behaviors such as EnrollFace, SayName, and InteractWithFaces request Markers_Off at high/standard frequency so cube/charger decoding does not run during face focus. Turning this console toggle on while Markers is also force-on effectively cancels marker detection until Off is cleared.",
+      "category": "Vision.General.VisionModes",
+      "related": [
+        "Markers",
+        "Markers_FastRotation",
+        "Faces"
+      ],
+      "evidence": "engine/vision/visionSystem.cpp:1571-1576; clad/src/clad/types/visionModes.clad:34-37; engine/components/visionComponent.cpp:2836-2882; engine/aiComponent/behaviorComponent/behaviors/meetCozmo/behaviorEnrollFace.cpp:1820; engine/aiComponent/behaviorComponent/behaviors/simpleFaceBehaviors/behaviorSayName.cpp:104",
+      "status": "live",
+      "tags": ["vision", "markers", "visionmode", "performance"]
+    }
+  }
+}

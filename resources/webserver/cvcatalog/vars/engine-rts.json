@@ -1,0 +1,110 @@
+{
+  "vars": {
+    "RTS_AbsolutePowerThreshold_display": {
+      "process": "engine",
+      "blurb": "WebViz-only horizontal line for the “loud enough to always react” mic power score (default 2.90). Changing it does not make Vector more or less sensitive — real reaction thresholds come from each ReactToSound behavior’s JSON.",
+      "detail": "MicDirectionHistory::SendMicDataToWebserver pushes this value as powerScoreThreshold to the SoundReactions WebViz module (micDataEngine.js) when a client is subscribed. The source comment states these console vars are for display only; actual gates are micAbsolutePowerThreshold on BehaviorReactToSound instance config (reactToSoundAwake.json defaults 2.90; reactToSoundAsleep.json 3.10). Power score is log10(power)−log10(noiseFloor) minus a running peak average; the awake behavior treats score ≥ absolute threshold as an immediate valid sound (or score ≥ min threshold with high direction confidence). Stale comments in behaviorReactToSound.cpp still name kRTS_AbsolutePowerThreshold, but that console var no longer drives reaction.",
+      "category": "SoundReaction",
+      "related": [
+        "RTS_MinPowerThreshold_display",
+        "RTS_PowerAvgNumSamples",
+        "RTS_WebVizUpdateInterval"
+      ],
+      "paths": {
+        "assets": [
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/reactions/reactToSoundAwake.json",
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/reactions/reactToSoundAsleep.json",
+          "resources/webserver/webVizModules/micDataEngine.js"
+        ],
+        "notes": "Tune real sensitivity in those behavior JSONs (micAbsolutePowerThreshold), not this console var. WebViz module id: soundreactions."
+      },
+      "evidence": "engine/components/mics/micDirectionHistory.cpp:41-43,554; engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToSound.cpp:54-80,251-262; resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/reactions/reactToSoundAwake.json:27",
+      "status": "partial",
+      "statusNote": "Live for SoundReactions WebViz plots only. Does not change on-robot ReactToSound decisions.",
+      "tags": ["sound", "mic", "webviz", "display", "rts"]
+    },
+    "RTS_MaxReactionTime_s": {
+      "process": "engine",
+      "blurb": "How many seconds (default 1.0) a heard sound direction may sit “pending” before it is discarded if ReactToSound never gets to activate and respond. After this window, Vector forgets that direction and will not turn for that stale event.",
+      "detail": "While BehaviorReactToSound is not activated but has a valid _triggeredDirection, BehaviorUpdate compares engine time to _triggerDetectedTime + MaxReactionTime_s×1000 ms. On timeout it logs and ClearTriggerDirection (also clears the child ReactToMicDirection react direction). This is not the animation length — only how long a sound may wait for the behavior stack to hand control to ReactToSound. A shorter value makes late activations miss the event; longer keeps a direction reserved longer and can block noticing a newer direction until clear (direction must also differ for re-trigger).",
+      "category": "SoundReaction",
+      "related": [
+        "RTS_ReReactionCooldown_s"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToSound.cpp:47,177-194,198-218",
+      "status": "live",
+      "tags": ["sound", "mic", "timing", "behavior", "rts"]
+    },
+    "RTS_MinPowerThreshold_display": {
+      "process": "engine",
+      "blurb": "WebViz-only lower mic power-score line (default 1.50) for the “maybe react if direction confidence is high” band. Does not change real thresholds; those live in ReactToSound JSON as micMinPowerThreshold.",
+      "detail": "Sent to WebViz as powerScoreMinThreshold alongside the absolute display line. Real gate: power ≥ min threshold AND direction confidence ≥ micConfidenceThresholdAtMinPower (awake defaults: min 1.50, confidence 5000). Asleep reaction sets micMinPowerThreshold to 999.9 so the low-power+confidence path effectively never fires and only the absolute threshold path can. Same display-only note as AbsolutePowerThreshold_display.",
+      "category": "SoundReaction",
+      "related": [
+        "RTS_AbsolutePowerThreshold_display",
+        "RTS_PowerAvgNumSamples",
+        "RTS_WebVizUpdateInterval"
+      ],
+      "paths": {
+        "assets": [
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/reactions/reactToSoundAwake.json",
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/reactions/reactToSoundAsleep.json",
+          "resources/webserver/webVizModules/micDataEngine.js"
+        ],
+        "notes": "Edit micMinPowerThreshold / micConfidenceThresholdAtMinPower in behavior JSON for real behavior."
+      },
+      "evidence": "engine/components/mics/micDirectionHistory.cpp:41-43,555; engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToSound.cpp:54-81,255-262; resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/reactions/reactToSoundAwake.json:30-31",
+      "status": "partial",
+      "statusNote": "Live for SoundReactions WebViz only. Not read by BehaviorReactToSound.",
+      "tags": ["sound", "mic", "webviz", "display", "rts"]
+    },
+    "RTS_PowerAvgNumSamples": {
+      "process": "engine",
+      "blurb": "Smoothing window (default 100, range 1–250) for the exponential moving average of local mic power peaks above the noise floor. Larger = slower-adapting “normal peak” baseline; smaller = baseline tracks noise more quickly. Spikes above this average become the power score fed to sound-reaction callbacks.",
+      "detail": "On each local max of log10(mic power) that is above log10(noise floor), AccumulatePeakPowerLevel updates averagePeakLevel with alpha = 1/PowerAvgNumSamples. ProcessSoundReactors then computes powerScore = (latestPower − noiseFloor) − averagePeakLevel and, if positive, invokes registered sound reactors (ReactToSound when in activatable scope). First samples wait until average is non-zero. Very small values make the baseline jump and can suppress or exaggerate reactions; very large values keep an older ambient peak average longer after the room quietens or gets louder.",
+      "category": "SoundReaction",
+      "related": [
+        "RTS_AbsolutePowerThreshold_display",
+        "RTS_MinPowerThreshold_display",
+        "RTS_WebVizUpdateInterval"
+      ],
+      "evidence": "engine/components/mics/micDirectionHistory.cpp:38,406-432,479-524",
+      "status": "live",
+      "tags": ["sound", "mic", "averaging", "sensitivity", "rts"]
+    },
+    "RTS_ReReactionCooldown_s": {
+      "process": "engine",
+      "blurb": "Minimum seconds (default 0.25) after a sound is accepted before ReactToSound will accept another while it is already active. Stops the robot from immediately re-triggering on the same slam/clatter mid-turn.",
+      "detail": "CanReactToSound also blocks when the lift was recently low and moving (lift-slam filter) and, when the behavior is activated, when the wheels are still moving. Cooldown is measured from _triggerDetectedTime (when SetTriggerDirection ran). Only applies in the IsActivated() branch together with wheel motion — when idle/listening, cooldown alone does not suppress new detections. Combined with MaxReactionTime for pending-vs-active timing.",
+      "category": "SoundReaction",
+      "related": [
+        "RTS_MaxReactionTime_s"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToSound.cpp:48,276-296,198-206",
+      "status": "live",
+      "tags": ["sound", "mic", "timing", "cooldown", "behavior", "rts"]
+    },
+    "RTS_WebVizUpdateInterval": {
+      "process": "engine",
+      "blurb": "How often (seconds, default 0.20, range 0–1) the engine pushes mic direction/power samples to the SoundReactions WebViz tab when a client is subscribed. Smaller = smoother plots and more network/CPU; 0 effectively updates every mic sample path that reaches the sender.",
+      "detail": "SendMicDataToWebserver runs after each mic sample. If WebViz module “soundreactions” has a subscriber, it sends JSON when currentTime ≥ nextUpdateTime or forceUpdate is set (peaks and successful reactor triggers force an immediate packet). Payload includes confidence, VAD active, directions, log power/noise, peak scores, the two display thresholds, and recent trigger flash fields (~1.5 s display). Does not gate ProcessSoundReactors or robot motion — visualization pacing only. No effect if no WebViz client is on that module.",
+      "category": "SoundReaction",
+      "related": [
+        "RTS_AbsolutePowerThreshold_display",
+        "RTS_MinPowerThreshold_display",
+        "RTS_PowerAvgNumSamples"
+      ],
+      "paths": {
+        "assets": [
+          "resources/webserver/webVizModules/micDataEngine.js",
+          "resources/webserver/webviz/js/config.js"
+        ],
+        "notes": "WebViz module name soundreactions / UI label SoundReactions."
+      },
+      "evidence": "engine/components/mics/micDirectionHistory.cpp:39,528-566; resources/webserver/webVizModules/micDataEngine.js:2-4",
+      "status": "live",
+      "statusNote": "Live for WebViz stream rate only; zero robot behavior change when no client is subscribed.",
+      "tags": ["sound", "mic", "webviz", "performance", "rts"]
+    }
+  }
+}

@@ -17,7 +17,16 @@
     "vars/engine-actions-dock.json",
     "vars/engine-blockworld.json",
     "vars/engine-net-ops.json",
-    "vars/engine-vision-motion-laser.json"
+    "vars/engine-vision-motion-laser.json",
+    "vars/engine-markers.json",
+    "vars/engine-powersave.json",
+    "vars/engine-rts.json",
+    "vars/engine-bpdb.json",
+    "vars/anim-procface.json",
+    "vars/engine-vision-benchmark.json",
+    "vars/engine-faces.json",
+    "vars/anim-eye-left.json",
+    "vars/anim-eye-right.json"
   ],
   "categories": [
     "categories/vision.json",

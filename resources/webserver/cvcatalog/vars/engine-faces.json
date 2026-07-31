@@ -1,0 +1,231 @@
+{
+  "vars": {
+    "FaceRecognitionThreshold": {
+      "process": "engine",
+      "blurb": "Minimum OKAO identification score (0–1000, default 575) for a face album match to count as a real recognition. Below this, the person is not treated as identified even if OKAO returns candidates.",
+      "detail": "After OKAO_FR_Identify ranks album entries, scores[0] must be greater than this value for foundMatchAboveThreshold. That gate drives accepting the top match (and related merge / enrollment update paths). Raising it makes Vector stricter about names (fewer false IDs, more unknown faces). Lowering it makes matches easier but can mis-identify lookalikes. Sibling margins (MarginForAdding, MarginForUsing2ndBest) are expressed relative to this number.",
+      "category": "Vision.FaceRecognition",
+      "related": [
+        "FaceRecognitionGuessThreshold",
+        "FaceRecognitionThresholdMarginForAdding",
+        "FaceRecognitionThresholdMarginForUsing2ndBest",
+        "FaceRecognitionExtraDebug"
+      ],
+      "evidence": "coretech/vision/engine/faceRecognizer_okao.cpp:49-50,1836-1837,1932,2128",
+      "status": "live",
+      "tags": ["vision", "faces", "recognition", "threshold", "okao"]
+    },
+    "FaceRecognitionGuessThreshold": {
+      "process": "engine",
+      "blurb": "Lower OKAO score floor (0–1000, default 350) used only for a soft “best guess” name when no match cleared FaceRecognitionThreshold. Does not promote the face to a firm ID.",
+      "detail": "UpdateBestGuessName walks identify results while scores stay above this value and picks the first named (non-session-only) album entry. That name is stored on the tracking ID as best-guess and can surface via TrackedFace::GetBestGuessName (e.g. SayName when unsure). It is intentionally weaker than a full recognition so behaviors can hedge without committing enrollment identity.",
+      "category": "Vision.FaceRecognition",
+      "related": [
+        "FaceRecognitionThreshold",
+        "FaceRecognitionExtraDebug"
+      ],
+      "evidence": "coretech/vision/engine/faceRecognizer_okao.cpp:52-53,1827,2145-2164; coretech/vision/engine/trackedFace.h:54-59; engine/aiComponent/behaviorComponent/behaviors/simpleFaceBehaviors/behaviorSayName.cpp:149,228",
+      "status": "live",
+      "tags": ["vision", "faces", "recognition", "threshold", "okao"]
+    },
+    "FaceRecognitionThresholdMarginForAdding": {
+      "process": "engine",
+      "blurb": "How far below FaceRecognitionThreshold a new face’s top score must sit before Vector will register a brand-new session user (default 200). Prevents near-matches from spawning duplicate album people.",
+      "detail": "When enrollment of any face is allowed and the recognizer did not accept a top match, a new user is added only if there were no results or scores[0] < Threshold − MarginForAdding. Example at defaults: Threshold 575 and margin 200 → must score under 375 (or have no candidates) to create a new album entry. Keeps OKAO albums from accumulating very similar people, which the code comments say is bad for the library.",
+      "category": "Vision.FaceRecognition",
+      "related": [
+        "FaceRecognitionThreshold",
+        "FaceRecognitionGuessThreshold",
+        "FaceRecognitionExtraDebug"
+      ],
+      "evidence": "coretech/vision/engine/faceRecognizer_okao.cpp:55-56,2122-2136",
+      "status": "live",
+      "tags": ["vision", "faces", "recognition", "enrollment", "threshold"]
+    },
+    "FaceRecognitionThresholdMarginForUsing2ndBest": {
+      "process": "engine",
+      "blurb": "Score leeway (default 50) that lets a named second-place OKAO match win when the top match is only a temporary session-only ID. Makes recovering a real enrolled name a bit easier.",
+      "detail": "If the top identify hit is session-only and not the face currently being enrolled, the code looks for the next named match. That 2nd score must exceed Threshold − this margin. It also requires that any later named different ID is not too close: scores must drop below min(2ndScore − margin, Threshold − 2×margin). Comment at registration: makes 2nd-best a little easier to use without allowing ambiguous 3rd named contenders.",
+      "category": "Vision.FaceRecognition",
+      "related": [
+        "FaceRecognitionThreshold",
+        "FaceRecognitionExtraDebug"
+      ],
+      "evidence": "coretech/vision/engine/faceRecognizer_okao.cpp:58-62,1898-1962",
+      "status": "live",
+      "tags": ["vision", "faces", "recognition", "threshold"]
+    },
+    "FaceRecognitionExtraDebug": {
+      "process": "engine",
+      "blurb": "When true, face recognition prints verbose LOG_INFO about merges, enrollment updates, album data replacement, and fills per-face debug match lists (names/IDs/scores). Off by default.",
+      "detail": "Gates many branches in faceRecognizer_okao: merge-by-enrollment-time logs, skip-merge logs, enrollment-ID update logs, clusteredness / replaced-data logs, merge success, and building FaceRecognitionMatch debug info after a threshold hit (also paired with DisplayDebugEnrollmentImages for match image viz). Useful when tuning thresholds; can spam logs if left on.",
+      "category": "Vision.FaceRecognition",
+      "related": [
+        "FaceRecognitionThreshold",
+        "FaceRecognitionGuessThreshold",
+        "FaceRecognitionSimulatedDelay_ms"
+      ],
+      "evidence": "coretech/vision/engine/faceRecognizer_okao.cpp:85,506-514,541-544,700-713,1293-1297,1358-1378,1831-1891,2273-2277",
+      "status": "live",
+      "tags": ["vision", "faces", "recognition", "debug"]
+    },
+    "FaceRecognitionSimulatedDelay_ms": {
+      "process": "engine",
+      "blurb": "Artificial sleep (ms, default 0) after each OKAO feature extraction on the face-recognizer thread. Simulates slow device recognition without changing algorithms.",
+      "detail": "ExtractFeatures runs OKAO_FR_ExtractPoints_GRAY then, if this is > 0, std::this_thread::sleep_for that many milliseconds before marking FeaturesReady. Only affects the async recognition path (not whole-engine FPS by itself, but delays when IDs update). Use for load/latency tests; leave 0 for normal robots.",
+      "category": "Vision.FaceRecognition",
+      "related": [
+        "FaceRecognitionExtraDebug",
+        "FaceRecognitionThreshold"
+      ],
+      "evidence": "coretech/vision/engine/faceRecognizer_okao.cpp:87-88,810-844",
+      "status": "live",
+      "tags": ["vision", "faces", "recognition", "debug", "performance"]
+    },
+    "Faces_Blink": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::Faces_Blink so OKAO blink detection runs whenever Faces is processing. Off unless a behavior, SDK, or this console toggle subscribes it.",
+      "detail": "Registered like other vision modes under Vision.General.VisionModes (SetupVisionModeConsoleVars). When Faces is on, visionSystem sets FaceTracker::EnableBlinkDetection from this mode. Blink shares OKAO’s gaze/blink detector with Faces_Gaze (DetectGazeAndBlink). Behaviors such as InteractWithFaces and ConditionEyeContact request it at Standard frequency; SDK can enable via enable_blink_detection. Parent Faces must actually be scheduled or force-on for DetectFaces to run.",
+      "category": "Vision.General.VisionModes",
+      "related": [
+        "Faces",
+        "Faces_Gaze",
+        "Faces_Smile",
+        "Faces_Expression",
+        "Faces_Crop"
+      ],
+      "requires": ["Faces"],
+      "evidence": "engine/components/visionComponent.cpp:2836-2882; engine/vision/visionSystem.cpp:1612-1641; clad/src/clad/types/visionModes.clad:54-59; coretech/vision/engine/faceTrackerImpl_okao.cpp:1203-1266; engine/components/sdkComponent.cpp:444-447",
+      "status": "live",
+      "tags": ["vision", "faces", "visionmode", "blink"]
+    },
+    "Faces_Crop": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::Faces_Crop: face tracking searches only a horizontal center band (default width fraction FaceTrackingCropWidthFraction ≈ 2/3) instead of the full frame. Faster, but faces near the left/right edges are easier to miss.",
+      "detail": "DetectFaces passes cropFactor = kFaceTrackingCropWidthFraction when the mode is on, else 1.0 (full width). FaceTracker::SetCroppingMask masks left/right edges for OKAO. Behaviors that focus on a known face (EnrollFace, SayName, InteractWithFaces, ObservingLookAtFaces) often request Crop at High/Standard to save CPU. Requires Faces. Does not change smile/expression/gaze math—only the search ROI for detection/tracking.",
+      "category": "Vision.General.VisionModes",
+      "related": [
+        "Faces",
+        "Faces_Blink",
+        "Faces_Gaze",
+        "Faces_Smile",
+        "Faces_Expression"
+      ],
+      "requires": ["Faces"],
+      "evidence": "engine/vision/visionSystem.cpp:121-122,824-841,1631-1637; coretech/vision/engine/faceTrackerImpl_okao.cpp:1015-1082; clad/src/clad/types/visionModes.clad:59; engine/components/visionComponent.cpp:2836-2882",
+      "status": "live",
+      "tags": ["vision", "faces", "visionmode", "crop", "performance"]
+    },
+    "Faces_Expression": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::Faces_Expression so OKAO facial-expression (emotion) estimation runs on detected faces when Faces is active. Extra CPU after face parts are found.",
+      "detail": "When Faces runs, IsModeEnabled(Faces_Expression) drives FaceTracker::EnableEmotionDetection → EstimateExpression (OKAO_EX_*) if part detection succeeded. Not on by default in freeplay schedules; SDK can toggle enable_expression_estimation. Results enrich TrackedFace expression fields for debug/SDK/behaviors that care about emotion—not the same as smile amount (Faces_Smile).",
+      "category": "Vision.General.VisionModes",
+      "related": [
+        "Faces",
+        "Faces_Smile",
+        "Faces_Gaze",
+        "Faces_Blink",
+        "Faces_Crop"
+      ],
+      "requires": ["Faces"],
+      "evidence": "engine/vision/visionSystem.cpp:1614-1638; coretech/vision/engine/faceTrackerImpl_okao.cpp:562-609,1203-1240; clad/src/clad/types/visionModes.clad:55; engine/components/sdkComponent.cpp:445; engine/components/visionComponent.cpp:2836-2882",
+      "status": "live",
+      "tags": ["vision", "faces", "visionmode", "expression"]
+    },
+    "Faces_Gaze": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::Faces_Gaze so OKAO estimates where the person is looking (left/right and up/down degrees). Used for eye-contact style reactions.",
+      "detail": "visionSystem enables FaceTracker gaze detection from this mode; DetectGazeAndBlink fills gaze on the face (shared OKAO path with blink). InteractWithFaces, ConditionEyeContact, and ReactToGazeDirection subscribe Gaze. SDK: enable_gaze_detection. Needs Faces on and successful face-part detection. Pair with Faces_Blink if you also want blink state for eye-contact conditions.",
+      "category": "Vision.General.VisionModes",
+      "related": [
+        "Faces",
+        "Faces_Blink",
+        "Faces_Expression",
+        "Faces_Smile",
+        "Faces_Crop"
+      ],
+      "requires": ["Faces"],
+      "evidence": "engine/vision/visionSystem.cpp:1620-1640; coretech/vision/engine/faceTrackerImpl_okao.cpp:661-675,1255-1274; clad/src/clad/types/visionModes.clad:57; engine/aiComponent/beiConditions/conditions/conditionEyeContact.h:31-32; engine/components/sdkComponent.cpp:447",
+      "status": "live",
+      "tags": ["vision", "faces", "visionmode", "gaze"]
+    },
+    "Faces_Smile": {
+      "process": "engine",
+      "blurb": "Force-enables VisionMode::Faces_Smile so OKAO smile degree/confidence are estimated for each tracked face when Faces is running.",
+      "detail": "EnableSmileDetection → DetectSmile (OKAO_SM_*) after face parts; results stored via SetSmileAmount on TrackedFace. Optional modifier—not required for basic face detection or name recognition. SDK can enable with enable_smile_detection. Costs extra OKAO work per face after parts are found.",
+      "category": "Vision.General.VisionModes",
+      "related": [
+        "Faces",
+        "Faces_Expression",
+        "Faces_Gaze",
+        "Faces_Blink",
+        "Faces_Crop"
+      ],
+      "requires": ["Faces"],
+      "evidence": "engine/vision/visionSystem.cpp:1617-1639; coretech/vision/engine/faceTrackerImpl_okao.cpp:614-639,1242-1253; clad/src/clad/types/visionModes.clad:56; engine/components/sdkComponent.cpp:444",
+      "status": "live",
+      "tags": ["vision", "faces", "visionmode", "smile"]
+    },
+    "StimFace_enabled": {
+      "process": "engine",
+      "blurb": "Master switch for stimulation-driven face color: when true, Vector’s eye-display saturation tracks the Stimulated mood (more excited → more saturated colors). Default false.",
+      "detail": "StimulationFaceDisplay::UpdateDependent returns immediately if this is off. When on (and FeatureType::PRDemo is not enabled), it reads MoodManager EmotionType::Stimulated (clamped 0–1), smooths it (StimFace_ema_N), maps through a saturation curve, and may call AnimationComponent::SetFaceSaturation → anim process ProceduralFace::SetSaturation. Off by default so stock behavior does not recolor the face from mood unless you opt in.",
+      "category": "StimFace",
+      "related": [
+        "StimFace_ema_N",
+        "StimFace_sendThresh",
+        "StimFace_minSaturation"
+      ],
+      "evidence": "engine/moodSystem/stimulationFaceDisplay.cpp:32,58-88; engine/components/animationComponent.cpp:796-798; animProcess/src/cozmoAnim/animProcessMessages.cpp:265-267",
+      "status": "live",
+      "tags": ["mood", "face", "saturation", "stim"]
+    },
+    "StimFace_ema_N": {
+      "process": "engine",
+      "blurb": "Smoothing length for the Stimulated-mood → face-saturation path (default 20, range 0–100). Larger N = slower/smoother color changes; smaller N = face saturation follows mood more tightly.",
+      "detail": "Only matters when StimFace_enabled is true. EMA alpha = 2/(1+N); _ema = stim×alpha + _ema×(1−alpha). N=0 yields alpha=2 (aggressive/unusual); N=20 is a gentle average over many engine ticks. Does not change mood values themselves—only how saturation is filtered before the send threshold check.",
+      "category": "StimFace",
+      "related": [
+        "StimFace_enabled",
+        "StimFace_sendThresh",
+        "StimFace_minSaturation"
+      ],
+      "requires": ["StimFace_enabled"],
+      "evidence": "engine/moodSystem/stimulationFaceDisplay.cpp:33,74-76",
+      "status": "live",
+      "tags": ["mood", "face", "saturation", "stim", "filter"]
+    },
+    "StimFace_minSaturation": {
+      "process": "engine",
+      "blurb": "Lowest eye-display saturation at zero stimulation on the stim→saturation curve (default 0.25). Full stim maps to 1.0. Prevents a completely washed-out face when calm.",
+      "detail": "At InitDependent, the component builds GraphEvaluator2d nodes (0 → minSaturation) and (1 → 1.0). Runtime Update uses that map: sat = EvaluateY(ema). Changing this console var after engine init does not rebuild the graph—only the value present when StimulationFaceDisplay initialized is used until restart/reinit.",
+      "category": "StimFace",
+      "related": [
+        "StimFace_enabled",
+        "StimFace_ema_N",
+        "StimFace_sendThresh"
+      ],
+      "requires": ["StimFace_enabled"],
+      "evidence": "engine/moodSystem/stimulationFaceDisplay.cpp:35,48-54,78-80",
+      "status": "partial",
+      "statusNote": "Read only in InitDependent when building _saturationMap. Live CONSOLE_VAR edits after boot do not update the curve until the component re-inits (typically engine restart).",
+      "tags": ["mood", "face", "saturation", "stim"]
+    },
+    "StimFace_sendThresh": {
+      "process": "engine",
+      "blurb": "Minimum change in computed face saturation (0–1, default 0.01) before a new SetFaceSaturation is sent to the animation process. Reduces message spam for tiny mood wiggles.",
+      "detail": "After EMA + map, if _lastSentSatLevel was never set or |sat − last| exceeds this threshold, AnimationComponent::SetFaceSaturation is called and last is updated. First send always goes through (last starts at −1). Larger values = fewer updates / blockier color steps; smaller = more responsive but more eng→anim traffic.",
+      "category": "StimFace",
+      "related": [
+        "StimFace_enabled",
+        "StimFace_ema_N",
+        "StimFace_minSaturation"
+      ],
+      "requires": ["StimFace_enabled"],
+      "evidence": "engine/moodSystem/stimulationFaceDisplay.cpp:34,83-88",
+      "status": "live",
+      "tags": ["mood", "face", "saturation", "stim", "ipc"]
+    }
+  }
+}

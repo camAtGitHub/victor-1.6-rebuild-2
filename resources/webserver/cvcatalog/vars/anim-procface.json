@@ -1,0 +1,294 @@
+{
+  "vars": {
+    "ProcFace_Display": {
+      "process": "anim",
+      "blurb": "Chooses what the face LCD shows instead of (or on top of) normal procedural eyes. Normal plays animations as usual. Test paints red/green/blue brightness stripes. FullWhite fills the whole screen white. Override individually / Override together freeze eye shape from console-editable face params so you can sculpt eyes live.",
+      "detail": "Test and FullWhite ignore the current animation face entirely. Override modes start from the live animation face, then replace any eye/face parameter that differs from a captured baseline with the value on s_faceDataOverride (the object bound to ProcFace_CenterX/Y, Angle_deg, ScaleX/Y, Left_*/Right_* eye params). Override together copies left-eye params onto the right eye before applying. ResetFace (console function) re-baselines and resets many related face console vars. Live under ANKI_DEV_CHEATS (present on this rebuild’s anim dump).",
+      "howTo": "1) Leave Normal for product faces. 2) For hardware checks: Test or FullWhite. 3) For live sculpting: set Override individually (or together), tweak Center/Scale/Angle and Left_/Right_ eye params, watch the face. 4) Call ResetFace to clear override baseline.",
+      "enumLabels": ["Normal", "Test", "FullWhite", "Override individually", "Override together"],
+      "related": ["ProcFace_CenterX", "ProcFace_CenterY", "ProcFace_Angle_deg", "ProcFace_ScaleX", "ProcFace_ScaleY", "ProcFace_Hue", "ProcFace_Saturation"],
+      "evidence": "animProcess/src/cozmoAnim/animation/animationStreamer.cpp:61-71,1186-1313 (FaceDisplayType, GetStreamableFace)",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "procedural", "debug", "override"]
+    },
+    "ProcFace_CenterX": {
+      "process": "anim",
+      "blurb": "Horizontal offset of the whole face (both eyes together) in screen pixels, relative to the display center. Positive shifts eyes right; negative left. Range about −100…100.",
+      "detail": "Bound to the override ProceduralFace’s face-position X via RegisterFaceWithConsoleVars. Only affects what you see when ProcFace_Display is Override individually or Override together — and only if this value differs from the baseline captured when override mode began. In Normal mode the animation/keyframe face position wins.",
+      "requires": ["ProcFace_Display"],
+      "related": ["ProcFace_CenterY", "ProcFace_Angle_deg", "ProcFace_ScaleX", "ProcFace_ScaleY"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:755-758; animProcess/.../animationStreamer.cpp:409-411,1261-1308; proceduralFaceDrawer.cpp:791-807",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "transform"]
+    },
+    "ProcFace_CenterY": {
+      "process": "anim",
+      "blurb": "Vertical offset of the whole face in screen pixels. Positive shifts eyes down; negative up. Range about −100…100.",
+      "detail": "Same override-only path as ProcFace_CenterX: registered on s_faceDataOverride, applied only in Display Override modes when different from baseline. Combined with Scale/Angle into the full-face warp matrix before each eye is drawn.",
+      "requires": ["ProcFace_Display"],
+      "related": ["ProcFace_CenterX", "ProcFace_Angle_deg", "ProcFace_ScaleX", "ProcFace_ScaleY"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:760-762; animProcess/.../animationStreamer.cpp:1261-1308; proceduralFaceDrawer.cpp:791-807",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "transform"]
+    },
+    "ProcFace_Angle_deg": {
+      "process": "anim",
+      "blurb": "Rotates the entire face (both eyes) around the screen center, in degrees. Positive and negative tilt the eyes like a head cock. Typical console range −90…90.",
+      "detail": "Maps to ProceduralFace face angle on the override instance. Only visible under ProcFace_Display Override modes when changed from baseline. The drawer builds a 2D transform (scale + rotate + translate) and warps eye polygons with it.",
+      "requires": ["ProcFace_Display"],
+      "related": ["ProcFace_CenterX", "ProcFace_CenterY", "ProcFace_ScaleX", "ProcFace_ScaleY"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:764-766; proceduralFaceDrawer.cpp:107-141,791-807; animationStreamer.cpp:1289-1291",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "transform"]
+    },
+    "ProcFace_ScaleX": {
+      "process": "anim",
+      "blurb": "Horizontal scale of the whole face. 1.0 is normal width; larger stretches eyes wider; 0 collapses them. Console range about 0…4.",
+      "detail": "Override-face faceScale.x. Applied only in Display Override modes when different from baseline. Independent of per-eye EyeScaleX parameters. Values below 0 are clipped when set via the ProceduralFace API.",
+      "requires": ["ProcFace_Display"],
+      "related": ["ProcFace_ScaleY", "ProcFace_CenterX", "ProcFace_Angle_deg"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:768-770; proceduralFaceDrawer.cpp:791-807; animationStreamer.cpp:1293-1297",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "transform"]
+    },
+    "ProcFace_ScaleY": {
+      "process": "anim",
+      "blurb": "Vertical scale of the whole face. 1.0 is normal height; larger makes eyes taller; 0 flattens them. Console range about 0…4.",
+      "detail": "Same override path as ScaleX. Combined with ScaleX, Angle, and Center into one face warp matrix.",
+      "requires": ["ProcFace_Display"],
+      "related": ["ProcFace_ScaleX", "ProcFace_CenterY", "ProcFace_Angle_deg"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:772-775; proceduralFaceDrawer.cpp:791-807; animationStreamer.cpp:1293-1297",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "transform"]
+    },
+    "ProcFace_Hue": {
+      "process": "anim",
+      "blurb": "Global color of the procedural eyes on a 0–1 hue wheel (HSV). Default is about 0.45 (teal/cyan Vector eyes). Changing this recolors every procedural face immediately — not only override mode.",
+      "detail": "Static ProceduralFace::_hue. Registered both as a ranged console var bound to that static and as a console function ProcFace_Hue(float hue) that calls SetHue. SetHue also fills the hue image used when canned face animations are colorized. ConvertColorspace multiplies eye brightness (V) with this hue and saturation into RGB565 for the LCD. Dance-to-the-beat and similar code curl localhost:8889 to set this. Range 0…1.",
+      "related": ["ProcFace_Saturation"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:42-50,777-779; proceduralFace.h:326-338; proceduralFaceDrawer.cpp:990-1007; engine/.../behaviorDanceToTheBeat.cpp:347-349",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "procedural", "color", "highlight"]
+    },
+    "ProcFace_Saturation": {
+      "process": "anim",
+      "blurb": "Global color intensity of the procedural eyes. 0 is gray; 1 is full strength (default); above 1 pushes more vivid color (range 0…2).",
+      "detail": "Static ProceduralFace::_saturation, same dual registration as Hue (console var + CONSOLE_FUNC). With PROCEDURALFACE_PROCEDURAL_SATURATION enabled, ConvertColorspace multiplies this into the sat channel for every drawn face. Per-keyframe animated saturation is compiled off (PROCEDURALFACE_ANIMATED_SATURATION 0). Affects live product faces, not only override mode.",
+      "related": ["ProcFace_Hue"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:43-56,781-783; proceduralFace.h:345-356; proceduralFaceDrawer.cpp:992-1007",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "procedural", "color", "highlight"]
+    },
+    "ProcFace_GammaType": {
+      "process": "anim",
+      "blurb": "Which gamma curve is applied to the finished face image just before it is sent to the LCD. None leaves pixels alone. FromLinear/ToLinear use fixed sRGB↔linear conversions. AddGamma/RemoveGamma use ProcFace_Gamma as the exponent. Custom uses a 256-entry LUT loaded by LoadFaceGammaLUT.",
+      "detail": "When type or ProcFace_Gamma changes, BufferFaceToSend rebuilds a 256×3 LUT and remaps every R/G/B sample of the RGB565 face. Dev-cheats path; Custom is selected automatically after a successful LoadFaceGammaLUT. Use for display calibration, not for day-to-day expression tuning.",
+      "enumLabels": ["None", "FromLinear", "ToLinear", "AddGamma", "RemoveGamma", "Custom"],
+      "related": ["ProcFace_Gamma"],
+      "evidence": "animProcess/src/cozmoAnim/animation/animationStreamer.cpp:75-85,1390-1438",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "procedural", "gamma", "display"]
+    },
+    "ProcFace_Gamma": {
+      "process": "anim",
+      "blurb": "Gamma exponent used when ProcFace_GammaType is AddGamma or RemoveGamma. Range 1…4. Default 1.0 on Vector (2.1 on Xray). Higher AddGamma brightens midtones; RemoveGamma darkens them.",
+      "detail": "AddGamma builds LUT[i] = (i/255)^(1/gamma)*255. RemoveGamma uses ^(gamma). Ignored for None/FromLinear/ToLinear/Custom. Changing the value rebuilds the LUT on the next face buffer send.",
+      "requires": ["ProcFace_GammaType"],
+      "related": ["ProcFace_GammaType"],
+      "evidence": "animProcess/src/cozmoAnim/animation/animationStreamer.cpp:76,1405-1418",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "procedural", "gamma", "display"]
+    },
+    "ProcFace_NominalEyeSpacing": {
+      "process": "anim",
+      "blurb": "Horizontal distance in pixels between the centers of the left and right eyes at rest. Default 92 on Vector (83 on Xray). Larger spreads the eyes apart; smaller brings them closer (can even cross if negative).",
+      "detail": "Used by GetNominalLeftEyeX/RightEyeX: left = (displayWidth − spacing)/2, right = left + spacing. Affects every procedural face draw, not only override mode. Extreme values can push eyes off-screen.",
+      "related": ["ProcFace_CenterX", "ProcFace_ScaleX"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:65,216-224",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "procedural", "layout"]
+    },
+    "ProcFace_LineType": {
+      "process": "anim",
+      "blurb": "How OpenCV fills the eye and lid polygons: Line_4, Line_8, or Line_AA (antialiased edges during fill). Default Line_8 on Vector (Line_AA on Xray). Changes the jaggedness of eye outlines before the separate full-image antialias pass.",
+      "detail": "Comment in code: only affects OpenCV drawing, not post-smoothing. Mapped to cv::LINE_4 / LINE_8 / LINE_AA for fillConvexPoly/fillPoly of eyes and lids. Line_AA is smoother but costlier at fill time; ProcFace_EnableAntiAliasing still does a later blur pass.",
+      "enumLabels": ["Line_4", "Line_8", "Line_AA"],
+      "related": ["ProcFace_EnableAntiAliasing", "ProcFace_EllipseDelta"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFaceDrawer.cpp:45,347-348,545-563",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "procedural", "draw"]
+    },
+    "ProcFace_InterpolationType": {
+      "process": "anim",
+      "blurb": "Listed as an OpenCV-style interpolation mode (Nearest, Linear, Cubic, …) but is never read by the procedural face drawer. Changing it does nothing on current firmware.",
+      "detail": "Registered CONSOLE_VAR_ENUM only. No references to kProcFace_InterpolationType outside the declaration. Face warps sample polygons directly; custom overlay resize hardcodes INTER_AREA. Orphan control.",
+      "enumLabels": ["Nearest", "Linear", "Cubic", "Area", "Lanczos", "LinearExact", "Max", "WarpFillOutliers"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFaceDrawer.cpp:46 (declaration only; rg shows no other uses)",
+      "category": "Face.ParameterizedFace",
+      "status": "dead",
+      "statusNote": "Registered but never referenced after definition — no runtime effect.",
+      "tags": ["face", "procedural", "orphan"]
+    },
+    "ProcFace_EllipseDelta": {
+      "process": "anim",
+      "blurb": "Angular step (degrees) for OpenCV ellipse2Poly when building rounded eye corners and lid bends. Smaller = smoother curves with more vertices; larger = chunkier polygons. Default 10 (15 on Xray). Range 1…90.",
+      "detail": "Passed as the delta argument to every cv::ellipse2Poly call for upper/lower corner radii and lid bend arcs. Very small values increase CPU for poly construction; very large values make rounded eyes look faceted.",
+      "related": ["ProcFace_LineType"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFaceDrawer.cpp:47,355-437",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "procedural", "draw"]
+    },
+    "ProcFace_EyeLightnessMultiplier": {
+      "process": "anim",
+      "blurb": "Global brightness scale for pixels inside the eyes (not the optional outer glow). 1.0 is normal; 0 blacks out the eyes; 2 doubles brightness (then clamps). Range 0…2.",
+      "detail": "Multiplied into each eye pixel after hotspot falloff and per-eye Lightness parameter. When the glow feature is compiled out (default), every lit eye pixel uses this multiplier. Quick way to dim or punch the face without changing hue.",
+      "related": ["ProcFace_HotspotRender", "ProcFace_HotspotFalloff", "ProcFace_NoiseMinLightness", "ProcFace_NoiseMaxLightness"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFaceDrawer.cpp:48,711-717",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "procedural", "brightness"]
+    },
+    "ProcFace_HotspotFalloff": {
+      "process": "anim",
+      "blurb": "How wide the soft bright “hotspot” glow is inside each eye, as a fraction of eye size. Smaller = tight bright core; larger = broader soft fill. Default ~0.48. Range 0.05…1.",
+      "detail": "Only used when ProcFace_HotspotRender is true. Sets sigmaX/Y = falloff × eyeWidth/Height for a Gaussian falloff from the eye’s HotSpotCenter. Values near 1 wash the whole eye; small values make a small bright spot.",
+      "requires": ["ProcFace_HotspotRender"],
+      "related": ["ProcFace_HotspotRender", "ProcFace_EyeLightnessMultiplier"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFaceDrawer.cpp:51,580-625",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "procedural", "hotspot"]
+    },
+    "ProcFace_AntiAliasingSize": {
+      "process": "anim",
+      "blurb": "Kernel size for the full-eye-shape antialias blur. 0 disables that blur even if antialiasing is enabled. Default 3 on Vector (2 on Xray); size 3 can use NEON box filter. Range 0…15.",
+      "detail": "Used only when ProcFace_EnableAntiAliasing is on and size > 0. Box filter uses this as the box width; Gaussian uses it as kernel size. Also expands the eye ROI by ~size/2 so edges are not clipped. Larger = softer edges, more CPU.",
+      "requires": ["ProcFace_EnableAntiAliasing"],
+      "related": ["ProcFace_EnableAntiAliasing", "ProcFace_AntiAliasingFilter", "ProcFace_AntiAliasingSigmaFraction"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFaceDrawer.cpp:54,228-249,533-536,667-671",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "procedural", "antialias"]
+    },
+    "ProcFace_AntiAliasingFilter": {
+      "process": "anim",
+      "blurb": "Which blur is used for full-shape antialiasing: None, Box, or Gaussian. Default Box. Box is cheaper (NEON-friendly at size 3); Gaussian is smoother and uses ProcFace_AntiAliasingSigmaFraction.",
+      "detail": "Applied inside ApplyAntiAliasing when EnableAntiAliasing and Size > 0. None leaves the filter switch with no blur work for that case. Independent of ProcFace_LineType’s OpenCV LINE_AA fill option.",
+      "enumLabels": ["None", "Box", "Gaussian"],
+      "requires": ["ProcFace_EnableAntiAliasing"],
+      "related": ["ProcFace_EnableAntiAliasing", "ProcFace_AntiAliasingSize", "ProcFace_AntiAliasingSigmaFraction"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFaceDrawer.cpp:39-43,55,234-249",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "procedural", "antialias"]
+    },
+    "ProcFace_AntiAliasingSigmaFraction": {
+      "process": "anim",
+      "blurb": "When the antialias filter is Gaussian, sigma = AntiAliasingSize × this fraction. Default 0.5 (0.3 on Xray). Higher = blurrier edges. Range 0…1.",
+      "detail": "Ignored for Box or None filters. Only matters with ProcFace_EnableAntiAliasing on, Size > 0, and Filter = Gaussian.",
+      "requires": ["ProcFace_EnableAntiAliasing", "ProcFace_AntiAliasingFilter"],
+      "related": ["ProcFace_AntiAliasingSize", "ProcFace_AntiAliasingFilter", "ProcFace_EnableAntiAliasing"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFaceDrawer.cpp:56,244-249",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "procedural", "antialias"]
+    },
+    "ProcFace_Scanlines": {
+      "process": "anim",
+      "blurb": "Master switch for a CRT-style dark scanline pattern on the procedural face. Off by default. When on, selected rows of the face image are dimmed (see opacity notes under ProcFace_DefaultScanlineOpacity).",
+      "detail": "ApplyScanlines runs after eyes are drawn. Rows where (row & 2) != 0 get their brightness multiplied by the scanline opacity. Feature is compile-capable (PROCEDURALFACE_SCANLINE_FEATURE 1) but this flag defaults false. Separate from ScanlineDistorter glitch (horizontal shifts / off-noise bars) used by face-layer “distortion” effects.",
+      "related": ["ProcFace_DefaultScanlineOpacity", "ProcFaceScanline_OffNoiseProb", "ProcFaceScanline_MaxShiftNoise"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFaceDrawer.cpp:69,747,1195-1268; proceduralFaceDrawer.h:146 ShouldApplyScanlineToRow; proceduralFace.h:30",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "procedural", "scanline"]
+    },
+    "ProcFace_DefaultScanlineOpacity": {
+      "process": "anim",
+      "blurb": "Intended default dimming strength for CRT scanline rows (0 = black lines, 1 = no dimming). Range 0…1. Default 1.",
+      "detail": "Constructor stores this into each ProceduralFace’s _scanlineOpacity, and SetScanlineOpacity writes the member. However GetScanlineOpacity() currently hardcodes return 0.5 whenever PROCEDURALFACE_SCANLINE_FEATURE is on, so ApplyScanlines always receives 0.5 regardless of this console var or keyframe opacity. Changing this control does not change on-screen scanline strength on current code. Marked partial for that reason.",
+      "requires": ["ProcFace_Scanlines"],
+      "related": ["ProcFace_Scanlines"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFaceDrawer.cpp:70; proceduralFace.cpp:172; proceduralFace.h:306-323 (GetScanlineOpacity returns 0.5)",
+      "category": "Face.ParameterizedFace",
+      "status": "partial",
+      "statusNote": "Member is initialized/set from this var, but GetScanlineOpacity hardcodes 0.5 — drawer never sees the tuned value.",
+      "tags": ["face", "procedural", "scanline"]
+    },
+    "ProcFace_NoiseNumFrames": {
+      "process": "anim",
+      "blurb": "How many pre-generated full-face noise textures cycle while drawing. 0 turns noise off. Default 5; max 7. Higher uses more of the noise bank for a livelier grain; 1 is a static grain layer.",
+      "detail": "ApplyNoise only runs when this is > 0. Each frame advances circularly through the first N of 7 noise images and multiplies eye brightness by noise (>>7 after u8×u8). Set to 0 for clean eyes. Changing min/max lightness regenerates all noise images.",
+      "related": ["ProcFace_NoiseMinLightness", "ProcFace_NoiseMaxLightness", "ProcFace_EyeLightnessMultiplier"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFaceDrawer.cpp:74-78,215-222,899-965",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "procedural", "noise"]
+    },
+    "ProcFace_NoiseMinLightness": {
+      "process": "anim",
+      "blurb": "Lower end of the random brightness multiplier baked into each noise texture. Default ~0.92. Range 0…2. Values below 1 darken some pixels; above 1 can brighten.",
+      "detail": "Noise samples are RandInRange(min, max)×128 stored as u8. When min or max changes at runtime, all 7 noise images are regenerated. Clamped so min ≤ max. Only visible when ProcFace_NoiseNumFrames > 0.",
+      "requires": ["ProcFace_NoiseNumFrames"],
+      "related": ["ProcFace_NoiseMaxLightness", "ProcFace_NoiseNumFrames"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFaceDrawer.cpp:77,178-212",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "procedural", "noise"]
+    },
+    "ProcFace_NoiseMaxLightness": {
+      "process": "anim",
+      "blurb": "Upper end of the random brightness multiplier for noise textures. Default ~1.14. Range 0…2. Wider gap vs min = more speckly grain; narrow gap near 1 = subtle film grain.",
+      "detail": "Paired with NoiseMinLightness when CreateNoiseImage fills the bank. Regenerates textures when changed. Only applied when NoiseNumFrames > 0.",
+      "requires": ["ProcFace_NoiseNumFrames"],
+      "related": ["ProcFace_NoiseMinLightness", "ProcFace_NoiseNumFrames"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFaceDrawer.cpp:78,178-212",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "procedural", "noise"]
+    },
+    "ProcFaceScanline_OffNoiseProb": {
+      "process": "anim",
+      "blurb": "When a scanline-distortion glitch starts, probability-related density of random “off” black bars punched into the eyes. Default 0.1. Range 0…1. Higher = more dead-pixel bars during the glitch sequence.",
+      "detail": "Category Face.ScanlineDistortion. On the first distortion frame, InitScanlineDistorter(amount, OffNoiseProb) creates N ≈ prob × (nominalEyeHeight×nominalEyeWidth) random points; each frame AddOffNoise blacks those pixels (width from OffNoiseMaxWidth). Only active while face-layer scanline distortion is playing (e.g. repair/glitch sequences via GetNextDistortionFrame) — not the CRT ProcFace_Scanlines toggle.",
+      "related": ["ProcFaceScanline_OffNoiseMaxWidth", "ProcFaceScanline_MaxShiftNoise", "ProcFace_Scanlines"],
+      "evidence": "cannedAnimLib/proceduralFace/scanlineDistorter.cpp:29,94-106,197; scanlineDistorter.h:56-89; faceLayerManager.cpp:278",
+      "category": "Face.ScanlineDistortion",
+      "status": "live",
+      "tags": ["face", "procedural", "scanline", "distortion", "glitch"]
+    },
+    "ProcFaceScanline_OffNoiseMaxWidth": {
+      "process": "anim",
+      "blurb": "Maximum horizontal width in pixels of each black “off” noise bar during scanline distortion. Default 3. If ≤ 1, each noise hit is a single pixel; if > 1, width is random in 1…max.",
+      "detail": "Used inside AddOffNoise when painting distortion noise. Only matters when a ScanlineDistorter is active (glitch sequence), and only if OffNoiseProb created points.",
+      "related": ["ProcFaceScanline_OffNoiseProb", "ProcFaceScanline_MaxShiftNoise"],
+      "evidence": "cannedAnimLib/proceduralFace/scanlineDistorter.cpp:32; scanlineDistorter.h:41,70-88",
+      "category": "Face.ScanlineDistortion",
+      "status": "live",
+      "tags": ["face", "procedural", "scanline", "distortion", "glitch"]
+    },
+    "ProcFaceScanline_MaxShiftNoise": {
+      "process": "anim",
+      "blurb": "Extra random left/right jitter (pixels) added on top of the smooth scanline-distortion shape each row. Default 3. 0 disables jitter (clean skew/triangle/S-curve only).",
+      "detail": "GetEyeDistortionAmount interpolates control-point shifts, then if MaxShiftNoise > 0 adds RandIntInRange(−max, +max). Makes the horizontal glitch look noisier. Only while a ScanlineDistorter is live on the face.",
+      "related": ["ProcFaceScanline_OffNoiseProb", "ProcFaceScanline_OffNoiseMaxWidth"],
+      "evidence": "cannedAnimLib/proceduralFace/scanlineDistorter.cpp:35,144-148; proceduralFaceDrawer.cpp:837-886",
+      "category": "Face.ScanlineDistortion",
+      "status": "live",
+      "tags": ["face", "procedural", "scanline", "distortion", "glitch"]
+    }
+  }
+}

@@ -1,0 +1,248 @@
+{
+  "vars": {
+    "Right_EyeCenterX": {
+      "process": "anim",
+      "blurb": "Horizontal offset of the right eye (screen-right eye) in pixels from its nominal rest position. Positive moves it right on the LCD; negative left. Console range about −92…92 on Vector (half the 184 px face width).",
+      "detail": "Bound to s_faceDataOverride’s right-eye EyeCenterX via RegisterFaceWithConsoleVars (same loop that registers Left_*). Only changes what you see when ProcFace_Display is Override individually, and only if this value differs from the baseline captured when override mode / ResetFace last baselined. In Normal mode the animation keyframe wins. “Right” means the eye on the right side of the screen, not Vector’s anatomical right. Under Override together, left-eye params are copied onto the right eye every frame before draw — so editing Right_* alone has no visible effect in that mode; sculpt with Left_* (or switch to Override individually).",
+      "howTo": "1) Set ProcFace_Display to Override individually (not Override together if you need independent right-eye control). 2) Optionally call ResetFace so the baseline matches the current animation face. 3) Nudge this value and watch the right eye slide horizontally.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Right_EyeCenterY", "Left_EyeCenterX", "ProcFace_CenterX", "ProcFace_NominalEyeSpacing", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:755-808 (RegisterFaceWithConsoleVars); proceduralFaceDrawer.cpp:448-453; animProcess/.../animationStreamer.cpp:1261-1308 (OverrideTogether copies Left→Right at L1270)",
+      "category": "Face.Right",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "right-eye", "transform"]
+    },
+    "Right_EyeCenterY": {
+      "process": "anim",
+      "blurb": "Vertical offset of the right eye in pixels from its nominal rest height. Positive moves it down on the LCD; negative up. Console range about −48…48 on Vector (half the 96 px face height).",
+      "detail": "Same override-only path as Right_EyeCenterX: registered on s_faceDataOverride right-eye EyeCenterY, applied in Display Override modes when different from baseline. Combined with EyeCenterX, EyeScale, and EyeAngle into the per-eye warp matrix before the eye polygon is drawn. Under Override together, left values overwrite this each frame.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Right_EyeCenterX", "Left_EyeCenterY", "ProcFace_CenterY", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:755-808; proceduralFaceDrawer.cpp:448-453; animationStreamer.cpp:1261-1308",
+      "category": "Face.Right",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "right-eye", "transform"]
+    },
+    "Right_EyeScaleX": {
+      "process": "anim",
+      "blurb": "Horizontal scale of the right eye. 1.0 is nominal width (~43 px on Vector); larger makes that eye wider; 0 collapses it. Console range 0…10.",
+      "detail": "Override-face right EyeScaleX. Applied only under ProcFace_Display Override modes when changed from baseline — and under Override together the left-eye scale is forced onto the right eye, so use Override individually for independent width. Independent of whole-face ProcFace_ScaleX. Multiplies NominalEyeWidth when building the eye polygon and transform.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Right_EyeScaleY", "Left_EyeScaleX", "ProcFace_ScaleX", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:100,755-808; proceduralFaceDrawer.cpp:327-329,457-459; animationStreamer.cpp:1261-1308",
+      "category": "Face.Right",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "right-eye", "transform"]
+    },
+    "Right_EyeScaleY": {
+      "process": "anim",
+      "blurb": "Vertical scale of the right eye. 1.0 is nominal height (~57 px on Vector); larger makes that eye taller; 0 flattens it. Console range 0…10.",
+      "detail": "Same override path as Right_EyeScaleX. LookAt and blink code also touch EyeScaleY on the live face; under override you freeze/sculpt via console instead of those systems for any param that differs from baseline. Override together copies Left_EyeScaleY onto the right eye.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Right_EyeScaleX", "Left_EyeScaleY", "ProcFace_ScaleY", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:101,755-808; proceduralFaceDrawer.cpp:327-329,457-459; animationStreamer.cpp:1261-1308",
+      "category": "Face.Right",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "right-eye", "transform"]
+    },
+    "Right_EyeAngle": {
+      "process": "anim",
+      "blurb": "Rotation of the right eye alone, in degrees, around that eye’s center. Positive and negative tilt the eye shape (and its lids/hotspot) like a cocked eyebrow. Console range −360…360.",
+      "detail": "Maps to right-eye EyeAngle on the override ProceduralFace. Only visible under ProcFace_Display Override modes when different from baseline. Fed into GetTransformationMatrix with scale and center; does not rotate the whole face (use ProcFace_Angle_deg for that). Under Override together, Left_EyeAngle is copied to the right eye before draw.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Left_EyeAngle", "ProcFace_Angle_deg", "Right_EyeCenterX", "Right_EyeScaleX", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:102,755-808; proceduralFaceDrawer.cpp:457-461; animationStreamer.cpp:1261-1308",
+      "category": "Face.Right",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "right-eye", "transform"]
+    },
+    "Right_LowerInnerRadiusX": {
+      "process": "anim",
+      "blurb": "How rounded the lower-inner corner of the right eye is, as a fraction of half-eye width (0 = sharp corner, 1 = fully rounded to the eye midline). Console range 0…1.",
+      "detail": "“Inner” means toward the nose / face center — for the screen-right eye that is the lower-left corner of that eye’s polygon (geometry is authored in left-eye coords then mirrored: x is negated for WhichEye::Right). Multiplied by halfEyeWidth for ellipse2Poly. Override-only (with ProcFace_Display Override modes) when changed from baseline. Pair with Right_LowerInnerRadiusY for the vertical radius of the same corner. Under Override together, left-eye radii overwrite these.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Right_LowerInnerRadiusY", "Right_LowerOuterRadiusX", "Left_LowerInnerRadiusX", "ProcFace_EllipseDelta", "ProcFace_Display"],
+      "evidence": "robot/clad/src/clad/types/proceduralFaceTypes.clad:19-20; cannedAnimLib/proceduralFace/proceduralFace.cpp:103; proceduralFaceDrawer.cpp:331-365,494-495 (mirror); animationStreamer.cpp:1261-1308",
+      "category": "Face.Right",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "right-eye", "shape"]
+    },
+    "Right_LowerInnerRadiusY": {
+      "process": "anim",
+      "blurb": "Vertical radius of the lower-inner (toward-nose) corner of the right eye, as a fraction of half-eye height. 0 = sharp; 1 = very round. Console range 0…1.",
+      "detail": "Paired with Right_LowerInnerRadiusX. Both must be > 0 for a curved corner; if either is 0 the drawer places a hard corner vertex instead of an ellipse arc.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Right_LowerInnerRadiusX", "Right_UpperInnerRadiusY", "Left_LowerInnerRadiusY", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:104; proceduralFaceDrawer.cpp:340-365; animationStreamer.cpp:1261-1308",
+      "category": "Face.Right",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "right-eye", "shape"]
+    },
+    "Right_UpperInnerRadiusX": {
+      "process": "anim",
+      "blurb": "Horizontal rounding of the upper-inner (toward-nose) corner of the right eye, as a fraction of half-eye width. 0 = sharp; 1 = fully rounded. Console range 0…1.",
+      "detail": "For the screen-right eye this is the upper-left corner of that eye after the left-authored poly is mirrored. Same override path as other radius params. Drawn with cv::ellipse2Poly using ProcFace_EllipseDelta as angular step.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Right_UpperInnerRadiusY", "Right_UpperOuterRadiusX", "Left_UpperInnerRadiusX", "ProcFace_EllipseDelta", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:105; proceduralFaceDrawer.cpp:338-360,494-495; animationStreamer.cpp:1261-1308",
+      "category": "Face.Right",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "right-eye", "shape"]
+    },
+    "Right_UpperInnerRadiusY": {
+      "process": "anim",
+      "blurb": "Vertical rounding of the upper-inner corner of the right eye, as a fraction of half-eye height. Console range 0…1.",
+      "detail": "Paired with Right_UpperInnerRadiusX. Both > 0 required for a curved arc; otherwise a hard corner.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Right_UpperInnerRadiusX", "Right_LowerInnerRadiusY", "Left_UpperInnerRadiusY", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:106; proceduralFaceDrawer.cpp:338-360; animationStreamer.cpp:1261-1308",
+      "category": "Face.Right",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "right-eye", "shape"]
+    },
+    "Right_UpperOuterRadiusX": {
+      "process": "anim",
+      "blurb": "Horizontal rounding of the upper-outer corner of the right eye (away from the nose — right side of the right eye on screen), as a fraction of half-eye width. Console range 0…1.",
+      "detail": "“Outer” = toward the edge of the face. Same override + ellipse2Poly path as other corner radii. Useful for soft vs squared upper lids on the outer edge. Override together still replaces right with left before draw.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Right_UpperOuterRadiusY", "Right_UpperInnerRadiusX", "Right_LowerOuterRadiusX", "Left_UpperOuterRadiusX", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:107; proceduralFaceDrawer.cpp:333-387; animationStreamer.cpp:1261-1308",
+      "category": "Face.Right",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "right-eye", "shape"]
+    },
+    "Right_UpperOuterRadiusY": {
+      "process": "anim",
+      "blurb": "Vertical rounding of the upper-outer corner of the right eye, as a fraction of half-eye height. Console range 0…1.",
+      "detail": "Paired with Right_UpperOuterRadiusX for the upper-right corner of the screen-right eye polygon (after mirror).",
+      "requires": ["ProcFace_Display"],
+      "related": ["Right_UpperOuterRadiusX", "Right_LowerOuterRadiusY", "Left_UpperOuterRadiusY", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:108; proceduralFaceDrawer.cpp:333-387; animationStreamer.cpp:1261-1308",
+      "category": "Face.Right",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "right-eye", "shape"]
+    },
+    "Right_LowerOuterRadiusX": {
+      "process": "anim",
+      "blurb": "Horizontal rounding of the lower-outer corner of the right eye (outer/lower-right of that eye on screen), as a fraction of half-eye width. Console range 0…1.",
+      "detail": "Same override path as other radii. Outer = away from nose. Zero either X or Y radius of this corner → sharp vertex instead of arc.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Right_LowerOuterRadiusY", "Right_LowerInnerRadiusX", "Right_UpperOuterRadiusX", "Left_LowerOuterRadiusX", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:109; proceduralFaceDrawer.cpp:335-378; animationStreamer.cpp:1261-1308",
+      "category": "Face.Right",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "right-eye", "shape"]
+    },
+    "Right_LowerOuterRadiusY": {
+      "process": "anim",
+      "blurb": "Vertical rounding of the lower-outer corner of the right eye, as a fraction of half-eye height. Console range 0…1.",
+      "detail": "Paired with Right_LowerOuterRadiusX for the lower-right corner of the screen-right eye.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Right_LowerOuterRadiusX", "Right_UpperOuterRadiusY", "Left_LowerOuterRadiusY", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:110; proceduralFaceDrawer.cpp:335-378; animationStreamer.cpp:1261-1308",
+      "category": "Face.Right",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "right-eye", "shape"]
+    },
+    "Right_UpperLidY": {
+      "process": "anim",
+      "blurb": "How far the upper eyelid of the right eye closes. 0 = fully open (lid at top of eye); 1 = fully closed (lid reaches the bottom). Console range 0…1.",
+      "detail": "Builds an upper-lid polygon that is filled black over the eye shape (negative space). Multiplied by NominalEyeHeight for pixel drop. Override-only under ProcFace_Display Override modes when changed from baseline. Combine with UpperLidAngle / UpperLidBend for squint, wink, or arched lids on the right eye only (use Override individually for a one-eye wink; Override together copies left lids onto right).",
+      "requires": ["ProcFace_Display"],
+      "related": ["Right_UpperLidAngle", "Right_UpperLidBend", "Right_LowerLidY", "Left_UpperLidY", "ProcFace_Display"],
+      "evidence": "robot/clad/.../proceduralFaceTypes.clad:27; cannedAnimLib/proceduralFace/proceduralFace.cpp:111; proceduralFaceDrawer.cpp:419-446,547-555; animationStreamer.cpp:1261-1308",
+      "category": "Face.Right",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "right-eye", "lid"]
+    },
+    "Right_UpperLidAngle": {
+      "process": "anim",
+      "blurb": "Tilts the right eye’s upper lid line in degrees. Positive/negative angles make one side of the lid drop more than the other (asymmetric squint). Console range −45…45.",
+      "detail": "Used as tan(angle) to raise/lower the lid corners relative to each other, and as the rotation for the optional lid-bend ellipse. Lid polygons are warped with the same left-authored then mirrored path as the eye outline. Override-only path with other Right_* sculpt params; ineffective under Override together when left overwrites right.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Right_UpperLidY", "Right_UpperLidBend", "Left_UpperLidAngle", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:112; proceduralFaceDrawer.cpp:422-437; animationStreamer.cpp:1261-1308",
+      "category": "Face.Right",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "right-eye", "lid"]
+    },
+    "Right_UpperLidBend": {
+      "process": "anim",
+      "blurb": "Curves the right upper lid. 0 = straight lid edge; positive bends the lid down into the eye (soft droop); negative bends up away from the eye (arched). Console range −1…1.",
+      "detail": "Non-zero values add an ellipse2Poly arc to the upper-lid polygon. Negative bend uses fillPoly (concave) instead of fillConvexPoly. Scale is fraction of NominalEyeHeight. Override-only under ProcFace_Display Override modes.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Right_UpperLidY", "Right_UpperLidAngle", "Right_LowerLidBend", "Left_UpperLidBend", "ProcFace_EllipseDelta", "ProcFace_Display"],
+      "evidence": "robot/clad/.../proceduralFaceTypes.clad:29; cannedAnimLib/proceduralFace/proceduralFace.cpp:113; proceduralFaceDrawer.cpp:432-445,547-555; animationStreamer.cpp:1261-1308",
+      "category": "Face.Right",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "right-eye", "lid"]
+    },
+    "Right_LowerLidY": {
+      "process": "anim",
+      "blurb": "How far the lower eyelid of the right eye closes. 0 = fully open (lid at bottom of eye); 1 = fully closed (lid reaches the top). Console range 0…1.",
+      "detail": "Mirror of UpperLidY for the bottom lid: polygon filled black over the eye. Useful for tired looks, blinks, or lower squint on the right eye alone. Override-only when ProcFace_Display is in an Override mode and the value differs from baseline; Override together still forces left→right.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Right_LowerLidAngle", "Right_LowerLidBend", "Right_UpperLidY", "Left_LowerLidY", "ProcFace_Display"],
+      "evidence": "robot/clad/.../proceduralFaceTypes.clad:30; cannedAnimLib/proceduralFace/proceduralFace.cpp:114; proceduralFaceDrawer.cpp:390-417,557-564; animationStreamer.cpp:1261-1308",
+      "category": "Face.Right",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "right-eye", "lid"]
+    },
+    "Right_LowerLidAngle": {
+      "process": "anim",
+      "blurb": "Tilts the right eye’s lower lid line in degrees. Console range −45…45.",
+      "detail": "Same geometry role as UpperLidAngle but for the lower-lid polygon and its bend arc. Override-only path.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Right_LowerLidY", "Right_LowerLidBend", "Left_LowerLidAngle", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:115; proceduralFaceDrawer.cpp:393-408; animationStreamer.cpp:1261-1308",
+      "category": "Face.Right",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "right-eye", "lid"]
+    },
+    "Right_LowerLidBend": {
+      "process": "anim",
+      "blurb": "Curves the right lower lid. 0 = straight; positive bends up into the eye; negative bends down away from the eye. Console range −1…1.",
+      "detail": "Non-zero adds an ellipse arc to the lower-lid poly; negative bend uses non-convex fillPoly. Fraction of NominalEyeHeight. Override-only under ProcFace_Display Override modes.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Right_LowerLidY", "Right_LowerLidAngle", "Right_UpperLidBend", "Left_LowerLidBend", "ProcFace_EllipseDelta", "ProcFace_Display"],
+      "evidence": "robot/clad/.../proceduralFaceTypes.clad:32; cannedAnimLib/proceduralFace/proceduralFace.cpp:116; proceduralFaceDrawer.cpp:403-416,557-564; animationStreamer.cpp:1261-1308",
+      "category": "Face.Right",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "right-eye", "lid"]
+    },
+    "Right_Lightness": {
+      "process": "anim",
+      "blurb": "Brightness multiplier for the filled right-eye pixels only. 1 = full strength; 0 blacks out that eye; values between dim it. Console range −1…1 (product faces use about 0…1; −1 is an animation “unset” sentinel).",
+      "detail": "Applied in DrawEye after the global ProcFace_EyeLightnessMultiplier: each lit eye pixel is multiplied by this value. Only affects the display when ProcFace_Display is Override individually/together and this differs from the override baseline — but under Override together left Lightness is copied onto the right, so dimming only the right eye requires Override individually. Does not change hue (use ProcFace_Hue) or the CRT scanline path. Extreme negatives clamp toward black after cast.",
+      "requires": ["ProcFace_Display"],
+      "related": ["Left_Lightness", "ProcFace_EyeLightnessMultiplier", "ProcFace_Hue", "ProcFace_Display"],
+      "evidence": "robot/clad/.../proceduralFaceTypes.clad:34; cannedAnimLib/proceduralFace/proceduralFace.cpp:118; proceduralFaceDrawer.cpp:674-724; animationStreamer.cpp:1261-1308",
+      "category": "Face.Right",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "right-eye", "brightness"]
+    },
+    "Right_HotSpotCenterX": {
+      "process": "anim",
+      "blurb": "Horizontal position of the soft bright “hotspot” (pupil-like glow) inside the right eye, as a fraction of eye width. 0 = eye center; −1 = left edge; +1 = right edge. Console range −1…1.",
+      "detail": "Only visible when ProcFace_HotspotRender is on (otherwise eyes are flat fill). The hotspot center is warped with the same eye transform as the polygon, so it moves/rotates with Right_EyeAngle and scale. Override-only for the sculpt value itself under ProcFace_Display Override modes. Falloff width is global ProcFace_HotspotFalloff. Under Override together, Left_HotSpotCenterX is forced onto the right eye.",
+      "howTo": "1) Enable ProcFace_HotspotRender. 2) Set ProcFace_Display to Override individually (or together if you want left hotspot mirrored to both). 3) Move this X (and Right_HotSpotCenterY) to place the bright core in the right eye only when using Override individually.",
+      "requires": ["ProcFace_Display", "ProcFace_HotspotRender"],
+      "related": ["Right_HotSpotCenterY", "Left_HotSpotCenterX", "ProcFace_HotspotRender", "ProcFace_HotspotFalloff", "ProcFace_Display"],
+      "evidence": "robot/clad/.../proceduralFaceTypes.clad:36-37; cannedAnimLib/proceduralFace/proceduralFace.cpp:120; proceduralFaceDrawer.cpp:570-625; animationStreamer.cpp:1261-1308",
+      "category": "Face.Right",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "right-eye", "hotspot"]
+    },
+    "Right_HotSpotCenterY": {
+      "process": "anim",
+      "blurb": "Vertical position of the right eye’s soft hotspot, as a fraction of eye height. 0 = center; −1 = top edge; +1 = bottom edge. Console range −1…1.",
+      "detail": "Paired with Right_HotSpotCenterX. Same requires: ProcFace_HotspotRender for the glow to paint, and ProcFace_Display Override modes for this console value to replace the animation’s hotspot when it differs from baseline. Override together copies left hotspot onto right.",
+      "requires": ["ProcFace_Display", "ProcFace_HotspotRender"],
+      "related": ["Right_HotSpotCenterX", "Left_HotSpotCenterY", "ProcFace_HotspotRender", "ProcFace_HotspotFalloff", "ProcFace_Display"],
+      "evidence": "cannedAnimLib/proceduralFace/proceduralFace.cpp:121; proceduralFaceDrawer.cpp:570-625; animationStreamer.cpp:1261-1308",
+      "category": "Face.Right",
+      "status": "live",
+      "tags": ["face", "procedural", "override", "right-eye", "hotspot"]
+    }
+  }
+}
