@@ -1,0 +1,20 @@
+{
+  "categories": {
+    "Vision": {
+      "blurb": "Camera pipeline, vision modes, mirror display, face/marker debug. Engine only.",
+      "process": "engine"
+    },
+    "Vision.General.VisionModes": {
+      "blurb": "Per-VisionMode force-enable toggles (Faces, MirrorMode, Markers, …). Enabling also Dev-subscribes so the mode is scheduled.",
+      "process": "engine"
+    },
+    "Vision.MirrorMode": {
+      "blurb": "Drawing options for the on-face camera mirror image (detections, exposure text, gamma).",
+      "process": "engine"
+    },
+    "Vision.General": {
+      "blurb": "Cross-cutting vision debug flags (e.g. eye-contact drawing in mirror).",
+      "process": "engine"
+    }
+  }
+}

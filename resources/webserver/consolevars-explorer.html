@@ -122,13 +122,39 @@
     }
     .cv-btn:hover { color: var(--cv-text); border-color: #3a465c; }
     .cv-btn-primary { background: var(--cv-accent-dim); border-color: var(--cv-accent); color: var(--cv-accent); }
-    .cv-meta {
-      display: block; width: 100%; margin: 4px 0 10px 0;
-      padding: 8px 10px; border-radius: 6px;
-      background: rgba(91, 159, 212, 0.08); border-left: 3px solid var(--cv-accent);
+    /* Compact Path A marks (shared consolevars-app.js) */
+    .cv-marks {
+      display: inline-flex; align-items: center; gap: 4px;
+      position: relative; vertical-align: middle; margin: 0 4px 0 2px;
     }
-    .cv-meta .cv-blurb { margin: 0 0 4px; }
-    .cv-requires, .cv-related { margin: 4px 0 0; font-size: 11px; color: var(--cv-dim); }
+    .cv-help {
+      cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+      width: 16px; height: 16px; padding: 0;
+      border: 1px solid #3a465c; border-radius: 999px;
+      background: var(--cv-accent-dim); color: var(--cv-accent);
+      font: 600 11px/1 var(--cv-sans); outline: none;
+    }
+    .cv-help:hover, .cv-help[aria-expanded="true"] {
+      color: #7ab8e8; border-color: var(--cv-accent);
+    }
+    .cv-dead {
+      display: inline-flex; min-width: 14px; height: 14px; align-items: center; justify-content: center;
+      color: var(--cv-faint); font: 600 12px/1 var(--cv-sans); cursor: help;
+    }
+    .cv-row-dead > label { color: var(--cv-dim); }
+    .cv-popover {
+      display: block; position: absolute; left: 0; top: calc(100% + 4px); z-index: 100;
+      min-width: 18ch; max-width: min(42ch, 70vw); padding: 8px 10px;
+      background: var(--cv-elev); color: var(--cv-text);
+      border: 1px solid var(--cv-line); border-radius: 6px;
+      font: 12px/1.4 var(--cv-sans); white-space: normal; text-align: left;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+    .cv-popover[hidden] { display: none !important; }
+    .cv-popover .cv-blurb { margin: 0 0 4px; color: var(--cv-dim); }
+    .cv-popover .cv-status-note { margin: 4px 0 0; color: var(--cv-warn); font-size: 11px; }
+    .cv-popover .cv-evidence { margin: 4px 0 0; color: var(--cv-faint); font: 10px/1.35 var(--cv-mono); word-break: break-word; }
+    .cv-popover .cv-requires, .cv-popover .cv-related { margin: 6px 0 0; font-size: 11px; color: var(--cv-dim); }
     .cv-linkvar {
       cursor: pointer; border: 0; background: transparent; color: var(--cv-accent);
       font-family: var(--cv-mono); font-size: 11px; text-decoration: underline; padding: 0 2px;
@@ -154,9 +180,8 @@
       background: #0e1218; border: 1px solid var(--cv-line);
       font-family: var(--cv-mono); font-size: 11px; color: var(--cv-dim);
     }
-    /* C++ used display:inline-block on all divs — force block layout for meta + rows */
+    /* C++ used display:inline-block on all divs — force block layout for rows / fieldsets */
     body.cv-body #tabs div.cv-row,
-    body.cv-body #tabs div.cv-meta,
     body.cv-body #tabs fieldset,
     body.cv-body #tabs .cv-cat-blurb { display: block; }
     body.cv-body #tabs > div > div {

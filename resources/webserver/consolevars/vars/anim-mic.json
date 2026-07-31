@@ -1,0 +1,18 @@
+{
+  "vars": {
+    "MicData_ClipRecordTime_ms": {
+      "process": "anim",
+      "blurb": "Duration of RecordMicDataClip (ms).",
+      "category": "MicData",
+      "related": ["RecordMicDataClip"],
+      "tags": ["mic", "highlight"]
+    },
+    "RecordMicDataClip": {
+      "process": "anim",
+      "blurb": "Console function: record raw + processed mic for MicData_ClipRecordTime_ms.",
+      "category": "MicData",
+      "related": ["MicData_ClipRecordTime_ms"],
+      "tags": ["mic", "func", "highlight"]
+    }
+  }
+}

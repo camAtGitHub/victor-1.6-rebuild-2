@@ -1,0 +1,53 @@
+{
+  "vars": {
+    "BW_PossibleObjectClose_mm": {
+      "process": "engine",
+      "blurb": "Spatial threshold (mm) treating two possible-object observations as the same for remove/match; also maxLocDist for FindLocatedClosestMatchingObject and viz quad half-size (default 50).",
+      "status": "live",
+      "evidence": "engine/aiComponent/aiWhiteboard.cpp:50,484,621,679",
+      "tags": ["blockworld", "whiteboard", "possibleObject"]
+    },
+    "BW_PossibleObjectClose_rad": {
+      "process": "engine",
+      "blurb": "Angular match tolerance (rad) for nearby known object vs new possible object (default π; comment suggests 2π may be better).",
+      "status": "live",
+      "evidence": "engine/aiComponent/aiWhiteboard.cpp:51,622",
+      "tags": ["blockworld", "whiteboard", "possibleObject"]
+    },
+    "BW_MaxPossibleObjects": {
+      "process": "engine",
+      "blurb": "Cap on pending possible-object list; oldest popped when full (default 10).",
+      "status": "live",
+      "evidence": "engine/aiComponent/aiWhiteboard.cpp:53,638-642",
+      "tags": ["blockworld", "whiteboard", "possibleObject"]
+    },
+    "FlatPosisbleObjectTol_deg": {
+      "process": "engine",
+      "blurb": "Max Z-axis angular deviation (deg) for an observation to count as flat enough to store as possible object (default 10). Dump id keeps source typo 'Posisble'.",
+      "status": "live",
+      "evidence": "engine/aiComponent/aiWhiteboard.cpp:54,579; consolevarlist_8888: FlatPosisbleObjectTol_deg",
+      "tags": ["blockworld", "whiteboard", "possibleObject", "typo"]
+    },
+    "BW_MaxHeightForPossibleObject_mm": {
+      "process": "engine",
+      "blurb": "Reject possible objects whose pose Z relative to robot exceeds this (mm) (default 30).",
+      "status": "live",
+      "evidence": "engine/aiComponent/aiWhiteboard.cpp:55,600",
+      "tags": ["blockworld", "whiteboard", "possibleObject"]
+    },
+    "BW_DebugRenderPossibleObjects": {
+      "process": "engine",
+      "blurb": "If true, draw orange Viz quads for stored possible objects (default true).",
+      "status": "live",
+      "evidence": "engine/aiComponent/aiWhiteboard.cpp:57,665-687",
+      "tags": ["blockworld", "whiteboard", "debug", "viz"]
+    },
+    "BW_DebugRenderPossibleObjectsZ": {
+      "process": "engine",
+      "blurb": "Z lift (mm) applied to possible-object debug quads (default 35).",
+      "status": "live",
+      "evidence": "engine/aiComponent/aiWhiteboard.cpp:58,674",
+      "tags": ["blockworld", "whiteboard", "debug", "viz"]
+    }
+  }
+}

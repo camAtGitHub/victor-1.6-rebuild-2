@@ -1,0 +1,272 @@
+{
+  "vars": {
+    "ForceDisableABTesting": {
+      "process": "engine",
+      "blurb": "Force-disable AnkiLab A/B testing (custom console var; toggle also calls EnableAnkiLab).",
+      "status": "live",
+      "evidence": "lib/util/source/anki/util/ankiLab/extLabInterface.cpp:56-86 (kForceDisableABTesting; category A/B Testing); ShouldABTestingBeDisabled()",
+      "category": "A/B Testing",
+      "tags": ["net", "abtest", "dev"]
+    },
+    "EnableVerboseNetworkLogging": {
+      "process": "engine",
+      "blurb": "Gate for ANKI_NET_MESSAGE_VERBOSE / ANKI_NET_PRINT_VERBOSE network message dumps (also unthrottles UDP send-fail warnings).",
+      "status": "live",
+      "evidence": "lib/util/source/anki/util/debug/messageDebugging.cpp:26; messageDebugging.h:31-33; udpTransport.cpp:833",
+      "category": "Network",
+      "related": ["PrintNetworkStats", "PrintNetworkStatsTimeSpacingMS"],
+      "tags": ["net", "debug", "logging"]
+    },
+    "ForceDisableAnkiDevFeatures": {
+      "process": "engine",
+      "blurb": "When true, NativeAnkiUtilAreDevFeaturesEnabled() is false even if ANKI_DEV_CHEATS is compiled in.",
+      "status": "live",
+      "evidence": "lib/util/source/anki/util/global/globalDefinitions.cpp:21-29 (kForceDisableAnkiDevFeatures; category Dev)",
+      "category": "Dev",
+      "tags": ["dev", "danger"]
+    },
+    "NetConnStatsUpdate": {
+      "process": "engine",
+      "blurb": "When true, ReliableTransport::UpdateNetStats() refreshes Network.Stats console gauges each tick (REMOTE_CONSOLE builds).",
+      "status": "live",
+      "evidence": "lib/util/source/anki/util/transport/connectionStats.cpp:23; reliableTransport.cpp:766-768; engine/cozmoEngine.cpp:509 (latency path also gated)",
+      "category": "Network.Stats",
+      "related": ["NetStat1NumConnections", "NetStat2LatencyAvg", "PrintNetworkStats"],
+      "tags": ["net", "stats"]
+    },
+    "NetStat1NumConnections": {
+      "process": "engine",
+      "blurb": "Read-mostly: active reliable-connection count (rewritten by UpdateNetStats).",
+      "status": "live",
+      "statusNote": "WRAP_CONSOLE_VAR over globals; values are produced by the stack, not durable knobs.",
+      "evidence": "lib/util/source/anki/util/transport/connectionStats.cpp:24,38; reliableTransport.cpp:873",
+      "category": "Network.Stats",
+      "related": ["NetConnStatsUpdate", "NetStat2LatencyAvg"],
+      "tags": ["net", "stats", "readonly"]
+    },
+    "NetStat2LatencyAvg": {
+      "process": "engine",
+      "blurb": "Read-mostly: mean RTT/ack latency across connections (ms scale from connection stats).",
+      "status": "live",
+      "statusNote": "Overwritten each stats update; also sampled into engine latency logging when NetConnStatsUpdate is on.",
+      "evidence": "lib/util/source/anki/util/transport/connectionStats.cpp:25,39; reliableTransport.cpp:874; engine/cozmoEngine.cpp:523",
+      "category": "Network.Stats",
+      "related": ["NetStat3LatencySD", "NetStat4LatencyMin", "NetStat5LatencyMax"],
+      "tags": ["net", "stats", "readonly"]
+    },
+    "NetStat3LatencySD": {
+      "process": "engine",
+      "blurb": "Read-mostly: averaged latency standard deviation across connections.",
+      "status": "live",
+      "statusNote": "Overwritten by UpdateNetStats; multi-connection averaging is approximate (see comment in UpdateNetStats).",
+      "evidence": "lib/util/source/anki/util/transport/connectionStats.cpp:26,40; reliableTransport.cpp:875",
+      "category": "Network.Stats",
+      "related": ["NetStat2LatencyAvg"],
+      "tags": ["net", "stats", "readonly"]
+    },
+    "NetStat4LatencyMin": {
+      "process": "engine",
+      "blurb": "Read-mostly: min observed latency among connections with ping samples.",
+      "status": "live",
+      "evidence": "lib/util/source/anki/util/transport/connectionStats.cpp:27,41; reliableTransport.cpp:876; engine/cozmoEngine.cpp:523",
+      "category": "Network.Stats",
+      "related": ["NetStat2LatencyAvg", "NetStat5LatencyMax"],
+      "tags": ["net", "stats", "readonly"]
+    },
+    "NetStat5LatencyMax": {
+      "process": "engine",
+      "blurb": "Read-mostly: max observed latency among connections with ping samples.",
+      "status": "live",
+      "evidence": "lib/util/source/anki/util/transport/connectionStats.cpp:28,42; reliableTransport.cpp:877; engine/cozmoEngine.cpp:523",
+      "category": "Network.Stats",
+      "related": ["NetStat2LatencyAvg", "NetStat4LatencyMin"],
+      "tags": ["net", "stats", "readonly"]
+    },
+    "NetStat6PingArrivedPC": {
+      "process": "engine",
+      "blurb": "Read-mostly: averaged ping-arrived percentage across connections.",
+      "status": "live",
+      "evidence": "lib/util/source/anki/util/transport/connectionStats.cpp:29,43; reliableTransport.cpp:878",
+      "category": "Network.Stats",
+      "related": ["NetStat2LatencyAvg", "NetConnStatsUpdate"],
+      "tags": ["net", "stats", "readonly"]
+    },
+    "NetStat7ExtQueuedAvg_ms": {
+      "process": "engine",
+      "blurb": "Read-mostly: mean external send-queue time (ms) across connections.",
+      "status": "live",
+      "evidence": "lib/util/source/anki/util/transport/connectionStats.cpp:30,44; reliableTransport.cpp:879; engine/cozmoEngine.cpp:524",
+      "category": "Network.Stats",
+      "related": ["NetStat8ExtQueuedMin_ms", "NetStat9ExtQueuedMax_ms", "NetStatAQueuedAvg_ms"],
+      "tags": ["net", "stats", "readonly"]
+    },
+    "NetStat8ExtQueuedMin_ms": {
+      "process": "engine",
+      "blurb": "Read-mostly: min external send-queue time (ms).",
+      "status": "live",
+      "evidence": "lib/util/source/anki/util/transport/connectionStats.cpp:31,45; reliableTransport.cpp:880",
+      "category": "Network.Stats",
+      "related": ["NetStat7ExtQueuedAvg_ms", "NetStat9ExtQueuedMax_ms"],
+      "tags": ["net", "stats", "readonly"]
+    },
+    "NetStat9ExtQueuedMax_ms": {
+      "process": "engine",
+      "blurb": "Read-mostly: max external send-queue time (ms).",
+      "status": "live",
+      "evidence": "lib/util/source/anki/util/transport/connectionStats.cpp:32,46; reliableTransport.cpp:881",
+      "category": "Network.Stats",
+      "related": ["NetStat7ExtQueuedAvg_ms", "NetStat8ExtQueuedMin_ms"],
+      "tags": ["net", "stats", "readonly"]
+    },
+    "NetStatAQueuedAvg_ms": {
+      "process": "engine",
+      "blurb": "Read-mostly: mean internal send-queue time (ms) across connections.",
+      "status": "live",
+      "evidence": "lib/util/source/anki/util/transport/connectionStats.cpp:33,47; reliableTransport.cpp:882; engine/cozmoEngine.cpp:525",
+      "category": "Network.Stats",
+      "related": ["NetStatBQueuedMin_ms", "NetStatCQueuedMax_ms", "NetStat7ExtQueuedAvg_ms"],
+      "tags": ["net", "stats", "readonly"]
+    },
+    "NetStatBQueuedMin_ms": {
+      "process": "engine",
+      "blurb": "Read-mostly: min internal send-queue time (ms).",
+      "status": "live",
+      "evidence": "lib/util/source/anki/util/transport/connectionStats.cpp:34,48; reliableTransport.cpp:883",
+      "category": "Network.Stats",
+      "related": ["NetStatAQueuedAvg_ms", "NetStatCQueuedMax_ms"],
+      "tags": ["net", "stats", "readonly"]
+    },
+    "NetStatCQueuedMax_ms": {
+      "process": "engine",
+      "blurb": "Read-mostly: max internal send-queue time (ms).",
+      "status": "live",
+      "evidence": "lib/util/source/anki/util/transport/connectionStats.cpp:35,49; reliableTransport.cpp:884",
+      "category": "Network.Stats",
+      "related": ["NetStatAQueuedAvg_ms", "NetStatBQueuedMin_ms"],
+      "tags": ["net", "stats", "readonly"]
+    },
+    "UDPRandomPacketLossPercentage": {
+      "process": "engine",
+      "blurb": "Net-emulator: random packet-loss percent (-1 uses socket default; 0–100 forces loss). Only applies when emulator socket is active.",
+      "status": "danger",
+      "statusNote": "Can drop reliable traffic and break SDK/UI connectivity. Requires NetEmulatorUDPSocket (see UDPNetEmulatorEnabled / runtime toggle).",
+      "evidence": "lib/util/source/anki/util/transport/netEmulatorUDPSocket.cpp:33,450-452 (gUDPRandomPacketLossPercentage)",
+      "category": "Network.Emulator",
+      "related": ["UDPMinLatency", "UDPMaxLatency", "UDPNetEmulatorEnabled", "UDPNetEmulatorRuntimeToggling"],
+      "tags": ["net", "emulator", "danger"]
+    },
+    "UDPMinLatency": {
+      "process": "engine",
+      "blurb": "Net-emulator: min added latency (ms). Console range active only when UDPMaxLatency > UDPMinLatency.",
+      "status": "danger",
+      "statusNote": "Emulated delay; can stall control links. Paired with UDPMaxLatency (see that var for max-side wiring quirk).",
+      "evidence": "lib/util/source/anki/util/transport/netEmulatorUDPSocket.cpp:34,462-464",
+      "category": "Network.Emulator",
+      "related": ["UDPMaxLatency", "UDPRandomPacketLossPercentage", "UDPNetEmulatorEnabled"],
+      "tags": ["net", "emulator", "danger"]
+    },
+    "UDPMaxLatency": {
+      "process": "engine",
+      "blurb": "Net-emulator: intended max added latency (ms); range 0–5000.",
+      "status": "partial",
+      "statusNote": "When console max>min, GetMaxLatencyInMS() returns gUDPMinLatency (same as min) — both getters use gUDPMinLatency; effective delay collapses to min until fixed. Still a danger knob if/when wiring is corrected.",
+      "evidence": "lib/util/source/anki/util/transport/netEmulatorUDPSocket.cpp:35,468-470",
+      "category": "Network.Emulator",
+      "related": ["UDPMinLatency", "UDPRandomPacketLossPercentage", "UDPNetEmulatorEnabled"],
+      "tags": ["net", "emulator", "danger", "partial"]
+    },
+    "PrintNetworkStats": {
+      "process": "engine",
+      "blurb": "When true, ReliableTransport periodically Print()s connection/transport stats to the Network log channel.",
+      "status": "live",
+      "evidence": "lib/util/source/anki/util/transport/reliableTransport.cpp:29,751-761 (gated by ANKI_NET_MESSAGE_LOGGING_ENABLED == REMOTE_CONSOLE_ENABLED)",
+      "category": "Network",
+      "related": ["PrintNetworkStatsTimeSpacingMS", "EnableVerboseNetworkLogging", "NetConnStatsUpdate"],
+      "tags": ["net", "debug", "logging"]
+    },
+    "PrintNetworkStatsTimeSpacingMS": {
+      "process": "engine",
+      "blurb": "Minimum ms between PrintNetworkStats dumps (default 1000, range 0–10000).",
+      "status": "live",
+      "evidence": "lib/util/source/anki/util/transport/reliableTransport.cpp:30,757",
+      "category": "Network",
+      "related": ["PrintNetworkStats"],
+      "tags": ["net", "debug", "logging"]
+    },
+    "UDPNetEmulatorRuntimeToggling": {
+      "process": "engine",
+      "blurb": "Allow live swap of UDP socket impl to/from NetEmulator based on UDPNetEmulatorEnabled (closes/reopens sockets).",
+      "status": "danger",
+      "statusNote": "Without this true, UpdateSocketImplForNetEmulation() returns immediately — emulator enable flag is ignored at runtime.",
+      "evidence": "lib/util/source/anki/util/transport/udpTransport.cpp:44,976-985",
+      "category": "Network.Emulator",
+      "related": ["UDPNetEmulatorEnabled", "UDPRandomPacketLossPercentage", "UDPMinLatency"],
+      "tags": ["net", "emulator", "danger"]
+    },
+    "UDPNetEmulatorEnabled": {
+      "process": "engine",
+      "blurb": "Desired net-emulator on/off; applied only when UDPNetEmulatorRuntimeToggling is true (socket impl switch).",
+      "status": "danger",
+      "statusNote": "Enabling + loss/latency knobs can black-hole traffic. partial unless RuntimeToggling is also on.",
+      "evidence": "lib/util/source/anki/util/transport/udpTransport.cpp:45,984-999",
+      "category": "Network.Emulator",
+      "related": ["UDPNetEmulatorRuntimeToggling", "UDPRandomPacketLossPercentage", "UDPMinLatency", "UDPMaxLatency"],
+      "requires": ["UDPNetEmulatorRuntimeToggling"],
+      "tags": ["net", "emulator", "danger"]
+    },
+    "HighMemPressureMultiple": {
+      "process": "engine",
+      "blurb": "OSState memory: pressure multiple above which alert is Red (default 10, range 0–100).",
+      "status": "live",
+      "evidence": "osState/osState_vicos.cpp:67,456; also osState/osState_mac.cpp:58,412",
+      "category": "OSState.MemoryInfo",
+      "related": ["MediumMemPressureMultiple"],
+      "tags": ["net", "osstate", "memory"]
+    },
+    "MediumMemPressureMultiple": {
+      "process": "engine",
+      "blurb": "OSState memory: pressure multiple above which alert is Yellow (default 5, range 0–100).",
+      "status": "live",
+      "evidence": "osState/osState_vicos.cpp:70,456; also osState/osState_mac.cpp:61,412",
+      "category": "OSState.MemoryInfo",
+      "related": ["HighMemPressureMultiple"],
+      "tags": ["net", "osstate", "memory"]
+    },
+    "HighDiskPressureMultiple": {
+      "process": "engine",
+      "blurb": "OSState disk: pressure multiple for Red alert (default 10, range 0–100).",
+      "status": "live",
+      "evidence": "osState/osState_vicos.cpp:73,474; also osState/osState_mac.cpp:64,440",
+      "category": "OSState.DiskInfo",
+      "related": ["MediumDiskPressureMultiple"],
+      "tags": ["net", "osstate", "disk"]
+    },
+    "MediumDiskPressureMultiple": {
+      "process": "engine",
+      "blurb": "OSState disk: pressure multiple for Yellow alert (default 5, range 0–100).",
+      "status": "live",
+      "evidence": "osState/osState_vicos.cpp:76,474; also osState/osState_mac.cpp:67,440",
+      "category": "OSState.DiskInfo",
+      "related": ["HighDiskPressureMultiple"],
+      "tags": ["net", "osstate", "disk"]
+    },
+    "HighWifiErrorRate": {
+      "process": "engine",
+      "blurb": "OSState WiFi: error/byte percent above which alert is Red (default 2, range 0–100). VICOS path only for GetWifiAlert.",
+      "status": "live",
+      "evidence": "osState/osState_vicos.cpp:79,714-715",
+      "category": "OSState.WifiInfo",
+      "related": ["MediumWifiErrorRate"],
+      "tags": ["net", "osstate", "wifi"]
+    },
+    "MediumWifiErrorRate": {
+      "process": "engine",
+      "blurb": "OSState WiFi: error/byte percent above which alert is Yellow (default 1, range 0–100). VICOS path only for GetWifiAlert.",
+      "status": "live",
+      "evidence": "osState/osState_vicos.cpp:82,717-718",
+      "category": "OSState.WifiInfo",
+      "related": ["HighWifiErrorRate"],
+      "tags": ["net", "osstate", "wifi"]
+    }
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "recipes": [
+    {
+      "id": "procface-custom-eyes-builtin",
+      "title": "Custom eye overlay (built-in pattern)",
+      "process": "anim",
+      "blurb": "Tint/overlay procedural eyes with a built-in faceOverlays asset (pride flags, frog, galaxy, …).",
+      "where": "Anim :8889 → Face → ParameterizedFace",
+      "steps": [
+        {
+          "var": "ProcFace_CustomEyeOverlay",
+          "value": 0,
+          "enumLabel": "Trans (index 0)",
+          "note": "List: Trans,Lesbian,Gay,Bi,Pan,Frog,All,Galaxy,Custom. Pick any built-in 0–7."
+        },
+        {
+          "func": "LoadFaceOverlay",
+          "args": "",
+          "note": "Loads the selected overlay PNG/JPG into memory (required after changing the list)."
+        },
+        {
+          "var": "ProcFace_CustomEyes",
+          "value": true,
+          "note": "Master switch: composite the loaded overlay onto procedural eyes."
+        },
+        {
+          "var": "ProcFace_CustomEyeOpacity",
+          "value": 0.8,
+          "note": "Optional blend strength (0–1)."
+        }
+      ],
+      "tips": [
+        "Anim process only (port 8889).",
+        "Order matters: choose list → LoadFaceOverlay → tick CustomEyes.",
+        "Built-in assets live under cozmo_resources/assets/faceOverlays/."
+      ]
+    },
+    {
+      "id": "procface-custom-eyes-file",
+      "title": "Custom eye overlay from /data/data/customFaceOverlay.jpg",
+      "process": "anim",
+      "blurb": "Same as built-in overlay, but uses your file on the robot after picking Custom in the list.",
+      "where": "Anim :8889 → Face → ParameterizedFace",
+      "steps": [
+        {
+          "var": "ProcFace_CustomEyeOverlay",
+          "value": 8,
+          "enumLabel": "Custom (index 8)",
+          "note": "Selects path /data/data/customFaceOverlay.jpg (see LoadCustomEyePNG)."
+        },
+        {
+          "func": "LoadFaceOverlay",
+          "args": "",
+          "note": "Reads that file; fails silently if missing/empty — scp/curl the jpg first."
+        },
+        { "var": "ProcFace_CustomEyes", "value": true, "note": "Enable overlay composite." },
+        { "var": "ProcFace_CustomEyeOpacity", "value": 0.8, "note": "Blend opacity." }
+      ],
+      "tips": [
+        "Push an image first, e.g. curl -T my.jpg http://ROBOT:8889/… or scp to /data/data/customFaceOverlay.jpg",
+        "Image is resized to face display resolution if needed.",
+        "Re-press LoadFaceOverlay after replacing the file."
+      ]
+    }
+  ]
+}

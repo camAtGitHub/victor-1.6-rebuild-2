@@ -1,0 +1,103 @@
+{
+  "vars": {
+    "DefaultDockingMethod": {
+      "process": "engine",
+      "blurb": "Default DockingMethod for IDockAction ctor: 0=BLIND, 1=TRACKER, 2=HYBRID, 3=HYBRID_BEELINE, 4=EVEN_BLINDER (default BLIND=0). Group label documents B:0 T:1 H:2 only.",
+      "status": "live",
+      "evidence": "engine/actions/dockActions.cpp:64,116; robot/clad/src/clad/types/dockingSignals.clad:9-28",
+      "tags": ["actions", "docking"]
+    },
+    "PickupDockingMethod": {
+      "process": "engine",
+      "blurb": "DockingMethod for PickupObjectAction and AlignWithObject LIFT_PLATE (default HYBRID_DOCKING_BEELINE=3).",
+      "status": "live",
+      "evidence": "engine/actions/dockActions.cpp:65,1175,1275",
+      "tags": ["actions", "docking", "pickup"]
+    },
+    "RollDockingMethod": {
+      "process": "engine",
+      "blurb": "DockingMethod for RollObjectAction (default BLIND_DOCKING=0).",
+      "status": "live",
+      "evidence": "engine/actions/dockActions.cpp:66,2255",
+      "tags": ["actions", "docking", "roll"]
+    },
+    "StackDockingMethod": {
+      "process": "engine",
+      "blurb": "DockingMethod when PlaceRelObjectAction places high/stack (DA_PLACE_HIGH) (default BLIND=0).",
+      "status": "live",
+      "evidence": "engine/actions/dockActions.cpp:67,1780-1782",
+      "tags": ["actions", "docking", "stack"]
+    },
+    "PlaceRelUseMaxOffset": {
+      "process": "engine",
+      "blurb": "If true (default), clip PlaceRel pre-dock lateral offsets to max; if false force clip offsets to 0.",
+      "status": "live",
+      "evidence": "engine/actions/dockActions.cpp:70,2187-2190",
+      "tags": ["actions", "docking", "place"]
+    },
+    "EnablePredockDistanceCheckFix": {
+      "process": "engine",
+      "blurb": "COZMO-5880 workaround: only skip dock pre-dock distance re-check when DriveTo succeeded (default true).",
+      "status": "live",
+      "evidence": "engine/actions/driveToActions.cpp:46,1012-1024",
+      "tags": ["actions", "drive", "docking"]
+    },
+    "DriveToPoseTimeout": {
+      "process": "engine",
+      "blurb": "Timeout seconds for DriveToPoseAction::GetTimeoutInSeconds (default 30).",
+      "status": "live",
+      "evidence": "engine/actions/driveToActions.cpp:47,629",
+      "tags": ["actions", "drive"]
+    },
+    "Override_PanDuration_s": {
+      "process": "engine",
+      "blurb": "If >0, override ITrackAction body pan duration (s) used to compute turn speed; -1 = use action default.",
+      "status": "live",
+      "evidence": "engine/actions/trackActionInterface.cpp:44,562",
+      "tags": ["actions", "tracking"]
+    },
+    "Override_TiltDuration_s": {
+      "process": "engine",
+      "blurb": "If >0, override ITrackAction head tilt duration (s) for speed; -1 = use action default.",
+      "status": "live",
+      "evidence": "engine/actions/trackActionInterface.cpp:45,467",
+      "tags": ["actions", "tracking"]
+    },
+    "Override_ClampSmallAngles": {
+      "process": "engine",
+      "blurb": "When true, force small-angle clamp path only if both Min/Max period overrides are ≥0; else effectively disables clamping. Default false keeps per-action _clampSmallAngles.",
+      "status": "partial",
+      "statusNote": "Bool alone is incomplete: clampSmallAngles becomes (true ? clampOverride : _clampSmallAngles) where clampOverride needs both period overrides ≥0.",
+      "evidence": "engine/actions/trackActionInterface.cpp:47,731-743",
+      "tags": ["actions", "tracking"]
+    },
+    "Override_ClampSmallAnglesMinPeriod_s": {
+      "process": "engine",
+      "blurb": "If ≥0 (with Max ≥0), overrides min period for small-angle clamping on ITrackAction; -1 means no override.",
+      "status": "live",
+      "evidence": "engine/actions/trackActionInterface.cpp:48,731-743",
+      "tags": ["actions", "tracking"]
+    },
+    "Override_ClampSmallAnglesMaxPeriod_s": {
+      "process": "engine",
+      "blurb": "If ≥0 (with Min ≥0), overrides max period for small-angle clamping on ITrackAction; -1 means no override.",
+      "status": "live",
+      "evidence": "engine/actions/trackActionInterface.cpp:49,731-743",
+      "tags": ["actions", "tracking"]
+    },
+    "Override_PanTolerance_deg": {
+      "process": "engine",
+      "blurb": "If ≥0, every CheckIfDone applies this pan tolerance (deg) on ITrackAction; -1 leaves action setting.",
+      "status": "live",
+      "evidence": "engine/actions/trackActionInterface.cpp:51,415-416",
+      "tags": ["actions", "tracking"]
+    },
+    "Override_TiltTolerance_deg": {
+      "process": "engine",
+      "blurb": "If ≥0, every CheckIfDone applies this tilt tolerance (deg) on ITrackAction; -1 leaves action setting.",
+      "status": "live",
+      "evidence": "engine/actions/trackActionInterface.cpp:52,419-420",
+      "tags": ["actions", "tracking"]
+    }
+  }
+}

@@ -1,0 +1,239 @@
+{
+  "vars": {
+    "Keepaway_minPouncesForSoloPlay": {
+      "process": "engine",
+      "blurb": "Min of RNG range for solo-play pounce count before exit (when cube never moves after game start).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:140,199",
+      "tags": ["keepaway", "behavior", "solo"]
+    },
+    "Keepaway_maxPouncesForSoloPlay": {
+      "process": "engine",
+      "blurb": "Max of RNG range for solo-play pounce count before exit (when cube never moves after game start).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:141,199",
+      "tags": ["keepaway", "behavior", "solo"]
+    },
+    "Keepaway_targetUnmovedGameEndTimeout_s": {
+      "process": "engine",
+      "blurb": "Seconds cube may stay unmoved while visible before bored get-out (0 disables). Skipped if cube never moved since game start.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:142,310-317",
+      "tags": ["keepaway", "behavior", "timeout"]
+    },
+    "Keepaway_noVisibleTargetGameEndTimeout_s": {
+      "process": "engine",
+      "blurb": "Seconds without a visible target before bored get-out (0 disables).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:143,320-327",
+      "tags": ["keepaway", "behavior", "timeout"]
+    },
+    "Keepaway_outOfPlayGameEndTimeout_s": {
+      "process": "engine",
+      "blurb": "Seconds target may remain out-of-play (Unready) before bored get-out while Stalking.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:144,330-337,388,424",
+      "tags": ["keepaway", "behavior", "timeout"]
+    },
+    "Keepaway_targetVisibleTimeout_s": {
+      "process": "engine",
+      "blurb": "Max age (s) of last observation to count the target as still visible (brief occlusion grace).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:145,267",
+      "tags": ["keepaway", "behavior", "visibility"]
+    },
+    "Keepaway_globalOffsetDist_mm": {
+      "process": "engine",
+      "blurb": "Added to all distance thresholds (in-play, pounce, mousetrap) to compensate anim vs physical distance.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:146,267-273",
+      "tags": ["keepaway", "behavior", "distance"]
+    },
+    "Keepaway_inPlayDistance_mm": {
+      "process": "engine",
+      "blurb": "Intended in-play distance (mm) from JSON; not read by game logic after load.",
+      "status": "dead",
+      "statusNote": "MakeMemberTunable + JSON load only. isInPlay uses globalOffsetDist_mm + outOfPlayDistance_mm; inPlayDistance_mm never referenced after definition.",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:76,147,267",
+      "tags": ["keepaway", "behavior", "dead"]
+    },
+    "Keepaway_outOfPlayDistance_mm": {
+      "process": "engine",
+      "blurb": "Distance (mm) + globalOffset for isInPlay: closer than this → Ready posture; farther → Unready / out-of-play.",
+      "status": "live",
+      "statusNote": "Despite the name, this is the only distance used for the in-play / out-of-play gate.",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:148,267,418-461",
+      "tags": ["keepaway", "behavior", "distance"]
+    },
+    "Keepaway_allowablePointingError_deg": {
+      "process": "engine",
+      "blurb": "If |angle to target| exceeds this (deg), Victor turns toward the cube while Stalking.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:149,268,404-412",
+      "tags": ["keepaway", "behavior", "aim"]
+    },
+    "Keepaway_targetUnmovedCreepTimeout_s": {
+      "process": "engine",
+      "blurb": "Seconds target must be unmoved before isNotMoving; starts creep delay schedule.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:150,272-280",
+      "tags": ["keepaway", "behavior", "creep"]
+    },
+    "Keepaway_creepDistanceMin_mm": {
+      "process": "engine",
+      "blurb": "Min random creep drive distance (mm) when closing on a still cube outside pounce range.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:151,483-488",
+      "tags": ["keepaway", "behavior", "creep"]
+    },
+    "Keepaway_creepDistanceMax_mm": {
+      "process": "engine",
+      "blurb": "Max random creep drive distance (mm), also capped by remaining distance to pounce range.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:152,486-488",
+      "tags": ["keepaway", "behavior", "creep"]
+    },
+    "Keepaway_creepDelayTimeMin_s": {
+      "process": "engine",
+      "blurb": "Min delay (s) after unmoved timeout / stalk start before a creep is allowed.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:153,277-278,382-383",
+      "tags": ["keepaway", "behavior", "creep"]
+    },
+    "Keepaway_creepDelayTimeMax_s": {
+      "process": "engine",
+      "blurb": "Max delay (s) after unmoved timeout / stalk start before a creep is allowed.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:154,277-278,382-383",
+      "tags": ["keepaway", "behavior", "creep"]
+    },
+    "Keepaway_pounceDelayTimeMin_s": {
+      "process": "engine",
+      "blurb": "Min delay (s) after entering pounce range / stalk start before a real pounce may fire.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:155,284-285,385-386",
+      "tags": ["keepaway", "behavior", "pounce"]
+    },
+    "Keepaway_pounceDelayTimeMax_s": {
+      "process": "engine",
+      "blurb": "Max delay (s) after entering pounce range / stalk start before a real pounce may fire.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:156,284-285,385-386",
+      "tags": ["keepaway", "behavior", "pounce"]
+    },
+    "Keepaway_basePounceChance": {
+      "process": "engine",
+      "blurb": "Initial pounce-vs-fakeout probability; reset to this after each real pounce.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:157,118,508",
+      "tags": ["keepaway", "behavior", "pounce"]
+    },
+    "Keepaway_pounceChanceIncrement": {
+      "process": "engine",
+      "blurb": "Added to pounceChance after each fakeout (clamped 0–1), making later pounces more likely.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:158,523",
+      "tags": ["keepaway", "behavior", "pounce", "fakeout"]
+    },
+    "Keepaway_nominalPounceDistance_mm": {
+      "process": "engine",
+      "blurb": "Distance (mm) + globalOffset for isInPounceRange and max creep toward target.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:159,273,478",
+      "tags": ["keepaway", "behavior", "pounce", "distance"]
+    },
+    "Keepaway_mousetrapPounceDistance_mm": {
+      "process": "engine",
+      "blurb": "Closer than this (mm + globalOffset): mousetrap path — immediate close pounce or backup.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:160,269,427-440,509-511",
+      "tags": ["keepaway", "behavior", "pounce", "distance"]
+    },
+    "Keepaway_probBackupInsteadOfMousetrap": {
+      "process": "engine",
+      "blurb": "Probability of CubePounceBackup instead of pounce/fakeout when target is in mousetrap range.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:161,428-432",
+      "tags": ["keepaway", "behavior", "pounce"]
+    },
+    "Keepaway_pounceSuccessPitchDiff_deg": {
+      "process": "engine",
+      "blurb": "Pitch rise (deg) above pre-pounce pitch that counts the pounce as a hit.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:162,507,636-641",
+      "tags": ["keepaway", "behavior", "pounce"]
+    },
+    "Keepaway_excitementIncPerHit": {
+      "process": "engine",
+      "blurb": "Per successful pounce, increase excitement/frustration scale (toward excited exit).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:163,547-550",
+      "tags": ["keepaway", "behavior", "mood"]
+    },
+    "Keepaway_maxProbExitExcited": {
+      "process": "engine",
+      "blurb": "Caps how far excitement scale may go above 1.0; exit prob on hit = scale − 1.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:164,547-550",
+      "tags": ["keepaway", "behavior", "mood"]
+    },
+    "Keepaway_frustrationIncPerMiss": {
+      "process": "engine",
+      "blurb": "Per missed pounce, decrease excitement/frustration scale (toward frustrated exit).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:165,557-560",
+      "tags": ["keepaway", "behavior", "mood"]
+    },
+    "Keepaway_maxProbExitFrustrated": {
+      "process": "engine",
+      "blurb": "Caps how far scale may go below 1.0; exit prob on miss = 1 − scale.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:166,557-560",
+      "tags": ["keepaway", "behavior", "mood"]
+    },
+    "Keepaway_minProbToExit": {
+      "process": "engine",
+      "blurb": "Floor on the random exit roll: rolls below this are clamped up, so low exit probs rarely win.",
+      "status": "live",
+      "statusNote": "If exitRoll < minProbToExit, exitRoll is set to minProbToExit before comparing to probExit.",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:167,567-575",
+      "tags": ["keepaway", "behavior", "mood"]
+    },
+    "Keepaway_baseProbReact": {
+      "process": "engine",
+      "blurb": "Starting and post-reaction hit/miss reaction probability (CubePounceWinHand / LoseHand).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:168,197-198,588-601",
+      "tags": ["keepaway", "behavior", "react"]
+    },
+    "Keepaway_minProbToReact": {
+      "process": "engine",
+      "blurb": "Lower bound of RNG sample compared to hit/miss react probability (lower → harder to react).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:169,588,600",
+      "tags": ["keepaway", "behavior", "react"]
+    },
+    "Keepaway_probReactIncrement": {
+      "process": "engine",
+      "blurb": "On skipped reaction, add this to hit/miss react probability (capped by probReactMax).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:170,593-594,606-607",
+      "tags": ["keepaway", "behavior", "react"]
+    },
+    "Keepaway_probReactMax": {
+      "process": "engine",
+      "blurb": "Cap for hit/miss reaction probability after increments.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:171,593-594,606-607",
+      "tags": ["keepaway", "behavior", "react"]
+    },
+    "Keepaway_useProxForDistance": {
+      "process": "engine",
+      "blurb": "JSON/console flag intended to select prox vs vision distance; never read after load.",
+      "status": "dead",
+      "statusNote": "Parsed and MakeMemberTunable-registered only; no read sites in BehaviorKeepaway or elsewhere.",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.cpp:106,172",
+      "tags": ["keepaway", "behavior", "dead"]
+    }
+  }
+}

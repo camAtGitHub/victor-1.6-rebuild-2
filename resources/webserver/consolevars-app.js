@@ -1,13 +1,18 @@
 /**
- * Console vars UI enhancer.
- * Runs after C++ injects category HTML into consolevarsui.html.
- * Loads consolevars-catalog.json (curated recipes + blurbs) and decorates matching rows.
+ * Console vars UI enhancer (Path A decorator).
+ * Runs after C++ injects category HTML into consolevarsui.html (classic) or
+ * consolevars-explorer.html. Explorer chrome (#cvRecipes, #cvSearch, #cvProcessBadge)
+ * is optional — missing nodes are skipped; catalog load + row decoration always run.
+ * Catalog: prefer consolevars/index.json shards; fall back to consolevars-catalog.json.
  */
 (function () {
   "use strict";
 
   var catalog = null;
   var processHint = guessProcess();
+  var DEAD_STATUSES = { dead: 1, orphan: 1, noop: 1 };
+  var CATALOG_INDEX = "consolevars/index.json";
+  var CATALOG_FALLBACK = "consolevars-catalog.json";
 
   function guessProcess() {
     var p = String(window.location.port || "");
@@ -24,11 +29,114 @@
     return Array.prototype.slice.call((root || document).querySelectorAll(sel));
   }
 
+  /** Resolve shard path relative to consolevars/ (or accept root-relative paths). */
+  function shardUrl(path) {
+    if (!path) return null;
+    if (/^https?:\/\//i.test(path) || path.indexOf("consolevars/") === 0) {
+      return path;
+    }
+    return "consolevars/" + String(path).replace(/^\//, "");
+  }
+
+  function fetchJson(url) {
+    return fetch(url, { cache: "no-cache" }).then(function (r) {
+      if (!r.ok) throw new Error(url + " HTTP " + r.status);
+      return r.json();
+    });
+  }
+
+  /** Missing shard: warn and return null so merge can continue. */
+  function fetchJsonOptional(url) {
+    return fetchJson(url).catch(function (err) {
+      console.warn("[consolevars] shard skipped:", url, err);
+      return null;
+    });
+  }
+
+  function mergeShardPayload(out, data) {
+    if (!data || typeof data !== "object") return;
+    if (data.vars && typeof data.vars === "object") {
+      Object.assign(out.vars, data.vars);
+    }
+    if (data.categories && typeof data.categories === "object") {
+      Object.assign(out.categories, data.categories);
+    }
+    if (Array.isArray(data.recipes)) {
+      out.recipes = out.recipes.concat(data.recipes);
+    }
+  }
+
+  /**
+   * Load index → optional meta + vars/categories/recipes shards → merged catalog.
+   * Paths in index are relative to consolevars/ unless they already start with it.
+   */
+  function fetchShardedCatalog(index) {
+    var out = {
+      version: index.version || 1,
+      vars: {},
+      categories: {},
+      recipes: [],
+    };
+    var jobs = [];
+
+    if (index.meta) {
+      jobs.push(
+        fetchJsonOptional(shardUrl(index.meta)).then(function (meta) {
+          if (meta) out.meta = meta;
+        })
+      );
+    }
+
+    function queueList(list) {
+      if (!Array.isArray(list)) return;
+      list.forEach(function (p) {
+        var url = shardUrl(p);
+        if (!url) return;
+        jobs.push(
+          fetchJsonOptional(url).then(function (data) {
+            mergeShardPayload(out, data);
+          })
+        );
+      });
+    }
+
+    queueList(index.vars);
+    queueList(index.categories);
+    queueList(index.recipes);
+
+    // Also support index.shards = [{type, path}, ...] if present later
+    if (Array.isArray(index.shards)) {
+      index.shards.forEach(function (s) {
+        if (!s || !s.path) return;
+        var url = shardUrl(s.path);
+        jobs.push(
+          fetchJsonOptional(url).then(function (data) {
+            mergeShardPayload(out, data);
+          })
+        );
+      });
+    }
+
+    return Promise.all(jobs).then(function () {
+      return out;
+    });
+  }
+
+  function fetchMonolithicCatalog() {
+    return fetchJson(CATALOG_FALLBACK);
+  }
+
   function fetchCatalog() {
-    return fetch("consolevars-catalog.json", { cache: "no-cache" })
-      .then(function (r) {
-        if (!r.ok) throw new Error("catalog HTTP " + r.status);
-        return r.json();
+    return fetchJson(CATALOG_INDEX)
+      .then(function (index) {
+        return fetchShardedCatalog(index);
+      })
+      .catch(function (err) {
+        console.warn(
+          "[consolevars] shard index failed, falling back to monolithic catalog:",
+          err
+        );
+        return fetchMonolithicCatalog();
       })
       .catch(function (err) {
         console.warn("[consolevars] catalog not loaded:", err);
@@ -59,17 +167,41 @@
 
   function varMeta(name) {
     if (!catalog || !catalog.vars) return null;
-    return catalog.vars[name] || null;
+    var candidates = idCandidates(name);
+    for (var i = 0; i < candidates.length; i++) {
+      if (catalog.vars[candidates[i]]) return catalog.vars[candidates[i]];
+    }
+    return null;
+  }
+
+  /**
+   * UI ids strip Hungarian k/g prefixes (see SkipHungarianNotation in
+   * lib/util/.../consoleVariable.cpp). Catalog keys may still use either form.
+   */
+  function idCandidates(name) {
+    var list = [name];
+    if (/^[kg][A-Z]/.test(name)) {
+      list.push(name.slice(1));
+    } else if (/^[A-Z]/.test(name)) {
+      list.push("k" + name);
+      list.push("g" + name);
+    }
+    return list;
   }
 
   function findControlByVarName(name) {
-    // Checkbox / select / slider div / amount input
-    var el = document.getElementById(name);
-    if (el) return el;
-    el = document.getElementById(name + "_amount");
-    if (el) return el;
-    el = document.getElementById(name + "_function");
-    return el || null;
+    var candidates = idCandidates(name);
+    for (var i = 0; i < candidates.length; i++) {
+      var n = candidates[i];
+      // Checkbox / select / slider div / amount input / function button
+      var el = document.getElementById(n);
+      if (el) return el;
+      el = document.getElementById(n + "_amount");
+      if (el) return el;
+      el = document.getElementById(n + "_function");
+      if (el) return el;
+    }
+    return null;
   }
 
   function rowForControl(el) {
@@ -83,6 +215,85 @@
     return el.parentElement;
   }
 
+  function isDeadStatus(status) {
+    return !!(status && DEAD_STATUSES[String(status).toLowerCase()]);
+  }
+
+  function labelForRow(row, name) {
+    if (!row) return null;
+    var lab = row.querySelector('label[for="' + name + '"]');
+    if (lab) return lab;
+    var candidates = idCandidates(name);
+    for (var i = 0; i < candidates.length; i++) {
+      lab = row.querySelector('label[for="' + candidates[i] + '"]');
+      if (lab) return lab;
+    }
+    return row.querySelector("label");
+  }
+
+  function buildPopover(meta) {
+    var pop = document.createElement("div");
+    pop.className = "cv-popover";
+    pop.setAttribute("hidden", "");
+    pop.setAttribute("role", "tooltip");
+
+    if (meta.blurb) {
+      var p = document.createElement("p");
+      p.className = "cv-blurb";
+      p.textContent = meta.blurb;
+      pop.appendChild(p);
+    }
+    if (meta.statusNote) {
+      var sn = document.createElement("p");
+      sn.className = "cv-status-note";
+      sn.textContent = meta.statusNote;
+      pop.appendChild(sn);
+    }
+    if (meta.evidence) {
+      var ev = document.createElement("p");
+      ev.className = "cv-evidence";
+      ev.textContent = "Evidence: " + meta.evidence;
+      pop.appendChild(ev);
+    }
+    if (meta.requires && meta.requires.length) {
+      var req = document.createElement("p");
+      req.className = "cv-requires";
+      req.innerHTML =
+        "<strong>Typically needs:</strong> " +
+        meta.requires
+          .map(function (r) {
+            return (
+              '<button type="button" class="cv-linkvar" data-var="' +
+              escapeAttr(r) +
+              '">' +
+              escapeHtml(r) +
+              "</button>"
+            );
+          })
+          .join(", ");
+      pop.appendChild(req);
+    }
+    if (meta.related && meta.related.length) {
+      var rel = document.createElement("p");
+      rel.className = "cv-related";
+      rel.innerHTML =
+        "<strong>Related:</strong> " +
+        meta.related
+          .map(function (r) {
+            return (
+              '<button type="button" class="cv-linkvar" data-var="' +
+              escapeAttr(r) +
+              '">' +
+              escapeHtml(r) +
+              "</button>"
+            );
+          })
+          .join(", ");
+      pop.appendChild(rel);
+    }
+    return pop;
+  }
+
   function decorateRows() {
     if (!catalog || !catalog.vars) return;
     Object.keys(catalog.vars).forEach(function (name) {
@@ -91,51 +302,60 @@
       if (!el) return;
       var row = rowForControl(el);
       if (!row) return;
+      // Avoid double decoration
+      if (row.querySelector(".cv-marks")) return;
+
       row.classList.add("cv-row");
       row.dataset.var = name;
       if (meta.tags && meta.tags.indexOf("highlight") >= 0) {
         row.classList.add("cv-highlight");
       }
 
-      // Avoid double decoration
-      if (row.querySelector(".cv-meta")) return;
+      var hasBlurb = !!(meta.blurb || meta.statusNote || meta.evidence ||
+        (meta.requires && meta.requires.length) ||
+        (meta.related && meta.related.length));
+      var dead = isDeadStatus(meta.status);
+      if (!hasBlurb && !dead) return;
 
-      var box = document.createElement("div");
-      box.className = "cv-meta";
-      if (meta.blurb) {
-        var p = document.createElement("p");
-        p.className = "cv-blurb";
-        p.textContent = meta.blurb;
-        box.appendChild(p);
+      var marks = document.createElement("span");
+      marks.className = "cv-marks";
+
+      if (dead) {
+        var glyph = document.createElement("span");
+        glyph.className = "cv-dead";
+        glyph.setAttribute("aria-label", "Status: " + meta.status);
+        glyph.textContent = "⌀";
+        glyph.title =
+          meta.statusNote ||
+          "Status: " + meta.status + " — control still enabled; may have no effect.";
+        marks.appendChild(glyph);
+        row.classList.add("cv-row-dead");
+        // Do NOT disable the control — user may still want to set/observe it.
       }
-      if (meta.requires && meta.requires.length) {
-        var req = document.createElement("p");
-        req.className = "cv-requires";
-        req.innerHTML =
-          "<strong>Typically needs:</strong> " +
-          meta.requires
-            .map(function (r) {
-              return '<button type="button" class="cv-linkvar" data-var="' + escapeAttr(r) + '">' + escapeHtml(r) + "</button>";
-            })
-            .join(", ");
-        box.appendChild(req);
+
+      if (hasBlurb) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "cv-help";
+        btn.setAttribute("aria-label", "About " + name);
+        btn.setAttribute("aria-expanded", "false");
+        btn.textContent = "?";
+        btn.title = meta.blurb || "Details";
+        marks.appendChild(btn);
+
+        var pop = buildPopover(meta);
+        marks.appendChild(pop);
       }
-      if (meta.related && meta.related.length) {
-        var rel = document.createElement("p");
-        rel.className = "cv-related";
-        rel.innerHTML =
-          "<strong>Related:</strong> " +
-          meta.related
-            .map(function (r) {
-              return '<button type="button" class="cv-linkvar" data-var="' + escapeAttr(r) + '">' + escapeHtml(r) + "</button>";
-            })
-            .join(", ");
-        box.appendChild(rel);
+
+      var lab = labelForRow(row, name);
+      if (lab && lab.parentNode) {
+        lab.parentNode.insertBefore(marks, lab.nextSibling);
+      } else {
+        row.insertBefore(marks, row.firstChild);
       }
-      row.appendChild(box);
     });
 
-    // Fieldset legends → category blurbs
+    // Fieldset legends → category blurbs (compact one-liner under legend)
     if (catalog.categories) {
       $all("fieldset legend").forEach(function (leg) {
         var group = leg.textContent.trim();
@@ -167,6 +387,31 @@
           leg.parentElement.insertBefore(d, leg.nextSibling);
         }
       });
+    }
+  }
+
+  function closeAllPopovers(except) {
+    $all(".cv-popover:not([hidden])").forEach(function (p) {
+      if (except && p === except) return;
+      p.setAttribute("hidden", "");
+      var btn = p.parentElement && p.parentElement.querySelector(".cv-help");
+      if (btn) btn.setAttribute("aria-expanded", "false");
+    });
+  }
+
+  function toggleHelpPopover(btn) {
+    var marks = btn.closest(".cv-marks");
+    if (!marks) return;
+    var pop = marks.querySelector(".cv-popover");
+    if (!pop) return;
+    var open = pop.hasAttribute("hidden");
+    closeAllPopovers(open ? pop : null);
+    if (open) {
+      pop.removeAttribute("hidden");
+      btn.setAttribute("aria-expanded", "true");
+    } else {
+      pop.setAttribute("hidden", "");
+      btn.setAttribute("aria-expanded", "false");
     }
   }
 
@@ -381,13 +626,14 @@
       }
       return;
     }
-    // Activate parent jQuery UI tab if needed
+    // Activate parent jQuery UI tab if needed (#tabs preferred; classic uses #main)
     var panel = row.closest('[id^="tabs-"]');
     if (panel && window.jQuery) {
-      var $tabs = window.jQuery("#tabs");
-      if ($tabs.length && $tabs.tabs) {
-        var idx = window.jQuery("#tabs > div").index(panel);
-        if (idx >= 0) $tabs.tabs("option", "active", idx);
+      var $host = window.jQuery("#tabs");
+      if (!$host.length) $host = window.jQuery("#main");
+      if ($host.length && $host.data("ui-tabs")) {
+        var idx = $host.children("div").index(panel);
+        if (idx >= 0) $host.tabs("option", "active", idx);
       }
     }
     row.classList.add("cv-flash");
@@ -430,6 +676,13 @@
     document.addEventListener("click", function (e) {
       var t = e.target;
       if (!t) return;
+      if (t.matches(".cv-help") || t.closest(".cv-help")) {
+        var helpBtn = t.matches(".cv-help") ? t : t.closest(".cv-help");
+        e.preventDefault();
+        e.stopPropagation();
+        toggleHelpPopover(helpBtn);
+        return;
+      }
       if (t.matches("[data-recipe]")) {
         applyRecipe(t.getAttribute("data-recipe"));
       } else if (t.matches("[data-focus-recipe]")) {
@@ -437,6 +690,8 @@
       } else if (t.matches(".cv-linkvar") || t.closest(".cv-linkvar")) {
         var b = t.matches(".cv-linkvar") ? t : t.closest(".cv-linkvar");
         focusVar(b.getAttribute("data-var"));
+      } else if (!t.closest(".cv-popover") && !t.closest(".cv-marks")) {
+        closeAllPopovers();
       }
     });
   }
@@ -444,21 +699,27 @@
   function initTabs() {
     if (!window.jQuery) return;
     var $ = window.jQuery;
-    // Prefer #tabs (generated); fall back to #main
+    // Prefer #tabs (generated); fall back to #main. Skip if already a tabs widget
+    // (classic consolevarsui.html already calls $("#main").tabs()).
     if ($("#tabs").length) {
       try {
-        $("#tabs").tabs();
+        if (!$("#tabs").data("ui-tabs")) {
+          $("#tabs").tabs();
+        }
       } catch (e) {
         console.warn(e);
       }
     } else if ($("#main").length) {
       try {
-        $("#main").tabs();
+        if (!$("#main").data("ui-tabs")) {
+          $("#main").tabs();
+        }
       } catch (e2) {}
     }
   }
 
   function boot() {
+    // Explorer-only chrome: no-ops when nodes are absent (classic /consolevars).
     setProcessBadge();
     initTabs();
     wireSearch();
@@ -466,6 +727,7 @@
     fetchCatalog().then(function (c) {
       catalog = c;
       if (!c) {
+        // Safe no-op: raw injected controls still work without catalog.
         var root = $("#cvRecipes");
         if (root) {
           root.innerHTML =
@@ -473,8 +735,8 @@
         }
         return;
       }
-      renderRecipes();
-      decorateRows();
+      renderRecipes(); // no-op without #cvRecipes
+      decorateRows(); // always: help / dead marks on #tabs or #main
       var n = Object.keys(c.vars || {}).length;
       var r = (c.recipes || []).length;
       var status = $("#cvStatus");

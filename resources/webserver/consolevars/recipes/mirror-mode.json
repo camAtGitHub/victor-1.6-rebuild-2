@@ -1,0 +1,35 @@
+{
+  "recipes": [
+    {
+      "id": "mirror-face-boxes",
+      "title": "Face boxes on the face LCD (MirrorMode)",
+      "process": "engine",
+      "blurb": "Camera feed on Vector’s screen with face (and related) overlays. Mode must be scheduled AND the mirror display flags enabled.",
+      "where": "Engine :8888 → Vision → General.VisionModes + Vision.General / Vision.MirrorMode",
+      "steps": [
+        { "var": "Faces", "value": true, "note": "Vision mode: run face detection so there is something to draw." },
+        { "var": "MirrorMode", "value": true, "note": "Vision mode: render camera to the face display (mirror screen)." },
+        { "var": "DisplayDetectionsInMirrorMode", "value": true, "note": "Draw detections (objects/faces/markers) into the mirror image." },
+        { "var": "DisplayEyeContactInMirrorMode", "value": true, "note": "Extra face/eye-contact debug drawing (often the ‘boxes’ people notice)." }
+      ],
+      "tips": [
+        "Engine only (port 8888), not anim 8889.",
+        "Faces + MirrorMode live under Vision.General.VisionModes (enum-named toggles)."
+      ]
+    },
+    {
+      "id": "mirror-markers",
+      "title": "Marker / charger detections in MirrorMode",
+      "process": "engine",
+      "blurb": "Fiducial / marker overlays on the face camera feed.",
+      "where": "Engine :8888 → Vision",
+      "steps": [
+        { "var": "Markers", "value": true, "note": "Vision mode for marker detection." },
+        { "var": "MirrorMode", "value": true, "note": "Show camera on face LCD." },
+        { "var": "DisplayDetectionsInMirrorMode", "value": true, "note": "Draw detections into mirror frame." },
+        { "var": "DisplayMarkerNamesScale", "value": 0.5, "note": "If > 0, also labels marker names (0–1 scale)." }
+      ],
+      "tips": ["DisplayMarkerNamesScale is under Vision.MirrorMode; 0 hides names."]
+    }
+  ]
+}

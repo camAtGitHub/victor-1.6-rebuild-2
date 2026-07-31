@@ -1,0 +1,73 @@
+{
+  "vars": {
+    "Faces": {
+      "process": "engine",
+      "blurb": "Force-enable VisionMode::Faces (face detection).",
+      "category": "Vision.General.VisionModes",
+      "related": ["MirrorMode", "DisplayEyeContactInMirrorMode", "DisplayDetectionsInMirrorMode"],
+      "tags": ["vision", "faces", "highlight"]
+    },
+    "MirrorMode": {
+      "process": "engine",
+      "blurb": "Force-enable VisionMode::MirrorMode — camera on the face LCD.",
+      "category": "Vision.General.VisionModes",
+      "related": ["Faces", "DisplayDetectionsInMirrorMode", "DisplayEyeContactInMirrorMode"],
+      "tags": ["vision", "mirror", "highlight"]
+    },
+    "Markers": {
+      "process": "engine",
+      "blurb": "Force-enable marker / fiducial detection.",
+      "category": "Vision.General.VisionModes",
+      "related": ["MirrorMode", "DisplayDetectionsInMirrorMode", "DisplayMarkerNamesScale"],
+      "tags": ["vision", "markers"]
+    },
+    "DisplayEyeContactInMirrorMode": {
+      "process": "engine",
+      "blurb": "With MirrorMode, draw eye-contact / face debug (often the ‘boxes’).",
+      "category": "Vision.General",
+      "requires": ["MirrorMode"],
+      "related": ["Faces", "DisplayDetectionsInMirrorMode"],
+      "tags": ["vision", "mirror", "faces", "highlight"]
+    },
+    "DisplayDetectionsInMirrorMode": {
+      "process": "engine",
+      "blurb": "Draw detected objects, faces, and markers into the MirrorMode image.",
+      "category": "Vision.MirrorMode",
+      "requires": ["MirrorMode"],
+      "related": ["Faces", "Markers", "DisplayEyeContactInMirrorMode"],
+      "tags": ["vision", "mirror", "highlight"]
+    },
+    "DisplayExposureInMirrorMode": {
+      "process": "engine",
+      "blurb": "Overlay exposure / AE info on the mirror image.",
+      "category": "Vision.MirrorMode",
+      "requires": ["MirrorMode"],
+      "tags": ["vision", "mirror"]
+    },
+    "DisplayMarkerNamesScale": {
+      "process": "engine",
+      "blurb": "Scale for marker name labels in mirror (0 = off).",
+      "category": "Vision.MirrorMode",
+      "requires": ["MirrorMode", "Markers"],
+      "tags": ["vision", "mirror", "markers"]
+    },
+    "MirrorModeGamma": {
+      "process": "engine",
+      "blurb": "Gamma for the mirrored camera image.",
+      "category": "Vision.MirrorMode",
+      "tags": ["vision", "mirror"]
+    },
+    "MirrorModeFaceDebugFontScale": {
+      "process": "engine",
+      "blurb": "Font scale for face debug text in mirror mode.",
+      "category": "Vision.MirrorMode",
+      "tags": ["vision", "mirror", "faces"]
+    },
+    "SendDebugImages": {
+      "process": "engine",
+      "blurb": "Send debug image streams from vision (bandwidth heavy).",
+      "category": "Vision.General",
+      "tags": ["vision", "debug"]
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "vars": {
+    "MoodManager_WebVizPeriod_s": {
+      "process": "engine",
+      "blurb": "How often mood state is pushed to WebViz Mood tab.",
+      "tags": ["webviz", "mood"]
+    },
+    "WebvizUpdatePeriod": {
+      "process": "engine",
+      "blurb": "Period used by some WebViz CPU-related updates.",
+      "tags": ["webviz"]
+    },
+    "ProfilerLogOutput": {
+      "process": "both",
+      "blurb": "Profiler logging level (WebViz CpuProfile may set this).",
+      "tags": ["perf"]
+    }
+  }
+}

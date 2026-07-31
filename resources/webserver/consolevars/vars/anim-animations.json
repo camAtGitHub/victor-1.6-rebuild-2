@@ -1,0 +1,23 @@
+{
+  "vars": {
+    "PlayAnimation": {
+      "process": "anim",
+      "blurb": "Console function: play animation by name (args: name [numLoops]).",
+      "category": "Animations",
+      "related": ["ListAnimations", "AbortCurrentAnimation"],
+      "tags": ["anim", "func"]
+    },
+    "ListAnimations": {
+      "process": "anim",
+      "blurb": "Console function: dump animation names to the result box.",
+      "category": "Animations",
+      "tags": ["anim", "func"]
+    },
+    "AbortCurrentAnimation": {
+      "process": "anim",
+      "blurb": "Console function: stop current animation.",
+      "category": "Animations",
+      "tags": ["anim", "func"]
+    }
+  }
+}

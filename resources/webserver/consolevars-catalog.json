@@ -1,5 +1,5 @@
 {
-  "$schema_note": "Curated human docs for console vars. Not exhaustive. Keys match CONSOLE_VAR / CONSOLE_FUNC ids as shown in /consolevars UI. process: engine|anim|both. Recipe steps: {var,value} or {func,args}. Enum values are 0-based indices (same as stock listbox posts).",
+  "$schema_note": "FALLBACK monolithic catalog. Prefer consolevars/index.json shards. Keys match UI / consolevarlist dump ids (no leading k). process: engine|anim|both. Recipe steps: {var,value} or {func,args}. Enum values are 0-based indices (same as stock listbox posts).",
   "version": 2,
   "recipes": [
     {
@@ -11,8 +11,8 @@
       "steps": [
         { "var": "Faces", "value": true, "note": "Vision mode: run face detection so there is something to draw." },
         { "var": "MirrorMode", "value": true, "note": "Vision mode: render camera to the face display (mirror screen)." },
-        { "var": "kDisplayDetectionsInMirrorMode", "value": true, "note": "Draw detections (objects/faces/markers) into the mirror image." },
-        { "var": "kDisplayEyeContactInMirrorMode", "value": true, "note": "Extra face/eye-contact debug drawing (often the ‘boxes’ people notice)." }
+        { "var": "DisplayDetectionsInMirrorMode", "value": true, "note": "Draw detections (objects/faces/markers) into the mirror image." },
+        { "var": "DisplayEyeContactInMirrorMode", "value": true, "note": "Extra face/eye-contact debug drawing (often the ‘boxes’ people notice)." }
       ],
       "tips": [
         "Engine only (port 8888), not anim 8889.",
@@ -28,10 +28,10 @@
       "steps": [
         { "var": "Markers", "value": true, "note": "Vision mode for marker detection." },
         { "var": "MirrorMode", "value": true, "note": "Show camera on face LCD." },
-        { "var": "kDisplayDetectionsInMirrorMode", "value": true, "note": "Draw detections into mirror frame." },
-        { "var": "kDisplayMarkerNamesScale", "value": 0.5, "note": "If > 0, also labels marker names (0–1 scale)." }
+        { "var": "DisplayDetectionsInMirrorMode", "value": true, "note": "Draw detections into mirror frame." },
+        { "var": "DisplayMarkerNamesScale", "value": 0.5, "note": "If > 0, also labels marker names (0–1 scale)." }
       ],
-      "tips": ["kDisplayMarkerNamesScale is under Vision.MirrorMode; 0 hides names."]
+      "tips": ["DisplayMarkerNamesScale is under Vision.MirrorMode; 0 hides names."]
     },
     {
       "id": "procface-custom-eyes-builtin",
@@ -41,7 +41,7 @@
       "where": "Anim :8889 → Face → ParameterizedFace",
       "steps": [
         {
-          "var": "kProcFace_CustomEyeOverlay",
+          "var": "ProcFace_CustomEyeOverlay",
           "value": 0,
           "enumLabel": "Trans (index 0)",
           "note": "List: Trans,Lesbian,Gay,Bi,Pan,Frog,All,Galaxy,Custom. Pick any built-in 0–7."
@@ -52,12 +52,12 @@
           "note": "Loads the selected overlay PNG/JPG into memory (required after changing the list)."
         },
         {
-          "var": "kProcFace_CustomEyes",
+          "var": "ProcFace_CustomEyes",
           "value": true,
           "note": "Master switch: composite the loaded overlay onto procedural eyes."
         },
         {
-          "var": "kProcFace_CustomEyeOpacity",
+          "var": "ProcFace_CustomEyeOpacity",
           "value": 0.8,
           "note": "Optional blend strength (0–1)."
         }
@@ -76,7 +76,7 @@
       "where": "Anim :8889 → Face → ParameterizedFace",
       "steps": [
         {
-          "var": "kProcFace_CustomEyeOverlay",
+          "var": "ProcFace_CustomEyeOverlay",
           "value": 8,
           "enumLabel": "Custom (index 8)",
           "note": "Selects path /data/data/customFaceOverlay.jpg (see LoadCustomEyePNG)."
@@ -86,8 +86,8 @@
           "args": "",
           "note": "Reads that file; fails silently if missing/empty — scp/curl the jpg first."
         },
-        { "var": "kProcFace_CustomEyes", "value": true, "note": "Enable overlay composite." },
-        { "var": "kProcFace_CustomEyeOpacity", "value": 0.8, "note": "Blend opacity." }
+        { "var": "ProcFace_CustomEyes", "value": true, "note": "Enable overlay composite." },
+        { "var": "ProcFace_CustomEyeOpacity", "value": 0.8, "note": "Blend opacity." }
       ],
       "tips": [
         "Push an image first, e.g. curl -T my.jpg http://ROBOT:8889/… or scp to /data/data/customFaceOverlay.jpg",
@@ -103,7 +103,7 @@
       "where": "Anim :8889 → MicData → RecordMicDataClip",
       "steps": [
         {
-          "var": "kMicData_ClipRecordTime_ms",
+          "var": "MicData_ClipRecordTime_ms",
           "value": 4000,
           "note": "Clip length in ms (default 4000; range ~500–15000)."
         },
@@ -187,113 +187,113 @@
       "process": "engine",
       "blurb": "Force-enable VisionMode::Faces (face detection).",
       "category": "Vision.General.VisionModes",
-      "related": ["MirrorMode", "kDisplayEyeContactInMirrorMode", "kDisplayDetectionsInMirrorMode"],
+      "related": ["MirrorMode", "DisplayEyeContactInMirrorMode", "DisplayDetectionsInMirrorMode"],
       "tags": ["vision", "faces", "highlight"]
     },
     "MirrorMode": {
       "process": "engine",
       "blurb": "Force-enable VisionMode::MirrorMode — camera on the face LCD.",
       "category": "Vision.General.VisionModes",
-      "related": ["Faces", "kDisplayDetectionsInMirrorMode", "kDisplayEyeContactInMirrorMode"],
+      "related": ["Faces", "DisplayDetectionsInMirrorMode", "DisplayEyeContactInMirrorMode"],
       "tags": ["vision", "mirror", "highlight"]
     },
     "Markers": {
       "process": "engine",
       "blurb": "Force-enable marker / fiducial detection.",
       "category": "Vision.General.VisionModes",
-      "related": ["MirrorMode", "kDisplayDetectionsInMirrorMode", "kDisplayMarkerNamesScale"],
+      "related": ["MirrorMode", "DisplayDetectionsInMirrorMode", "DisplayMarkerNamesScale"],
       "tags": ["vision", "markers"]
     },
-    "kDisplayEyeContactInMirrorMode": {
+    "DisplayEyeContactInMirrorMode": {
       "process": "engine",
       "blurb": "With MirrorMode, draw eye-contact / face debug (often the ‘boxes’).",
       "category": "Vision.General",
       "requires": ["MirrorMode"],
-      "related": ["Faces", "kDisplayDetectionsInMirrorMode"],
+      "related": ["Faces", "DisplayDetectionsInMirrorMode"],
       "tags": ["vision", "mirror", "faces", "highlight"]
     },
-    "kDisplayDetectionsInMirrorMode": {
+    "DisplayDetectionsInMirrorMode": {
       "process": "engine",
       "blurb": "Draw detected objects, faces, and markers into the MirrorMode image.",
       "category": "Vision.MirrorMode",
       "requires": ["MirrorMode"],
-      "related": ["Faces", "Markers", "kDisplayEyeContactInMirrorMode"],
+      "related": ["Faces", "Markers", "DisplayEyeContactInMirrorMode"],
       "tags": ["vision", "mirror", "highlight"]
     },
-    "kDisplayExposureInMirrorMode": {
+    "DisplayExposureInMirrorMode": {
       "process": "engine",
       "blurb": "Overlay exposure / AE info on the mirror image.",
       "category": "Vision.MirrorMode",
       "requires": ["MirrorMode"],
       "tags": ["vision", "mirror"]
     },
-    "kDisplayMarkerNamesScale": {
+    "DisplayMarkerNamesScale": {
       "process": "engine",
       "blurb": "Scale for marker name labels in mirror (0 = off).",
       "category": "Vision.MirrorMode",
       "requires": ["MirrorMode", "Markers"],
       "tags": ["vision", "mirror", "markers"]
     },
-    "kMirrorModeGamma": {
+    "MirrorModeGamma": {
       "process": "engine",
       "blurb": "Gamma for the mirrored camera image.",
       "category": "Vision.MirrorMode",
       "tags": ["vision", "mirror"]
     },
-    "kMirrorModeFaceDebugFontScale": {
+    "MirrorModeFaceDebugFontScale": {
       "process": "engine",
       "blurb": "Font scale for face debug text in mirror mode.",
       "category": "Vision.MirrorMode",
       "tags": ["vision", "mirror", "faces"]
     },
-    "kSendDebugImages": {
+    "SendDebugImages": {
       "process": "engine",
       "blurb": "Send debug image streams from vision (bandwidth heavy).",
       "category": "Vision.General",
       "tags": ["vision", "debug"]
     },
-    "kProcFace_CustomEyes": {
+    "ProcFace_CustomEyes": {
       "process": "anim",
       "blurb": "Composite a loaded eye overlay image onto procedural eyes. Requires LoadFaceOverlay first (and a valid overlay selection).",
       "category": "Face.ParameterizedFace",
-      "requires": ["kProcFace_CustomEyeOverlay"],
-      "related": ["kProcFace_CustomEyeOpacity", "LoadFaceOverlay"],
+      "requires": ["ProcFace_CustomEyeOverlay"],
+      "related": ["ProcFace_CustomEyeOpacity", "LoadFaceOverlay"],
       "tags": ["face", "procedural", "highlight"]
     },
-    "kProcFace_CustomEyeOverlay": {
+    "ProcFace_CustomEyeOverlay": {
       "process": "anim",
       "blurb": "Which overlay asset to load: 0–7 built-ins under faceOverlays/, 8 = Custom → /data/data/customFaceOverlay.jpg.",
       "category": "Face.ParameterizedFace",
-      "related": ["kProcFace_CustomEyes", "LoadFaceOverlay", "kProcFace_CustomEyeOpacity"],
+      "related": ["ProcFace_CustomEyes", "LoadFaceOverlay", "ProcFace_CustomEyeOpacity"],
       "tags": ["face", "procedural", "highlight"]
     },
-    "kProcFace_CustomEyeOpacity": {
+    "ProcFace_CustomEyeOpacity": {
       "process": "anim",
       "blurb": "Opacity when blending the custom eye overlay (0–1).",
       "category": "Face.ParameterizedFace",
-      "related": ["kProcFace_CustomEyes"],
+      "related": ["ProcFace_CustomEyes"],
       "tags": ["face", "procedural"]
     },
     "LoadFaceOverlay": {
       "process": "anim",
-      "blurb": "Console function: load the file selected by kProcFace_CustomEyeOverlay into the procedural face drawer.",
+      "blurb": "Console function: load the file selected by ProcFace_CustomEyeOverlay into the procedural face drawer.",
       "category": "Face.ParameterizedFace",
-      "related": ["kProcFace_CustomEyes", "kProcFace_CustomEyeOverlay"],
+      "related": ["ProcFace_CustomEyes", "ProcFace_CustomEyeOverlay"],
       "tags": ["face", "procedural", "func", "highlight"]
     },
-    "kProcFace_HotspotRender": {
+    "ProcFace_HotspotRender": {
       "process": "anim",
       "blurb": "Render eye glow / hotspot on procedural face.",
       "category": "Face.ParameterizedFace",
       "tags": ["face", "procedural"]
     },
-    "kProcFace_EnableAntiAliasing": {
+    "ProcFace_EnableAntiAliasing": {
       "process": "anim",
       "blurb": "Full-image antialiasing on procedural face.",
       "category": "Face.ParameterizedFace",
       "tags": ["face", "procedural"]
     },
-    "kMicData_ClipRecordTime_ms": {
+    "MicData_ClipRecordTime_ms": {
       "process": "anim",
       "blurb": "Duration of RecordMicDataClip (ms).",
       "category": "MicData",
@@ -302,9 +302,9 @@
     },
     "RecordMicDataClip": {
       "process": "anim",
-      "blurb": "Console function: record raw + processed mic for kMicData_ClipRecordTime_ms.",
+      "blurb": "Console function: record raw + processed mic for MicData_ClipRecordTime_ms.",
       "category": "MicData",
-      "related": ["kMicData_ClipRecordTime_ms"],
+      "related": ["MicData_ClipRecordTime_ms"],
       "tags": ["mic", "func", "highlight"]
     },
     "PlayAnimation": {
@@ -340,6 +340,26 @@
       "process": "both",
       "blurb": "Profiler logging level (WebViz CpuProfile may set this).",
       "tags": ["perf"]
+    },
+    "RenderZOffset": {
+      "process": "engine",
+      "blurb": "Intended Z offset (mm) for QuadTreeProcessor debug render quads.",
+      "status": "dead",
+      "statusNote": "Registered CONSOLE_VAR but never read after definition — changing it has no effect on this tree.",
+      "evidence": "engine/navMap/quadTree/quadTreeProcessor.cpp (kRenderZOffset); UI id strips Hungarian k → RenderZOffset (consolevarlist_8888)",
+      "category": "QuadTreeProcessor",
+      "related": ["RenderBorder3DLines", "RenderBordersFrom", "RenderSeeds"],
+      "tags": ["navmap", "debug", "dead"]
+    },
+    "RenderBorder3DLines": {
+      "process": "engine",
+      "blurb": "Intended to render nav-map borders as 3D lines instead of quads.",
+      "status": "dead",
+      "statusNote": "Registered CONSOLE_VAR but never referenced outside its declaration — orphan flag.",
+      "evidence": "engine/navMap/quadTree/quadTreeProcessor.cpp (kRenderBorder3DLines); UI id RenderBorder3DLines",
+      "category": "QuadTreeProcessor",
+      "related": ["RenderZOffset", "RenderBordersFrom"],
+      "tags": ["navmap", "debug", "dead"]
     }
   }
 }

@@ -1,0 +1,45 @@
+{
+  "vars": {
+    "ProcFace_CustomEyes": {
+      "process": "anim",
+      "blurb": "Composite a loaded eye overlay image onto procedural eyes. Requires LoadFaceOverlay first (and a valid overlay selection).",
+      "category": "Face.ParameterizedFace",
+      "requires": ["ProcFace_CustomEyeOverlay"],
+      "related": ["ProcFace_CustomEyeOpacity", "LoadFaceOverlay"],
+      "tags": ["face", "procedural", "highlight"]
+    },
+    "ProcFace_CustomEyeOverlay": {
+      "process": "anim",
+      "blurb": "Which overlay asset to load: 0–7 built-ins under faceOverlays/, 8 = Custom → /data/data/customFaceOverlay.jpg.",
+      "category": "Face.ParameterizedFace",
+      "related": ["ProcFace_CustomEyes", "LoadFaceOverlay", "ProcFace_CustomEyeOpacity"],
+      "tags": ["face", "procedural", "highlight"]
+    },
+    "ProcFace_CustomEyeOpacity": {
+      "process": "anim",
+      "blurb": "Opacity when blending the custom eye overlay (0–1).",
+      "category": "Face.ParameterizedFace",
+      "related": ["ProcFace_CustomEyes"],
+      "tags": ["face", "procedural"]
+    },
+    "LoadFaceOverlay": {
+      "process": "anim",
+      "blurb": "Console function: load the file selected by ProcFace_CustomEyeOverlay into the procedural face drawer.",
+      "category": "Face.ParameterizedFace",
+      "related": ["ProcFace_CustomEyes", "ProcFace_CustomEyeOverlay"],
+      "tags": ["face", "procedural", "func", "highlight"]
+    },
+    "ProcFace_HotspotRender": {
+      "process": "anim",
+      "blurb": "Render eye glow / hotspot on procedural face.",
+      "category": "Face.ParameterizedFace",
+      "tags": ["face", "procedural"]
+    },
+    "ProcFace_EnableAntiAliasing": {
+      "process": "anim",
+      "blurb": "Full-image antialiasing on procedural face.",
+      "category": "Face.ParameterizedFace",
+      "tags": ["face", "procedural"]
+    }
+  }
+}

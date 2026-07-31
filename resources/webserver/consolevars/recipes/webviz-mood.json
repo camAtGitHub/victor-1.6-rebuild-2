@@ -1,0 +1,19 @@
+{
+  "recipes": [
+    {
+      "id": "webviz-mood-stream",
+      "title": "Stream mood into WebViz",
+      "process": "engine",
+      "blurb": "Mood samples to the Mood WebViz tab at a useful rate.",
+      "where": "Engine :8888",
+      "steps": [
+        {
+          "var": "MoodManager_WebVizPeriod_s",
+          "value": 0.25,
+          "note": "Seconds between mood pushes (smaller = more traffic)."
+        }
+      ],
+      "tips": ["Open WebViz → Mood and Subscribe."]
+    }
+  ]
+}

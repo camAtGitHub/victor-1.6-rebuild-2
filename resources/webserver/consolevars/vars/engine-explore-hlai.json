@@ -1,0 +1,150 @@
+{
+  "vars": {
+    "AI_MaxExtraExploringCooldown_s": {
+      "process": "engine",
+      "blurb": "Clamp on extra seconds added to exploring transition cooldown (e.g. after voice intents) on AIWhiteboard.",
+      "status": "live",
+      "evidence": "engine/aiComponent/aiWhiteboard.cpp:59 (kAI_MaxExtraExploringCooldown_s); clamp at :801",
+      "tags": ["exploring", "cooldown", "AIWhiteboard"]
+    },
+    "ExploringCooldownUpdatePeriod_s": {
+      "process": "engine",
+      "blurb": "How often AIWhiteboard recomputes the base exploring transition cooldown from hours-alive.",
+      "status": "live",
+      "evidence": "engine/aiComponent/aiWhiteboard.cpp:62 (kExploringCooldownUpdatePeriod_s); used UpdateDependent :143",
+      "tags": ["exploring", "cooldown", "AIWhiteboard"]
+    },
+    "ExploringPostBumpReferenceProb": {
+      "process": "engine",
+      "blurb": "Probability (0–1) that BehaviorBumpObject delegates to reference-human after a bump; ≤0 skips entirely.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/basicWorldInteractions/behaviorBumpObject.cpp:50; DoReferenceHumanIfDesired :264–270",
+      "tags": ["exploring", "bump", "BehaviorExploring"]
+    },
+    "HighLevelAI_socializeKnownFaceCooldown_s": {
+      "process": "engine",
+      "blurb": "HLAI instance cooldown (s) before CloseFaceForSocializing can fire again; scaled by TimeMultiplier.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/behaviorHighLevelAI.cpp:93 MakeMemberTunable; used :136",
+      "tags": ["hlai", "socialize", "cooldown"]
+    },
+    "HighLevelAI_playWithCubeOnChargerCooldown_s": {
+      "process": "engine",
+      "blurb": "HLAI cooldown (s) before leaving charger for play (ObservingDriveOffCharger state exit); scaled by TimeMultiplier.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/behaviorHighLevelAI.cpp:94 MakeMemberTunable; WantsToLeaveChargerForPlay :196–198",
+      "tags": ["hlai", "cube", "charger", "cooldown"]
+    },
+    "HighLevelAI_playWithCubeCooldown_s": {
+      "process": "engine",
+      "blurb": "HLAI cooldown (s) on PlayingWithCube timer for drive-off-charger play and CloseCubeForPlaying; scaled by TimeMultiplier.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/behaviorHighLevelAI.cpp:95 MakeMemberTunable; used :202 and :216",
+      "tags": ["hlai", "cube", "cooldown"]
+    },
+    "ComeHereVoiceCommand_timeUntilCancelFaceTrack_s": {
+      "process": "engine",
+      "blurb": "ComeHere (DriveToFace) how long (s) to track the face after arriving before canceling track; only if trackFaceOnceKnown.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/simpleFaceBehaviors/behaviorDriveToFace.cpp:135 MakeMemberTunable; track end :404",
+      "tags": ["comehere", "face", "voice"]
+    },
+    "ComeHereVoiceCommand_minDriveToFaceDistanceKey_mm": {
+      "process": "engine",
+      "blurb": "ComeHere stop distance (mm) to face head — drive remaining distToHead minus this; also “already close enough” test.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/simpleFaceBehaviors/behaviorDriveToFace.cpp:136 MakeMemberTunable; drive :296; close :432",
+      "tags": ["comehere", "face", "voice", "distance"]
+    },
+    "ExploringInternal25_minSearchRadius_m": {
+      "process": "engine",
+      "blurb": "Per-instance Exploring anonymous (ExploringInternal#25): min open-space sample radius (m) when not too far from charger.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/exploring/behaviorExploring.cpp:180 MakeMemberTunable; sample r1 :739; id = debugLabel after @ strip + instance index",
+      "tags": ["exploring", "instance", "radius"]
+    },
+    "ExploringInternal25_maxSearchRadius_m": {
+      "process": "engine",
+      "blurb": "Per-instance ExploringInternal#25: max open-space sample radius (m); also used in too-far-from-charger threshold.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/exploring/behaviorExploring.cpp:181; sample r2 :740; tooFar :705",
+      "tags": ["exploring", "instance", "radius"]
+    },
+    "ExploringInternal25_maxChargerDistance_m": {
+      "process": "engine",
+      "blurb": "Per-instance ExploringInternal#25: max distance (m) from charger for samples; r2 when recovering closer. Near-charger reject condition is built at Init from this value.",
+      "status": "partial",
+      "statusNote": "Sample radii re-read _iConfig; RejectIfNotInRange near-charger bound is set once in InitBehavior.",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/exploring/behaviorExploring.cpp:182 MakeMemberTunable; Init near-charger :223–224; sample :743",
+      "tags": ["exploring", "instance", "charger"]
+    },
+    "ExploringInternal25_pAcceptKnownAreas": {
+      "process": "engine",
+      "blurb": "Per-instance ExploringInternal#25: probability of accepting sample polygons that hit already-known map cells.",
+      "status": "partial",
+      "statusNote": "Applied via SetAcceptanceProbability only in InitBehavior — console change after init may not update the sampler until re-init.",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/exploring/behaviorExploring.cpp:183 MakeMemberTunable; Init :242",
+      "tags": ["exploring", "instance", "navmap"]
+    },
+    "ExploringInternal27_minSearchRadius_m": {
+      "process": "engine",
+      "blurb": "Per-instance Exploring anonymous (ExploringInternal#27): min open-space sample radius (m). Same semantics as #25; separate instance (Exploring / Voice / PRDemo parents).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/exploring/behaviorExploring.cpp:180; MakeUniqueDebugLabelFromConfig instance index iCozmoBehavior.cpp:240–256",
+      "tags": ["exploring", "instance", "radius"]
+    },
+    "ExploringInternal27_maxSearchRadius_m": {
+      "process": "engine",
+      "blurb": "Per-instance ExploringInternal#27: max open-space sample radius (m).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/exploring/behaviorExploring.cpp:181; sample :740",
+      "tags": ["exploring", "instance", "radius"]
+    },
+    "ExploringInternal27_maxChargerDistance_m": {
+      "process": "engine",
+      "blurb": "Per-instance ExploringInternal#27: max charger distance (m) for sampling / recovery.",
+      "status": "partial",
+      "statusNote": "Same Init-vs-sample partial as ExploringInternal25_maxChargerDistance_m.",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/exploring/behaviorExploring.cpp:182; Init :223–224",
+      "tags": ["exploring", "instance", "charger"]
+    },
+    "ExploringInternal27_pAcceptKnownAreas": {
+      "process": "engine",
+      "blurb": "Per-instance ExploringInternal#27: p accept known map areas when sampling.",
+      "status": "partial",
+      "statusNote": "SetAcceptanceProbability only in InitBehavior.",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/exploring/behaviorExploring.cpp:183; Init :242",
+      "tags": ["exploring", "instance", "navmap"]
+    },
+    "ExploringInternal64_minSearchRadius_m": {
+      "process": "engine",
+      "blurb": "Per-instance Exploring anonymous (ExploringInternal#64): min open-space sample radius (m). Third dump instance of ExploringInternal.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/exploring/behaviorExploring.cpp:180; configs under resources/.../exploring/*.json anonymous ExploringInternal",
+      "tags": ["exploring", "instance", "radius"]
+    },
+    "ExploringInternal64_maxSearchRadius_m": {
+      "process": "engine",
+      "blurb": "Per-instance ExploringInternal#64: max open-space sample radius (m).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/exploring/behaviorExploring.cpp:181; sample :740",
+      "tags": ["exploring", "instance", "radius"]
+    },
+    "ExploringInternal64_maxChargerDistance_m": {
+      "process": "engine",
+      "blurb": "Per-instance ExploringInternal#64: max charger distance (m) for sampling / recovery.",
+      "status": "partial",
+      "statusNote": "Same Init-vs-sample partial as other ExploringInternal*_maxChargerDistance_m.",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/exploring/behaviorExploring.cpp:182; Init :223–224",
+      "tags": ["exploring", "instance", "charger"]
+    },
+    "ExploringInternal64_pAcceptKnownAreas": {
+      "process": "engine",
+      "blurb": "Per-instance ExploringInternal#64: p accept known map areas when sampling.",
+      "status": "partial",
+      "statusNote": "SetAcceptanceProbability only in InitBehavior.",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/exploring/behaviorExploring.cpp:183; Init :242",
+      "tags": ["exploring", "instance", "navmap"]
+    }
+  }
+}

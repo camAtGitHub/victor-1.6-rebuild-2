@@ -1,0 +1,151 @@
+{
+  "vars": {
+    "InteractWithFaces_DriveForwardIdealDist_mm": {
+      "process": "engine",
+      "blurb": "Preferred drive-forward distance (mm) during InteractWithFaces when the memory-map ray is clear (default 40).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/basicWorldInteractions/behaviorInteractWithFaces.cpp:53,276,378",
+      "tags": ["behavior", "faces", "drive"]
+    },
+    "InteractWithFaces_DriveForwardMinDist_mm": {
+      "process": "engine",
+      "blurb": "Fallback drive distance (mm) when memory-map check fails / collides; can be negative (default -15).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/basicWorldInteractions/behaviorInteractWithFaces.cpp:56,379",
+      "tags": ["behavior", "faces", "drive"]
+    },
+    "InteractWithFaces_DoGlanceDown": {
+      "process": "engine",
+      "blurb": "If true (and memory-map check enabled), dip head to -10° before driving forward (default false).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/basicWorldInteractions/behaviorInteractWithFaces.cpp:60,359-363",
+      "tags": ["behavior", "faces"]
+    },
+    "InteractWithFaces_DoMemoryMapCheckForDriveForward": {
+      "process": "engine",
+      "blurb": "If true, ray-check nav map for collisions over ideal dist and pick ideal vs min drive; if false always use ideal (default true).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/basicWorldInteractions/behaviorInteractWithFaces.cpp:64,270-299",
+      "tags": ["behavior", "faces", "navmap"]
+    },
+    "InteractWithFaces_VizMemoryMapCheck": {
+      "process": "engine",
+      "blurb": "Draw Viz segment for the drive-forward collision ray (yellow=collision, blue=clear).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/basicWorldInteractions/behaviorInteractWithFaces.cpp:66,281-290",
+      "tags": ["behavior", "faces", "debug", "viz"]
+    },
+    "InteractWithFaces_DriveForwardSpeed_mmps": {
+      "process": "engine",
+      "blurb": "Speed (mm/s) for the DriveStraight during face interaction approach (default 40).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/basicWorldInteractions/behaviorInteractWithFaces.cpp:68,392-393",
+      "tags": ["behavior", "faces", "drive"]
+    },
+    "InteractWithFaces_MinTrackingPanAngle_deg": {
+      "process": "engine",
+      "blurb": "Min pan tolerance (deg) for TrackFaceAction during TrackingFace state so small turns still animate life (default 4). Not used on the head-only drive phase (that uses behavior JSON).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/basicWorldInteractions/behaviorInteractWithFaces.cpp:71,439-440",
+      "tags": ["behavior", "faces", "tracking"]
+    },
+    "InteractWithFaces_MinTrackingTiltAngle_deg": {
+      "process": "engine",
+      "blurb": "Min tilt tolerance (deg) for TrackFaceAction during TrackingFace state (default 4). Drive-forward head track uses instance JSON instead.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/basicWorldInteractions/behaviorInteractWithFaces.cpp:72,439-440",
+      "tags": ["behavior", "faces", "tracking"]
+    },
+    "Wiggle_ForwardDist_mm": {
+      "process": "engine",
+      "blurb": "Forward wiggle distance (mm) when re-seating on charger contacts (default 6). Group label is Behavior.InteractWithFaces (copy-paste).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/basicWorldInteractions/behaviorWiggleOntoChargerContacts.cpp:35,148",
+      "tags": ["behavior", "charger", "wiggle"]
+    },
+    "Wiggle_ForwardSpeed_mmps": {
+      "process": "engine",
+      "blurb": "Forward wiggle speed (mm/s) onto charger contacts (default 120).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/basicWorldInteractions/behaviorWiggleOntoChargerContacts.cpp:36,148",
+      "tags": ["behavior", "charger", "wiggle"]
+    },
+    "Wiggle_BackupDist_mm": {
+      "process": "engine",
+      "blurb": "Backup distance (mm) first step of charger-contact wiggle (default 15; DriveStraight uses -dist).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/basicWorldInteractions/behaviorWiggleOntoChargerContacts.cpp:37,135",
+      "tags": ["behavior", "charger", "wiggle"]
+    },
+    "Wiggle_BackupSpeed_mmps": {
+      "process": "engine",
+      "blurb": "Backup speed (mm/s) during charger-contact wiggle (default 100).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/basicWorldInteractions/behaviorWiggleOntoChargerContacts.cpp:38,135",
+      "tags": ["behavior", "charger", "wiggle"]
+    },
+    "Wiggle_VerifyWaitTime_s": {
+      "process": "engine",
+      "blurb": "Wait (s) after hitting contacts before verifying still on charger (default 0.25).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/basicWorldInteractions/behaviorWiggleOntoChargerContacts.cpp:39,161",
+      "tags": ["behavior", "charger", "wiggle"]
+    },
+    "Wiggle_BackupSettleTime_s": {
+      "process": "engine",
+      "blurb": "While backing up, keep driving this long (s) after first contact before verify (default 0.4).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/basicWorldInteractions/behaviorWiggleOntoChargerContacts.cpp:40,187",
+      "tags": ["behavior", "charger", "wiggle"]
+    },
+    "ReactToHand_DriveDistanceFraction": {
+      "process": "engine",
+      "blurb": "Fraction of prox distance_mm used as DriveStraight distance toward hand (0–1, default 1).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToHand.cpp:34,79",
+      "tags": ["behavior", "hand", "prox"]
+    },
+    "ReactToHand_PitchAngleThresh_deg": {
+      "process": "engine",
+      "blurb": "Pitch rise (deg) from activate that counts as robot-lifted-on-hand; skips lift reaction path (default 3).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToHand.cpp:35,56",
+      "tags": ["behavior", "hand"]
+    },
+    "ReactToMotion_ticksInIntervalForTurn": {
+      "process": "engine",
+      "blurb": "Per-instance tunable: motion ticks in history interval before turning toward motion (MakeMemberTunable → ReactToMotion_*). ANKI_DEV_CHEATS only.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToMotion.cpp:118,324; iCozmoBehavior.h:787-806",
+      "tags": ["behavior", "motion", "tunable"]
+    },
+    "ReactToMotion_procHeadAngle_deg": {
+      "process": "engine",
+      "blurb": "Procedural-mode head angle (deg) when turning toward Top motion area; only loaded/used if behavior JSON procedural=true.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToMotion.cpp:119,61-63,451",
+      "tags": ["behavior", "motion", "procedural", "tunable"]
+    },
+    "ReactToMotion_procTurnAngle_deg": {
+      "process": "engine",
+      "blurb": "Procedural-mode body turn magnitude (deg) for Left/Right motion (signed by side); requires procedural=true in config.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToMotion.cpp:120,63,454-457",
+      "tags": ["behavior", "motion", "procedural", "tunable"]
+    },
+    "ReactToMotion_eyeTimeout_s": {
+      "process": "engine",
+      "blurb": "Seconds without motion in looked-at area before exiting eye-tracking (also used after turn wait).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToMotion.cpp:121,304,351,417",
+      "tags": ["behavior", "motion", "tunable"]
+    },
+    "ReactToMotion_eyeShiftTimeout_s": {
+      "process": "engine",
+      "blurb": "Seconds without motion in current look direction before shifting eyes to another motion area (must be ≤ eyeTimeout).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/reactions/behaviorReactToMotion.cpp:122,54,311",
+      "tags": ["behavior", "motion", "tunable"]
+    }
+  }
+}

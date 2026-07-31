@@ -1,0 +1,170 @@
+{
+  "vars": {
+    "EnrollFace_TimeoutForReLookForFace_ms": {
+      "process": "engine",
+      "blurb": "ms without seeing the enrollee face before aborting scan and re-looking; also scales timeout extension when a face is first found.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/meetCozmo/behaviorEnrollFace.cpp:77,803,1468-1471",
+      "tags": ["enrollface", "behavior", "timeout"]
+    },
+    "EnrollFace_UpdateFacePositionThreshold_mm": {
+      "process": "engine",
+      "blurb": "Pose translation threshold (mm) to treat a different FaceID as the same enrollee in MatchesBasedOnPose.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/meetCozmo/behaviorEnrollFace.cpp:80,2396-2398",
+      "tags": ["enrollface", "behavior", "pose"]
+    },
+    "EnrollFace_UpdateFaceAngleThreshold_deg": {
+      "process": "engine",
+      "blurb": "Pose angle threshold (deg) for matching a different FaceID to the current enrollee pose.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/meetCozmo/behaviorEnrollFace.cpp:81,2396-2398",
+      "tags": ["enrollface", "behavior", "pose"]
+    },
+    "EnrollFace_Timeout_sec": {
+      "process": "engine",
+      "blurb": "Default overall enrollment timeout (s) copied into InstanceConfig at behavior construction.",
+      "status": "partial",
+      "statusNote": "Only seeds InstanceConfig.timeout_sec at construct (line 257); runtime CONSOLE_VAR changes do not re-read into an existing behavior. Session uses _dVars->timeout_sec from that copy, then TimeoutMax extension.",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/meetCozmo/behaviorEnrollFace.cpp:84,257,511,1174",
+      "tags": ["enrollface", "behavior", "timeout"]
+    },
+    "EnrollFace_TimeoutMax_sec": {
+      "process": "engine",
+      "blurb": "Hard cap (s) when extending timeout after a face is found (plus re-look × max enroll samples).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/meetCozmo/behaviorEnrollFace.cpp:85,1468-1471",
+      "tags": ["enrollface", "behavior", "timeout"]
+    },
+    "EnrollFace_DriveForwardIntentDist_mm": {
+      "process": "engine",
+      "blurb": "Forward drive distance (mm) after choosing a face, signaling intent before scanning (treads free).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/meetCozmo/behaviorEnrollFace.cpp:88,1491-1492",
+      "tags": ["enrollface", "behavior", "motion"]
+    },
+    "EnrollFace_DriveForwardIntentSpeed_mmps": {
+      "process": "engine",
+      "blurb": "Speed (mm/s) for the post-face-found intent DriveStraightAction.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/meetCozmo/behaviorEnrollFace.cpp:89,1491-1492",
+      "tags": ["enrollface", "behavior", "motion"]
+    },
+    "EnrollFace_MinTrackingPanAngle_deg": {
+      "process": "engine",
+      "blurb": "TrackFaceAction pan tolerance (deg); small angles clamped so body keeps micro-moving while tracking.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/meetCozmo/behaviorEnrollFace.cpp:92,1546-1548",
+      "tags": ["enrollface", "behavior", "tracking"]
+    },
+    "EnrollFace_MinTrackingTiltAngle_deg": {
+      "process": "engine",
+      "blurb": "TrackFaceAction tilt tolerance (deg); small angles clamped so head keeps micro-moving while tracking.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/meetCozmo/behaviorEnrollFace.cpp:93,1546-1548",
+      "tags": ["enrollface", "behavior", "tracking"]
+    },
+    "EnrollFace_MinBackup_mm": {
+      "process": "engine",
+      "blurb": "Min random backup distance (mm) while looking around for a face.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/meetCozmo/behaviorEnrollFace.cpp:96,1962-1966",
+      "tags": ["enrollface", "behavior", "motion"]
+    },
+    "EnrollFace_MaxBackup_mm": {
+      "process": "engine",
+      "blurb": "Max random backup distance (mm) while looking around for a face.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/meetCozmo/behaviorEnrollFace.cpp:97,1962-1966",
+      "tags": ["enrollface", "behavior", "motion"]
+    },
+    "EnrollFace_MaxTotalBackup_mm": {
+      "process": "engine",
+      "blurb": "Cap on cumulative backup distance (mm) during look-around; no more reverse once exceeded.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/meetCozmo/behaviorEnrollFace.cpp:98,1962-1966",
+      "tags": ["enrollface", "behavior", "motion"]
+    },
+    "EnrollFace_MaxTurnTowardsFaceAngle_rad": {
+      "process": "engine",
+      "blurb": "Max turn angle (rad) for TurnTowardsFace / TurnTowardsLastFacePose when seeking a face (default π).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/meetCozmo/behaviorEnrollFace.cpp:101,1918,1928",
+      "tags": ["enrollface", "behavior", "motion"]
+    },
+    "EnrollFace_NumImagesToWait": {
+      "process": "engine",
+      "blurb": "VisionMode::Faces frames to wait after turn / look-around before deciding next enroll step.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/meetCozmo/behaviorEnrollFace.cpp:103,1298,1978",
+      "tags": ["enrollface", "behavior", "vision"]
+    },
+    "EnrollFace_NumImagesToWaitInPlace": {
+      "process": "engine",
+      "blurb": "Faces frames to wait in place (head up) before first look-around, so vision can refresh FaceWorld.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/meetCozmo/behaviorEnrollFace.cpp:104,1264",
+      "tags": ["enrollface", "behavior", "vision"]
+    },
+    "EnrollFace_DefaultMaxFacesVisible": {
+      "process": "engine",
+      "blurb": "Default maxFacesVisible for JSON config.get; more simultaneous faces starts the too-many-faces clock.",
+      "status": "partial",
+      "statusNote": "Only used as construction-time JSON default into InstanceConfig; live path uses _iConfig->maxFacesVisible, not this CONSOLE_VAR at runtime.",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/meetCozmo/behaviorEnrollFace.cpp:107,305",
+      "tags": ["enrollface", "behavior", "config"]
+    },
+    "EnrollFace_DefaultTooManyFacesTimeout_sec": {
+      "process": "engine",
+      "blurb": "Default tooManyFacesTimeout_sec for JSON config.get; how long >max faces may persist before timeout fail.",
+      "status": "partial",
+      "statusNote": "Construction-time JSON default only; HasTimedOut uses _iConfig->tooManyFacesTimeout_sec.",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/meetCozmo/behaviorEnrollFace.cpp:108,306,1175-1176",
+      "tags": ["enrollface", "behavior", "config"]
+    },
+    "EnrollFace_DefaultTooManyFacesRecentTime_sec": {
+      "process": "engine",
+      "blurb": "Default tooManyFacesRecentTime_sec for JSON config.get; recency window for counting multi-face observations.",
+      "status": "partial",
+      "statusNote": "Construction-time JSON default only; multi-face logic uses _iConfig->tooManyFacesRecentTime_sec.",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/meetCozmo/behaviorEnrollFace.cpp:109,307,2012",
+      "tags": ["enrollface", "behavior", "config"]
+    },
+    "EnrollFace_TicksForKnownNameBeforeFail": {
+      "process": "engine",
+      "blurb": "Observations of a named wrong face (without idChanged) before IsSeeingWrongFace treats it as fail-worthy.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/meetCozmo/behaviorEnrollFace.cpp:112,2077-2078",
+      "tags": ["enrollface", "behavior", "wrongface"]
+    },
+    "EnrollFace_ScoreThresholdToFailOnWrongFace": {
+      "process": "engine",
+      "blurb": "If max match score of a wrong named face exceeds this, refuse/enroll path treats it as high-confidence wrong face.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/meetCozmo/behaviorEnrollFace.cpp:117,714,832",
+      "tags": ["enrollface", "behavior", "wrongface"]
+    },
+    "EnrollFace_MaxInterruptionBeforeReset_ms": {
+      "process": "engine",
+      "blurb": "While deactivated mid-enroll, ms since last deactivation before DisableEnrollment resets the request.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/meetCozmo/behaviorEnrollFace.cpp:119,642",
+      "tags": ["enrollface", "behavior", "timeout"]
+    },
+    "EnrollFace_FailOnWrongFace": {
+      "process": "engine",
+      "blurb": "true: wrong named face fails enrollment; false: say name (per SayWrongNameMode) and resume looking.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/meetCozmo/behaviorEnrollFace.cpp:123,1697-1702,1779",
+      "tags": ["enrollface", "behavior", "wrongface"]
+    },
+    "EnrollFace_SayWrongNameMode": {
+      "process": "engine",
+      "blurb": "u8 enum when handling wrong face: 0=Off (no TTS), 1=Short (name!), 2=Long (localized already-know lines). Default Long.",
+      "status": "live",
+      "statusNote": "Comment says it only matters if FailOnWrongFace==false for continuing; switch still runs on wrong-face path either way.",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/meetCozmo/behaviorEnrollFace.cpp:125-133,1729-1756",
+      "tags": ["enrollface", "behavior", "wrongface", "tts"]
+    }
+  }
+}

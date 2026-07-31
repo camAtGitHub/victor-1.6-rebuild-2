@@ -1,40 +1,53 @@
-# Console vars UI (`/consolevars`)
+# Console vars UI (`/consolevars`) — Path A
 
-**Paths:** engine `:8888/consolevars`, anim `:8889/consolevars`  
-**Classic (default):** `consolevarsui.html` → `GET /consolevars`  
-**Explorer (new):** `consolevars-explorer.html` → `GET /consolevars-explorer`  
-**Catalog:** `consolevars-catalog.json` + `consolevars-app.js` (explorer only)
+**Path A (guaranteed on robot):** classic themed page only.  
+**Ports:** engine `:8888/consolevars`, anim `:8889/consolevars`  
+**Template:** `consolevarsui.html` → C++ injects tabs/controls at three markers  
+**Chrome:** `webviz/css/tokens.css` + `consolevars-chrome.css` (token-only colors)  
+**Decorator:** `consolevars-app.js` — curated `?` help + `⌀` dead marks; raw controls always work  
+**Catalog (preferred):** sharded under `consolevars/` (`index.json` → `vars/`, `categories/`, `recipes/`, `meta.json`)  
+**Catalog fallback:** root `consolevars-catalog.json` if the shard index fails  
+**Dumps (name lists for docs agents):** `resources/webserver/.docs/consolevarlist_8888|8889`, `consolefunclist_*`  
+**Agent rules:** `resources/webserver/AGENTS.md` · shard how-to: `consolevars/README.md`
 
-Classic stays the stock jQuery UI page. A link at the top points to the Explorer.
+Explorer (`consolevars-explorer.html` / `/consolevars-explorer`) is **optional** and may be missing without a webserver C++ rebuild. Do not depend on it for Path A.
 
 ## How it works
 
-1. C++ registers thousands of `CONSOLE_VAR` / `CONSOLE_FUNC` at runtime.
-2. `GET /consolevars` or `/consolevars-explorer` builds HTML tabs from those registrations (ids = var names, categories = tab/fieldset) into the chosen template.
-3. **Explorer only:** `consolevars-app.js` fetches the **curated catalog** and:
-   - Shows **recipes** (e.g. MirrorMode face boxes, custom eyes) with **Apply** / **Highlight**
-   - Attaches **blurbs**, **requires**, **related** links on known vars
-   - Provides **filter** search across labels
+1. C++ registers `CONSOLE_VAR` / `CONSOLE_FUNC` at runtime.
+2. `GET /consolevars` loads `consolevarsui.html` and injects category HTML (ids = dump/UI names).
+3. `consolevars-app.js` fetches `consolevars/index.json`, merges shards, and decorates matching rows.
+4. Catalog is **progressive / incomplete** — grow shards when you verify useful or confusing controls.
 
-The catalog is intentionally incomplete. Grow it when you discover useful combos.
+UI ids strip Hungarian `k`/`g` (`kRenderZOffset` → `RenderZOffset`); catalog keys must match dump/UI ids.
 
-## Adding a recipe or note
+## Adding a note or recipe
 
-Edit `consolevars-catalog.json`:
+Prefer a domain shard, then list it in `consolevars/index.json`:
+
+| Kind | Path |
+|---|---|
+| Var notes | `consolevars/vars/<domain>.json` → `{ "vars": { "DumpId": { ... } } }` |
+| Category notes | `consolevars/categories/<name>.json` |
+| Recipes | `consolevars/recipes/<name>.json` → `{ "recipes": [ { "id", "steps", ... } ] }` |
+
+Entry sketch:
 
 ```json
-"vars": {
-  "MyVarName": {
-    "process": "engine",
-    "blurb": "What it does in one sentence.",
-    "requires": ["OtherVar"],
-    "related": ["FriendVar"],
-    "tags": ["highlight"]
-  }
+"MyVarName": {
+  "process": "engine",
+  "blurb": "What it does in one sentence.",
+  "status": "live",
+  "requires": [],
+  "related": [],
+  "tags": []
 }
 ```
 
-Var keys must match the **id** in the UI (first argument of `CONSOLE_VAR`, or `EnumToString` for VisionModes such as `Faces` / `MirrorMode`).
+`process`: `engine` | `anim` | `both`.  
+`status` (optional): `live` (default) | `dead` | `orphan` | `noop` | `partial` | `danger`.
+
+Recipe steps: `{ "var", "value" }` or `{ "func", "args" }`. Enum values are 0-based listbox indices.
 
 ## Process ports
 
@@ -43,13 +56,13 @@ Var keys must match the **id** in the UI (first argument of `CONSOLE_VAR`, or `E
 | 8888 | Engine | Vision, Mood, Behaviors, … |
 | 8889 | Anim | MicData, ProceduralFace, … |
 
-Recipes filter by `process`. Open the matching port (or remote feed to that process).
+## Deploy (copy-only; no C++ rebuild)
 
-## API (unchanged)
+| Changed | On robot |
+|---|---|
+| `.js` / `.json` / `.css` only | `scp` + browser **hard-refresh** |
+| `consolevarsui.html` (template) | `scp` + **restart** eng/anim webserver (template cached at process start) |
 
-- `POST /consolevarset` key/value  
-- `GET /consolevarget?key=`  
-- `GET /consolevarlist`  
-- `POST /consolefunccall`  
+No new HTTP routes. Stock APIs only: `consolevarset`, `consolevarget`, `consolevarlist`, `consolefunclist`, `consolefunccall`.
 
-See `docs/development/web-server.md`.
+See `docs/development/web-server.md` and `resources/webserver/AGENTS.md`.

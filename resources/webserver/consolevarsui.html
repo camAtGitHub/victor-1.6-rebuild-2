@@ -7,13 +7,20 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Console Vars and Functions</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
     <link rel="stylesheet" href="jquery-ui.css">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="webviz/css/tokens.css">
+    <link rel="stylesheet" href="consolevars-chrome.css">
 
     <style>
+    /* Layout only — color comes from tokens / consolevars-chrome.css */
     div {
         display: inline-block;
-        color: #000000;
         vertical-align: top;
     }
 /* -- generated style -- */
@@ -121,7 +128,7 @@
         <h3 class="ui-widget-header" style="text-align: center; margin: 0;">Console Vars and Functions</h3>
         <p style="text-align:center; margin:0.4em 0 0.6em; font-size:13px;">
           <a href="/consolevars-explorer">Open Console Vars Explorer</a>
-          <span style="color:#666;"> — recipes, search, curated notes (new UI)</span>
+          <span style="color:var(--wv-text-faint);"> — recipes, search, curated notes (new UI)</span>
         </p>
         <div id="main">
 <!-- generated html -->
@@ -129,6 +136,7 @@
         <div id='id_consolefunc_result'></div>
         </div>
     </div>
+    <script src="consolevars-app.js"></script>
 </body>
 
 <!-- page postamble -->

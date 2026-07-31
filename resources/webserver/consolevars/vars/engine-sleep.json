@@ -1,0 +1,180 @@
+{
+  "vars": {
+    "SleepTimeAfterActionCompleted_s": {
+      "process": "engine",
+      "blurb": "Wait (s) after gaze-direction reaction turns/anims before finishing the compound action — not SleepCycle; Vision.GazeDirection / ReactToGazeDirection.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorReactToGazeDirection.cpp:34; WaitAction :183 and :216",
+      "tags": ["gaze", "vision", "wait", "not-sleep-cycle"]
+    },
+    "SleepCycle_DeepSleep_PersonCheckInterval_s": {
+      "process": "engine",
+      "blurb": "Interval (s) between person-check wake opportunities while in DeepSleep (default 4 h).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/sleeping/behaviorSleepCycle.cpp:75; TransitionToDeepSleep :1018",
+      "tags": ["sleep", "sleepcycle", "deep"]
+    },
+    "SleepCycle_LightSleep_PersonCheckInterval_s": {
+      "process": "engine",
+      "blurb": "Interval (s) between person-check wake opportunities while in LightSleep (default 0.5 h).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/sleeping/behaviorSleepCycle.cpp:76; TransitionToLightSleep :1027",
+      "tags": ["sleep", "sleepcycle", "light"]
+    },
+    "SleepCycle_ComatoseLength_s": {
+      "process": "engine",
+      "blurb": "How long (s) Comatose lasts after system_sleep before transitioning to DeepSleep (default 30 s).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/sleeping/behaviorSleepCycle.cpp:78; Comatose branch :560",
+      "tags": ["sleep", "sleepcycle", "comatose"]
+    },
+    "SleepCycle_RecentSleepLength_s": {
+      "process": "engine",
+      "blurb": "Min time awake after natural wake (s) before sleepy natural sleep can re-trigger (default 10 min).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/sleeping/behaviorSleepCycle.cpp:81; wokeRecently :715–716",
+      "tags": ["sleep", "sleepcycle", "cooldown"]
+    },
+    "SleepCycle_MinSleepDebt_s": {
+      "process": "engine",
+      "blurb": "Minimum sleep debt (s) enforced when entering light/deep sleep so natural wake is not immediate (default 30 min).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/sleeping/behaviorSleepCycle.cpp:84; EnsureSleepDebtAtLeast :1126",
+      "tags": ["sleep", "sleepcycle", "debt"]
+    },
+    "SleepCycle_EnableWiggleWhileSleeping": {
+      "process": "engine",
+      "blurb": "If false, disables wiggle-back-onto-charger while sleeping when contacts are lost.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/sleeping/behaviorSleepCycle.cpp:86; ShouldWiggleOntoChargerFromSleep :654",
+      "tags": ["sleep", "sleepcycle", "charger"]
+    },
+    "SleepCycleForceSleep": {
+      "process": "engine",
+      "blurb": "When true, GoToSleepIfNeeded immediately enters light/deep sleep (console force; DAS SleepReason::ConsoleVar).",
+      "status": "danger",
+      "statusNote": "Forces freeplay into sleep path every check while true — use only for debug.",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/sleeping/behaviorSleepCycle.cpp:88; GoToSleepIfNeeded :690–693",
+      "tags": ["sleep", "sleepcycle", "force", "danger"]
+    },
+    "SleepCycleForceLightSleep": {
+      "process": "engine",
+      "blurb": "When true, TransitionToLightOrDeepSleep always chooses LightSleep even at night (skips DeepSleep).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/sleeping/behaviorSleepCycle.cpp:90; TransitionToLightOrDeepSleep :1130",
+      "tags": ["sleep", "sleepcycle", "force", "light"]
+    },
+    "SleepCycle_TooLongOnChargerNotChargingDuration_sec": {
+      "process": "engine",
+      "blurb": "If battery disconnected-duration while “charging” exceeds this (s) during ObservingOnCharger, force sleep (overheat cooldown).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/sleeping/behaviorSleepCycle.cpp:93; GoToSleepIfNeeded :780",
+      "tags": ["sleep", "sleepcycle", "battery", "charger"]
+    },
+    "SleepingStirSpacing_min_s": {
+      "process": "engine",
+      "blurb": "Min wait (s) between sleep bouts before next stir bout in BehaviorSleeping (default 2700).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/sleeping/behaviorSleeping.cpp:30; TransitionToSleeping :112",
+      "tags": ["sleep", "sleeping", "stir"]
+    },
+    "SleepingStirSpacing_max_s": {
+      "process": "engine",
+      "blurb": "Max wait (s) between sleep bouts before next stir bout (default 5400).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/sleeping/behaviorSleeping.cpp:31; TransitionToSleeping :112",
+      "tags": ["sleep", "sleeping", "stir"]
+    },
+    "SleepingBoutSpacing_min_s": {
+      "process": "engine",
+      "blurb": "Min wait (s) between individual stir animations within a bout (default 1.5).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/sleeping/behaviorSleeping.cpp:33; TransitionToBoutOfStirring :128",
+      "tags": ["sleep", "sleeping", "stir"]
+    },
+    "SleepingBoutSpacing_max_s": {
+      "process": "engine",
+      "blurb": "Max wait (s) between stirs in a bout (default 5).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/sleeping/behaviorSleeping.cpp:34; TransitionToBoutOfStirring :128",
+      "tags": ["sleep", "sleeping", "stir"]
+    },
+    "SleepingBoutNumStirs_min": {
+      "process": "engine",
+      "blurb": "Min number of stir animations per bout (default 5).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/sleeping/behaviorSleeping.cpp:38; TransitionToSleeping :110",
+      "tags": ["sleep", "sleeping", "stir"]
+    },
+    "SleepingBoutNumStirs_max": {
+      "process": "engine",
+      "blurb": "Max number of stir animations per bout (default 10).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/sleeping/behaviorSleeping.cpp:39; TransitionToSleeping :110",
+      "tags": ["sleep", "sleeping", "stir"]
+    },
+    "SleepTracker_moning_hour": {
+      "process": "engine",
+      "blurb": "Local-time morning hour (0–23) that ends “night” for IsNightTime (typo moning is source name). Default 7.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/sleepTracker.cpp:33; IsNightTime :162",
+      "tags": ["sleep", "sleeptracker", "time"]
+    },
+    "SleepTracker_moning_minute": {
+      "process": "engine",
+      "blurb": "Local-time morning minute (0–59) with moning_hour; default 0.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/sleepTracker.cpp:34; IsNightTime :162",
+      "tags": ["sleep", "sleeptracker", "time"]
+    },
+    "SleepTracker_night_hour": {
+      "process": "engine",
+      "blurb": "Local-time night hour (0–23) that starts “night”; must be after morning and before midnight. Default 21.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/sleepTracker.cpp:37; IsNightTime :163",
+      "tags": ["sleep", "sleeptracker", "time"]
+    },
+    "SleepTracker_night_minute": {
+      "process": "engine",
+      "blurb": "Local-time night minute (0–59) with night_hour; default 0.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/sleepTracker.cpp:38; IsNightTime :163",
+      "tags": ["sleep", "sleeptracker", "time"]
+    },
+    "SleepTracker_awakeSleepDebtRate": {
+      "process": "engine",
+      "blurb": "Debt accumulation multiplier while awake: each update adds period_s * this rate (default 20/4 = 5×).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/sleepTracker.cpp:41; UpdateDependent :113",
+      "tags": ["sleep", "sleeptracker", "debt"]
+    },
+    "SleepTracker_maxSleepDebt_hours": {
+      "process": "engine",
+      "blurb": "Cap on sleep debt in hours (default 20); clamp after each debt update.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/sleepTracker.cpp:42; clamp :126",
+      "tags": ["sleep", "sleeptracker", "debt"]
+    },
+    "SleepTracker_debtToConsiderSleepy_awake": {
+      "process": "engine",
+      "blurb": "Sleep debt (s) threshold for IsSleepy(fromSleep=false) while awake (default 3600).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/sleepTracker.cpp:44; IsSleepy :140–141",
+      "tags": ["sleep", "sleeptracker", "debt"]
+    },
+    "SleepTracker_debtToConsiderSleepy_fromSleep": {
+      "process": "engine",
+      "blurb": "Sleep debt (s) threshold for IsSleepy while already asleep / fromSleep path (default 1800); also floor warning in EnsureSleepDebtAtLeast.",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/sleepTracker.cpp:45; IsSleepy :139–141; Ensure :177",
+      "tags": ["sleep", "sleeptracker", "debt"]
+    },
+    "SleepTracker_updatePeriod_s": {
+      "process": "engine",
+      "blurb": "How often (s) sleep debt is stepped and WebViz sleeping payload refreshed (default 60).",
+      "status": "live",
+      "evidence": "engine/aiComponent/behaviorComponent/sleepTracker.cpp:48; UpdateDependent :107–113",
+      "tags": ["sleep", "sleeptracker", "webviz"]
+    }
+  }
+}

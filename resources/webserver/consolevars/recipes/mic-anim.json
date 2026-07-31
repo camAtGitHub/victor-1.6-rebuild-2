@@ -1,0 +1,45 @@
+{
+  "recipes": [
+    {
+      "id": "mic-record-clip",
+      "title": "Record a mic data clip",
+      "process": "anim",
+      "blurb": "Capture raw + processed mic audio for a few seconds (debug / ear pull).",
+      "where": "Anim :8889 → MicData → RecordMicDataClip",
+      "steps": [
+        {
+          "var": "MicData_ClipRecordTime_ms",
+          "value": 4000,
+          "note": "Clip length in ms (default 4000; range ~500–15000)."
+        },
+        {
+          "func": "RecordMicDataClip",
+          "args": "",
+          "note": "Starts the recording job (console function button)."
+        }
+      ],
+      "tips": [
+        "Clips land under cache micdata — see docs/development/mic-systems-overview.md and tools/ear_puller.py.",
+        "Web: http://ROBOT:8889/cache/micdata/"
+      ]
+    },
+    {
+      "id": "play-anim-once",
+      "title": "Play a canned animation (anim process)",
+      "process": "anim",
+      "blurb": "Fire a named animation from console (useful smoke test of anim stack).",
+      "where": "Anim :8889 → Animations → PlayAnimation",
+      "steps": [
+        {
+          "func": "PlayAnimation",
+          "args": "anim_idle_01 1",
+          "note": "Args: name numLoops — change name to any known anim; ListAnimations dumps names."
+        }
+      ],
+      "tips": [
+        "Use ListAnimations (no args) to print available names into the console-func result box.",
+        "AbortCurrentAnimation cancels playback."
+      ]
+    }
+  ]
+}

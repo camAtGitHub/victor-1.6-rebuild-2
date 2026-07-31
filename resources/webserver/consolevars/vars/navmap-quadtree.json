@@ -1,0 +1,24 @@
+{
+  "vars": {
+    "RenderZOffset": {
+      "process": "engine",
+      "blurb": "Intended Z offset (mm) for QuadTreeProcessor debug render quads.",
+      "status": "dead",
+      "statusNote": "Registered CONSOLE_VAR but never read after definition — changing it has no effect on this tree.",
+      "evidence": "engine/navMap/quadTree/quadTreeProcessor.cpp (kRenderZOffset); UI id strips Hungarian k → RenderZOffset (consolevarlist_8888)",
+      "category": "QuadTreeProcessor",
+      "related": ["RenderBorder3DLines", "RenderBordersFrom", "RenderSeeds"],
+      "tags": ["navmap", "debug", "dead"]
+    },
+    "RenderBorder3DLines": {
+      "process": "engine",
+      "blurb": "Intended to render nav-map borders as 3D lines instead of quads.",
+      "status": "dead",
+      "statusNote": "Registered CONSOLE_VAR but never referenced outside its declaration — orphan flag.",
+      "evidence": "engine/navMap/quadTree/quadTreeProcessor.cpp (kRenderBorder3DLines); UI id RenderBorder3DLines",
+      "category": "QuadTreeProcessor",
+      "related": ["RenderZOffset", "RenderBordersFrom"],
+      "tags": ["navmap", "debug", "dead"]
+    }
+  }
+}

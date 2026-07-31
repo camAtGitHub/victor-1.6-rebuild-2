@@ -1,0 +1,16 @@
+{
+  "categories": {
+    "MicData": {
+      "blurb": "Microphone capture / clip recording. Anim process (:8889).",
+      "process": "anim"
+    },
+    "Face.ParameterizedFace": {
+      "blurb": "Procedural face drawing, AA, glow, custom eye overlays. Anim process (:8889). UI path often Face → ParameterizedFace.",
+      "process": "anim"
+    },
+    "Animations": {
+      "blurb": "List/play/abort canned animations on the anim process.",
+      "process": "anim"
+    }
+  }
+}

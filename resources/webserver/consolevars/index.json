@@ -1,0 +1,30 @@
+{
+  "version": 2,
+  "meta": "meta.json",
+  "vars": [
+    "vars/vision.json",
+    "vars/anim-face.json",
+    "vars/anim-mic.json",
+    "vars/anim-animations.json",
+    "vars/mood-webviz.json",
+    "vars/navmap-quadtree.json",
+    "vars/engine-keepaway.json",
+    "vars/engine-enroll-face.json",
+    "vars/engine-explore-hlai.json",
+    "vars/engine-sleep.json",
+    "vars/engine-interact.json",
+    "vars/engine-actions-dock.json",
+    "vars/engine-blockworld.json",
+    "vars/engine-net-ops.json"
+  ],
+  "categories": [
+    "categories/vision.json",
+    "categories/anim.json"
+  ],
+  "recipes": [
+    "recipes/mirror-mode.json",
+    "recipes/procface.json",
+    "recipes/mic-anim.json",
+    "recipes/webviz-mood.json"
+  ]
+}

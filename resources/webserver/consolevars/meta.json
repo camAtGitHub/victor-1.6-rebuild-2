@@ -1,0 +1,24 @@
+{
+  "version": 2,
+  "schema_note": "Curated human docs for console vars. Not exhaustive. Keys match UI / consolevarlist dump ids (Hungarian k/g stripped). process: engine|anim|both. Recipe steps: {var,value} or {func,args}. Enum values are 0-based indices (same as stock listbox posts).",
+  "statusLegend": {
+    "live": "Documented and expected to affect runtime (default when omitted).",
+    "dead": "Registered but not read after definition — control is a no-op. Glyph ⌀.",
+    "orphan": "Declared but unused outside registration — treat like dead.",
+    "noop": "Explicitly confirmed no runtime effect.",
+    "partial": "Works only under extra conditions; see statusNote.",
+    "danger": "Can break behavior, hang, or thrash; use carefully."
+  },
+  "processNotes": {
+    "engine": "Engine process — typically port 8888.",
+    "anim": "Anim process — typically port 8889.",
+    "both": "May appear on either process (or both)."
+  },
+  "dumps": {
+    "engine_vars": "resources/webserver/.docs/consolevarlist_8888",
+    "anim_vars": "resources/webserver/.docs/consolevarlist_8889",
+    "engine_funcs": "resources/webserver/.docs/consolefunclist_8888",
+    "anim_funcs": "resources/webserver/.docs/consolefunclist_8889"
+  },
+  "coverageNote": "Progressive curated catalog (~198 keys in 14 vars/*.json shards). Engine dump ~800 / anim ~223 names in .docs/ — not exhaustive."
+}

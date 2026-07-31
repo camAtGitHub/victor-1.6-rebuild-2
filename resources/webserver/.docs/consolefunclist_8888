@@ -1,0 +1,113 @@
+ForceAssignExperiment
+IntentionalCrash
+IntentionalExit
+IntentionalAbort
+IntentionalAssert
+IntentionalSIGTERM
+IntentionalSIGINT
+IntentionalSIGQUIT
+IntentionalSIGKILL
+IntentionalPthreadExit
+IntentionalThrow
+IntentionalMallocBigNum
+ResetConsoleVars
+LoadConsoleVars
+SaveConsoleVars
+DeleteConsoleVars
+List_Variables
+List_Functions
+Console_Help
+SetConnectionTimeoutInMS
+PrintWallTimeToLog
+SetFakeWallTime24HourUTC
+ClearFakeWallTime
+ForceNextBigGreeting
+StackDeck
+StopStackingDeck
+LockLight
+SaveLights
+DealToPlayer
+DealToDealer
+Flop
+SpreadPlayerCards
+Charlie
+ClearCardsToSortedDeck
+ClearCardsAndShuffle
+AnnouncePlayerScore
+AnnounceDealerScore
+NextDatasetState
+ForcePersonCheck
+ForceAntic
+AdvanceAntic
+ForceAddSleepDebtHours
+AdvanceTimer
+AdvanceTimerAndAntic
+DebugDeleteSelectedJdocInCloud
+DebugDeleteAllJdocsInCloud
+DebugFakeUserLogOut
+DebugCheckForUser
+RecordMessageFor
+PlaybackNextMessageFor
+DeleteMessagesFor
+ResetRobotStats
+FlushRobotStatsToDisk
+SetTouchSensor
+DebugSetMasterVolume
+DebugSetEyeColor
+DebugSetCustomEyeColor
+DebugSetButtonWakeWord
+DebugSetLocale
+DebugSetTimeZone
+DebugSetDefaultLocation
+DebugToggle24HourClock
+DebugToggleTempIsFahrenheit
+DebugToggleDistIsMetric
+DebugDemoSetLocaleIndex
+DebugToggleDataCollection
+DebugToggleKickstarterEyes
+DebugEraseAllEnrolledFaces
+DebugCaptureOneImage
+DebugToggleCameraEnabled
+ResetGamma
+DevProcessOneFrameForVisionEdges
+DevDrawCliffPoses
+PlayAnimationByName
+AddAnimation
+PrintBodyData
+SayText
+EnableFeature
+DisableFeature
+DefaultFeature
+DefaultAllFeatures
+SetNewTapHeight
+ProcFace_Hue
+ProcFace_Saturation
+LoadFaceOverlay
+ForceAlexaOptIn
+ForceAlexaOptOut
+EnableDevTriggerWord
+MoveToState
+Restart Onboarding
+Simulate App Disconnect
+Exit Onboarding - DO NOT Mark Complete
+Exit Onboarding - Mark Complete
+Hail Mary: Send Wake Up Request
+Hail Mary: Send Wake Up Started Request
+ToggleLiftOnOff
+ToggleHeadOnOff
+ToggleTreadsOnOff
+SetHeadAngle
+SetLoopingAnimationState
+Clear Onboarding Data
+Set Phase: TeachMeetVictor
+Set Phase: TeachComeHere
+Set Phase: TeachWakeWord
+Set Phase: LookAtUser
+Set Phase: WakeUp
+Set Phase: LookAtPhone
+Set Phase: Emulate1p0WaitForVC
+Set Phase: Default
+Set active mode and boot mode to DevDoNothing
+Set active mode and boot mode to Normal
+
+
