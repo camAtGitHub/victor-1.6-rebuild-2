@@ -50,7 +50,10 @@
     "vars/engine-vision-save-display.json",
     "vars/engine-vision-ae-illum.json",
     "vars/engine-neural-salient.json",
-    "vars/engine-pet.json"
+    "vars/engine-pet.json",
+    "vars/engine-onboarding-prdemo.json",
+    "vars/engine-turn-imu.json",
+    "vars/engine-audio-beat.json"
   ],
   "categories": [
     "categories/vision.json",
