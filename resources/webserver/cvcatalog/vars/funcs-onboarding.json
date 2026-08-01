@@ -1,0 +1,453 @@
+{
+  "vars": {
+    "Clear Onboarding Data": {
+      "process": "engine",
+      "blurb": "Wipes onboarding completion state and related pairing data from this robot: deletes the onboarding save file, forgets the preferred cube, and erases every enrolled face name. Does not by itself restart the onboarding behavior stack — use Restart Onboarding or reboot after delete if you need the setup flow to run again.",
+      "detail": "ANKI_DEV_CHEATS console function on BehaviorOnboardingCoordinator (category OnboardingCoordinator). Handler deletes saveFolder + onboardingState.json (persistent Scope path …/onboarding/onboardingState.json), CubeCommsComponent::ForgetPreferredCube() (clears preferred cube factory id), and broadcasts EraseAllEnrolledFaces so VisionComponent wipes FaceWorld + OKAO album to disk. Live boot stage in BehaviorsBootLoader is unchanged until next InitOnboarding / stage write / Restart. Irreversible for face enrollments.",
+      "howTo": "1) Only on a unit you can re-enroll. 2) Call Clear Onboarding Data. 3) Optionally call Restart Onboarding (or reboot with no onboardingState.json so stage becomes NotStarted) to re-enter setup. Re-pair cube and re-enroll faces afterward.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/persistent/onboarding/onboardingState.json",
+          "/data/data/com.anki.victor/persistent/faceAlbums/"
+        ],
+        "notes": "Onboarding path = DataPlatform Scope::Persistent + folder \"onboarding\" + file onboardingState.json (platform_config DataPlatformPersistentPath). Face album wipe is the same path as DebugEraseAllEnrolledFaces."
+      },
+      "related": [
+        "Restart Onboarding",
+        "Set active mode and boot mode to Normal",
+        "Set active mode and boot mode to DevDoNothing",
+        "DebugEraseAllEnrolledFaces"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/onboarding/behaviorOnboardingCoordinator.cpp:40-42,214-228; cubeCommsComponent.cpp:310-314; visionComponent.cpp:106-111,2099-2107; platform/config/etc/config/platform_config.json DataPlatformPersistentPath",
+      "category": "OnboardingCoordinator",
+      "status": "danger",
+      "statusNote": "Deletes onboarding save, preferred cube, and all enrolled faces with no confirmation. Does not auto-restart onboarding stack.",
+      "tags": ["onboarding", "console-func", "faces", "cube", "danger", "dev-cheats"]
+    },
+    "Exit Onboarding - DO NOT Mark Complete": {
+      "process": "engine",
+      "blurb": "Leaves the first-time setup flow without treating it as finished. Vector exits the onboarding coordinator and writes onboarding stage NotStarted so the next boot (or stage read) can run onboarding again. Use when you want to abort setup but still look “not done” to the app.",
+      "detail": "ANKI_DEV_CHEATS OnboardingMessageHandler button (category OnboardingCoordinator). Broadcasts gateway OnboardingSkipOnboarding. BehaviorOnboardingCoordinator handles kOnboardingSkipOnboarding by setting skipOnboardingOnNextUpdate; on the next BehaviorUpdate while activated it TerminateOnboarding() (stack → post-onboarding ModeSelector via OnboardingState Complete message for the stack, see note) and SaveToDisk(NotStarted). TerminateOnboarding always broadcasts OnboardingState Complete to reboot the stack into freeplay-ish ModeSelector, while SaveToDisk writes NotStarted for persistence — so live stack leaves onboarding but disk says not finished. Only processed while the Onboarding coordinator behavior is activated.",
+      "howTo": "1) Boot/run with Onboarding as the base stack (stage NotStarted/TimedOut). 2) Call this. 3) Confirm onboardingState.json has onboardingStage NotStarted and freeplay stack is active. To fully re-run setup, call Restart Onboarding or reboot.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/persistent/onboarding/onboardingState.json"
+        ]
+      },
+      "related": [
+        "Exit Onboarding - Mark Complete",
+        "Restart Onboarding",
+        "Clear Onboarding Data"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/onboardingMessageHandler.cpp:85-95; behaviorOnboardingCoordinator.cpp:331-335,388-397,757-775,778-790; behaviorsBootLoader.cpp:156-171",
+      "category": "OnboardingCoordinator",
+      "status": "partial",
+      "statusNote": "Gateway inject only takes effect when OnboardingCoordinator is activated and BehaviorUpdate runs. Outside onboarding the button is effectively a no-op. Disk stage becomes NotStarted while stack is still reset via TerminateOnboarding’s Complete message.",
+      "tags": ["onboarding", "console-func", "dev-cheats"]
+    },
+    "Exit Onboarding - Mark Complete": {
+      "process": "engine",
+      "blurb": "Finishes first-time setup as if the user completed it: forces the WakeUp onboarding phase, then when that phase ends marks onboarding Complete (with completion timestamp) and leaves the setup stack into normal post-onboarding freeplay (ModeSelector).",
+      "detail": "ANKI_DEV_CHEATS. Broadcasts OnboardingMarkCompleteAndExit. Coordinator sets pendingPhase=WakeUp and shouldExitAfterWakeUp. BehaviorUpdate transitions to OnboardingWakeUp; OnPhaseComplete then sets markCompleteAndExitOnNextUpdate → TerminateOnboarding + SaveToDisk(Complete) including kOnboardingTimeKey (seconds since epoch) for How-Old-Are-You. Comment in code: hack until websetup can force wakeup then exit. Requires active OnboardingCoordinator and a WakeUp phase that can activate.",
+      "howTo": "1) Be in onboarding (Onboarding base behavior). 2) Prefer robot able to run WakeUp (often on charger / battery ready). 3) Call this and wait for wake-up anim to finish. 4) Confirm onboardingState.json stage Complete and ModeSelector/freeplay stack.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/persistent/onboarding/onboardingState.json"
+        ],
+        "assets": [
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/onboarding/onboarding.json",
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/onboarding/onboardingWakeUp.json"
+        ]
+      },
+      "related": [
+        "Exit Onboarding - DO NOT Mark Complete",
+        "Set Phase: WakeUp",
+        "Set active mode and boot mode to Normal"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/onboardingMessageHandler.cpp:97-107; behaviorOnboardingCoordinator.cpp:336-342,388-391,531-541,757-790",
+      "category": "OnboardingCoordinator",
+      "status": "partial",
+      "statusNote": "Only while OnboardingCoordinator is active. Plays WakeUp before marking complete; if WakeUp will not activate, exit may not finish.",
+      "tags": ["onboarding", "console-func", "dev-cheats", "wakeup"]
+    },
+    "Hail Mary: Send Wake Up Request": {
+      "process": "engine",
+      "blurb": "Simulates the old companion-app “hail mary” wake-up request used by 1.0-style onboarding. If battery does not still need charging, Vector queues the WakeUp onboarding phase and replies to the app with whether it is waking; if it still needs charge, it refuses wake-up and only reports charging info.",
+      "detail": "ANKI_DEV_CHEATS. Broadcasts OnboardingWakeUpRequest. Coordinator sets emulate1p0Onboarding=true, canWakeUp = (GetSuggestedChargerTime()==0), Send1p0WakeUpResponseToApp(canWakeUp). If canWakeUp: pendingPhase=WakeUp and started1p0WakeUp=true. After WakeUp completes under emulate mode, auto-transitions to Emulate1p0WaitForVC then completes onboarding on that phase end. Kept for backward compatibility with older apps.",
+      "howTo": "1) Run Onboarding coordinator. 2) Ensure suggested charger time is 0 if you want wake-up (otherwise only a refuse + charging info response). 3) Call this. 4) Watch WakeUp then Emulate1p0WaitForVC.",
+      "related": [
+        "Hail Mary: Send Wake Up Started Request",
+        "Set Phase: WakeUp",
+        "Set Phase: Emulate1p0WaitForVC"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/onboardingMessageHandler.cpp:109-118; behaviorOnboardingCoordinator.cpp:285-298,544-557,684-702",
+      "category": "OnboardingCoordinator",
+      "status": "partial",
+      "statusNote": "Needs active OnboardingCoordinator for pending phase to run. Wake-up only starts when battery GetSuggestedChargerTime() is 0.",
+      "tags": ["onboarding", "console-func", "legacy", "hail-mary", "dev-cheats"]
+    },
+    "Hail Mary: Send Wake Up Started Request": {
+      "process": "engine",
+      "blurb": "Simulates the old app poll “has wake-up started yet?” after a hail-mary wake request. Does not start motion itself — only enables 1.0 onboarding emulation mode and answers true/false based on whether a prior Wake Up Request already began wake-up.",
+      "detail": "ANKI_DEV_CHEATS. Broadcasts OnboardingWakeUpStartedRequest. Handler sets emulate1p0Onboarding=true and sends OnboardingWakeUpStartedResponse{ started1p0WakeUp }. Pair with Hail Mary: Send Wake Up Request. Useful when testing legacy app sequencing without a real app.",
+      "howTo": "1) Call Hail Mary: Send Wake Up Request (when can wake). 2) Call this to see started=true in the gateway response / logs. Before step 1, response is false.",
+      "requires": ["Hail Mary: Send Wake Up Request"],
+      "related": [
+        "Hail Mary: Send Wake Up Request",
+        "Set Phase: Emulate1p0WaitForVC"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/onboardingMessageHandler.cpp:121-131; behaviorOnboardingCoordinator.cpp:300-309",
+      "category": "OnboardingCoordinator",
+      "status": "partial",
+      "statusNote": "Query-only plus sets emulate1p0 flag; no phase transition by itself. Meaningful only with live OnboardingCoordinator / gateway.",
+      "tags": ["onboarding", "console-func", "legacy", "hail-mary", "dev-cheats"]
+    },
+    "Restart Onboarding": {
+      "process": "engine",
+      "blurb": "Forces Vector back into first-time setup from the beginning: saves stage NotStarted, tears down the current onboarding phase if running, briefly parks on Wait, then re-boots the Onboarding behavior stack after a short delay. App-facing stage becomes NotStarted.",
+      "detail": "ANKI_DEV_CHEATS OnboardingMessageHandler. Broadcasts OnboardingRestart → BehaviorOnboardingCoordinator::RestartOnboarding: CancelDelegates if activated, waitingForTermination, broadcasts EngineToGame OnboardingState{NotStarted}, SaveToDisk(NotStarted). BehaviorsBootLoader on OnboardingState with stage < Complete calls RestartOnboarding(): SetNewBehavior(Wait), _countUntilResetOnboarding=20 ticks, then SetNewBehavior(onboardingBehavior=Onboarding). DAS event onboarding.restart. Works even when leaving freeplay/complete because the gateway→coordinator subscription is always registered once Onboarding init ran.",
+      "howTo": "1) Call Restart Onboarding on engine. 2) Expect a brief Wait base then Onboarding (Default phase / LookAtPhone). 3) Confirm onboardingState.json is NotStarted.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/persistent/onboarding/onboardingState.json"
+        ],
+        "assets": [
+          "resources/config/engine/behaviorComponent/victor_behavior_config.json",
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/onboarding/onboarding.json"
+        ]
+      },
+      "related": [
+        "Clear Onboarding Data",
+        "Exit Onboarding - DO NOT Mark Complete",
+        "Set Phase: Default"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/onboardingMessageHandler.cpp:62-71; behaviorOnboardingCoordinator.cpp:732-753; behaviorsBootLoader.cpp:156-166,226-238,367-377; victor_behavior_config.json onboardingBehavior",
+      "category": "OnboardingCoordinator",
+      "status": "live",
+      "tags": ["onboarding", "console-func", "boot", "dev-cheats"]
+    },
+    "Set Phase: Default": {
+      "process": "engine",
+      "blurb": "Jumps onboarding to the Default phase — the idle/waiting face used at coordinator start and after app disconnect. On shipping config Default runs OnboardingLookAtPhone with no phase timeout (global/app-disconnect timeouts still apply).",
+      "detail": "One of the ANKI_DEV_CHEATS Set Phase buttons registered for each OnboardingPhase in the JSON phase map. Injects gateway OnboardingSetPhaseRequest with that phase. Coordinator sets pendingPhase and replies OnboardingSetPhaseResponse; BehaviorUpdate then TransitionToPhase (cancels current delegates, delegates phase behavior). Only applied while OnboardingCoordinator is activated.",
+      "howTo": "1) Ensure onboarding stack is active (Restart Onboarding if needed). 2) Call Set Phase: Default. 3) Robot should show LookAtPhone-style default waiting UX.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/onboarding/onboarding.json",
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/onboarding/onboardingLookAtPhone.json"
+        ]
+      },
+      "related": [
+        "Set Phase: LookAtPhone",
+        "Simulate App Disconnect",
+        "Restart Onboarding"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/onboarding/behaviorOnboardingCoordinator.cpp:230-241,311-319,401-408,443-485; clad/src/clad/types/onboardingPhase.clad; onboarding.json phases Default",
+      "category": "OnboardingCoordinator",
+      "status": "partial",
+      "statusNote": "Requires active OnboardingCoordinator; outside onboarding pending phase is not applied.",
+      "tags": ["onboarding", "console-func", "phase", "dev-cheats"]
+    },
+    "Set Phase: Emulate1p0WaitForVC": {
+      "process": "engine",
+      "blurb": "Jumps onboarding to Emulate1p0WaitForVC — the legacy 1.0 “wait for a voice command then finish” phase (60 s timeout in config). Used after hail-mary WakeUp in old-app emulation; when that phase completes under emulate mode, onboarding marks Complete.",
+      "detail": "Same Set Phase inject path as other phases (OnboardingSetPhaseRequest). Phase behavior OnboardingEmulate1p0WaitForVC. Enum value is internal-only for the app (clad notes Emulate1p0WaitForVC=100), but still registered as a console Set Phase button from the coordinator’s phase map. App-commanded transition starts onboardingStarted / completion timeout when first used.",
+      "howTo": "1) Active onboarding. 2) Call Set Phase: Emulate1p0WaitForVC (or finish Hail Mary WakeUp so coordinator auto-enters this under emulate). 3) Say a voice command or wait for timeout path.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/onboarding/onboarding.json",
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/onboarding/onboardingEmulate1p0WaitForVC.json"
+        ]
+      },
+      "related": [
+        "Hail Mary: Send Wake Up Request",
+        "Set Phase: WakeUp"
+      ],
+      "evidence": "behaviorOnboardingCoordinator.cpp:230-241,544-557; onboardingPhase.clad Emulate1p0WaitForVC; onboarding.json Emulate1p0WaitForVC",
+      "category": "OnboardingCoordinator",
+      "status": "partial",
+      "statusNote": "Requires active OnboardingCoordinator.",
+      "tags": ["onboarding", "console-func", "phase", "legacy", "dev-cheats"]
+    },
+    "Set Phase: LookAtPhone": {
+      "process": "engine",
+      "blurb": "Jumps onboarding to LookAtPhone (OnboardingLookAtPhone behavior, 60 s phase timeout). Vector focuses on the phone/setup screen phase of first-time setup.",
+      "detail": "Gateway OnboardingSetPhaseRequest → pendingPhase LookAtPhone → TransitionToPhase while coordinator active. Same registration loop as other Set Phase buttons under ANKI_DEV_CHEATS.",
+      "howTo": "Active onboarding → Set Phase: LookAtPhone → confirm LookAtPhone phase behavior.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/onboarding/onboarding.json",
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/onboarding/onboardingLookAtPhone.json"
+        ]
+      },
+      "related": [
+        "Set Phase: Default",
+        "Set Phase: WakeUp"
+      ],
+      "evidence": "behaviorOnboardingCoordinator.cpp:230-241,311-319,443-485; onboarding.json LookAtPhone",
+      "category": "OnboardingCoordinator",
+      "status": "partial",
+      "statusNote": "Requires active OnboardingCoordinator.",
+      "tags": ["onboarding", "console-func", "phase", "dev-cheats"]
+    },
+    "Set Phase: LookAtUser": {
+      "process": "engine",
+      "blurb": "Jumps onboarding to LookAtUser (OnboardingLookAtUser, 120 s timeout, power-off allowed). Face-tracking / look-at-user portion of setup.",
+      "detail": "Same Set Phase inject + TransitionToPhase path. allowCoordinatorPowerOff true for this phase in onboarding.json.",
+      "howTo": "Active onboarding → Set Phase: LookAtUser.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/onboarding/onboarding.json",
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/onboarding/onboardingLookAtUser.json"
+        ]
+      },
+      "related": [
+        "Set Phase: TeachWakeWord",
+        "Set Phase: TeachMeetVictor"
+      ],
+      "evidence": "behaviorOnboardingCoordinator.cpp:230-241; onboarding.json LookAtUser",
+      "category": "OnboardingCoordinator",
+      "status": "partial",
+      "statusNote": "Requires active OnboardingCoordinator.",
+      "tags": ["onboarding", "console-func", "phase", "dev-cheats"]
+    },
+    "Set Phase: TeachComeHere": {
+      "process": "engine",
+      "blurb": "Jumps onboarding to TeachComeHere (strict-priority dispatcher teaching come-here / drive-to-face, 300 s timeout). Runs the come-here tutorial subtree (trigger word, OnboardingComeHere, LookAtUser, etc.).",
+      "detail": "Phase behavior OnboardingTeachComeHere from onboarding.json. Console injects OnboardingSetPhaseRequest like other Set Phase buttons.",
+      "howTo": "Active onboarding → Set Phase: TeachComeHere → exercise come-here prompts.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/onboarding/onboarding.json",
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/onboarding/onboardingTeachComeHere.json"
+        ]
+      },
+      "related": [
+        "Set Phase: TeachWakeWord",
+        "Set Phase: TeachMeetVictor",
+        "OnboardingComeHere_minDriveToFaceDistanceKey_mm"
+      ],
+      "evidence": "behaviorOnboardingCoordinator.cpp:230-241; onboarding.json TeachComeHere; onboardingTeachComeHere.json",
+      "category": "OnboardingCoordinator",
+      "status": "partial",
+      "statusNote": "Requires active OnboardingCoordinator.",
+      "tags": ["onboarding", "console-func", "phase", "comehere", "dev-cheats"]
+    },
+    "Set Phase: TeachMeetVictor": {
+      "process": "engine",
+      "blurb": "Jumps onboarding to TeachMeetVictor (meet/enroll name tutorial dispatcher, 300 s timeout). Includes meet-victor voice path, ComeHereVoiceCommand, MeetVictor, and LookAtUser under a strict priority stack.",
+      "detail": "Phase map behavior OnboardingTeachMeetVictor. Same gateway SetPhase request path; face enrollment can occur in this phase — use with care on production units.",
+      "howTo": "Active onboarding → Set Phase: TeachMeetVictor → complete or cancel meet flow as needed.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/onboarding/onboarding.json",
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/onboarding/onboardingTeachMeetVictor.json"
+        ]
+      },
+      "related": [
+        "Set Phase: TeachWakeWord",
+        "Set Phase: TeachComeHere",
+        "Clear Onboarding Data"
+      ],
+      "evidence": "behaviorOnboardingCoordinator.cpp:230-241; onboarding.json TeachMeetVictor; onboardingTeachMeetVictor.json",
+      "category": "OnboardingCoordinator",
+      "status": "partial",
+      "statusNote": "Requires active OnboardingCoordinator. May enroll faces as part of MeetVictor.",
+      "tags": ["onboarding", "console-func", "phase", "meetvictor", "dev-cheats"]
+    },
+    "Set Phase: TeachWakeWord": {
+      "process": "engine",
+      "blurb": "Jumps onboarding to TeachWakeWord (OnboardingTeachWakeWord, 300 s timeout) — the “Hey Vector” practice phase of setup.",
+      "detail": "Phase behavior OnboardingTeachWakeWord (optional simulatedStreamingDuration_ms in JSON). Same Set Phase inject machinery.",
+      "howTo": "Active onboarding → Set Phase: TeachWakeWord → say the wake word as prompted.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/onboarding/onboarding.json",
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/onboarding/onboardingTeachWakeWord.json"
+        ]
+      },
+      "related": [
+        "Set Phase: LookAtUser",
+        "Set Phase: TeachComeHere"
+      ],
+      "evidence": "behaviorOnboardingCoordinator.cpp:230-241; onboarding.json TeachWakeWord; onboardingTeachWakeWord.json",
+      "category": "OnboardingCoordinator",
+      "status": "partial",
+      "statusNote": "Requires active OnboardingCoordinator.",
+      "tags": ["onboarding", "console-func", "phase", "wake-word", "dev-cheats"]
+    },
+    "Set Phase: WakeUp": {
+      "process": "engine",
+      "blurb": "Jumps onboarding to WakeUp (OnboardingWakeUp, 60 s timeout, power-off allowed). Plays the wake-from-charger / wake-up ceremony used in setup and by hail-mary / mark-complete flows.",
+      "detail": "Same OnboardingSetPhaseRequest path. Used as the forced first step of Exit Onboarding - Mark Complete and of Hail Mary wake when battery is ready.",
+      "howTo": "Active onboarding → Set Phase: WakeUp → watch wake-up behavior complete then idle unless emulate/exit flags set.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/onboarding/onboarding.json",
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/onboarding/onboardingWakeUp.json"
+        ]
+      },
+      "related": [
+        "Exit Onboarding - Mark Complete",
+        "Hail Mary: Send Wake Up Request",
+        "Set Phase: Emulate1p0WaitForVC"
+      ],
+      "evidence": "behaviorOnboardingCoordinator.cpp:230-241,336-342,531-541; onboarding.json WakeUp",
+      "category": "OnboardingCoordinator",
+      "status": "partial",
+      "statusNote": "Requires active OnboardingCoordinator.",
+      "tags": ["onboarding", "console-func", "phase", "wakeup", "dev-cheats"]
+    },
+    "Set active mode and boot mode to DevDoNothing": {
+      "process": "engine",
+      "blurb": "Immediately switches the live behavior stack to the quiet “dev base” mode and makes that the boot choice after restarts: stage DevDoNothing, base behavior DevBaseBehavior (neutral eyes + shake-to-dispatch into ModeSelector). Skips first-time onboarding and normal InitNormalOperation freeplay boot.",
+      "detail": "ANKI_DEV_CHEATS BehaviorsBootLoader console func (category BehaviorBootLoader). Sets _stage=DevDoNothing, SetNewBehavior(devBaseBehavior, requestStackReset=true), writes onboardingState.json with onboardingStage DevDoNothing. Boot mapping: DevDoNothing → DevBaseBehavior (victor_behavior_config). DevBaseBehavior queues EyesInternal NeutralFace then DispatchAfterShake → ModeSelector after shake (or DevDispatchAfterShake console var in sim). App “onboarding complete” queries treat DevDoNothing as completed.",
+      "howTo": "1) Call on engine. 2) Stack resets to DevBaseBehavior. 3) Shake (or DevDispatchAfterShake) if you want ModeSelector freeplay from that tree. 4) File persists across reboot until you change stage again.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/persistent/onboarding/onboardingState.json"
+        ],
+        "assets": [
+          "resources/config/engine/behaviorComponent/victor_behavior_config.json",
+          "resources/config/engine/behaviorComponent/behaviors/devBehaviors/devBaseBehavior.json"
+        ]
+      },
+      "related": [
+        "Set active mode and boot mode to Normal",
+        "Restart Onboarding",
+        "DevDispatchAfterShake"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviorsBootLoader.cpp:184-197,305-310; victor_behavior_config.json; devBaseBehavior.json; onboardingMessageHandler.cpp:182 (complete == Complete || DevDoNothing)",
+      "category": "BehaviorBootLoader",
+      "status": "live",
+      "tags": ["onboarding", "boot", "console-func", "dev", "dev-cheats"]
+    },
+    "Set active mode and boot mode to Normal": {
+      "process": "engine",
+      "blurb": "Immediately switches the live behavior stack to normal product freeplay boot (InitNormalOperation) and writes onboarding stage Complete so reboots skip first-time setup. Use to leave onboarding/dev-idle and run the usual high-level AI tree.",
+      "detail": "ANKI_DEV_CHEATS BehaviorsBootLoader. Sets _stage=Complete, SetNewBehavior(normalBaseBehavior=InitNormalOperation, stack reset), saves onboardingStage Complete to onboardingState.json. Note: finishing onboarding via TerminateOnboarding uses postOnboardingBehavior (ModeSelector) for the stack; this console path uses normalBaseBehavior (InitNormalOperation) — both are “normal product” but not identical entry behaviors. Does not set completion timestamp (kOnboardingTimeKey) the way SaveToDisk(Complete) from the coordinator does.",
+      "howTo": "Call on engine → confirm InitNormalOperation/freeplay and onboardingState.json Complete. Prefer Exit Onboarding - Mark Complete if you need WakeUp + completion time for How-Old-Are-You.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/persistent/onboarding/onboardingState.json"
+        ],
+        "assets": [
+          "resources/config/engine/behaviorComponent/victor_behavior_config.json"
+        ]
+      },
+      "related": [
+        "Set active mode and boot mode to DevDoNothing",
+        "Exit Onboarding - Mark Complete",
+        "Restart Onboarding"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviorsBootLoader.cpp:199-211,305-308; victor_behavior_config.json normalBaseBehavior; behaviorOnboardingCoordinator.cpp:778-786 (contrast completion time)",
+      "category": "BehaviorBootLoader",
+      "status": "live",
+      "tags": ["onboarding", "boot", "console-func", "freeplay", "dev-cheats"]
+    },
+    "SetHeadAngle": {
+      "process": "engine",
+      "blurb": "While the Dev Squawk Box test behavior is running, aims Vector’s head to a given angle in degrees (argument angleDeg). Values outside the hardware head range are clamped. Cancels any ongoing squawk-box head up/down cycle first.",
+      "detail": "BehaviorDevSquawkBoxTest console function (category DevSquawkBoxBehavior, ANKI_DEV_CHEATS). Arg: float angleDeg. Clamps DEG_TO_RAD(angleDeg) to MIN_HEAD_ANGLE..MAX_HEAD_ANGLE, then queues MoveHeadToAngleAction. If ToggleHeadOnOff was cycling, that cycle is stopped. Logs success or “Invalid Angle, setting head angle to …”. If DevSquawkBoxTest is not activated, logs Error: DevSquawkBoxBehavior is NOT Active! and returns.",
+      "howTo": "1) Activate behavior DevSquawkBoxTest on the stack (dev cheats). 2) Call SetHeadAngle with angleDeg (e.g. 0, 20, -10). 3) Tune motion duration via HeadMovementDuration_s only for ToggleHeadOnOff cycles, not this one-shot.",
+      "related": [
+        "ToggleHeadOnOff",
+        "HeadMovementDuration_s",
+        "SetLoopingAnimationState"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevSquawkBoxTest.cpp:41-45,72-87,101,287-302",
+      "category": "DevSquawkBoxBehavior",
+      "status": "partial",
+      "statusNote": "No-op unless BehaviorDevSquawkBoxTest is activated (ANKI_DEV_CHEATS).",
+      "tags": ["squawkbox", "head", "motors", "console-func", "dev-cheats"]
+    },
+    "SetLoopingAnimationState": {
+      "process": "engine",
+      "blurb": "While Dev Squawk Box is active, starts or stops a forever-looping QA animation based on the LoopingAnimationState list: NONE stops (empty name still queues a play action), Move Head plays head up/down QA clip, Move Lift plays lift up/down QA clip. Restricted vs full motion clips come from UseRestrictedMotionAnim.",
+      "detail": "Reads kLoopingAnimationState: 1 → anim_qa_head_updown[_alt], 2 → anim_qa_lift_updown[_alt], else empty. PlayAnimationAction(animName, loops=0) NOW. Wake-word detection while state>0 restarts the same clip. Changing the enum alone does nothing until this function (or wake-word restart) runs.",
+      "howTo": "1) Activate DevSquawkBoxTest. 2) Set LoopingAnimationState (and optional UseRestrictedMotionAnim). 3) Call SetLoopingAnimationState. 4) Set NONE and call again to stop.",
+      "requires": ["LoopingAnimationState"],
+      "related": [
+        "LoopingAnimationState",
+        "UseRestrictedMotionAnim",
+        "ToggleHeadOnOff",
+        "ToggleLiftOnOff"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevSquawkBoxTest.cpp:37-38,88-102,186-188,305-323",
+      "category": "DevSquawkBoxBehavior",
+      "status": "partial",
+      "statusNote": "No-op unless DevSquawkBoxTest is activated. Enum applied only when this runs (or wake-word restart).",
+      "tags": ["squawkbox", "animation", "console-func", "dev-cheats"]
+    },
+    "Simulate App Disconnect": {
+      "process": "engine",
+      "blurb": "Pretends the companion app dropped the connection during onboarding. If setup had already started (and you are not mid hail-mary wake-up), Vector returns to the Default waiting phase and starts the app-disconnect timeout (default 180 s); if the app never reconnects, onboarding can exit as complete.",
+      "detail": "ANKI_DEV_CHEATS. Broadcasts AppDisconnected. Coordinator: if not (emulate1p0 && started1p0WakeUp) and onboardingStarted, sets appDisconnectExitTime_s = now + appDisconnectTimeout_s (from onboarding.json, default 180). BehaviorUpdate then TransitionToPhase(Default) once; ShouldExitDueToTimeout can TerminateOnboarding + Save Complete. AppDisconnected does not clear the disconnect timer the way other app messages do (early return skips reconnect clear). Outside active onboarding / before start, little or no effect.",
+      "howTo": "1) Active onboarding that has already been app-started (a Set Phase or real app start). 2) Call Simulate App Disconnect. 3) Expect Default phase; wait out appDisconnectTimeout_s or send any other onboarding app message / Set Phase to clear disconnect wait.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/onboarding/onboarding.json"
+        ],
+        "notes": "appDisconnectTimeout_s default 180.0 in onboarding.json."
+      },
+      "related": [
+        "Set Phase: Default",
+        "Restart Onboarding"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/onboardingMessageHandler.cpp:73-83; behaviorOnboardingCoordinator.cpp:344-359,409-414,423-429; onboarding.json appDisconnectTimeout_s",
+      "category": "OnboardingCoordinator",
+      "status": "partial",
+      "statusNote": "Only meaningful while OnboardingCoordinator is activated and onboardingStarted; hail-mary wake path ignores disconnect.",
+      "tags": ["onboarding", "console-func", "app", "dev-cheats"]
+    },
+    "ToggleHeadOnOff": {
+      "process": "engine",
+      "blurb": "While Dev Squawk Box is active, starts or stops a repeating head nod: ~42° up then ~−20° down, each move lasting HeadMovementDuration_s (default 0.5 s). For acoustic/motor soak testing in a fixture (“squawk box”).",
+      "detail": "Toggles _isHeadMoving and calls MoveHead which queues sequential MoveHeadToAngleActions; on RobotCompletedAction the cycle restarts while the flag stays true. Logs “Start Head Movement” / “Stop Head Movment”. Not active → error log only.",
+      "howTo": "1) Activate DevSquawkBoxTest. 2) ToggleHeadOnOff to start. 3) Optionally set HeadMovementDuration_s. 4) Call again to stop.",
+      "related": [
+        "HeadMovementDuration_s",
+        "SetHeadAngle",
+        "ToggleLiftOnOff",
+        "ToggleTreadsOnOff"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevSquawkBoxTest.cpp:35,58-64,99,164-174,255-273",
+      "category": "DevSquawkBoxBehavior",
+      "status": "partial",
+      "statusNote": "Requires active DevSquawkBoxTest (ANKI_DEV_CHEATS).",
+      "tags": ["squawkbox", "head", "motors", "console-func", "dev-cheats"]
+    },
+    "ToggleLiftOnOff": {
+      "process": "engine",
+      "blurb": "While Dev Squawk Box is active, starts or stops a repeating lift cycle: HIGH_DOCK then LOW_DOCK, each lasting LiftMovementDuration_s (default 0.5 s).",
+      "detail": "Toggles _isLiftMoving; MoveLift queues CompoundActionSequential of two MoveLiftToHeightAction presets; completion restarts while on. Same activation gate as other squawk-box motor toggles.",
+      "howTo": "Activate DevSquawkBoxTest → ToggleLiftOnOff → tune LiftMovementDuration_s → toggle again to stop.",
+      "related": [
+        "LiftMovementDuration_s",
+        "ToggleHeadOnOff",
+        "SetLoopingAnimationState"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevSquawkBoxTest.cpp:34,51-57,98,164-174,233-252",
+      "category": "DevSquawkBoxBehavior",
+      "status": "partial",
+      "statusNote": "Requires active DevSquawkBoxTest (ANKI_DEV_CHEATS).",
+      "tags": ["squawkbox", "lift", "motors", "console-func", "dev-cheats"]
+    },
+    "ToggleTreadsOnOff": {
+      "process": "engine",
+      "blurb": "While Dev Squawk Box is active, starts or stops continuous straight driving at TreadMovementSpeed_mmps (default 200 mm/s, both wheels). On deactivate the behavior always stops the treads.",
+      "detail": "Toggles _isMovingTreads; MoveTreads calls MovementComponent::DriveWheels with equal left/right speed or 0. BehaviorUpdate re-applies if the speed console var changes while driving. Fixture soak test — robot will drive off a table if free.",
+      "howTo": "1) Secure the robot (fixture/squawk box). 2) Activate DevSquawkBoxTest. 3) ToggleTreadsOnOff. 4) Adjust TreadMovementSpeed_mmps live. 5) Toggle again to stop.",
+      "related": [
+        "TreadMovementSpeed_mmps",
+        "ToggleHeadOnOff",
+        "ToggleLiftOnOff"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevSquawkBoxTest.cpp:36,65-71,100,214-218,222-228,277-283",
+      "category": "DevSquawkBoxBehavior",
+      "status": "partial",
+      "statusNote": "Requires active DevSquawkBoxTest. Can drive off surfaces — treat as operational hazard when not fixture-mounted.",
+      "tags": ["squawkbox", "treads", "motors", "console-func", "dev-cheats"]
+    }
+  }
+}
