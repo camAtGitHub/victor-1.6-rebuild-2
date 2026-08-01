@@ -1,0 +1,211 @@
+{
+  "vars": {
+    "ForceAssignExperiment": {
+      "process": "both",
+      "blurb": "Forces AnkiLab (A/B testing) to treat this robot as belonging to a specific experiment variation. Takes two string arguments: experimentKey and variationKey (names from the lab definition, not free-form labels). Used by QA/dev to put a unit into a known treatment/control bucket without waiting for random assignment.",
+      "detail": "Registered under category “A/B Testing” in lib/util (shared by engine and anim). Handler reads experimentKey and variationKey, calls AddABTestingForcedAssignment, and echoes the pair to the console channel. That path enables A/B testing if it was force-disabled, then either (1) stores the pair in a static map if the AnkiLab op-runner is not wired yet, or (2) runs lab->ForceActivateExperiment(experimentKey, userId, variationKey) when the runner is live. ForceActivateExperiment validates keys against the loaded AnkiLabDef, refuses invalid experiment/variation names, and records a force assignment so IsActiveExperiment is true and later ActivateExperiment returns that variation. Engine wires the interface in CozmoExperiments::InitExperiments (user id = head serial when a robot exists, else device id). Experiments are loaded from config/experiments.json via RobotDataLoader. Anim process also registers the console function (same lib) but never calls InitializeABInterface, so pressing it on :8889 only fills a map nothing reads — use engine :8888 for real effect. Does not by itself rewrite product features unless code elsewhere consults that experiment.",
+      "howTo": "1) Prefer engine console (:8888). 2) Look up valid keys/variations in resources/config/experiments.json (or whatever the robot loaded). 3) Call ForceAssignExperiment with experimentKey and variationKey. 4) Confirm log line “ForceAssignExperiment X => Y” and AnkiLab.ForceActivate if successful. Wrong names yield ExperimentNotFound / VariantNotFound (no force).",
+      "paths": {
+        "assets": [
+          "resources/config/experiments.json"
+        ],
+        "notes": "Robot loads experiments from the installed resources path (engine RobotDataLoader pathToResource …/config/experiments.json)."
+      },
+      "related": [],
+      "evidence": "lib/util/source/anki/util/ankiLab/extLabInterface.cpp:65-72,89-104; ankiLab.cpp:90-103,215-222,367-400; engine/utils/cozmoExperiments.cpp:59-76; engine/robotDataLoader.cpp:1032-1034",
+      "category": "A/B Testing",
+      "status": "partial",
+      "statusNote": "Live on engine after CozmoExperiments::InitExperiments (sOpRunner set). On anim, or before AB interface init, only a static map is written and GetABTestingForcedAssignments has no production readers — effectively a no-op. Invalid experiment/variation keys do nothing useful.",
+      "tags": ["ab-testing", "ankilab", "console-func", "qa"]
+    },
+    "IntentionalAbort": {
+      "process": "both",
+      "blurb": "Immediately aborts the process you call it on (engine on :8888 or anim on :8889). Logs IntentionalAbort then calls C abort(), which raises SIGABRT and usually produces a crash dump / Breakpad minidump. The robot will lose that process until systemd/watchdog restarts it.",
+      "detail": "Dev/QA fault-injection helper in lib/util ConsoleSystem (category “Debug”), compiled when REMOTE_CONSOLE_ENABLED (on for this rebuild’s dumps on both ports). Same binary path in engine and anim — press on the port of the process you intend to kill. No arguments. After abort the console session dies with the process; expect face freeze / motion stop if you kill eng or anim, and a restart cycle.",
+      "howTo": "Only on a robot you are willing to crash. Pick the correct process tab/port, call IntentionalAbort once, wait for restart. Do not use on a production unit in the field.",
+      "related": [
+        "IntentionalCrash",
+        "IntentionalExit",
+        "IntentionalAssert",
+        "IntentionalSIGTERM",
+        "IntentionalSIGINT",
+        "IntentionalSIGQUIT",
+        "IntentionalSIGKILL",
+        "IntentionalPthreadExit",
+        "IntentionalThrow",
+        "IntentionalMallocBigNum"
+      ],
+      "evidence": "lib/util/source/anki/util/console/consoleSystem.cpp:446-451",
+      "category": "Debug",
+      "status": "danger",
+      "statusNote": "Hard-kills vic-engine or vic-anim via abort()/SIGABRT. Intentional fault injection only.",
+      "tags": ["debug", "crash", "danger", "console-func", "fault-injection"]
+    },
+    "IntentionalAssert": {
+      "process": "both",
+      "blurb": "Attempts to fire a failed C assert (assert(false)) in the process you call it on, after logging IntentionalAssert. On debug builds without NDEBUG this typically aborts like a failed assert. On VICOS Release toolchains that define NDEBUG, assert is compiled out so you may only see the log line and no crash.",
+      "detail": "Same shared Debug CONSOLE_FUNC family as IntentionalCrash. Use when testing assert-path crash reporting vs null-deref or signals. Because product Release flags include -DNDEBUG (vicos/android release toolchains), treat a “no crash” result as expected for assert, not as proof the button is broken — try IntentionalAbort or IntentionalCrash to force a real fault.",
+      "howTo": "Call on the target process. If the process stays up, check whether this firmware was built with NDEBUG and use IntentionalAbort/IntentionalCrash instead for guaranteed termination.",
+      "related": [
+        "IntentionalAbort",
+        "IntentionalCrash",
+        "IntentionalThrow"
+      ],
+      "evidence": "lib/util/source/anki/util/console/consoleSystem.cpp:453-458; cmake/vicos.oelinux.toolchain.cmake:142 (-DNDEBUG on release)",
+      "category": "Debug",
+      "status": "danger",
+      "statusNote": "Danger when assert is live (debug). On NDEBUG/Release builds the assert body is stripped — logs then returns (partial effectiveness). Still never press casually.",
+      "tags": ["debug", "crash", "assert", "danger", "console-func", "fault-injection"]
+    },
+    "IntentionalCrash": {
+      "process": "both",
+      "blurb": "Deliberately crashes the process by writing to a null pointer (*(int*)0 = 42) after an IntentionalCrash log line. Used to test crash reporting, Breakpad, and process restart. Kills only the process behind the console port you hit (engine or anim).",
+      "detail": "Classic fault-injection entry in ConsoleSystem under “Debug”. volatile int* at address 0 guarantees a SIGSEGV-style fault independent of assert/NDEBUG. Immediate process death; no recovery until the service restarts. Anim crash freezes face/audio path; engine crash stops behaviors/actions until vic-engine is back.",
+      "howTo": "Select engine or anim console → IntentionalCrash. Expect process death and (if configured) a crash report. Prefer this over IntentionalAssert when you need a reliable crash on Release builds.",
+      "related": [
+        "IntentionalAbort",
+        "IntentionalExit",
+        "IntentionalAssert",
+        "IntentionalSIGKILL",
+        "IntentionalThrow"
+      ],
+      "evidence": "lib/util/source/anki/util/console/consoleSystem.cpp:431-437",
+      "category": "Debug",
+      "status": "danger",
+      "statusNote": "Null-pointer write; guaranteed process crash for fault-injection testing.",
+      "tags": ["debug", "crash", "danger", "console-func", "fault-injection"]
+    },
+    "IntentionalExit": {
+      "process": "both",
+      "blurb": "Calls exit(-1) on the process after logging IntentionalExit. Cleaner process termination than a segfault (runs atexit handlers / flushes in a normal exit path) but still ends vic-engine or vic-anim immediately with a failing status.",
+      "detail": "Debug CONSOLE_FUNC with no args. Unlike IntentionalCrash/Abort this is a voluntary process exit rather than a signal fault — useful to compare “orderly” exit restart vs crash dump paths. Still takes down all robot functionality owned by that process until restart.",
+      "howTo": "Call on the process you want stopped. Wait for systemd/service manager to bring it back. Do not use unless you intend to stop that process.",
+      "related": [
+        "IntentionalAbort",
+        "IntentionalCrash",
+        "IntentionalSIGTERM",
+        "IntentionalPthreadExit"
+      ],
+      "evidence": "lib/util/source/anki/util/console/consoleSystem.cpp:439-444",
+      "category": "Debug",
+      "status": "danger",
+      "statusNote": "Process exit(-1); stops engine or anim by design.",
+      "tags": ["debug", "exit", "danger", "console-func", "fault-injection"]
+    },
+    "IntentionalMallocBigNum": {
+      "process": "both",
+      "blurb": "Stresses the process heap by repeatedly malloc’ing large blocks (starts at 128 MB, halves on failure, down to 4 bytes), chaining successful blocks together and never freeing them. Goal is to exhaust memory or provoke OOM killer / allocation failures for stress testing.",
+      "detail": "Debug helper — does not free the chain. Can hang the console call for a long time while allocating, thrash the robot into swap/OOM, or leave the process critically low on memory even if it survives. Worse than a clean crash button because partial success can leave eng/anim unstable without an immediate restart. Prefer intentional crash/abort helpers if you only need a dump.",
+      "howTo": "Only on a disposable/dev robot with monitoring. Call once; watch free memory and logs for IntentionalMallocBigNum size lines. Expect possible OOM kill or need to restart the process afterward. Avoid on a unit you care about mid-session.",
+      "related": [
+        "IntentionalCrash",
+        "IntentionalAbort"
+      ],
+      "evidence": "lib/util/source/anki/util/console/consoleSystem.cpp:502-520",
+      "category": "Debug",
+      "status": "danger",
+      "statusNote": "Unbounded allocate-and-leak loop; can OOM-kill or permanently bloat the process heap until restart.",
+      "tags": ["debug", "memory", "oom", "danger", "console-func", "fault-injection"]
+    },
+    "IntentionalPthreadExit": {
+      "process": "both",
+      "blurb": "Calls pthread_exit(NULL) on the thread that is handling the console function (after logging IntentionalPthreadExit). Ends that thread only — not necessarily the whole process — which can leave engine or anim half-dead (console dead, main loop stuck, or process aborted when the last thread exits).",
+      "detail": "Unlike IntentionalExit/Crash, this is thread-scoped. Depending on which thread services remote console commands, you may hang the console channel, corrupt state, or still take the process down. Intended to exercise thread-exit / pthread cleanup paths, not as a clean stop. Prefer IntentionalExit or IntentionalSIGTERM for a full process stop.",
+      "howTo": "Dev-only. Call once and observe whether the process dies, the console stops responding, or the robot becomes unresponsive. Plan to restart the process either way.",
+      "related": [
+        "IntentionalExit",
+        "IntentionalAbort",
+        "IntentionalSIGTERM"
+      ],
+      "evidence": "lib/util/source/anki/util/console/consoleSystem.cpp:488-493",
+      "category": "Debug",
+      "status": "danger",
+      "statusNote": "pthread_exit on the console handler thread; can strand or kill the process unpredictably.",
+      "tags": ["debug", "pthread", "danger", "console-func", "fault-injection"]
+    },
+    "IntentionalSIGINT": {
+      "process": "both",
+      "blurb": "raise(SIGINT) in the target process after logging IntentionalSIGINT. Same signal as Ctrl-C — typically terminates unless the process installs a SIGINT handler that ignores it.",
+      "detail": "Part of the Debug intentional-signal suite (SIGTERM/INT/QUIT/KILL). Useful to verify signal handling and service restart for interactive-interrupt style stops. Hits only the process bound to that console port.",
+      "howTo": "Call on engine or anim. Expect process stop and restart. Compare with SIGTERM/SIGKILL if handlers differ.",
+      "related": [
+        "IntentionalSIGTERM",
+        "IntentionalSIGQUIT",
+        "IntentionalSIGKILL",
+        "IntentionalAbort"
+      ],
+      "evidence": "lib/util/source/anki/util/console/consoleSystem.cpp:467-472",
+      "category": "Debug",
+      "status": "danger",
+      "statusNote": "Sends SIGINT to the process; stops eng/anim for fault/restart testing.",
+      "tags": ["debug", "signal", "danger", "console-func", "fault-injection"]
+    },
+    "IntentionalSIGKILL": {
+      "process": "both",
+      "blurb": "raise(SIGKILL) on the target process after logging IntentionalSIGKILL. SIGKILL cannot be caught or ignored — the kernel tears the process down immediately with no cleanup handlers.",
+      "detail": "Harshest intentional signal helper. No atexit, no destructor-friendly shutdown: open files, IPC sockets, and locks vanish with the process. Use when testing “hard kill” recovery (systemd restart, anim/engine reconnect). Prefer SIGTERM first if you want a catchable stop.",
+      "howTo": "Call once on the intended process port. Process is gone immediately; wait for service restart.",
+      "related": [
+        "IntentionalSIGTERM",
+        "IntentionalSIGINT",
+        "IntentionalSIGQUIT",
+        "IntentionalCrash"
+      ],
+      "evidence": "lib/util/source/anki/util/console/consoleSystem.cpp:481-486",
+      "category": "Debug",
+      "status": "danger",
+      "statusNote": "Uncatchable SIGKILL; hard-kills the process with no cleanup.",
+      "tags": ["debug", "signal", "danger", "console-func", "fault-injection"]
+    },
+    "IntentionalSIGQUIT": {
+      "process": "both",
+      "blurb": "raise(SIGQUIT) after logging IntentionalSIGQUIT. Often used to quit with a core dump (like Ctrl-\\). Terminates the process unless a custom handler intervenes.",
+      "detail": "Debug signal suite member. Behavior depends on process signal disposition and core-dump ulimits on the robot image. Useful alongside IntentionalCrash when comparing dump-producing paths.",
+      "howTo": "Call on engine or anim; expect quit (+ possible core). Restart the process after.",
+      "related": [
+        "IntentionalSIGTERM",
+        "IntentionalSIGINT",
+        "IntentionalSIGKILL",
+        "IntentionalAbort"
+      ],
+      "evidence": "lib/util/source/anki/util/console/consoleSystem.cpp:474-479",
+      "category": "Debug",
+      "status": "danger",
+      "statusNote": "Sends SIGQUIT; can terminate with core dump depending on OS settings.",
+      "tags": ["debug", "signal", "danger", "console-func", "fault-injection"]
+    },
+    "IntentionalSIGTERM": {
+      "process": "both",
+      "blurb": "raise(SIGTERM) after logging IntentionalSIGTERM. Standard “please terminate” signal — catchable; default action is process termination. Mimics a polite service stop.",
+      "detail": "Softest of the intentional kill signals (vs SIGKILL). Good for testing graceful-shutdown handlers if the process installs any; otherwise still exits. Only affects the process for the console port used.",
+      "howTo": "Call on :8888 (engine) or :8889 (anim). Watch for clean exit vs hung shutdown, then restart if needed.",
+      "related": [
+        "IntentionalSIGINT",
+        "IntentionalSIGQUIT",
+        "IntentionalSIGKILL",
+        "IntentionalExit"
+      ],
+      "evidence": "lib/util/source/anki/util/console/consoleSystem.cpp:460-465",
+      "category": "Debug",
+      "status": "danger",
+      "statusNote": "Sends SIGTERM; stops the process unless a handler blocks it.",
+      "tags": ["debug", "signal", "danger", "console-func", "fault-injection"]
+    },
+    "IntentionalThrow": {
+      "process": "both",
+      "blurb": "Throws a C++ exception (throw \"error\") after logging IntentionalThrow. If nothing catches it on the console call stack, std::terminate runs and the process aborts — another crash-injection path distinct from signals and null deref.",
+      "detail": "Debug CONSOLE_FUNC. Exercises exception / terminate paths and any surrounding try/catch on the console dispatcher (if present). Uncaught exception → process death similar to abort. Prefer IntentionalCrash when you need a simple, predictable fault on Release builds.",
+      "howTo": "Call once on the target process. Expect terminate/abort if uncaught. Restart process after.",
+      "related": [
+        "IntentionalAbort",
+        "IntentionalAssert",
+        "IntentionalCrash"
+      ],
+      "evidence": "lib/util/source/anki/util/console/consoleSystem.cpp:495-500",
+      "category": "Debug",
+      "status": "danger",
+      "statusNote": "Uncaught C++ throw typically calls std::terminate and kills the process.",
+      "tags": ["debug", "exception", "danger", "console-func", "fault-injection"]
+    }
+  }
+}
