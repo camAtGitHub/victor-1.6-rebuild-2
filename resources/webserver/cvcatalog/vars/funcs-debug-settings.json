@@ -1,0 +1,281 @@
+{
+  "vars": {
+    "DebugCaptureOneImage": {
+      "process": "engine",
+      "blurb": "Turns the camera on just long enough to grab and process a single frame, then turns capture off again. Use when image capture is already disabled and you still want one vision pass (debug, calibration-style checks).",
+      "detail": "CONSOLE_FUNC under Vision.General. Calls VisionComponent::CaptureOneFrame: EnableImageCapture(true) (unpauses CameraService and may reset last image timestamps) and sets _captureOneImage. When the next captured buffer reaches the vision path, that flag clears and EnableImageCapture(false) runs so streaming stops after one frame. If capture was already on, enabling is a no-op until that one-shot path disables it after the frame — so a normally streaming robot will stop the camera after the next processed image. Logs “Capture one image”.",
+      "howTo": "1) Prefer after DebugToggleCameraEnabled has left capture off, or when power-save already paused the camera. 2) Call DebugCaptureOneImage. 3) Expect one frame through vision, then capture disabled. Re-enable continuous capture with DebugToggleCameraEnabled if needed (see that entry’s toggle state).",
+      "related": [
+        "DebugToggleCameraEnabled"
+      ],
+      "evidence": "engine/components/visionComponent.cpp:113-118,621-627,2809-2834",
+      "category": "Vision.General",
+      "status": "live",
+      "tags": ["vision", "camera", "capture", "console-func", "debug"]
+    },
+    "DebugDemoSetLocaleIndex": {
+      "process": "engine",
+      "blurb": "PR-demo helper: sets robot language region and temperature units from a single index 0–3 (US °F, UK, Australia, Canada/US °C). Updates the mirror console var DebugDemoLocaleIndex. Prefer this over flipping locale and temp separately for those four demo presets.",
+      "detail": "CONSOLE_FUNC category RobotSettings, arg localeIndex (int). Maps 0→en-US+Fahrenheit, 1→en-GB+Celsius, 2→en-AU+Celsius, 3→en-US+Celsius (Canada-style). Calls HandleRobotSettingChangeRequest for locale then temp_is_fahrenheit. Locale apply uses default updateSettingsJdoc=false so the locale write may not flush the robot-settings jdoc on this path; temperature is written with updateSettingsJdoc=true. Locale still ApplySettingLocale (robot + anim speech/locale paths) when the value changes. No bounds check: index outside 0–3 is undefined behavior (array OOB). Seeds DebugDemoLocaleIndex on init from current locale/temp; that var alone is a mirror (see engine-debug-dev).",
+      "howTo": "Call with localeIndex 0, 1, 2, or 3 only. Confirm speech/locale and weather °F/°C. For arbitrary locales use DebugSetLocale + DebugToggleTempIsFahrenheit instead.",
+      "related": [
+        "DebugDemoLocaleIndex",
+        "DebugSetLocale",
+        "DebugToggleTempIsFahrenheit"
+      ],
+      "evidence": "engine/components/settingsCommManager.cpp:152-178,249-269; ApplySettingLocale settingsManager.cpp:953-968; weather temp behaviorDisplayWeather.cpp:424",
+      "category": "RobotSettings",
+      "status": "danger",
+      "statusNote": "localeIndex is not clamped; values outside 0–3 index fixed arrays and can crash. Locale jdoc update may be skipped on this path (temp units still jdoc-updated).",
+      "tags": ["settings", "locale", "temperature", "prdemo", "console-func", "danger"]
+    },
+    "DebugEraseAllEnrolledFaces": {
+      "process": "engine",
+      "blurb": "Wipes every enrolled/recognized face name from Vector: clears the live face world, empties the OKAO face album in the vision system, saves the empty album to disk, and broadcasts RobotErasedAllEnrolledFaces. Permanent loss of “who is who” enrollments until you re-enroll.",
+      "detail": "CONSOLE_FUNC Vision.General → VisionComponent::EraseAllFaces: FaceWorld::ClearAllFaces, VisionSystem/FaceTracker EraseAllFaces (OKAO_FR_ClearAlbum + enrollment maps), SaveFaceAlbum() to the album path from vision_config (default name \"default\" under faceAlbums), then MessageEngineToGame RobotErasedAllEnrolledFaces. Same wipe path product uses for full album erase. Does not touch non-face settings.",
+      "howTo": "Only on a unit whose face album you can lose. Call once; confirm faces no longer recognized and album file rewritten. Re-enroll via normal meet/enroll behaviors afterward.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/persistent/faceAlbums/"
+        ],
+        "assets": [
+          "resources/config/engine/vision_config.json"
+        ],
+        "notes": "Album basename is vision_config FaceAlbum (default \"default\"); full path is DataPlatform persistent + faceAlbums/<name>."
+      },
+      "related": [],
+      "evidence": "engine/components/visionComponent.cpp:106-111,2099-2107,1948-1958; coretech/vision/engine/faceRecognizer_okao.cpp:2574-2593; faceWorld.cpp:155-164; vision_config.json FaceAlbum",
+      "category": "Vision.General",
+      "status": "danger",
+      "statusNote": "Irreversible wipe of all enrolled faces and album on disk (plus engine FaceWorld). No confirmation string.",
+      "tags": ["vision", "faces", "enroll", "delete", "danger", "console-func"]
+    },
+    "DebugSetButtonWakeWord": {
+      "process": "engine",
+      "blurb": "Applies the staging ButtonWakeWord list (Hey Vector vs Alexa) so a backpack-button press arms that assistant’s wake path. Setting the list alone does nothing until you call this.",
+      "detail": "Reads CONSOLE_VAR_ENUM ButtonWakeWord (kButtonWakeWord), HandleRobotSettingChangeRequest(button_wakeword) with jdoc update. Validate + ApplySettingButtonWakeWord sends RobotInterface::SetButtonWakeWord(isAlexa) to anim; MicDataSystem::SetButtonWakeWordIsAlexa stores the flag. Same pipeline as app/SDK UpdateSettings for button_wakeword. Alexa product still needs Alexa opt-in/locale support for full Alexa UX.",
+      "howTo": "1) Set ButtonWakeWord to BUTTON_WAKEWORD_HEY_VECTOR or BUTTON_WAKEWORD_ALEXA. 2) Call DebugSetButtonWakeWord. 3) Press backpack button and confirm the chosen wake path.",
+      "requires": ["ButtonWakeWord"],
+      "related": [
+        "ButtonWakeWord"
+      ],
+      "evidence": "engine/components/settingsCommManager.cpp:96-105; settingsManager.cpp:326,899-934; animProcess/.../animProcessMessages.cpp:467-472; micDataSystem.cpp:895-898",
+      "category": "RobotSettings",
+      "status": "live",
+      "tags": ["settings", "wake-word", "alexa", "backpack", "console-func"]
+    },
+    "DebugSetCustomEyeColor": {
+      "process": "engine",
+      "blurb": "Pushes the three custom-eye staging knobs (enabled, hue, saturation) into the robot custom_eye_color setting and applies face color. Required after changing CustomEyeColorEnabled / Hue / Saturation — those vars alone never recolor the face.",
+      "detail": "Builds JSON {enabled, hue, saturation} from kCustomEyeColor* and HandleRobotSettingChangeRequest(custom_eye_color, updateJdoc). Eye color settings are latent: ApplySettingEyeColor is deferred so BehaviorEyeColor can play EyeColorGetIn/Switch/GetOut and apply on AnimEvent::CHANGE_EYE_COLOR; if nothing claims within ~3 engine ticks, UpdateDependent force-applies. When enabled is true, hue/sat (0–1) are validated and SetFaceHue/SetFaceSaturation are sent; when false, the named EyeColor preset (or rebuild specials) is used instead. Stops any active rainbow/rebuild eye threads before applying. Jdoc updateCloudOnChange for custom_eye_color is false (local settings body still updated when updateSettingsJdoc is true).",
+      "howTo": "1) Set CustomEyeColorEnabled, CustomEyeColorHue, CustomEyeColorSaturation. 2) Call DebugSetCustomEyeColor. 3) Allow the eye-color behavior/animation or wait a few ticks for force-apply. To leave custom mode, set Enabled false and call again (or use DebugSetEyeColor with custom already off).",
+      "requires": [
+        "CustomEyeColorEnabled",
+        "CustomEyeColorHue",
+        "CustomEyeColorSaturation"
+      ],
+      "related": [
+        "DebugSetEyeColor",
+        "EyeColor",
+        "CustomEyeColorEnabled",
+        "CustomEyeColorHue",
+        "CustomEyeColorSaturation"
+      ],
+      "evidence": "engine/components/settingsCommManager.cpp:79-94; settingsManager.cpp:321-322,226-243,360-370,628-895; behaviorEyeColor.cpp:74-111",
+      "category": "RobotSettings",
+      "status": "live",
+      "tags": ["settings", "eyes", "color", "face", "console-func", "jdocs"]
+    },
+    "DebugSetDefaultLocation": {
+      "process": "engine",
+      "blurb": "Sets the robot’s default_location string (human-readable place name used as the product “home” / weather default location) and saves it into the robot-settings jdoc (cloud-on-change true). Pass the place as the function argument.",
+      "detail": "CONSOLE_FUNC arg defaultLocationValue (const char*). HandleRobotSettingChangeRequest(default_location, …, updateJdoc). ValidateSettingDefaultLocation rejects strings longer than 255 characters. No SettingsManager apply function and no engine behavior read found — value is stored for app/cloud/settings sync (default in settings_config.json is “San Francisco, California, United States”). On-robot freeplay does not re-resolve maps from this string by itself.",
+      "howTo": "Call DebugSetDefaultLocation with defaultLocationValue like \"San Francisco, California, United States\" (≤255 chars). Confirm robot settings jdoc / app settings UI.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/persistent/jdocs/"
+        ],
+        "notes": "ROBOT_SETTINGS jdoc body key default_location; updateCloudOnChange true in settings_config.json."
+      },
+      "related": [
+        "DebugToggleDistIsMetric",
+        "DebugSetLocale"
+      ],
+      "evidence": "engine/components/settingsCommManager.cpp:125-132; settingsManager.cpp:325,1010-1022; resources/config/engine/settings_config.json default_location",
+      "category": "RobotSettings",
+      "status": "partial",
+      "statusNote": "Persists and cloud-syncs the setting; no on-robot Apply function and no engine consumer of the string found — effect is settings/jdoc/app facing.",
+      "tags": ["settings", "location", "weather", "jdocs", "console-func"]
+    },
+    "DebugSetEyeColor": {
+      "process": "engine",
+      "blurb": "Applies the staging EyeColor preset list (teal, orange, … plus Rainbow / Rebuild / Mystery) to Vector’s procedural eyes. Changing the EyeColor list alone does nothing until you call this.",
+      "detail": "Packages kEyeColor into HandleRobotSettingChangeRequest(eye_color, updateJdoc). Latent apply: BehaviorEyeColor plays the eye-color change animations and ApplySettingEyeColor runs on CHANGE_EYE_COLOR (or force after ~3 ticks / behavior end). Apply stops rainbow/rebuild threads; named presets load hue/sat from eye_color_config (optional /data/data/rebuild override); RAINBOW_EYES / REBUILD_EYES start background hue threads; MYSTERY_EYES picks random hue/sat. Important: if custom_eye_color.enabled is still true, ApplySettingEyeColor keeps using custom hue/sat and ignores the new preset for the face — disable custom via DebugSetCustomEyeColor first. Jdoc updateCloudOnChange for eye_color is false.",
+      "howTo": "1) If custom eyes are on, turn CustomEyeColorEnabled false and DebugSetCustomEyeColor (or ensure custom enabled is false). 2) Pick EyeColor. 3) Call DebugSetEyeColor. 4) Watch eye-color anim / face recolor.",
+      "requires": ["EyeColor"],
+      "related": [
+        "EyeColor",
+        "DebugSetCustomEyeColor",
+        "CustomEyeColorEnabled",
+        "MasterVolumeLevel"
+      ],
+      "paths": {
+        "assets": [
+          "resources/config/engine/eye_color_config.json"
+        ],
+        "robot": [
+          "/data/data/rebuild/eye_color_config.json",
+          "/data/data/rebuild/"
+        ],
+        "notes": "Preset hue/sat from eye_color_config; rebuild path preferred if present. REBUILD_EYES also uses /data/data/rebuild/* and save-eye-color."
+      },
+      "evidence": "engine/components/settingsCommManager.cpp:68-77; settingsManager.cpp:321,666-895,226-243; behaviorEyeColor.cpp:74-111",
+      "category": "RobotSettings",
+      "status": "live",
+      "tags": ["settings", "eyes", "color", "face", "console-func", "rebuild"]
+    },
+    "DebugSetLocale": {
+      "process": "engine",
+      "blurb": "Sets the robot language/region locale string (must look like language-COUNTRY, e.g. en-US) and applies it through the same path as the app: TTS, mic/anim locale, health reporting, settings jdoc.",
+      "detail": "Arg localeValue (const char*). ValidateSettingLocale requires IsValidLocaleString: exactly 5 characters language-country (e.g. en-US, en-GB, en-AU, de-DE). ApplySettingLocale → Robot::SetLocale (propagates to anim SetLocale / TTS / related) and RobotHealthReporter::OnSetLocale. updateSettingsJdoc true; updateCloudOnChange true. Invalid strings fail validation and leave the previous locale.",
+      "howTo": "Call with localeValue=en-US (or other valid xx-YY). For the four PR-demo locale+temp bundles use DebugDemoSetLocaleIndex instead.",
+      "related": [
+        "DebugDemoSetLocaleIndex",
+        "DebugSetTimeZone",
+        "DebugToggleTempIsFahrenheit"
+      ],
+      "evidence": "engine/components/settingsCommManager.cpp:107-114; settingsManager.cpp:323,938-968; lib/util/.../locale.cpp:946-959; animEngine SetLocale path",
+      "category": "RobotSettings",
+      "status": "live",
+      "tags": ["settings", "locale", "tts", "jdocs", "console-func"]
+    },
+    "DebugSetMasterVolume": {
+      "process": "engine",
+      "blurb": "Applies the staging MasterVolumeLevel enum (MUTE through HIGH) to the robot speaker master volume and updates the robot-settings jdoc. Setting the list alone does not change volume.",
+      "detail": "HandleRobotSettingChangeRequest(master_volume) from kMasterVolumeLevel. Validate Volume_IsValid; ApplySettingMasterVolume → EngineRobotAudioClient::SetRobotMasterVolume maps MUTE/LOW/…/HIGH to audio game-state Robot_Vic_Volume. updateCloudOnChange false for master_volume (local jdoc still updated). Same setting path as voice volume behaviors and app UpdateSettings. Unrelated to factory SoundVolume float.",
+      "howTo": "1) Set MasterVolumeLevel (0=MUTE … 5=HIGH). 2) Call DebugSetMasterVolume. 3) Play any sound to confirm level.",
+      "requires": ["MasterVolumeLevel"],
+      "related": [
+        "MasterVolumeLevel",
+        "SoundVolume"
+      ],
+      "evidence": "engine/components/settingsCommManager.cpp:57-66; settingsManager.cpp:320,602-624; engine/audio/engineRobotAudioClient.cpp:56-84",
+      "category": "RobotSettings",
+      "status": "live",
+      "tags": ["settings", "volume", "audio", "console-func"]
+    },
+    "DebugSetTimeZone": {
+      "process": "engine",
+      "blurb": "Sets the robot OS timezone (IANA name such as America/Los_Angeles) via sudo set-timezone, updates health reporting, and notifies the anim mic path of the new zone. Argument is the timezone string.",
+      "detail": "Arg timeZoneValue. ApplySettingTimeZone on VICOS runs /usr/bin/sudo /usr/sbin/set-timezone <value>; on non-VICOS (e.g. Webots) logs that apply is unsupported but still returns success. Also RobotHealthReporter::OnSetTimeZone and EngineToRobot UpdatedSettings SETTING_TIME_ZONE for anim MicDataSystem::UpdateTimeZone. updateSettingsJdoc true; updateCloudOnChange true. Invalid OS timezone names fail the shell helper and roll back the in-memory setting.",
+      "howTo": "Call with timeZoneValue=America/New_York (or another zoneinfo id). Confirm OS local time / wall-clock behaviors and logs ApplySettingTimeZone.",
+      "related": [
+        "DebugSetLocale",
+        "PrintWallTimeToLog",
+        "SetFakeWallTime24HourUTC"
+      ],
+      "paths": {
+        "robot": [
+          "/usr/sbin/set-timezone"
+        ],
+        "notes": "VICOS only for real TZ change; default in settings_config is America/Los_Angeles."
+      },
+      "evidence": "engine/components/settingsCommManager.cpp:116-123; settingsManager.cpp:324,972-1006",
+      "category": "RobotSettings",
+      "status": "live",
+      "tags": ["settings", "timezone", "clock", "console-func", "vicos"]
+    },
+    "DebugToggle24HourClock": {
+      "process": "engine",
+      "blurb": "Flips the clock_24_hour robot setting (12-hour vs 24-hour face/time display) and saves the settings jdoc. Next wall-clock display behaviors use the new format.",
+      "detail": "ToggleRobotSettingHelper: reads current bool, writes the inverse with updateJdoc. No dedicated Apply function — BehaviorDisplayWallTime and BehaviorWallTimeCoordinator call GetRobotSettingAsBool(clock_24_hour) when showing time. updateCloudOnChange true. Default false (12-hour) in settings_config.json.",
+      "howTo": "Call once to flip; ask Vector the time or trigger wall-time display to verify. Call again to restore.",
+      "related": [
+        "DebugSetTimeZone",
+        "DebugToggleTempIsFahrenheit"
+      ],
+      "evidence": "engine/components/settingsCommManager.cpp:134-138,305-308; behaviorDisplayWallTime.cpp:157; behaviorWallTimeCoordinator.cpp:204; settings_config.json clock_24_hour",
+      "category": "RobotSettings",
+      "status": "live",
+      "tags": ["settings", "clock", "display", "console-func"]
+    },
+    "DebugToggleCameraEnabled": {
+      "process": "engine",
+      "blurb": "Toggles continuous camera image capture on or off for the engine vision pipeline. First press after process start turns capture off; second turns it on; and so on. When off, the camera service is paused and vision stops receiving frames.",
+      "detail": "CONSOLE_FUNC Vision.General. Static flip-flop starts as enable=false, so the first call always disables. EnableImageCapture sets _enableImageCapture and CameraService::PauseCamera(!enable); re-enabling resets last processed/received image timestamps. PowerStateManager also enables/disables capture for calm/power modes — this console toggle can fight those paths if used while power state is changing. Pair with DebugCaptureOneImage for single-frame grabs while left disabled.",
+      "howTo": "Call to disable camera for lab/privacy/power tests; call again to restore streaming. If unsure of state, watch VisionComponent.EnableImageCapture logs (“Enabling” vs “Disabling”).",
+      "related": [
+        "DebugCaptureOneImage"
+      ],
+      "evidence": "engine/components/visionComponent.cpp:120-127,2809-2825; powerStateManager.cpp:145,171",
+      "category": "Vision.General",
+      "status": "live",
+      "tags": ["vision", "camera", "toggle", "console-func", "debug"]
+    },
+    "DebugToggleDataCollection": {
+      "process": "engine",
+      "blurb": "Flips the account DATA_COLLECTION flag (opt-in for analytics / DAS-related upload allow and mic cloud stream privacy flag). Updates account-settings jdoc and tells anim mic whether collected stream data is allowed.",
+      "detail": "Category AccountSettings. ToggleAccountSettingHelper → SetAccountSetting(DATA_COLLECTION). ApplyAccountSettingDataCollection: DASMSG DASMSG_DAS_ALLOW_UPLOAD with i1 0/1, and EngineToRobot UpdatedSettings SETTING_ENABLE_DATA_COLLECTION → anim MicDataSystem::_enableDataCollection. That flag is inverted into CloudMic hotword “do not collect” when starting a stream (Hotword privacy field). Default true in accountSettings_config.json; updateCloudOnChange true.",
+      "howTo": "Call to flip; check AccountSettingsManager logs “Setting data collection flag to …”. Affects subsequent cloud mic streams and DAS allow-upload event — not a one-shot wipe of past data.",
+      "related": [],
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/persistent/jdocs/"
+        ],
+        "notes": "ACCOUNT_SETTINGS jdoc; key DATA_COLLECTION."
+      },
+      "evidence": "engine/components/settingsCommManager.cpp:184-188,336-339; accountSettingsManager.cpp:43-48,316-333; animProcess/.../micDataSystem.cpp:492-494, h:143; accountSettings_config.json",
+      "category": "AccountSettings",
+      "status": "live",
+      "tags": ["settings", "account", "privacy", "das", "mic", "console-func"]
+    },
+    "DebugToggleDistIsMetric": {
+      "process": "engine",
+      "blurb": "Flips dist_is_metric in robot settings (imperial vs metric distance preference for product/app) and saves/syncs the settings jdoc. No on-robot apply function or engine reader was found — effect is storage and cloud/app facing.",
+      "detail": "ToggleRobotSettingHelper(dist_is_metric). Setting is a plain bool in the ROBOT_SETTINGS jdoc (default false = non-metric in settings_config). Not registered with a validation/apply pair beyond storage; engine behaviors do not call GetRobotSettingAsBool for this key in this tree. Companion app / external clients may display units from the synced jdoc.",
+      "howTo": "Call to flip the stored preference; verify app/settings UI or jdoc body if that is what you care about. Do not expect drivetrain or vision to change units on-robot.",
+      "related": [
+        "DebugSetDefaultLocation",
+        "DebugToggleTempIsFahrenheit"
+      ],
+      "evidence": "engine/components/settingsCommManager.cpp:146-150; settings_config.json dist_is_metric; rg shows no Apply* or behavior Get for dist_is_metric outside settings plumbing",
+      "category": "RobotSettings",
+      "status": "partial",
+      "statusNote": "Toggle + jdoc/cloud update work; no on-robot consumer of dist_is_metric found in engine.",
+      "tags": ["settings", "units", "jdocs", "console-func"]
+    },
+    "DebugToggleKickstarterEyes": {
+      "process": "engine",
+      "blurb": "Flips the KICKSTARTER_EYES user-entitlement flag in the entitlements jdoc (cloud-on-change). Intended historical Kickstarter backer eye style — apply code currently only logs; no face/visual path is wired.",
+      "detail": "Category UserEntitlements. ToggleUserEntitlementHelper → SetUserEntitlement. ApplyUserEntitlementKickstarterEyes reads the bool, logs “Setting kickstarter eyes flag to …”, and has an explicit TODO (“Can call whereever here”) with no further calls. Default false in userEntitlements_config.json. So the toggle persists the entitlement document, but rg shows no other engine/anim consumer of KICKSTARTER_EYES for rendering.",
+      "howTo": "Call if you need to flip the stored entitlement for jdoc/cloud tests. Do not expect eyes to change until product code implements the apply path.",
+      "related": [],
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/persistent/jdocs/"
+        ],
+        "notes": "USER_ENTITLEMENTS jdoc key KICKSTARTER_EYES."
+      },
+      "evidence": "engine/components/settingsCommManager.cpp:194-198,367-370; userEntitlementsManager.cpp:112,302-311; userEntitlements_config.json",
+      "category": "UserEntitlements",
+      "status": "partial",
+      "statusNote": "Jdoc toggle live; ApplyUserEntitlementKickstarterEyes is log-only TODO — no visual effect found.",
+      "tags": ["settings", "entitlements", "eyes", "stub", "console-func"]
+    },
+    "DebugToggleTempIsFahrenheit": {
+      "process": "engine",
+      "blurb": "Flips temp_is_fahrenheit (weather/temperature display in °F vs °C) and saves the robot-settings jdoc. Next weather display uses the new unit.",
+      "detail": "ToggleRobotSettingHelper. BehaviorDisplayWeather reads GetRobotSettingAsBool(temp_is_fahrenheit) when compositing temperature sprites (°F vs °C indicators). updateCloudOnChange true; default true in settings_config. Also part of DebugDemoSetLocaleIndex bundles. No separate Apply hook beyond storage + readers.",
+      "howTo": "Call to flip; ask for weather or trigger weather display to confirm unit labels.",
+      "related": [
+        "DebugDemoSetLocaleIndex",
+        "DebugToggle24HourClock",
+        "DebugToggleDistIsMetric"
+      ],
+      "evidence": "engine/components/settingsCommManager.cpp:140-144; behaviorDisplayWeather.cpp:424; settings_config.json temp_is_fahrenheit",
+      "category": "RobotSettings",
+      "status": "live",
+      "tags": ["settings", "temperature", "weather", "console-func"]
+    }
+  }
+}
