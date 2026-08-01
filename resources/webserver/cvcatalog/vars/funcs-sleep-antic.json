@@ -1,0 +1,127 @@
+{
+  "vars": {
+    "AdvanceAntic": {
+      "process": "engine",
+      "blurb": "Fast-forwards the kitchen-timer “antic” schedule by AdvanceAnticSeconds (default 10 s). Antics are the small reminder animations Vector plays while a user-facing timer is counting down. Pressing this pretends that much more time has already passed since the last antic, so the next one is due sooner.",
+      "detail": "ANKI_DEV_CHEATS only. Calls AdvanceAnticBySeconds → BehaviorTimerUtilityCoordinator::DevAdvanceAnticBySeconds → AnticTracker::AdvanceAnticBySeconds, which subtracts the configured seconds from _lastAnticPlayed_s. Min/max time-till-next-antic are then computed from that timestamp vs the current timer’s remaining-time rules (JSON anticConfig recurrance bands). Does not change the countdown itself (use AdvanceTimer / AdvanceTimerAndAntic). No-op if the timer coordinator was never constructed (sCoordinator null) or was destroyed. Does not force an immediate antic unless the advanced schedule already hits zero — use ForceAntic for that.",
+      "howTo": "1) Optionally set AdvanceAnticSeconds. 2) Start a voice/user kitchen timer so TimerUtility has an active handle and the timer coordinator is in play. 3) Call AdvanceAntic one or more times. 4) Wait for the coordinator to run an antic when min/max interval is satisfied.",
+      "related": [
+        "AdvanceAnticSeconds",
+        "ForceAntic",
+        "AdvanceTimer",
+        "AdvanceTimerAndAntic"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/timer/behaviorTimerUtilityCoordinator.cpp:63-89,109-111,242-244; timerUtilityDevFunctions.h",
+      "category": "TimerUtility.AdvanceAntic",
+      "status": "live",
+      "tags": ["timer", "antic", "console-func", "dev-cheats"]
+    },
+    "AdvanceTimer": {
+      "process": "engine",
+      "blurb": "Jumps the active user-facing kitchen timer forward by AdvanceTimerSeconds (default 60 s). The countdown loses that many seconds immediately so you can test almost-done and ring paths without waiting real time.",
+      "detail": "ANKI_DEV_CHEATS only. AdvanceTimerBySeconds → TimerUtility::AdvanceTimeBySeconds → active TimerHandle::_endTime_s -= seconds. GetTimeRemaining_s() then reports less time; when remaining hits 0 the timer coordinator rings. Harmless no-op if no timer is active (sTimerUtility null or no _activeTimer). Does not advance antics — pair with AdvanceAntic or use AdvanceTimerAndAntic.",
+      "howTo": "1) Optionally set AdvanceTimerSeconds. 2) Set a kitchen timer on the robot. 3) Call AdvanceTimer repeatedly until remaining time is where you want it (or 0 to force ring on the next coordinator tick).",
+      "related": [
+        "AdvanceTimerSeconds",
+        "AdvanceTimerAndAntic",
+        "AdvanceAntic"
+      ],
+      "evidence": "engine/aiComponent/timerUtility.cpp:32-38,49-54,58; engine/aiComponent/timerUtility.h:60-63,92-95",
+      "category": "TimerUtility.AdvanceTimer",
+      "status": "live",
+      "tags": ["timer", "console-func", "dev-cheats"]
+    },
+    "AdvanceTimerAndAntic": {
+      "process": "engine",
+      "blurb": "One-shot fast-forward of both the kitchen timer countdown and its antic schedule by AdvanceTimerAndAnticSeconds (default 60 s). Same effect as calling AdvanceTimer and AdvanceAntic with that shared amount.",
+      "detail": "ANKI_DEV_CHEATS. Handler calls AdvanceTimerBySeconds then AdvanceAnticBySeconds with kAdvanceTimerAndAnticSeconds. Timer half no-ops without an active timer; antic half no-ops without a live BehaviorTimerUtilityCoordinator. Useful to march a long timer toward ring while also compressing inter-antic spacing.",
+      "howTo": "1) Optionally set AdvanceTimerAndAnticSeconds. 2) Start a timer. 3) Call this repeatedly. Watch countdown drop and antics become eligible earlier.",
+      "related": [
+        "AdvanceTimerAndAnticSeconds",
+        "AdvanceTimer",
+        "AdvanceAntic",
+        "ForceAntic"
+      ],
+      "evidence": "engine/aiComponent/timerUtility.cpp:33-45,59; AdvanceAnticBySeconds in behaviorTimerUtilityCoordinator.cpp",
+      "category": "TimerUtility.AdvanceTimerAndAntic",
+      "status": "live",
+      "tags": ["timer", "antic", "console-func", "dev-cheats"]
+    },
+    "ForceAddSleepDebtHours": {
+      "process": "engine",
+      "blurb": "Instantly adds (or subtracts, if negative) sleep “debt” in hours to Vector’s SleepTracker. Higher debt makes the robot more likely to be treated as sleepy and to prefer sleep in the sleep cycle; sleeping pays debt down over time.",
+      "detail": "Category Sleeping.SleepTracker. Argument deltaHours (float) is converted to seconds and stored in sForceSleepDebtDelta_s. On the next SleepTracker::UpdateDependent (immediately if debt was non-zero, else on the normal ~60 s update period) that delta is added to _sleepDebt_s, then the debt is clamped to [0, kSleepTracker_maxSleepDebt_hours×3600] (default max 20 h). While awake, debt also grows at kSleepTracker_awakeSleepDebtRate; while asleep it falls with real time. IsSleepy(fromSleep) compares debt to console thresholds (1 h awake / 0.5 h from-sleep by default). WebViz module “sleeping” is refreshed on the same update. Does not force sleep by itself — SleepCycle and related behaviors still decide transitions.",
+      "howTo": "1) Call ForceAddSleepDebtHours with e.g. deltaHours=2 to add two hours of debt (or a negative value to reduce). 2) Watch WebViz sleeping / sleep-cycle behavior for IsSleepy effects. 3) Put the robot to sleep or wait to pay debt back naturally.",
+      "related": [],
+      "evidence": "engine/aiComponent/behaviorComponent/sleepTracker.cpp:53-63,98-134,137-145",
+      "category": "Sleeping.SleepTracker",
+      "status": "live",
+      "tags": ["sleep", "sleep-debt", "console-func", "qa"]
+    },
+    "ForceAntic": {
+      "process": "engine",
+      "blurb": "Forces the kitchen-timer coordinator to want a timer “antic” on the next opportunity — the little reminder show Vector does while a countdown is running, without waiting for the antic schedule.",
+      "detail": "ANKI_DEV_CHEATS. Sets BehaviorTimerUtilityCoordinator::_lParams.shouldForceAntic via DevSetForceAntic on the singleton sCoordinator (set in the coordinator constructor). shouldForceAntic makes WantsToBeActivated true so the coordinator can climb the stack; once activated, CheckShouldPlayAntic calls TransitionToPlayAntic if there is still an active TimerUtility handle (or if the min-time antic schedule is already due). The force flag is cleared at the end of BehaviorUpdate (and is preserved across OnBehaviorActivated reset). No-op if sCoordinator is null. Does not shorten the countdown; pair with AdvanceTimer if you also need less time remaining.",
+      "howTo": "1) Start a user kitchen timer so TimerUtility has a handle and the timer coordinator can run. 2) Call ForceAntic. 3) Expect an antic animation/base behavior when the coordinator next gets control.",
+      "related": [
+        "AdvanceAntic",
+        "AdvanceTimer",
+        "AdvanceTimerAndAntic"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/timer/behaviorTimerUtilityCoordinator.cpp:66-71,88,281-286,394-396,401-407,432,557-566,596-599; .h DevSetForceAntic",
+      "category": "TimerUtility.ForceAntic",
+      "status": "live",
+      "tags": ["timer", "antic", "console-func", "dev-cheats"]
+    },
+    "ForceNextBigGreeting": {
+      "process": "engine",
+      "blurb": "Makes Vector treat every remembered named face as “not seen in a very long time,” so the next time he re-sees one of those people he will try to play the big GreetAfterLongTime greeting (turn to face + GreetAfterLongTime animation, optionally driving off the charger first).",
+      "detail": "Category BehaviorBigGreeting. Requires REMOTE_CONSOLE_ENABLED. Walks the shared last-seen map (name → UTC time_t) owned by BehaviorGreetAfterLongTime and sets every timestamp to epoch (0). BehaviorUpdate later compares last-seen + cooldown (30 min … 4 h depending on robot age hours) against wall UTC; epoch always fails the cooldown, so a known named face re-sight within ~5 s of detection can arm activation. Newly named faces that were never in the map are not greeters on first sight (they only get an entry). No-op if the behavior instance never constructed (sMapPtr null) or the map is empty. Feature-gated by features.json GreetAfterLongTime; behavior sits in globalInterruptions. Companion var BigGreetingDriveOffCharger controls undock-before-greet.",
+      "howTo": "1) Ensure GreetAfterLongTime has run enough that named faces exist in the map (or have been greeted before). 2) Call ForceNextBigGreeting. 3) Present a known named face to the camera within freeplay/interruption eligibility. 4) Expect big greeting within a few seconds of the sighting window.",
+      "related": ["BigGreetingDriveOffCharger"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/behaviorGreetAfterLongTime.cpp:48-67,83-87,156-160,200-277,312-343; resources/config/.../greetAfterLongTime.json",
+      "category": "BehaviorBigGreeting",
+      "status": "live",
+      "tags": ["greeting", "faces", "console-func", "qa"]
+    },
+    "ForcePersonCheck": {
+      "process": "engine",
+      "blurb": "While Vector is in light or deep sleep under SleepCycle, forces the next “person check” ASAP: he briefly wakes, looks for a face, and either fully wakes if someone is there or goes back to sleep.",
+      "detail": "Category Sleeping.SleepCycle. Sets static sForcePersonCheck; on the next BehaviorSleepCycle::BehaviorUpdate while the sleep-cycle behavior is activated, logs a warning and sets nextPersonCheckTime_s = 0.01 so the LightSleep/DeepSleep branch treats a person check as due (currTime >= next). TransitionToCheckingForPerson runs WakeupGetout, mutes audio, and delegates SleepingPersonCheck; RespondToPersonCheck may fully wake on a recognizable face. Night-time person checks can be disabled by file /data/data/rebuild/dont-look-for-people-at-night. No effect if SleepCycle is not activated, or if state is not LightSleep/DeepSleep (e.g. awake, comatose, emergency). Deep/light intervals normally 4 h / 0.5 h via console vars.",
+      "howTo": "1) Put the robot into natural light or deep sleep (SleepCycle active). 2) Call ForcePersonCheck. 3) Watch for person-check wake animation and optional full wake if a face is present.",
+      "paths": {
+        "robot": [
+          "/data/data/rebuild/dont-look-for-people-at-night"
+        ],
+        "notes": "Presence of this rebuild flag disables person checks at night (IsNightTime && _disablePersonCheck)."
+      },
+      "related": [],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/sleeping/behaviorSleepCycle.cpp:61-66,95,451-458,583-595,909-939; behaviorSleepCycle.h nextPersonCheckTime_s / _disablePersonCheck",
+      "category": "Sleeping.SleepCycle",
+      "status": "live",
+      "statusNote": "Only takes effect when SleepCycle is activated and current state is LightSleep or DeepSleep; otherwise the flag is cleared after update with no transition.",
+      "tags": ["sleep", "person-check", "console-func", "qa"]
+    },
+    "NextDatasetState": {
+      "process": "engine",
+      "blurb": "Advances the DevTouchDataCollection test harness to the next touch-sensor logging cell: saves the current raw touch samples to a cache file, then steps collection mode (idle/move × charger on/off) and annotation (no-touch / sustained / soft pet / hard pet).",
+      "detail": "ANKI_DEV_CHEATS only. Console category string “NextDatasetState”. Sets _rcvdNextDatasetRequest; BehaviorDevTouchDataCollection::BehaviorUpdate (only while that behavior is activated) calls OnNextDataset then increments CollectionMode 0..3, wrapping into DataAnnotation 0..3. OnNextDataset writes newline-separated raw backpack touch values under Scope::Cache / touchDataCollection / <headSerialHex> / <modeAbbr>_<annotAbbr>.txt (e.g. IF_NT.txt). Move modes re-enqueue motor wiggle actions. Pure factory/lab tooling for training touch baselines — not part of product freeplay. No effect if DevTouchDataCollection is not on the active stack (flag stays set until that behavior’s update runs, or is lost on process restart).",
+      "howTo": "1) Activate behavior DevTouchDataCollection (dev tree / boot loader — not production freeplay). 2) Put robot in the physical state for the current mode (on/off charger; idle vs moving). 3) Collect samples (raw touch while RobotConfigMatchesExpected). 4) Call NextDatasetState to flush file and advance. 5) Repeat through the 4×4 grid.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/touchDataCollection/<headSerial>/XX_YY.txt"
+        ],
+        "assets": [
+          "resources/config/engine/behaviorComponent/behaviors/devBehaviors/devTouchDataCollection.json"
+        ],
+        "notes": "Exact cache root is DataPlatform Scope::Cache + touchDataCollection. Mode codes: IF/IN/MF/MN; annotation: NT/SC/PS/PH."
+      },
+      "related": [],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevTouchDataCollection.cpp:30-38,203-239,254-294",
+      "category": "NextDatasetState",
+      "status": "partial",
+      "statusNote": "Only consumed while BehaviorDevTouchDataCollection is activated; outside that dev behavior the button only sets a sticky flag with no product effect.",
+      "tags": ["touch", "dev", "data-collection", "console-func", "dev-cheats"]
+    }
+  }
+}
