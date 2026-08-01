@@ -14,7 +14,7 @@
       "process": "engine",
       "blurb": "Intended to render nav-map borders as 3D lines instead of quads.",
       "status": "dead",
-      "statusNote": "Registered CONSOLE_VAR but never referenced outside its declaration — orphan flag.",
+      "statusNote": "Registered CONSOLE_VAR but never referenced outside its declaration — dead: registered but never read.",
       "evidence": "engine/navMap/quadTree/quadTreeProcessor.cpp (kRenderBorder3DLines); UI id RenderBorder3DLines",
       "category": "QuadTreeProcessor",
       "related": ["RenderZOffset", "RenderBordersFrom"],

@@ -74,7 +74,7 @@
       "evidence": "engine/cozmoAPI/comms/uiMessageHandler.cpp:62 (registration only),550,643-651; engine/cozmoAPI/comms/sdkStatus.h; engine/actions/actionContainers.cpp:650-655",
       "status": "dead",
       "statusNote": "rg finds only the CONSOLE_VAR line for kSdkStatusSendFreq. UpdateSdk() body is empty — intended periodic send never implemented.",
-      "tags": ["ui", "sdk", "dead", "orphan"]
+      "tags": ["ui", "sdk", "dead"]
     },
     "SendAnythingToViz": {
       "process": "engine",

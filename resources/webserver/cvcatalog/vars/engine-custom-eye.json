@@ -94,7 +94,7 @@
       "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:42-43 (registration only; no reads in tree)",
       "status": "dead",
       "statusNote": "CONSOLE_VAR only; rg finds no uses of kFarDistanceBetweenEyesMax beyond the definition.",
-      "tags": ["vision", "faces", "enrollment", "orphan"]
+      "tags": ["vision", "faces", "enrollment", "dead"]
     },
     "CloseDistanceBetweenEyesMin": {
       "process": "engine",
@@ -109,7 +109,7 @@
       "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:40 (registration only; no reads in tree)",
       "status": "dead",
       "statusNote": "CONSOLE_VAR only; kCloseDistanceBetweenEyesMin is never referenced after registration.",
-      "tags": ["vision", "faces", "enrollment", "orphan"]
+      "tags": ["vision", "faces", "enrollment", "dead"]
     },
     "CloseDistanceBetweenEyesMax": {
       "process": "engine",
@@ -124,7 +124,7 @@
       "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:41 (registration only; no reads in tree)",
       "status": "dead",
       "statusNote": "CONSOLE_VAR only; kCloseDistanceBetweenEyesMax is never referenced after registration.",
-      "tags": ["vision", "faces", "enrollment", "orphan"]
+      "tags": ["vision", "faces", "enrollment", "dead"]
     },
     "CenterTolerance": {
       "process": "engine",

@@ -68,7 +68,7 @@
       "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:44-50; rg shows registration only (no other uses)",
       "status": "dead",
       "statusNote": "CONSOLE_VAR registered; zero read sites outside declaration.",
-      "tags": ["faces", "enroll", "orphan", "dead"]
+      "tags": ["faces", "enroll", "dead"]
     },
     "LookingDownMinAngle_deg": {
       "process": "engine",
@@ -84,7 +84,7 @@
       "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:49; rg registration only",
       "status": "dead",
       "statusNote": "CONSOLE_VAR registered; never consumed.",
-      "tags": ["faces", "enroll", "orphan", "dead"]
+      "tags": ["faces", "enroll", "dead"]
     },
     "LookingStraightMaxAngle_deg": {
       "process": "engine",
@@ -110,7 +110,7 @@
       "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:48; rg registration only",
       "status": "dead",
       "statusNote": "CONSOLE_VAR registered; never consumed.",
-      "tags": ["faces", "enroll", "orphan", "dead"]
+      "tags": ["faces", "enroll", "dead"]
     },
     "LookingUpMinAngle_deg": {
       "process": "engine",
@@ -121,7 +121,7 @@
       "evidence": "coretech/vision/engine/faceTrackerImpl_okao.cpp:47; rg registration only",
       "status": "dead",
       "statusNote": "CONSOLE_VAR registered; never consumed.",
-      "tags": ["faces", "enroll", "orphan", "dead"]
+      "tags": ["faces", "enroll", "dead"]
     },
     "MaxPanAccel_radPerSec2": {
       "process": "engine",

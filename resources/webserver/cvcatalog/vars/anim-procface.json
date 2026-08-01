@@ -133,13 +133,13 @@
     "ProcFace_InterpolationType": {
       "process": "anim",
       "blurb": "Listed as an OpenCV-style interpolation mode (Nearest, Linear, Cubic, …) but is never read by the procedural face drawer. Changing it does nothing on current firmware.",
-      "detail": "Registered CONSOLE_VAR_ENUM only. No references to kProcFace_InterpolationType outside the declaration. Face warps sample polygons directly; custom overlay resize hardcodes INTER_AREA. Orphan control.",
+      "detail": "Registered CONSOLE_VAR_ENUM only. No references to kProcFace_InterpolationType outside the declaration. Face warps sample polygons directly; custom overlay resize hardcodes INTER_AREA. Dead control: registered but never read.",
       "enumLabels": ["Nearest", "Linear", "Cubic", "Area", "Lanczos", "LinearExact", "Max", "WarpFillOutliers"],
       "evidence": "cannedAnimLib/proceduralFace/proceduralFaceDrawer.cpp:46 (declaration only; rg shows no other uses)",
       "category": "Face.ParameterizedFace",
       "status": "dead",
       "statusNote": "Registered but never referenced after definition — no runtime effect.",
-      "tags": ["face", "procedural", "orphan"]
+      "tags": ["face", "procedural", "dead"]
     },
     "ProcFace_EllipseDelta": {
       "process": "anim",

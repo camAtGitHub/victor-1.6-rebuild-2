@@ -158,8 +158,8 @@
       "evidence": "lib/util/source/anki/audioUtil/audioRecognizerProcessor.cpp:27-50,57-62,113-151; rg shows no AudioRecognizerProcessor construction outside that TU",
       "category": "VoiceCommand",
       "status": "dead",
-      "statusNote": "Handler runs and sets _minSamplesToCapture, but AudioRecognizerProcessor is never constructed in this repo, so AudioSamplesCallback never fires and no WAV is written. Orphan Cozmo-era voice-command utility still linked into anim.",
-      "tags": ["mic", "audio", "orphan", "dead", "dev-cheats", "console-func"]
+      "statusNote": "Handler runs and sets _minSamplesToCapture, but AudioRecognizerProcessor is never constructed in this repo, so AudioSamplesCallback never fires and no WAV is written. Dead Cozmo-era voice-command utility still linked into anim; registration only, no working capture path.",
+      "tags": ["mic", "audio", "dead", "dev-cheats", "console-func"]
     },
     "RemoveFakePlayingSource": {
       "process": "anim",

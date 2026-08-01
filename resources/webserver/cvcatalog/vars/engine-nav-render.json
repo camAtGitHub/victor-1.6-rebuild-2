@@ -214,7 +214,7 @@
     "RenderBordersToDot": {
       "process": "engine",
       "blurb": "Was meant to draw each detected border’s center as a debug dot. Default false. Unused in this tree — registration only.",
-      "detail": "Same orphan cluster as RenderBordersFrom / ToQuad / Seeds under QuadTreeProcessor. Changing it cannot affect Viz or WebViz navmap colors.",
+      "detail": "Same unused (dead) cluster as RenderBordersFrom / ToQuad / Seeds under QuadTreeProcessor. Changing it cannot affect Viz or WebViz navmap colors.",
       "related": [
         "RenderBordersFrom",
         "RenderBordersToQuad",
@@ -272,7 +272,7 @@
     "RenderSeeds": {
       "process": "engine",
       "blurb": "Was meant to highlight “seed” quads differently when debugging nav-map border fill. Default false. Never read after registration — dead viz toggle.",
-      "detail": "Registered at top of quadTreeProcessor.cpp with the RenderBorders* cluster. GetNodesToFill / FillBorder implement seed expansion for fill but do not branch on kRenderSeeds. Same orphan status as RenderZOffset / RenderBorder3DLines documented in navmap-quadtree.json.",
+      "detail": "Registered at top of quadTreeProcessor.cpp with the RenderBorders* cluster. GetNodesToFill / FillBorder implement seed expansion for fill but do not branch on kRenderSeeds. Same dead status as RenderZOffset / RenderBorder3DLines documented in navmap-quadtree.json.",
       "related": [
         "RenderBordersFrom",
         "RenderBordersToDot",

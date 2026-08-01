@@ -9,7 +9,7 @@
       "evidence": "engine/xyPlanner.cpp:39 (registration only; no other references in tree)",
       "status": "dead",
       "statusNote": "Only CONSOLE_VAR_RANGED registration at xyPlanner.cpp:39. rg finds no reads of kArtificialPlanningDelay_ms or ArtificialPlanningDelay anywhere else.",
-      "tags": ["planner", "xyplanner", "path", "dead", "orphan"]
+      "tags": ["planner", "xyplanner", "path", "dead"]
     },
     "Benchmark": {
       "process": "engine",

@@ -13,7 +13,7 @@
       "evidence": "engine/components/blockTapFilterComponent.cpp:37 (registration only); dirty path 83-114 does not reference kCanDoubleTapDirtyPoses",
       "status": "dead",
       "statusNote": "rg finds only the CONSOLE_VAR line; no reads of kCanDoubleTapDirtyPoses.",
-      "tags": ["cube", "double-tap", "pose", "dead", "orphan"]
+      "tags": ["cube", "double-tap", "pose", "dead"]
     },
     "DoubleTapTime_ms": {
       "process": "engine",
@@ -164,7 +164,7 @@
       "evidence": "engine/components/blockTapFilterComponent.cpp:33 (registration only); handle path 120-158 has no intensity compare",
       "status": "dead",
       "statusNote": "rg finds only the CONSOLE_VAR definition; never read.",
-      "tags": ["cube", "tap", "dead", "orphan"]
+      "tags": ["cube", "tap", "dead"]
     },
     "TapWaitOffset_ms": {
       "process": "engine",

@@ -167,7 +167,7 @@
     },
     "FaceWorld": {
       "process": "both",
-      "blurb": "Log-channel enable for the name “FaceWorld” (ChannelVar under category Channels). When on, any INFO/DEBUG line tagged FaceWorld would pass the filter; when off (vicos default), those would be suppressed. This is still a live filter toggle, not an orphan.",
+      "blurb": "Log-channel enable for the name “FaceWorld” (ChannelVar under category Channels). When on, any INFO/DEBUG line tagged FaceWorld would pass the filter; when off (vicos default), those would be suppressed. This is still a live filter toggle, not a dead/unused control — the ChannelVar is read by the log filter.",
       "detail": "Registered like every other entry in console_filter_config.json via ChannelFilter::Initialize as a ChannelVar (bool console var, category Channels). IsChannelEnabled reads the bool on every channeled log. Important: in this tree, engine/faceWorld.cpp sets kLoggingChannelName = \"FaceRecognizer\" and PRINT_CH_* goes there — rg finds no PRINT_CH/LOG_CHANNEL producers for the string \"FaceWorld\". So enabling FaceWorld alone usually will not un-silence face-world traffic; enable FaceRecognizer instead. Separate FaceWorld *tuning* knobs live under console category Vision.FaceWorld (kDeletionTimeout_ms, kIgnoreFacesBelowRobot, …) and are different dump ids.",
       "paths": {
         "assets": [

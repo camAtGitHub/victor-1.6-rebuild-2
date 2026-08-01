@@ -126,7 +126,7 @@
       "category": "Vision.PreProcessing",
       "status": "dead",
       "statusNote": "Registered but unused. Runtime floor is MIN_CAMERA_GAIN (0.25f), not this console var.",
-      "tags": ["vision", "camera", "gain", "orphan"]
+      "tags": ["vision", "camera", "gain", "dead"]
     },
     "MinDetectionConfidence": {
       "process": "engine",

@@ -75,7 +75,7 @@
       "evidence": "engine/actions/basicActions.cpp:56,2692-2694; engine/actions/basicActions.h:574-580; no UseDefaultNumImages call sites (rg)",
       "status": "dead",
       "statusNote": "Only read by WaitForImagesAction(UseDefaultNumImages_t) which has zero call sites in this repo.",
-      "tags": ["vision", "actions", "orphan"]
+      "tags": ["vision", "actions", "dead"]
     },
     "DefaultTimeout_ms": {
       "process": "engine",

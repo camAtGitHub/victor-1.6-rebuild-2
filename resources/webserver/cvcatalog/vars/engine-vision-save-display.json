@@ -213,7 +213,7 @@
       "evidence": "engine/components/visionComponent.cpp:81 (registration only; no other references in tree)",
       "status": "dead",
       "statusNote": "rg finds only the CONSOLE_VAR line — never read.",
-      "tags": ["vision", "dead", "orphan"]
+      "tags": ["vision", "dead"]
     },
     "SimulateDroppedFrameFraction": {
       "process": "engine",
@@ -223,7 +223,7 @@
       "evidence": "engine/components/visionComponent.cpp:87-88 (registration only; no other references in tree)",
       "status": "dead",
       "statusNote": "rg finds only the CONSOLE_VAR line — never read.",
-      "tags": ["vision", "dead", "orphan", "testing"]
+      "tags": ["vision", "dead", "testing"]
     },
     "TrackerWebVizUpdatePeriod_s": {
       "process": "engine",

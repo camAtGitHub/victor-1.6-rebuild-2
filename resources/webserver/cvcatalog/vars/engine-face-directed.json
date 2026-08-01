@@ -151,7 +151,7 @@
       "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.h:39; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/selfTestConfig.cpp:22; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.h:45; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/playpenConfig.cpp:77; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/selfTest/behaviorSelfTest.cpp:379-429; engine/aiComponent/behaviorComponent/behaviors/devBehaviors/playpen/behaviorPlaypenTest.cpp:465-509",
       "status": "dead",
       "statusNote": "Registered under SelfTest and Playpen; rg finds no read of kTimeToDisplayResultOnFace_ms outside config headers/wrappers. DisplayResult never times display with it.",
-      "tags": ["selftest", "playpen", "factory", "dead", "orphan"]
+      "tags": ["selftest", "playpen", "factory", "dead"]
     },
     "UseExistingFacesWhenSearchingForFaces": {
       "process": "engine",
