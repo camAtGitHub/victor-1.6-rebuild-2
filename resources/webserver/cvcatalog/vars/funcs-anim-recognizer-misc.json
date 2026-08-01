@@ -1,0 +1,94 @@
+{
+  "vars": {
+    "DeleteImpl": {
+      "process": "anim",
+      "blurb": "Tears down the live Alexa client (AlexaImpl) inside the anim process without logging out of Amazon or deleting opt-in/auth files. After you press it, Alexa stops mid-session: no AVS connection, auth reported Uninitialized, wake-word/UX for Alexa go dead until something creates a new impl (re-opt-in path or reboot if last-boot opt-in is still on disk).",
+      "detail": "Registered always in Alexa::Init under category “Alexa” (not gated by ANKI_DEV_CHEATS). Comment in code: useful for testing shutdown without losing auth credentials. Handler calls Alexa::DeleteImpl: under a mutex it RemoveCallbacksForShutdown on the current unique_ptr impl, moves the raw pointer to _implToBeDeleted, and sets auth Uninitialized. The next Alexa::Update() deletes that pointer on a background thread (SDK shutdown joins media-player loops). Unlike ForceAlexaOptOut / SetAlexaActive(false), this button does not DeleteOptInFile, DeleteUserFiles, clear notifications, or fully walk the “signed out” UX — only the impl object is destroyed. If there is already no impl, ANKI_VERIFY(“Alexa.DeleteImpl.DoesntExist”) fires. Calling again before Update finishes the first delete hits ASSERT_NAMED(“Alexa.DeleteImpl.Leak”). A second dtor thread while the first is still running asserts “Alexa.Update.DtorThreadExists”. Persistent Alexa data under /data/data/com.anki.victor/persistent/alexa is left intact so reboot or CreateImpl can re-auth.",
+      "howTo": "1) Prefer only on a lab robot already opted into Alexa. 2) Call DeleteImpl once on anim (:8889). 3) Confirm Alexa face/UX stops and logs show auth Uninitialized / impl gone. 4) Do not spam the button (assert risk). 5) To recover: ForceAlexaOptIn / app opt-in, or reboot if last-boot authenticated so SetAlexaActive recreates the impl. For a full product logout that wipes credentials, use ForceAlexaOptOut on engine instead.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/persistent/alexa"
+        ],
+        "notes": "DeleteImpl leaves this tree alone; only the in-memory AlexaImpl is destroyed. Opt-out paths that call DeleteImpl also delete files under this directory."
+      },
+      "related": [
+        "ForceAlexaOptOut",
+        "ForceAlexaOptIn"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/alexa/alexa.cpp:126-130,252-265,337-396,162-181; alexa.h:116,153-154",
+      "category": "Alexa",
+      "status": "danger",
+      "statusNote": "Kills the Alexa session without a clean product logout. Double-press or press with no impl can ASSERT; async dtor must finish before another DeleteImpl. Not a whole-process crash helper, but bricks Alexa UX until re-create.",
+      "tags": ["alexa", "console-func", "danger", "teardown", "dev"]
+    },
+    "Update Alexa Playback Recognizer": {
+      "process": "anim",
+      "blurb": "Applies the AlexaPlaybackRecognizerModel console enum to the “Alexa” wake-word recognizer that listens on speaker playback (self-trigger / barge-in protection). Reloads the Pryon Lite model for the selected locale so Vector can detect “Alexa” in its own audio out and ignore it. Changing the enum alone does nothing until you press this.",
+      "detail": "ANKI_DEV_CHEATS only. Registered in SpeechRecognizerSystem::SetupConsoleFuncs under category SpeechRecognizer.AlexaPlayback. Requires _alexaPlaybackTrigger already created (Alexa activated via ActivateAlexa → InitAlexaPlayback). If the trigger is missing, logs “'Alexa' Playback Trigger is not active” and returns. UpdateRecognizerHelper copies kAlexaPlaybackRecognizerModel into the active index only when the index (or dummy sensitivity) actually changed; then SetLocaleDevOnly for that locale, looks up alexa_pryon mic-trigger paths, and queues ApplySpeechRecognizerLocaleUpdate. Pryon UpdateRecognizerModel stops the recognizer, InitRecognizer(netFilePath), restarts with mic offset when Alexa component exists. Log line: “Update Alexa Playback Recognizer success!” / “fail :(” / empty if nothing changed / “Recognizer modle or search file was not found…” if paths empty after a claimed success. Does not take function arguments — set the companion enum first.",
+      "howTo": "1) Opt into Alexa so mic + playback Alexa recognizers exist. 2) Set AlexaPlaybackRecognizerModel (enUS, enUK, enAU, frFR, deDE). 3) Call “Update Alexa Playback Recognizer” on anim (:8889). 4) Confirm console log “Update Alexa Playback Recognizer success!” (or fail/not-active). 5) Speak/play audio that would self-trigger and check ignore/barge-in behavior.",
+      "requires": [
+        "AlexaPlaybackRecognizerModel"
+      ],
+      "related": [
+        "AlexaRecognizerModel",
+        "PlaybackRecognizerSampleCountThreshold",
+        "Update Alexa Recognizer"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/speechRecognizer/speechRecognizerSystem.cpp:147-150,223-241,246-276,429-452,521-537,643-659; alexaPlaybackRecognizerComponent.cpp:7-10,87-95",
+      "category": "SpeechRecognizer.AlexaPlayback",
+      "status": "live",
+      "statusNote": "ANKI_DEV_CHEATS. No-op if playback trigger inactive or enum index unchanged. Real Pryon model reload when paths resolve.",
+      "tags": ["alexa", "speech", "playback", "wake-word", "dev-cheats", "console-func"]
+    },
+    "Update Alexa Recognizer": {
+      "process": "anim",
+      "blurb": "Applies the AlexaRecognizerModel console enum to the microphone “Alexa” wake-word recognizer. Switches which Pryon Lite locale model listens on the mics. Enum change alone is not enough — you must press this button after selecting a model.",
+      "detail": "ANKI_DEV_CHEATS only. Category SpeechRecognizer.Alexa. Same UpdateRecognizerHelper path as the playback button, but targets _alexaTrigger (mic stream). If Alexa is not active and the trigger was never created, logs “'Alexa' Trigger is not active”. Product code normally reloads models via UpdateTriggerForLocale from robot locale; this console path forces a specific Pryon locale from the enum (enUS/enUK/enAU/frFR/deDE) for lab testing. Sensitivity index is hard-wired to 0 for Alexa (no separate Alexa sensitivity enum). Side effect: SetLocaleDevOnly on MicDataSystem to the model’s locale (FIXME in code: shared locale among multiple recognizers). Successful reload stops/reinits Pryon with the new net file under the trigger-word data directory.",
+      "howTo": "1) Enable/opt-in Alexa so the mic Alexa trigger is running. 2) Set AlexaRecognizerModel. 3) Call “Update Alexa Recognizer” on anim. 4) Say “Alexa” (or locale variant) and check detection. 5) Watch for “Update Alexa Recognizer success!” vs not-active / fail.",
+      "requires": [
+        "AlexaRecognizerModel"
+      ],
+      "related": [
+        "AlexaPlaybackRecognizerModel",
+        "Update Alexa Playback Recognizer",
+        "AlexaEnabledInUK",
+        "AlexaEnabledInAU"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/speechRecognizer/speechRecognizerSystem.cpp:144-146,210-221,236-241,246-276,505-515,643-659",
+      "category": "SpeechRecognizer.Alexa",
+      "status": "live",
+      "statusNote": "ANKI_DEV_CHEATS. Requires active _alexaTrigger and a changed AlexaRecognizerModel index; otherwise log-only no-op.",
+      "tags": ["alexa", "speech", "wake-word", "dev-cheats", "console-func"]
+    },
+    "Update Vector Recognizer": {
+      "process": "anim",
+      "blurb": "Intended to apply VectorRecognizerModel and VectorRecognizerModelSensitivity to the “Hey Vector” wake-word engine. On this rebuild the Vector recognizer is Picovoice, and the model-reload path is a no-op stub — pressing this will not swap the live .ppn or sensitivity the way stock Sensory/THF tooling expected.",
+      "detail": "ANKI_DEV_CHEATS only. Category SpeechRecognizer.Vector. If _victorTrigger is missing, logs “'Hey Vector' Trigger is not active”. Otherwise UpdateRecognizerHelper may still run: when the model or sensitivity enum index changed, it SetLocaleDevOnly, looks up legacy hey_vector_thf paths from kThfTriggerModelDataList, and queues path updates. ApplySpeechRecognizerLocaleUpdate then calls UpdateRecognizerModel for SpeechRecognizerPicovoice, which is fully commented out and always returns true — it does not load THF nets or re-init Picovoice. Console may still print “Update Vector Recognizer success!” even though the wake word model is unchanged. Real Picovoice assets are fixed paths (default hey_vector.ppn / custom_1-5-0.ppn and sensitivity2). Prefer those files + anim restart over this button for rebuild wake-word work.",
+      "howTo": "1) Optional: set VectorRecognizerModel / VectorRecognizerModelSensitivity only if you are tracing leftover console plumbing. 2) Call “Update Vector Recognizer” and read the log — do not expect a new wake-word model on rebuild. 3) For real Picovoice changes: place custom ppn/sensitivity under /data/data/.../persistent/picovoice/ and re-init (anim restart); see VectorRecognizerModel catalog entry.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/persistent/picovoice/custom_1-5-0.ppn",
+          "/data/data/com.anki.victor/persistent/picovoice/sensitivity2"
+        ],
+        "assets": [
+          "/anki/data/assets/cozmo_resources/assets/picovoice/hey_vector.ppn",
+          "/anki/data/assets/cozmo_resources/assets/picovoice/porcupine_params.pv"
+        ],
+        "notes": "Picovoice Init uses these paths; this console function does not select them. Legacy THF path map is hey_vector_thf via mic trigger config."
+      },
+      "requires": [
+        "VectorRecognizerModel",
+        "VectorRecognizerModelSensitivity"
+      ],
+      "related": [
+        "VectorRecognizerModel",
+        "VectorRecognizerModelSensitivity"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/speechRecognizer/speechRecognizerSystem.cpp:64-142,199-208,236-241,246-276,303-329,574-640; speechRecognizerPicovoice.cpp:22-26,101-156",
+      "category": "SpeechRecognizer.Vector",
+      "status": "partial",
+      "statusNote": "ANKI_DEV_CHEATS. Button and helper still run (locale/path bookkeeping, success logs), but Picovoice UpdateRecognizerModel is a stub — does not change the live Hey Vector model on this rebuild.",
+      "tags": ["speech", "wake-word", "picovoice", "legacy-thf", "dev-cheats", "console-func"]
+    }
+  }
+}
