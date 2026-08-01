@@ -1,0 +1,185 @@
+{
+  "vars": {
+    "DefaultAllFeatures": {
+      "process": "engine",
+      "blurb": "Clears every console FeatureGate override so product feature on/off again comes only from the shipped features.json (and any non-override SetFeatureEnabled state). After this, no feature is forced Enabled or Disabled by the override table.",
+      "detail": "Under REMOTE_CONSOLE_ENABLED, FeatureGate keeps a per-FeatureType override: Default (use JSON), Enabled, or Disabled. DefaultAllFeatures walks all FeatureType entries, sets any non-Default back to Default, logs each removal, then SaveFeatureOverrides(). If nothing remains overridden, the save path deletes the overrides file; otherwise it rewrites the file with all zeros/defaults. Does not edit resources/config/features.json itself. WebViz “features” module can perform the same reset via type=reset.",
+      "howTo": "1) Call DefaultAllFeatures on engine :8888. 2) Confirm FeatureGate.Override debug lines for cleared names. 3) Optional: delete or inspect /data/data/com.anki.victor/cache/featureGateOverrides.ini — it should be removed when no overrides remain. 4) Behaviors/gates that check IsFeatureEnabled will use JSON defaults again (may need a behavior re-eval or feature consumer path to notice).",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/featureGateOverrides.ini"
+        ],
+        "assets": [
+          "resources/config/features.json"
+        ],
+        "notes": "Overrides file is DataPlatform Scope::Cache + featureGateOverrides.ini. Stock enablement is features.json (FeatureType names)."
+      },
+      "related": [
+        "FeatureToEdit",
+        "EnableFeature",
+        "DisableFeature",
+        "DefaultFeature"
+      ],
+      "evidence": "engine/utils/cozmoFeatureGate.cpp:147-206,220-235; clad/src/clad/types/featureGateTypes.clad; platform/config/etc/config/platform_config.json DataPlatformCachePath",
+      "category": "FeatureGate",
+      "status": "live",
+      "tags": ["feature-gate", "console-func", "override", "dev"]
+    },
+    "DefaultFeature": {
+      "process": "engine",
+      "blurb": "Removes the console override for the single feature selected by FeatureToEdit so that feature returns to its features.json default (enabled or disabled as shipped).",
+      "detail": "Sets sFeatureTypeOverrides[FeatureToEdit] = Default, logs FeatureGate.Override “Removing override…”, and SaveFeatureOverrides(). Enable/Disable for that feature are cleared; other features’ overrides stay. FeatureToEdit is a CONSOLE_VAR_ENUM built from every FeatureType name (Invalid, Laser, Exploring, FetchCube, Keepaway, Alexa, PRDemo, …).",
+      "howTo": "1) Set FeatureToEdit to the feature name. 2) Call DefaultFeature. 3) Use EnableFeature/DisableFeature if you need a forced state again.",
+      "requires": ["FeatureToEdit"],
+      "related": [
+        "EnableFeature",
+        "DisableFeature",
+        "DefaultAllFeatures"
+      ],
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/featureGateOverrides.ini"
+        ],
+        "assets": [
+          "resources/config/features.json"
+        ]
+      },
+      "evidence": "engine/utils/cozmoFeatureGate.cpp:149-160,182-190,220-235",
+      "category": "FeatureGate",
+      "status": "live",
+      "tags": ["feature-gate", "console-func", "override", "dev"]
+    },
+    "DevDrawCliffPoses": {
+      "process": "engine",
+      "blurb": "Draws a 3D frame (axes) at every cliff cell currently stored in the robot’s memory map, for Viz/Webots-style debug visualization. Call again to erase previous cliff frames and redraw from the latest map.",
+      "detail": "Category MapComponent.VisualEdgeDetection (REMOTE_CONSOLE_ENABLED). Looks up the current memory map, finds nodes with EContentType::Cliff (drop-sensor / visual cliff data), lifts each pose’s Z to 3 mm for drawing, and VizManager::DrawFrameAxes with ids cliff_frame0, cliff_frame1, …. Cached identifier list is erased on the next call so redraws stay clean. No-op if MapComponent has not set consoleRobot yet or the map is null. Does not change the map, navigation policy, or cliff sensors — pure Viz debug. Pair with DevProcessOneFrameForVisionEdges when testing visual edge insertion into the map.",
+      "howTo": "1) Drive so cliffs exist in the map (or run visual-edge capture). 2) Call DevDrawCliffPoses. 3) Inspect Viz/Webots debug frames. 4) Call again after map changes to refresh.",
+      "related": [
+        "DevProcessOneFrameForVisionEdges"
+      ],
+      "evidence": "engine/navMap/mapComponent.cpp:215-267,1398-1585",
+      "category": "MapComponent.VisualEdgeDetection",
+      "status": "live",
+      "tags": ["map", "cliff", "viz", "debug", "console-func"]
+    },
+    "DevProcessOneFrameForVisionEdges": {
+      "process": "engine",
+      "blurb": "Queues an immediate engine action that waits for one vision frame processed with OverheadEdges mode so visual table-edge / cliff chains can be computed and written into the memory map.",
+      "detail": "Queues WaitForImagesAction(1, VisionMode::OverheadEdges) at QueueActionPosition::NOW on the robot action list (preempts current action queue position NOW). When vision finishes OverheadEdges, MapComponent::ProcessVisionOverheadEdges / AddVisionOverheadEdges can insert or refine cliff content from the overhead edge frame. Requires consoleRobot set (MapComponent::InitDependent). Sibling console vars in the same category tune Hough line detection (angle resolution, min length, padding, etc.). Does not itself draw Viz frames — use DevDrawCliffPoses after the map updates.",
+      "howTo": "1) Point the head/camera at a table edge or cliff-like boundary. 2) Call DevProcessOneFrameForVisionEdges. 3) Optionally call DevDrawCliffPoses to see cliff poses. 4) Tune MapComponent.VisualEdgeDetection console vars if detection is weak.",
+      "related": [
+        "DevDrawCliffPoses"
+      ],
+      "evidence": "engine/navMap/mapComponent.cpp:87-94,215-223,266-267,1398-1475; engine/actions/basicActions.h WaitForImagesAction",
+      "category": "MapComponent.VisualEdgeDetection",
+      "status": "live",
+      "tags": ["map", "vision", "overhead-edges", "cliff", "console-func", "dev"]
+    },
+    "DisableFeature": {
+      "process": "engine",
+      "blurb": "Force-disables the feature named by FeatureToEdit, ignoring whether features.json has it on. The override is saved under cache and reloaded on engine start.",
+      "detail": "Sets override Disabled for kFeatureToEdit, logs FeatureGate.Override, SaveFeatureOverrides() → featureGateOverrides.ini. CozmoFeatureGate::IsFeatureEnabled returns false for that FeatureType while the override is non-Default. Affects behaviors/gates that consult the feature gate (e.g. Alexa, Keepaway, Exploring, conditionFeatureGate, intent maps). Same mechanism as WebViz features override=disabled.",
+      "howTo": "1) Set FeatureToEdit (e.g. Keepaway, Alexa). 2) Call DisableFeature. 3) Exercise the gated behavior/path — it should treat the feature as off. 4) DefaultFeature or DefaultAllFeatures to restore JSON default.",
+      "requires": ["FeatureToEdit"],
+      "related": [
+        "EnableFeature",
+        "DefaultFeature",
+        "DefaultAllFeatures"
+      ],
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/featureGateOverrides.ini"
+        ],
+        "assets": [
+          "resources/config/features.json"
+        ]
+      },
+      "evidence": "engine/utils/cozmoFeatureGate.cpp:160-180,220-235",
+      "category": "FeatureGate",
+      "status": "live",
+      "tags": ["feature-gate", "console-func", "override", "dev"]
+    },
+    "EnableFeature": {
+      "process": "engine",
+      "blurb": "Force-enables the feature named by FeatureToEdit even if features.json has it disabled. Override is persisted in the cache file across engine restarts.",
+      "detail": "Sets override Enabled for the selected FeatureType, logs, and SaveFeatureOverrides(). IsFeatureEnabled returns true without consulting JSON while overridden. Useful for turning on disabled product flags (e.g. CubeSpinner, Laser, Messaging when false in features.json) during lab testing. Does not by itself start a behavior — only opens gates that check the feature flag.",
+      "howTo": "1) Set FeatureToEdit. 2) Call EnableFeature. 3) Trigger the code path that checks that feature. 4) Clear with DefaultFeature when finished so production defaults return.",
+      "requires": ["FeatureToEdit"],
+      "related": [
+        "DisableFeature",
+        "DefaultFeature",
+        "DefaultAllFeatures"
+      ],
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/featureGateOverrides.ini"
+        ],
+        "assets": [
+          "resources/config/features.json"
+        ]
+      },
+      "evidence": "engine/utils/cozmoFeatureGate.cpp:160-170,220-235; clad/src/clad/types/featureGateTypes.clad",
+      "category": "FeatureGate",
+      "status": "live",
+      "tags": ["feature-gate", "console-func", "override", "dev"]
+    },
+    "PrintBodyData": {
+      "process": "engine",
+      "blurb": "Tells the low-level robot process (via syscon/HAL) to periodically print raw body-board sensor data to the robot logs: motors, cliff/prox, and/or battery. Period 0 turns printing off.",
+      "detail": "CONSOLE_FUNC category “Syscon”. Args: printPeriod_tics (required uint), optional motors (default true), prox (default false), battery (default false). Engine sends EngineToRobot PrintBodyData; supervisor Process_printBodyData → HAL::PrintBodyData. Each robot control tic (~5 ms / 200 Hz), PrintBodyDataUpdate logs selected groups when the period counter hits. Motors: head/lift/wheel positions and deltas; Prox: four cliff sensors + range proximity; Battery: voltage, charger, temp, flags. Sim HAL warns NotSupportedInSim. Floods logs if period is 1 — use a larger period for long captures.",
+      "howTo": "1) Call PrintBodyData with printPeriod_tics e.g. 20–200 and set motors/prox/battery as needed. 2) Watch robot logs for HAL.BodyData.Motors / .Prox / .Battery. 3) Call again with printPeriod_tics=0 to stop.",
+      "related": [],
+      "evidence": "engine/robot.cpp:159-172; robot/clad/.../messageEngineToRobot.clad PrintBodyData; robot/supervisor/src/messages.cpp:480-481; robot/hal/src/hal.cpp:1082-1135",
+      "category": "Syscon",
+      "status": "live",
+      "tags": ["syscon", "hal", "logging", "motors", "battery", "console-func", "debug"]
+    },
+    "ResetGamma": {
+      "process": "engine",
+      "blurb": "Applies the current DebayerGamma console value to the camera debayer pipeline so new frames are color-converted with that gamma. Changing DebayerGamma alone does nothing until you press this.",
+      "detail": "Category Vision.Debayer. Calls Vision::Debayer::Instance().SetGamma(kDebayerGamma). SetGamma rebuilds the default debayer op map when the gamma actually changes (mutex-protected). DebayerGamma is ranged ~0.1–4 (defaults ~1.7 normal Vector, ~2.1 xray). Affects RAW10→RGB/Y perception images used by engine vision, not the anim process procedural-face gamma (ProcFace_Gamma*). A leftover static s_debayerResetGamma is never read — only this func applies the var.",
+      "howTo": "1) Set console var DebayerGamma. 2) Call ResetGamma. 3) Capture/process camera frames and judge brightness/contrast of vision output.",
+      "requires": ["DebayerGamma"],
+      "related": [],
+      "evidence": "engine/components/visionComponent.cpp:129-135; coretech/vision/engine/debayer.cpp:42-60; coretech/vision/engine/imageBuffer/imageBuffer.cpp Debayer::Instance().Invoke",
+      "category": "Vision.Debayer",
+      "status": "live",
+      "tags": ["vision", "debayer", "gamma", "camera", "console-func"]
+    },
+    "SayText": {
+      "process": "engine",
+      "blurb": "Makes Vector speak the text string you pass, immediately, through the text-to-speech coordinator. Underscores in the string are turned into spaces so multi-word phrases are easy to type in the console.",
+      "detail": "Category TextToSpeech. Required arg: text. Uses companion console vars VoiceStyle (Default_Processed vs Unprocessed), DurationScalar (0.25–4, default 1), PitchScalar (−1…1, default 0). Creates an utterance with UtteranceTriggerType::Immediate so playback starts without a separate play step. Logs style/scalars with PII-hidden text. Needs a live robot object (_thisRobot); errors if missing or text null. Shares the product TTS path used by SayTextAction / behaviors — may contend with other utterances.",
+      "howTo": "1) Optionally set VoiceStyle, DurationScalar, PitchScalar. 2) Call SayText with text=hello_world (underscores → spaces). 3) Listen for speech; check Robot.SayText logs if silent.",
+      "requires": [],
+      "related": [
+        "VoiceStyle",
+        "DurationScalar",
+        "PitchScalar"
+      ],
+      "evidence": "engine/robot.cpp:174-234; engine/components/textToSpeech/textToSpeechCoordinator.h; engine/actions/sayTextAction.cpp",
+      "category": "TextToSpeech",
+      "status": "live",
+      "tags": ["tts", "speech", "console-func", "audio"]
+    },
+    "SetNewTapHeight": {
+      "process": "both",
+      "blurb": "Writes AdjustHeightOfSpinnerLift into the second lift keyframe of the cube-spinner tap animation anim_spinner_tap_01, so the next play of that anim uses your lift height. Present on both engine :8888 and anim :8889 because cannedAnimLib is linked into both processes.",
+      "detail": "ANKI_DEV_CHEATS only, category CubeSpinner. Uses the process-local CannedAnimationContainer pointer set in the container constructor. Looks up anim_spinner_tap_01, gets the LiftHeightKeyFrame track, advances to the second keyframe, OverrideHeight(kAdjustHeightOfSpinnerLift) (default 81). Changing AdjustHeightOfSpinnerLift without this call does nothing. Only the process that owns the animation instance you will play matters: product cube-spinner play often goes through anim streaming — call on the process that actually holds the loaded anim you will run. No null checks on GetAnimation or keyframe count: if the anim name is missing or the lift track has fewer than two frames, this can crash the process.",
+      "howTo": "1) Set AdjustHeightOfSpinnerLift. 2) Call SetNewTapHeight on the process whose canned-anim container holds anim_spinner_tap_01 (try anim if playback is streamer-side; engine if engine-held). 3) Run cube spinner / play anim_spinner_tap_01 and watch the lift tap height.",
+      "requires": ["AdjustHeightOfSpinnerLift"],
+      "related": ["AdjustHeightOfSpinnerLift"],
+      "paths": {
+        "assets": [
+          "assets/animations/anim_spinner_tap_01.bin"
+        ],
+        "notes": "Animation name hard-coded as anim_spinner_tap_01; asset listed in engine/robotDataLoader.cpp animation allow/list paths."
+      },
+      "evidence": "cannedAnimLib/cannedAnims/cannedAnimationContainer.cpp:28-52; cannedAnimLib/baseTypes/keyframe.h OverrideHeight; engine/aiComponent/.../behaviorVectorPlaysCubeSpinner.cpp anim_spinner_tap_01; dumps consolefunclist_8888/8889",
+      "category": "CubeSpinner",
+      "status": "partial",
+      "statusNote": "ANKI_DEV_CHEATS only. Applied only when container + anim_spinner_tap_01 with ≥2 lift keyframes exist; null/short track can crash. Dual registration engine+anim — must hit the process that owns the instance you play.",
+      "tags": ["cube-spinner", "animation", "lift", "dev-cheats", "console-func"]
+    }
+  }
+}
