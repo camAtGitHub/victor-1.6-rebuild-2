@@ -1,0 +1,115 @@
+{
+  "vars": {
+    "Console_Help": {
+      "process": "both",
+      "blurb": "Prints console help for the process you call it on (engine :8888 or anim :8889). With no argument, dumps every registered console variable (name, category, current value) and every console function name to the remote-console log channel. With an optional command name, looks up that one function’s argument signature or that one variable’s current value.",
+      "detail": "Registered under category “Console” in lib/util ConsoleSystem when REMOTE_CONSOLE_ENABLED. Optional arg command (const char*). Empty command: AppendConsoleVariables then AppendConsoleFunctions (same bulk lists as List_Variables / List_Functions). Non-empty: FindFunction → “function: name <signature>”; else FindVariable → “variable: id = value” plus a “set id <value>” hint; else “Unknown function or variable”. Output goes to the console channel (WriteLog), not the robot face. Each process has its own registry (engine vs anim vars/funcs differ). Does not change any values.",
+      "howTo": "1) Open the console for the process of interest. 2) Call Console_Help with no args for a full dump, or pass a name like SaveConsoleVars or ProcFace_Hue for one entry. 3) Read the reply on the console/log channel.",
+      "related": ["List_Variables", "List_Functions"],
+      "evidence": "lib/util/source/anki/util/console/consoleSystem.cpp:568-607 (handler + CONSOLE_FUNC); AppendConsoleVariables/Functions at 391-418",
+      "category": "Console",
+      "status": "live",
+      "tags": ["console", "help", "listing", "console-func"]
+    },
+    "DeleteConsoleVars": {
+      "process": "both",
+      "blurb": "Deletes this process’s on-disk console-vars ini file so a future load or restart will not restore previously saved knobs. Does not reset live in-memory values — whatever is set right now stays until you change it, call ResetConsoleVars, or restart without a file.",
+      "detail": "Category “Console”. Calls NativeAnkiUtilConsoleDeleteVarsWithContext → std::remove(g_ConsoleVarIniFilePath). Path is set once at process start via ANKI_CONSOLE_SYSTEM_INIT: engine uses cache consoleVarsEngine.ini (cozmoEngineMain); anim uses cache consoleVarsAnim.ini (cozmoAnimMain). Typical robot cache root is DataPlatformCachePath (product: under /data/data/com.anki.victor/cache/). On remove failure logs ConsoleSystem.DeleteVars error; no success WriteLog on the channel. Sibling of Save/Load/Reset.",
+      "howTo": "1) Optionally call ResetConsoleVars first if you also want defaults in RAM. 2) Call DeleteConsoleVars on the same process you saved from. 3) Confirm the ini is gone under cache. Next boot will skip Load if the file is missing.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/consoleVarsEngine.ini",
+          "/data/data/com.anki.victor/cache/consoleVarsAnim.ini"
+        ],
+        "notes": "Exact directory is DataPlatformCachePath from process config; filenames are fixed (Engine vs Anim)."
+      },
+      "related": ["SaveConsoleVars", "LoadConsoleVars", "ResetConsoleVars", "SaveModifiedConsoleVarsOnly"],
+      "evidence": "lib/util/source/anki/util/console/consoleSystem.cpp:540-544,1284-1292; engine/tools/engined/cozmoEngineMain.cpp:212; animProcess/src/cozmoAnim/cozmoAnimMain.cpp:152",
+      "category": "Console",
+      "status": "live",
+      "tags": ["console", "persist", "paths", "console-func"]
+    },
+    "List_Functions": {
+      "process": "both",
+      "blurb": "Writes the full list of registered console function names for this process to the remote-console log channel (between “== Functions ==” banners). Read-only inventory — does not run any other function.",
+      "detail": "Category “Console”. Handler calls ConsoleSystem::AppendConsoleFunctions, which walks the process’s function database and appends each registered id (one per line). Same bulk function list that Console_Help prints when called with no arguments. Useful from a text console or log tail; the web cvcatalog UI already shows functions from the live funclist dumps.",
+      "howTo": "Call on :8888 or :8889 and read the channel log for that process’s function names.",
+      "related": ["List_Variables", "Console_Help"],
+      "evidence": "lib/util/source/anki/util/console/consoleSystem.cpp:558-566,408-418",
+      "category": "Console",
+      "status": "live",
+      "tags": ["console", "listing", "console-func"]
+    },
+    "List_Variables": {
+      "process": "both",
+      "blurb": "Writes every registered console variable for this process to the remote-console log: name, [category], and current value. Read-only snapshot of live state — does not load or save the ini file.",
+      "detail": "Category “Console”. Uses AppendConsoleVariables over the edit-var database: lines like “Name [Category] = value”. Same variable bulk dump as bare Console_Help. Engine and anim lists differ (each process only has the vars it registered). Pair with SaveConsoleVars if you want this state on disk.",
+      "howTo": "Call on the desired process port; inspect the log dump for current values before/after experiments.",
+      "related": ["List_Functions", "Console_Help", "SaveConsoleVars", "LoadConsoleVars"],
+      "evidence": "lib/util/source/anki/util/console/consoleSystem.cpp:547-555,391-405",
+      "category": "Console",
+      "status": "live",
+      "tags": ["console", "listing", "console-func"]
+    },
+    "LoadConsoleVars": {
+      "process": "both",
+      "blurb": "Re-reads this process’s console-vars ini file from disk and applies every “VarName = Value” line to live console variables. Use after editing the file by hand, or to re-apply a saved snapshot without restarting. If the file is missing, logs a warning and changes nothing.",
+      "detail": "Category “Console”. NativeAnkiUtilConsoleLoadVarsWithContext opens g_ConsoleVarIniFilePath (engine: consoleVarsEngine.ini; anim: consoleVarsAnim.ini under DataPlatform cache). Skips comments (;), section headers ([…]), and blank lines; splits on first ‘=’; FindVariable + ParseText. On parse/update, WriteLog reports errors and successful value changes when called from the console. Unknown var names and bad lines warn in process logs. The same load path also runs automatically once at ConsoleSystem::FinishInitialization when the process starts (so saved knobs reapply on boot). Does not create the file.",
+      "howTo": "1) Ensure a saved ini exists (call SaveConsoleVars first, or place a file at the cache path). 2) Call LoadConsoleVars on the matching process. 3) Watch channel for “Updated var …” lines or “No ini file …”.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/consoleVarsEngine.ini",
+          "/data/data/com.anki.victor/cache/consoleVarsAnim.ini"
+        ],
+        "notes": "Load is also invoked at boot from FinishInitialization after the ini path is set."
+      },
+      "related": ["SaveConsoleVars", "DeleteConsoleVars", "ResetConsoleVars", "SaveModifiedConsoleVarsOnly"],
+      "evidence": "lib/util/source/anki/util/console/consoleSystem.cpp:104-115,528-532,1066-1183; engine/tools/engined/cozmoEngineMain.cpp:212; animProcess/src/cozmoAnim/cozmoAnimMain.cpp:152",
+      "category": "Console",
+      "status": "live",
+      "tags": ["console", "persist", "paths", "console-func"]
+    },
+    "ResetConsoleVars": {
+      "process": "both",
+      "blurb": "Sets every registered console variable in this process back to its compile-time default value in memory. Does not delete or rewrite the on-disk ini — a later LoadConsoleVars or process restart with a saved file will reapply persisted values.",
+      "detail": "Category “Console”. NativeAnkiUtilConsoleResetAllToDefault walks the variable database and calls ResetToDefault on each IConsoleVariable. Immediate effect on live knobs (toggles, ranges, enums) for the process you press. To clear persistence as well: DeleteConsoleVars (and optionally save a clean snapshot afterward). Not the same as reloading from disk.",
+      "howTo": "1) Call ResetConsoleVars to restore defaults in RAM. 2) If you also want defaults after reboot, call DeleteConsoleVars (or SaveConsoleVars after reset if SaveModifiedConsoleVarsOnly is false and you want an all-default file).",
+      "related": ["LoadConsoleVars", "SaveConsoleVars", "DeleteConsoleVars"],
+      "evidence": "lib/util/source/anki/util/console/consoleSystem.cpp:522-526,847-857",
+      "category": "Console",
+      "status": "live",
+      "tags": ["console", "persist", "console-func"]
+    },
+    "SaveConsoleVars": {
+      "process": "both",
+      "blurb": "Writes the current console-variable values for this process out to its cache ini file so they can survive restart or be reloaded later with LoadConsoleVars. By default only non-default (modified) variables are written; flip SaveModifiedConsoleVarsOnly false first if you want a full dump of every var.",
+      "detail": "Category “Console”. NativeAnkiUtilConsoleSaveVarsWithContext opens the process ini for write (engine consoleVarsEngine.ini / anim consoleVarsAnim.ini under cache), writes a header comment, sorts vars by category then id, emits [Category] sections and “Id = value” lines when !kSaveModifiedConsoleVarsOnly || !IsDefaultValue(). Reports “Saving Console Var Ini file '…' Succeeded/Failed!” on the console channel. Overwrites any previous file. Boot already loads this file once via FinishInitialization.",
+      "howTo": "1) Tune the vars you care about on this process. 2) Optionally set SaveModifiedConsoleVarsOnly. 3) Call SaveConsoleVars. 4) Confirm the channel success line and/or pull the ini from cache. 5) LoadConsoleVars or restart to reapply later.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/consoleVarsEngine.ini",
+          "/data/data/com.anki.victor/cache/consoleVarsAnim.ini"
+        ],
+        "notes": "Engine and anim files are separate; saving on :8888 does not update the anim file and vice versa."
+      },
+      "requires": [],
+      "related": ["LoadConsoleVars", "DeleteConsoleVars", "ResetConsoleVars", "SaveModifiedConsoleVarsOnly"],
+      "evidence": "lib/util/source/anki/util/console/consoleSystem.cpp:34,534-538,1214-1280; engine/tools/engined/cozmoEngineMain.cpp:212; animProcess/src/cozmoAnim/cozmoAnimMain.cpp:152",
+      "category": "Console",
+      "status": "live",
+      "tags": ["console", "persist", "paths", "console-func"]
+    },
+    "SetConnectionTimeoutInMS": {
+      "process": "both",
+      "blurb": "Sets how long (milliseconds) Anki’s reliable network transport will wait without receiving any packet from a peer before treating that reliable connection as timed out. Argument timeoutInMS is a double; process default is 5000 ms (5 s). Affects ReliableConnection timeout for code that uses this transport — not the Unix-domain eng↔anim↔robot CLAD sockets.",
+      "detail": "Registered under category “Network” in reliableConnection.cpp when REMOTE_CONSOLE_ENABLED. Handler reads ConsoleArg timeoutInMS, logs Network.SetConnectionTimeoutInMS (old → new), then ReliableConnection::SetConnectionTimeoutInMS. Static sConnectionTimeoutInMS is compared in HasConnectionTimedOut against time since last receive; Update returns false when timed out so the transport can drop the connection. Same registration exists in any process linking this util code (both dumps list it). Very small values make connections drop under brief stalls; very large values keep dead peers around longer. Does not persist via SaveConsoleVars (not a CONSOLE_VAR).",
+      "howTo": "1) Call SetConnectionTimeoutInMS with the desired milliseconds (e.g. 5000 for stock). 2) Watch Network logs for the change line. 3) Only needed when debugging app/game-style reliable UDP connectivity timeouts — leave default for normal robot freeplay.",
+      "related": [],
+      "evidence": "lib/util/source/anki/util/transport/reliableConnection.cpp:32-38,45,663-666,887; reliableConnection.h:86-92,169",
+      "category": "Network",
+      "status": "live",
+      "statusNote": "Live for ReliableConnection users of the shared util transport. Not a process-crash helper; extreme low values can cause frequent disconnects on that transport only.",
+      "tags": ["network", "timeout", "reliable-transport", "console-func"]
+    }
+  }
+}
