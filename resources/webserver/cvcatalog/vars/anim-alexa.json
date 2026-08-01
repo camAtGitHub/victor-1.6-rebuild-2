@@ -1,21 +1,28 @@
 {
   "vars": {
     "Alexa": {
-      "process": "anim",
-      "blurb": "Not a settable console variable. The inventory dump lists bare “Alexa” next to other category tab names (Actions, Audio, Behaviors, …). Real Alexa knobs live under the console categories “Alexa”, “Alexa.Init”, “Alexa.Messaging”, “SpeechRecognizer.Alexa”, and “FaceInfoScreenManager”.",
-      "detail": "No CONSOLE_VAR or CONSOLE_FUNC registers with id kAlexa / Alexa. Hungarian strip would only produce id “Alexa” from a symbol named kAlexa or gAlexa — neither exists in this tree. The same dump block also contains “*” and many engine-style category labels, so treat this line as inventory noise (category label leakage), not a control you can flip. Product Alexa is gated by features.json feature “Alexa”, opt-in (app or engine ForceAlexaOptIn), and the anim Alexa stack under animProcess/src/cozmoAnim/alexa/.",
+      "process": "both",
+      "blurb": "Log-channel enable for the name “Alexa”. When on, INFO/DEBUG lines tagged with that channel (anim Alexa client/impl, media player, observer, notch detector, etc.) pass the channel filter; when off (vicos robot default), they are suppressed. This is a logging mute switch, not the product Alexa feature on/off.",
+      "detail": "Registered as a ChannelVar (ConsoleVar<bool> under category Channels) when ChannelFilter::Initialize loads resources/config/engine/console_filter_config.json — same path for anim (:8889) and engine (:8888). Code uses #define LOG_CHANNEL \"Alexa\" across animProcess/src/cozmoAnim/alexa/* and related files. Do not confuse with real Alexa *tuning* ids under console categories Alexa, Alexa.Init, Alexa.Messaging, SpeechRecognizer.Alexa, FaceInfoScreenManager (AlexaEnabledInUK/AU, LogAlexaDirectives, …). Product Alexa is gated by features.json “Alexa”, opt-in, and the anim Alexa stack — none of that is this bool.",
+      "howTo": "1) Open Channels on :8889 (anim) while debugging Alexa. 2) Set Alexa true to un-silence Alexa-tagged logs. 3) Leave false on-robot to reduce log noise. Restart not required.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/console_filter_config.json"
+        ],
+        "notes": "vicos default enabled=false; osx true. Channel name string must match LOG_CHANNEL \"Alexa\"."
+      },
       "related": [
-        "AlexaEnabledInUK",
-        "AlexaEnabledInAU",
-        "AlexaIdleDelay_s",
+        "*",
+        "Microphones",
+        "SpeechRecognizer",
         "LogAlexaDirectives",
-        "SaveAlexaAudio"
+        "AlexaEnabledInUK",
+        "AlexaEnabledInAU"
       ],
-      "evidence": "resources/webserver/.docs/consolevarlist_8889:156 (peer category-like lines 154–172 + '*'); no kAlexa registration (rg); docs/development/alexa.md; resources/config/features.json feature Alexa",
-      "category": "Alexa",
-      "status": "dead",
-      "statusNote": "Dump id only — not registered as a console var. Category string for many real Alexa vars; do not expect consolevarset key=Alexa to do anything useful.",
-      "tags": ["alexa", "orphan", "dump-artifact"]
+      "evidence": "lib/util/source/anki/util/logging/channelFilter.h:31-48; channelFilter.cpp:37-52,108-129; resources/config/engine/console_filter_config.json channel Alexa; animProcess/src/cozmoAnim/cozmoAnimMain.cpp:130-148; animProcess/src/cozmoAnim/alexa/alexaImpl.cpp:90 LOG_CHANNEL \"Alexa\"",
+      "category": "Channels",
+      "status": "live",
+      "tags": ["logging", "channels", "alexa", "channel"]
     },
     "AlexaEnabledInAU": {
       "process": "anim",

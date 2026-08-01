@@ -34,20 +34,28 @@
       "tags": ["alexa", "notch", "debug", "aec", "tuning"]
     },
     "Microphones": {
-      "process": "anim",
-      "blurb": "Not a settable console variable. The inventory dump lists bare “Microphones” next to other category/tab names (Actions, Audio, SpeechRecognizer, …). Real mic knobs live under categories such as “MicData” and “Audio.Microphone”.",
-      "detail": "No CONSOLE_VAR registers as kMicrophones / Microphones. The string is used as a LOG_CHANNEL in micDataProcessor, micDataSystem, micDataInfo, and some engine sound-reaction behaviors — not as a tunable. Treat this dump line as category-label leakage (same pattern as dump ids Alexa, SpeechRecognizer, VisionComponent).",
+      "process": "both",
+      "blurb": "Log-channel enable for the name “Microphones”. When on, INFO/DEBUG lines tagged Microphones (mic data system/processor/info paths) pass the channel filter; when off (vicos default), they are filtered out. Logging mute only — does not enable or mute the physical mics.",
+      "detail": "ChannelVar bool under category Channels from console_filter_config.json (ChannelFilter::Initialize). Anim producers use #define LOG_CHANNEL \"Microphones\" in micDataProcessor, micDataSystem, micDataInfo. Not a category-label dump artifact and not a MicData master switch. Real mic/noise knobs live under categories such as MicData and Audio.Microphone (NoiseFloorMin/Range, SaveNotches, MicData_*).",
+      "howTo": "1) Open Channels on :8889. 2) Set Microphones true while debugging mic pipeline logs. 3) Pair with SpeechRecognizer / Alexa channels if tracing wake-word end-to-end.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/console_filter_config.json"
+        ],
+        "notes": "vicos default enabled=false; osx false as well for this channel."
+      },
       "related": [
+        "*",
+        "Audio",
+        "SpeechRecognizer",
         "NoiseFloorMin",
         "NoiseFloorRange",
-        "SaveNotches",
-        "MicData_SpeakerNoiseDisablesMics"
+        "SaveNotches"
       ],
-      "evidence": "resources/webserver/.docs/consolevarlist_8889 (peer category-like block with Actions/Audio/Microphones/SpeechRecognizer/*); no CONSOLE_VAR Microphones (rg); LOG_CHANNEL Microphones in animProcess/src/cozmoAnim/micData/*",
-      "category": "Microphones",
-      "status": "dead",
-      "statusNote": "Dump id only — not registered. Do not expect consolevarset key=Microphones to change behavior.",
-      "tags": ["mic", "orphan", "dump-artifact"]
+      "evidence": "lib/util/source/anki/util/logging/channelFilter.h:31-48; channelFilter.cpp:37-52,108-129; resources/config/engine/console_filter_config.json channel Microphones; animProcess/src/cozmoAnim/micData/micDataSystem.cpp:53; micDataProcessor.cpp:50; micDataInfo.cpp:25",
+      "category": "Channels",
+      "status": "live",
+      "tags": ["logging", "channels", "mic", "channel"]
     },
     "NoiseFloorMin": {
       "process": "anim",
@@ -161,21 +169,29 @@
       "tags": ["alexa", "mic", "debug", "capture", "paths", "dev-cheats"]
     },
     "SpeechRecognizer": {
-      "process": "anim",
-      "blurb": "Not a settable console variable. The inventory dump lists bare “SpeechRecognizer” among category/tab labels. Real knobs use dotted groups such as SpeechRecognizer.Vector, SpeechRecognizer.Alexa, and SpeechRecognizer.AlexaPlayback.",
-      "detail": "No CONSOLE_VAR id SpeechRecognizer / kSpeechRecognizer. SuppressTriggerResponse uses category string \"SpeechRecognizer\"; other vars use SpeechRecognizer.* groups. LOG_CHANNEL \"SpeechRecognizer\" appears in speech recognizer sources. Same dump-artifact pattern as Microphones and Alexa bare names.",
+      "process": "both",
+      "blurb": "Log-channel enable for the name “SpeechRecognizer”. When on, INFO/DEBUG lines tagged SpeechRecognizer (wake-word / recognizer system, Alexa playback recognizer component, …) pass the channel filter; when off (vicos default), they are suppressed. Not a master switch for recognition itself.",
+      "detail": "ChannelVar under category Channels from console_filter_config.json — same registration as other channel bools. Producers include speechRecognizerSystem.cpp and alexaPlaybackRecognizerComponent.cpp (#define LOG_CHANNEL \"SpeechRecognizer\"). Distinct from console *category* string \"SpeechRecognizer\" used by SuppressTriggerResponse and the SpeechRecognizer.Vector / .Alexa / .AlexaPlayback tuning groups (DefaultDetectThreshold, VectorRecognizerModel, …).",
+      "howTo": "1) Channels category on :8889. 2) Set SpeechRecognizer true to un-mute recognizer logs. 3) Use Microphones / Alexa channel bools alongside when needed.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/console_filter_config.json"
+        ],
+        "notes": "vicos default enabled=false; osx false for this channel."
+      },
       "related": [
+        "*",
+        "Microphones",
+        "Alexa",
         "SuppressTriggerResponse",
         "VectorRecognizerModel",
-        "VectorRecognizerModelSensitivity",
         "DefaultDetectThreshold",
         "ForceRunNotchDetector"
       ],
-      "evidence": "resources/webserver/.docs/consolevarlist_8889 category-like block; micDataSystem.cpp:59 category \"SpeechRecognizer\"; speechRecognizerSystem.cpp CONSOLE_GROUP_VECTOR/ALEXA; no CONSOLE_VAR named SpeechRecognizer",
-      "category": "SpeechRecognizer",
-      "status": "dead",
-      "statusNote": "Dump id only — not registered as a var. Use the SpeechRecognizer.* children.",
-      "tags": ["speech", "orphan", "dump-artifact"]
+      "evidence": "lib/util/source/anki/util/logging/channelFilter.h:31-48; channelFilter.cpp:37-52,108-129; resources/config/engine/console_filter_config.json channel SpeechRecognizer; animProcess/src/cozmoAnim/speechRecognizer/speechRecognizerSystem.cpp:44; alexa/media/alexaPlaybackRecognizerComponent.cpp:28",
+      "category": "Channels",
+      "status": "live",
+      "tags": ["logging", "channels", "speech", "channel"]
     },
     "SuppressTriggerResponse": {
       "process": "anim",
