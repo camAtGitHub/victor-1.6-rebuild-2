@@ -1,0 +1,49 @@
+{
+  "vars": {
+    "ClearFakeWallTime": {
+      "process": "both",
+      "blurb": "Turns off the fake clock override set by SetFakeWallTime24HourUTC. After this, WallTime APIs in the process you call it on use the real OS system clock again.",
+      "detail": "Sets the process-local sFakeWallTime back to −1. GetApproximateTime() then returns std::chrono::system_clock::now() as usual. Does not change the OS clock, NTP state, or the FakeWallTimeIsSynced console var. Engine (:8888) and anim (:8889) each keep their own override — clear on the same port where you set the fake. Safe at any time; if no fake was set, it is a harmless no-op.",
+      "howTo": "Call ClearFakeWallTime on the process (engine and/or anim) where you previously ran SetFakeWallTime24HourUTC. Optionally leave FakeWallTimeIsSynced as you found it.",
+      "related": [
+        "SetFakeWallTime24HourUTC",
+        "PrintWallTimeToLog",
+        "FakeWallTimeIsSynced"
+      ],
+      "evidence": "osState/wallTime.cpp:97,114-117,208-224; CONSOLE_FUNC ClearFakeWallTime category WallTime L129",
+      "category": "WallTime",
+      "status": "live",
+      "tags": ["walltime", "clock", "fake-time", "console-func", "dev"]
+    },
+    "PrintWallTimeToLog": {
+      "process": "both",
+      "blurb": "Dumps this process’s view of wall clock to the logs: whether OS time is synced, whether a timezone is set, and the current UTC and local times (labeled accurate or approximate).",
+      "detail": "Registered under category “WallTime” in osState (linked into both vic-engine and vic-anim). For each of UTC and local: tries the “accurate” API first (only succeeds when WallTime thinks time is synced), otherwise falls back to the approximate API and tags the line accordingly. Uses asctime for the printed string. Does not change time, sync flags, or behavior — pure diagnostics. Call on :8888 vs :8889 to compare engine vs anim (including any per-process fake time).",
+      "howTo": "1) Optionally set FakeWallTimeIsSynced or SetFakeWallTime24HourUTC first if you are testing overrides. 2) Call PrintWallTimeToLog. 3) Read log tags WallTime.DEBUG.OSState.IsSynced / HasTimezone / UTCTime / LocalTime (or *.FAIL).",
+      "related": [
+        "SetFakeWallTime24HourUTC",
+        "ClearFakeWallTime",
+        "FakeWallTimeIsSynced"
+      ],
+      "evidence": "osState/wallTime.cpp:37-95,126; OSState::IsWallTimeSynced / HasTimezone",
+      "category": "WallTime",
+      "status": "live",
+      "tags": ["walltime", "clock", "debug", "logging", "console-func"]
+    },
+    "SetFakeWallTime24HourUTC": {
+      "process": "both",
+      "blurb": "Forces this process’s WallTime layer to pretend it is a chosen UTC clock time of day (HHMM as an integer, e.g. 1830 = 18:30 UTC). Used to test “what time is it?” behaviors without waiting for real NTP or the wall clock.",
+      "detail": "Argument fakeTime must be 0 ≤ N < 2400 with minutes N%100 < 60 (e.g. 0, 930, 1830, 2359). Invalid values log WallTime.SetFakeWallTime.InvalidTime and leave the previous setting. When set, GetApproximateTime() keeps today’s UTC date from the real clock, zeroes seconds, and replaces hour/minute via timegm — so every WallTime path that reads approximate or (when synced) accurate time in this process sees that UTC clock. Does not set the Linux system clock. Engine and anim have separate sFakeWallTime statics; set on the process you care about. Accurate GetLocalTime/GetUTCTime/GetTime still require IsTimeSynced() true unless you also enable FakeWallTimeIsSynced. Callers include wall-clock display behaviors, sleep tracker, face “seen today”, Alexa jump detection (anim), external message timestamps (engine), etc. Leave on only while testing — clear with ClearFakeWallTime.",
+      "howTo": "1) Prefer engine :8888 for behavior/sleep/date tests; use anim :8889 if testing Alexa/face-info time in anim. 2) Optionally set FakeWallTimeIsSynced true so “accurate” APIs succeed without real NTP. 3) Call SetFakeWallTime24HourUTC with fakeTime=HHMM (e.g. 2200 for 10 PM UTC). 4) PrintWallTimeToLog to confirm. 5) ClearFakeWallTime when done.",
+      "related": [
+        "ClearFakeWallTime",
+        "PrintWallTimeToLog",
+        "FakeWallTimeIsSynced"
+      ],
+      "evidence": "osState/wallTime.cpp:97-111,128-129,208-224; consumers e.g. behaviorDisplayWallTime.cpp, sleepTracker.cpp, alexaImpl.cpp",
+      "category": "WallTime",
+      "status": "live",
+      "tags": ["walltime", "clock", "fake-time", "console-func", "dev", "qa"]
+    }
+  }
+}
