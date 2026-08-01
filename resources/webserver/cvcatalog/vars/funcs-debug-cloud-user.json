@@ -1,0 +1,198 @@
+{
+  "vars": {
+    "DebugCheckForUser": {
+      "process": "engine",
+      "blurb": "Asks vic-cloud again for the signed-in account id used by the jdocs (cloud JSON document) system. Use this after a fake log-out or when cloud jdoc sync never got a user id, so engine can resume cloud read/write for settings and lifetime stats.",
+      "detail": "CONSOLE_FUNC under category “JdocsManager” (REMOTE_CONSOLE_ENABLED). Calls JdocsManager::CheckForUserLoggedIn(). Three branches: (1) If _userID is the sentinel “NotLoggedIn” (e.g. after DebugFakeUserLogOut or a failed user response), clears it and queues DocRequest::user to the jdocs UDP client (vic-cloud). (2) If _userID is still empty (startup or a request already in flight), logs that a userID request is already pending and does nothing. (3) If a real user id is already present, only logs that the user is already logged in. Does not clear local on-disk jdocs. Also invoked automatically when engine receives ExternalInterface::UserLoggedIn from vic-gateway.",
+      "howTo": "1) Optionally call DebugFakeUserLogOut first to force the NotLoggedIn state. 2) Call DebugCheckForUser. 3) Watch JdocsManager logs for “Requesting user id from vic-cloud” vs “already logged in” / “already pending”.",
+      "related": [
+        "DebugFakeUserLogOut",
+        "DebugDeleteSelectedJdocInCloud",
+        "DebugDeleteAllJdocsInCloud",
+        "JdocType"
+      ],
+      "evidence": "engine/components/jdocsManager.cpp:100-104,336-356,424-427,1485-1500",
+      "category": "JdocsManager",
+      "status": "live",
+      "tags": ["jdocs", "cloud", "user", "console-func", "debug"]
+    },
+    "DebugDeleteAllJdocsInCloud": {
+      "process": "engine",
+      "blurb": "Deletes every managed cloud jdoc for this robot’s account/thing: RobotSettings, RobotLifetimeStats, AccountSettings, and UserEntitlements. Local copies on disk are not deleted by this button. Destructive — cloud will no longer hold those documents until rewritten.",
+      "detail": "Loops JdocType_ARRAYSIZE and calls DeleteJdocInCloud for each index. Each delete builds DocRequest::deleteReq with current _userID, _thingID, and the doc name from config, then SendJdocsRequest to vic-cloud. Comment in code notes deletion is only requested from these debug console funcs. If the user is not logged in (NotLoggedIn / empty id), cloud requests may be skipped or fail depending on queue rules — check JdocsManager logs. Does not call ClearJdocBody or erase persistent files under the jdocs folder.",
+      "howTo": "Lab/test accounts only. Prefer DebugDeleteSelectedJdocInCloud + JdocType for a single type. After delete, product code may re-create/push jdocs on later saves; confirm with cloud/account tooling if needed.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/persistent/jdocs/"
+        ],
+        "notes": "Local jdoc JSON files live under DataPlatform Scope::Persistent + \"jdocs\"; this function only issues cloud deleteReq and does not remove those files."
+      },
+      "related": [
+        "DebugDeleteSelectedJdocInCloud",
+        "JdocType",
+        "DebugCheckForUser",
+        "DebugFakeUserLogOut"
+      ],
+      "evidence": "engine/components/jdocsManager.cpp:85-92,319-323,1461-1465",
+      "category": "JdocsManager",
+      "status": "danger",
+      "statusNote": "Irreversible cloud document wipe for all four managed jdoc types on the logged-in account/thing. Local disk jdocs are left alone but cloud state is destroyed.",
+      "tags": ["jdocs", "cloud", "delete", "danger", "console-func", "debug"]
+    },
+    "DebugDeleteSelectedJdocInCloud": {
+      "process": "engine",
+      "blurb": "Deletes one cloud jdoc type chosen by the JdocType console enum (RobotSettings, RobotLifetimeStats, AccountSettings, or UserEntitlements). Does not erase the matching local file by itself — only the cloud copy for this account/thing.",
+      "detail": "Reads CONSOLE_VAR_ENUM kJdocType (dump id JdocType), casts to external_interface::JdocType, and calls DeleteJdocInCloud: GetJdocName → DocRequest deleteReq(_userID, _thingID, docName) → SendJdocsRequest. Keep enum order in sync with settings.proto JdocType. Destructive for that one cloud document (e.g. wiping cloud lifetime stats or robot settings).",
+      "howTo": "1) Set console var JdocType to the document you mean. 2) Call this function only if you intend to remove that cloud doc. 3) Confirm logs / cloud side. For all four types use DebugDeleteAllJdocsInCloud instead.",
+      "requires": ["JdocType"],
+      "related": [
+        "DebugDeleteAllJdocsInCloud",
+        "JdocType",
+        "DebugCheckForUser"
+      ],
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/persistent/jdocs/"
+        ],
+        "notes": "Cloud-only delete; local *.json under persistent/jdocs remain until other code rewrites or deletes them."
+      },
+      "evidence": "engine/components/jdocsManager.cpp:75-83,319-323",
+      "category": "JdocsManager",
+      "status": "danger",
+      "statusNote": "Destructive cloud delete of the selected jdoc type. Requires JdocType staging enum; wrong selection wipes the wrong document.",
+      "tags": ["jdocs", "cloud", "delete", "danger", "console-func", "debug"]
+    },
+    "DebugFakeUserLogOut": {
+      "process": "engine",
+      "blurb": "Pretends the user signed out for the jdocs manager only: sets the internal cloud user id to “NotLoggedIn”. Engine then treats the robot as having no account for cloud jdoc get/put until something re-fetches the user (DebugCheckForUser or a real UserLoggedIn path).",
+      "detail": "Does not talk to the app, gateway, or OS account store — only JdocsManager::_userID = kNotLoggedIn. Cloud save paths that check (_userID == kNotLoggedIn) will skip immediate cloud uploads. Local disk jdocs and in-memory document bodies keep their last values. Pair with DebugCheckForUser to re-request the id from vic-cloud after testing offline/no-account behavior.",
+      "howTo": "1) Call DebugFakeUserLogOut. 2) Exercise settings/stats cloud paths and confirm they skip or queue differently. 3) Call DebugCheckForUser (or complete a real app login that sends UserLoggedIn) to restore a user id.",
+      "related": [
+        "DebugCheckForUser",
+        "DebugDeleteSelectedJdocInCloud",
+        "DebugDeleteAllJdocsInCloud"
+      ],
+      "evidence": "engine/components/jdocsManager.cpp:67,94-98,328-332,786,994,1474",
+      "category": "JdocsManager",
+      "status": "live",
+      "tags": ["jdocs", "cloud", "user", "console-func", "debug", "logout"]
+    },
+    "DeleteMessagesFor": {
+      "process": "engine",
+      "blurb": "Deletes every unread “leave a message” voice note addressed to the given person name (case-insensitive). Removes metadata slots and the matching .wav files under the robot’s persistent messages folder. Does not play them first.",
+      "detail": "CONSOLE_FUNC category “VoiceMessage”, arg name (const char*). Requires a non-null name. GetUnreadMessages(name) then DeleteMessage for each id: clears the slot, deletes the wav if present, saves message_metadata.json. Name match is case-insensitive (StringCaseInsensitiveEquals after lowercasing the query). Max 10 message slots total for all recipients. Silent no-op if name is null/omitted or no unread messages match. Does not null-check sVMSystem (set in VoiceMessageSystem::Initialize).",
+      "howTo": "Pass the recipient name exactly as used when recording (e.g. the face/person name). Call DeleteMessagesFor with that name. Confirm files under persistent/messages are gone and metadata updated.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/persistent/messages/",
+          "/data/data/com.anki.victor/persistent/messages/message_metadata.json"
+        ],
+        "notes": "Scope::Persistent + \"messages\"; wavs use prefix message + slot; metadata is message_metadata.json."
+      },
+      "related": [
+        "RecordMessageFor",
+        "PlaybackNextMessageFor"
+      ],
+      "evidence": "engine/components/mics/voiceMessageSystem.cpp:77-89,384-408,550-588; voiceMessageSystem.h:88",
+      "category": "VoiceMessage",
+      "status": "live",
+      "tags": ["voicemail", "messages", "delete", "console-func"]
+    },
+    "FlushRobotStatsToDisk": {
+      "process": "engine",
+      "blurb": "Immediately writes the robot lifetime stats jdoc (odometer, petting time, alive seconds, behavior stats, etc.) to local persistent storage. Does not force a cloud upload — only disk.",
+      "detail": "Bound at RobotStatsTracker construction to a lambda: UpdateStatsJdoc(saveToDiskImmediately=true, saveToCloudImmediately=false). That calls JdocsManager::UpdateJdoc for ROBOT_LIFETIME_STATS. Normal runtime only dirties the jdoc in memory and flushes disk on a schedule/shutdown; this button is the “save now” for crash/power tests. No arguments. Harmless if stats were already clean (still runs an update/save path).",
+      "howTo": "Call FlushRobotStatsToDisk after generating stats activity; inspect the RobotLifetimeStats file under persistent/jdocs (or equivalent jdoc name from config).",
+      "related": [
+        "ResetRobotStats",
+        "RobotStats_AliveUpdatePeriod_s",
+        "RobotStats_OverrideAliveHours"
+      ],
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/persistent/jdocs/"
+        ],
+        "notes": "ROBOT_LIFETIME_STATS jdoc filename is configured (docName + .json under persistent/jdocs)."
+      },
+      "evidence": "engine/components/robotStatsTracker.cpp:65-71,84-85,95-100,263-271",
+      "category": "RobotStats",
+      "status": "live",
+      "tags": ["stats", "jdocs", "disk", "console-func", "debug"]
+    },
+    "PlaybackNextMessageFor": {
+      "process": "engine",
+      "blurb": "Plays the oldest unread voice message left for the given recipient name, then deletes that message. Use to step through a mailbox without going through freeplay “play message” behaviors.",
+      "detail": "Arg name required. GetUnreadMessages(name, OldestToNewest); if non-empty, PlaybackRecordedMessage(front) then DeleteMessage(front). Playback sends StartPlaybackAudio with the message file path to the robot/anim path and marks status Read before delete removes the slot/file. No-op if no unread messages or name missing. Same case-insensitive recipient matching as DeleteMessagesFor. Product behaviors (BehaviorPlaybackMessage) use newest-first; this console path is oldest-first.",
+      "howTo": "1) RecordMessageFor with a test name (or leave a message via product UX). 2) Call PlaybackNextMessageFor with the same name. 3) Listen for playback; message is removed after play starts/metadata update. Repeat to drain the queue.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/persistent/messages/"
+        ]
+      },
+      "related": [
+        "RecordMessageFor",
+        "DeleteMessagesFor"
+      ],
+      "evidence": "engine/components/mics/voiceMessageSystem.cpp:62-75,461-496,550-588",
+      "category": "VoiceMessage",
+      "status": "live",
+      "tags": ["voicemail", "messages", "playback", "console-func"]
+    },
+    "RecordMessageFor": {
+      "process": "engine",
+      "blurb": "Starts recording a ~10 second processed-mic voice message for the given recipient name into the next free mailbox slot (max 10 total). Same pipeline product “leave a message” uses, without needing the behavior stack.",
+      "detail": "Arg name required. StartRecordingMessage(name): needs a free slot and no active recording; creates a MessageRecord for the recipient, sends EngineToRobot StartRecordingMicsProcessed with default duration 10000 ms and a default filename, saves metadata. Anim completes recording → MicRecordingComplete updates the file handle. Failures: MailboxFull, MessageAlreadyActive (already recording), or missing name (handler no-ops). Case-insensitive name matching on later playback/delete.",
+      "howTo": "1) Ensure a free message slot (delete old mail if full). 2) Call RecordMessageFor with recipient name. 3) Speak for up to ~10 s. 4) PlaybackNextMessageFor or freeplay message playback to hear it.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/persistent/messages/",
+          "/data/data/com.anki.victor/persistent/messages/message_metadata.json"
+        ],
+        "notes": "Default record duration kMessageRecordDuration = 10.0f seconds; 10 slots (kNumMessageSlots)."
+      },
+      "related": [
+        "PlaybackNextMessageFor",
+        "DeleteMessagesFor"
+      ],
+      "evidence": "engine/components/mics/voiceMessageSystem.cpp:49-60,96-100,411-457; voiceMessageSystem.h:88",
+      "category": "VoiceMessage",
+      "status": "live",
+      "tags": ["voicemail", "messages", "record", "mic", "console-func"]
+    },
+    "ResetRobotStats": {
+      "process": "engine",
+      "blurb": "Wipes all robot lifetime stats (stimulation, features, behavior counters, odometer, alive time, petting, faces, …) and immediately saves the empty stats jdoc to disk and to the cloud. Requires the string argument typeResetToConfirm to be exactly “reset” so it is hard to fire by accident.",
+      "detail": "If typeResetToConfirm != \"reset\", logs ResetRobotStats.ConsoleFunc.Invalid and does nothing. On confirm: ResetAllStats → ClearJdocBody(ROBOT_LIFETIME_STATS) then UpdateStatsJdoc(disk=true, cloud=true). Permanent loss of cumulative counters used for age/app filters and any cloud lifetime-stats document. Opposite of FlushRobotStatsToDisk (flush preserves data; this clears it). Wired via static lambda at tracker construct (REMOTE_CONSOLE_ENABLED).",
+      "howTo": "Only on a unit whose history you can lose. Call ResetRobotStats with typeResetToConfirm=reset. Confirm warning log “Resetting and wiping all stats” and empty stats in jdoc/app.",
+      "related": [
+        "FlushRobotStatsToDisk",
+        "RobotStats_AliveUpdatePeriod_s",
+        "RobotStats_OverrideAliveHours",
+        "DebugDeleteSelectedJdocInCloud"
+      ],
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/persistent/jdocs/"
+        ],
+        "notes": "Clears ROBOT_LIFETIME_STATS body then forces disk+cloud UpdateJdoc."
+      },
+      "evidence": "engine/components/robotStatsTracker.cpp:49-62,84,92-94,274-280,806-825 (ClearJdocBody in jdocsManager)",
+      "category": "RobotStats",
+      "status": "danger",
+      "statusNote": "Irreversible wipe of lifetime stats on disk and cloud when confirmed with argument \"reset\". Typo protection only; still destructive when used correctly.",
+      "tags": ["stats", "jdocs", "cloud", "delete", "danger", "console-func"]
+    },
+    "SetTouchSensor": {
+      "process": "engine",
+      "blurb": "Fakes one backpack-touch press or release event for testing. Argument pressed=true injects a touch-down; false injects release. Does not hold the sensor “down” on later ticks and does not change GetIsPressed() used by most behaviors — it only broadcasts a single TouchButtonEvent.",
+      "detail": "ANKI_DEV_CHEATS only, category “Touch”. Sets devTouchSensorPressed and devSendTouchSensor; next NotifyOfRobotStateInternal path broadcasts MessageEngineToGame TouchButtonEvent(pressed) once, then clears the send flag. If pressed true, also updates _touchPressTime. Subscribers include BehaviorReactToTouchPetting and BehaviorKnowledgeGraphQuestion. Code that polls TouchSensorComponent::GetIsPressed() / confirmed press (ConditionRobotTouched, timers, dance coordinator, self-test, playpen, robot status, etc.) still follows the real capacitive baseline — so many “is touched?” gates will ignore this console func. Not a continuous override.",
+      "howTo": "1) Call SetTouchSensor with pressed=true to fire a press event (e.g. interrupt KG question / petting event path). 2) Call with pressed=false for release. 3) If a feature keys off GetIsPressed(), physically touch the backpack or use a path that listens to TouchButtonEvent instead.",
+      "related": [],
+      "evidence": "engine/components/sensors/touchSensorComponent.cpp:95-103,472-479,679-681; behaviorReactToTouchPetting.cpp:109,136-138; conditionRobotTouched.cpp:58",
+      "category": "Touch",
+      "status": "partial",
+      "statusNote": "Live one-shot TouchButtonEvent under ANKI_DEV_CHEATS. Does not set _confirmedPressState / GetIsPressed(), so poll-based touch logic is unaffected.",
+      "tags": ["touch", "backpack", "dev-cheats", "console-func", "fake-input"]
+    }
+  }
+}
