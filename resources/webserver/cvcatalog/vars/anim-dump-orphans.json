@@ -167,18 +167,19 @@
     },
     "FaceWorld": {
       "process": "both",
-      "blurb": "Log-channel enable for the name “FaceWorld”. When on, logs tagged FaceWorld pass the channel filter; when off (vicos default), they are filtered out.",
-      "detail": "ChannelVar from console_filter_config.json under Channels. FaceWorld *component* console knobs use category Vision.FaceWorld (deletion timeout, frontal stability, ignore faces below robot, …) — those are separate ids. Enabling this bool only unmutes FaceWorld-tagged log lines in the process that owns the filter instance you flipped.",
+      "blurb": "Log-channel enable for the name “FaceWorld” (ChannelVar under category Channels). When on, any INFO/DEBUG line tagged FaceWorld would pass the filter; when off (vicos default), those would be suppressed. This is still a live filter toggle, not an orphan.",
+      "detail": "Registered like every other entry in console_filter_config.json via ChannelFilter::Initialize as a ChannelVar (bool console var, category Channels). IsChannelEnabled reads the bool on every channeled log. Important: in this tree, engine/faceWorld.cpp sets kLoggingChannelName = \"FaceRecognizer\" and PRINT_CH_* goes there — rg finds no PRINT_CH/LOG_CHANNEL producers for the string \"FaceWorld\". So enabling FaceWorld alone usually will not un-silence face-world traffic; enable FaceRecognizer instead. Separate FaceWorld *tuning* knobs live under console category Vision.FaceWorld (kDeletionTimeout_ms, kIgnoreFacesBelowRobot, …) and are different dump ids.",
       "paths": {
         "assets": [
           "resources/config/engine/console_filter_config.json"
         ],
-        "notes": "vicos default enabled=false. Face-world tuning: engine/faceWorld.cpp Vision.FaceWorld CONSOLE_VARs."
+        "notes": "vicos default enabled=false. No current log producers use channel name FaceWorld; face-world code logs as FaceRecognizer."
       },
       "related": ["*", "FaceRecognizer", "VisionComponent"],
-      "evidence": "lib/util/source/anki/util/logging/channelFilter.h:31-48; channelFilter.cpp:37-52; resources/config/engine/console_filter_config.json channel FaceWorld; engine/faceWorld.cpp Vision.FaceWorld vars",
+      "evidence": "lib/util/source/anki/util/logging/channelFilter.h:31-48; channelFilter.cpp:37-52,108-129; resources/config/engine/console_filter_config.json channel FaceWorld; engine/faceWorld.cpp:71 (kLoggingChannelName = \"FaceRecognizer\"), PRINT_CH_* via that constant",
       "category": "Channels",
       "status": "live",
+      "statusNote": "ChannelVar is read by the filter (live). Currently no code logs with channel name FaceWorld; use FaceRecognizer to unmute face-world PRINT_CH lines.",
       "tags": ["logging", "channels", "faces"]
     },
     "JdocsManager": {
