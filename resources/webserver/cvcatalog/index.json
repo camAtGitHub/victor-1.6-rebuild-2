@@ -74,7 +74,10 @@
     "vars/engine-misc-c.json",
     "vars/funcs-intentional-crash.json",
     "vars/funcs-console-persist.json",
-    "vars/funcs-walltime.json"
+    "vars/funcs-walltime.json",
+    "vars/funcs-blackjack-lights.json",
+    "vars/funcs-sleep-antic.json",
+    "vars/funcs-debug-cloud-user.json"
   ],
   "categories": [
     "categories/vision.json",
