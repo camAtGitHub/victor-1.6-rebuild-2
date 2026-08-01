@@ -1,0 +1,253 @@
+{
+  "vars": {
+    "AddFakePlayingSource": {
+      "process": "anim",
+      "blurb": "Dev Alexa helper: pretends an AVS media “source” with the given integer id is currently playing. Used to exercise the Alexa speaking/idle watchdog without real cloud audio. Pass a non-zero source id.",
+      "detail": "Under ANKI_DEV_CHEATS, category Alexa.ImplWatchdog. The console handler only stashes the id in sAddFakeSourcePlaying if nothing is already pending; the next AlexaImpl::Update() inserts that id into _playingSources and clears the pending slot. _playingSources non-empty makes anyPlaying true in CheckForUXStateChange, so UX tends to stay Speaking instead of Idle. Code intentionally does not call CheckForUXStateChange right away — UX may lag until another Alexa event re-evaluates. Source id 0 never applies (pending/add checks treat 0 as empty). Concurrent second press while one is pending logs an error and ignores the new value.",
+      "howTo": "1) Alexa client must be initialized (opted in). 2) Call AddFakePlayingSource with source e.g. 1. 3) Observe Alexa UX holding speaking-like state / watchdog paths. 4) Clear with RemoveFakePlayingSource using the same id.",
+      "requires": [],
+      "related": [
+        "RemoveFakePlayingSource",
+        "AlexaIdleDelay_s",
+        "AlexaMaxIdleDelay_s"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/alexa/alexaImpl.cpp:140-173,618-638,1089-1115",
+      "category": "Alexa.ImplWatchdog",
+      "status": "live",
+      "statusNote": "ANKI_DEV_CHEATS only. Does not play audio; only fakes source-set membership. source=0 is a no-op.",
+      "tags": ["alexa", "watchdog", "dev-cheats", "console-func"]
+    },
+    "CaptureFace": {
+      "process": "anim",
+      "blurb": "Starts a screen capture of Vector’s face LCD buffer to a file under the anim cache. Optional filename (default screenshot.tga) and numFrames (default 1). Supports .tga (single frame), .gif (jo_gif encoder), or .GIF (alternate GifWriter).",
+      "detail": "Category Face. Sets s_framesToCapture and opens the output under DataPlatform Scope::Cache + filename. Each later BufferFaceToSend calls UpdateCaptureFace: converts RGB565→RGBA and appends a frame until the count is reached, then closes the file. TGA always forces one frame. While a capture is already in progress, a second press only logs that capture is busy. Result is browsable at http://ROBOT:8889/cache/<filename> (console HTML links that path). Failures (bad open, wrong type) write an HTML error to the console channel.",
+      "howTo": "1) Call CaptureFace (defaults: screenshot.tga, 1 frame) or pass filename=myeyes.gif and numFrames=30. 2) Wait for anim ticks to finish the frame count. 3) Pull /data/data/com.anki.victor/cache/<filename> or open /cache/ on :8889.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/"
+        ],
+        "notes": "File name is the argument (default screenshot.tga). HTTP: http://ROBOT_IP:8889/cache/<filename>."
+      },
+      "related": [
+        "CaptureFaceImage",
+        "ClearCapturedFaces",
+        "LoadFaceGammaLUT"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/animation/animationStreamer.cpp:314-379,1341-1441; platform/config/etc/config/platform_config.json DataPlatformCachePath",
+      "category": "Face",
+      "status": "live",
+      "tags": ["face", "capture", "gif", "tga", "dev-cheats", "console-func", "paths"]
+    },
+    "CaptureFaceImage": {
+      "process": "anim",
+      "blurb": "Saves one PNG of the current face draw buffer for manual animation-frame review. File name is {animationName}_{manualFrameNumber}.png under the cache folder dev_face_imgs/.",
+      "detail": "Category ManualAnimationPlayback. Uses sDevBufferFacePtr (_faceDrawBuf) set when AnimationStreamer is constructed under ANKI_DEV_CHEATS. Creates cache/dev_face_imgs/ if needed, overwrites an existing same-name file, then ImageRGB565::Save. Animation name comes from the streaming animation if any; frame index is kCurrentManualFrameNumber (from ToggleManualControlOfAnimStreamer / IncrementPlaybackFrame). No-op if the streamer was destroyed (null buffer pointer). Different from CaptureFace (TGA/GIF multi-frame pipeline).",
+      "howTo": "1) Optionally ToggleManualControlOfAnimStreamer and step with IncrementPlaybackFrame to the frame you want. 2) Call CaptureFaceImage. 3) Pull PNGs from the robot path below.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/dev_face_imgs/"
+        ],
+        "notes": "Filenames look like <animName>_<frame>.png."
+      },
+      "requires": [],
+      "related": [
+        "ToggleManualControlOfAnimStreamer",
+        "IncrementPlaybackFrame",
+        "ClearCapturedFaces",
+        "CaptureFace",
+        "kNumberOfFramesToIncrement",
+        "kShouldDisplayKeyframeNumber"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/animation/animationStreamer.cpp:244-278,406-408",
+      "category": "ManualAnimationPlayback",
+      "status": "live",
+      "tags": ["face", "capture", "png", "manual-playback", "dev-cheats", "console-func", "paths"]
+    },
+    "ClearCapturedFaces": {
+      "process": "anim",
+      "blurb": "Deletes the whole dev_face_imgs folder used by CaptureFaceImage, wiping all saved manual-playback face PNGs.",
+      "detail": "Category ManualAnimationPlayback. If cache/dev_face_imgs exists, FileUtils::RemoveDirectory removes it recursively. Does not touch CaptureFace TGA/GIF files written to the cache root with arbitrary names.",
+      "howTo": "Call after you are done collecting PNGs from CaptureFaceImage.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/dev_face_imgs/"
+        ]
+      },
+      "related": [
+        "CaptureFaceImage",
+        "ToggleManualControlOfAnimStreamer"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/animation/animationStreamer.cpp:280-289",
+      "category": "ManualAnimationPlayback",
+      "status": "live",
+      "tags": ["face", "capture", "cleanup", "dev-cheats", "console-func", "paths"]
+    },
+    "ClearMicData": {
+      "process": "anim",
+      "blurb": "Deletes the entire anim mic-data debug capture tree under the robot cache (all recorded wake-word clips, forced RecordMicDataClip dumps, etc.). Hidden under category zHiddenForSafety because it is a bulk wipe.",
+      "detail": "ANKI_DEV_CHEATS. MicDataSystem constructor sets _debugMicDataWriteLocation to Scope::Cache + \"micdata\" (same as _writeLocationDir). ClearMicData calls FileUtils::RemoveDirectory on that path when non-empty. Does not stop live mic processing — only removes saved files on disk. Next captures recreate directories as needed.",
+      "howTo": "1) Prefer pulling/backing up anything you care about first. 2) Call ClearMicData on anim :8889. 3) Confirm /data/data/com.anki.victor/cache/micdata is gone or recreated empty on next capture.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/micdata/"
+        ],
+        "notes": "Same tree used by MicData_* save flags and RecordMicDataClip. HTTP: http://ROBOT_IP:8889/cache/micdata/."
+      },
+      "related": [
+        "RecordMicDataClip",
+        "MicData_ClipRecordTime_ms",
+        "MicData_CollectRawTriggers"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/micData/micDataSystem.cpp:61-69,116-129",
+      "category": "zHiddenForSafety",
+      "status": "live",
+      "statusNote": "Destructive: recursively removes all debug mic captures under cache/micdata. Not a crash helper, but irreversible for those files.",
+      "tags": ["mic", "cleanup", "paths", "dev-cheats", "console-func", "destructive"]
+    },
+    "IncrementPlaybackFrame": {
+      "process": "anim",
+      "blurb": "While manual animation playback is on, advances the frozen stream time by kNumberOfFramesToIncrement frames (default 1) so you can step through an animation face/keyframe by keyframe.",
+      "detail": "Category ManualAnimationPlayback. Only meaningful after ToggleManualControlOfAnimStreamer has set kIsInManualUpdateMode. Each press does kCurrentManualFrameNumber += kNumberOfFramesToIncrement. On the next AnimationStreamer::Update, _relativeStreamTime_ms is forced to frame * AnimTimeStepMS and tracks advance to that time without free-running. Does nothing useful if manual mode is off (the counter still increments but stream time is not driven from it).",
+      "howTo": "1) Start or leave an animation streaming. 2) Call ToggleManualControlOfAnimStreamer. 3) Optionally set console var kNumberOfFramesToIncrement. 4) Call IncrementPlaybackFrame repeatedly. 5) Use CaptureFaceImage or kShouldDisplayKeyframeNumber to inspect frames.",
+      "requires": [
+        "ToggleManualControlOfAnimStreamer"
+      ],
+      "related": [
+        "kNumberOfFramesToIncrement",
+        "kShouldDisplayKeyframeNumber",
+        "CaptureFaceImage",
+        "ClearCapturedFaces"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/animation/animationStreamer.cpp:201-242,1987-2053",
+      "category": "ManualAnimationPlayback",
+      "status": "live",
+      "tags": ["animation", "manual-playback", "dev-cheats", "console-func"]
+    },
+    "LoadFaceGammaLUT": {
+      "process": "anim",
+      "blurb": "Loads a 256×1 image as a custom per-channel gamma lookup table for the procedural face, then switches ProcFace_GammaType to Custom so the next face send remaps R/G/B through that table.",
+      "detail": "Category Face.ParameterizedFace. Argument filename is resolved under Scope::Cache (default string in code path screenshot.tga if optional get used). Tries Vision::Image::Load first; on failure falls back to raw TGA binary parse (uncompressed true-color or grayscale, 256×1). Fills s_gammaLUT[3][256] from the row (grey uses the same channel for RGB). Sets kProcFace_GammaType = Custom. Errors (wrong size/format) are written as HTML to the console channel. Pair with ProcFace_GammaType / ProcFace_Gamma for non-custom curves.",
+      "howTo": "1) Place a 256×1 TGA (or loadable image) on the robot cache, e.g. /data/data/com.anki.victor/cache/mygamma.tga. 2) Call LoadFaceGammaLUT with filename=mygamma.tga. 3) Watch face brightness curve change; set ProcFace_GammaType back to None to disable.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/"
+        ],
+        "notes": "filename is relative to DataPlatform cache. Must be width 256 height 1."
+      },
+      "related": [
+        "ProcFace_GammaType",
+        "ProcFace_Gamma",
+        "ResetFace",
+        "CaptureFace"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/animation/animationStreamer.cpp:105-165,1389-1438",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "gamma", "lut", "display", "dev-cheats", "console-func", "paths"]
+    },
+    "RecordAudioInput": {
+      "process": "anim",
+      "blurb": "Intended to record N seconds of speech-recognizer input audio to a timestamped .wav. On this firmware the button is registered, but nothing instantiates AudioRecognizerProcessor, so no audio path ever saves a file.",
+      "detail": "CONSOLE_FUNC under category VoiceCommand (ANKI_DEV_CHEATS) in lib/util audioRecognizerProcessor.cpp. Handler clamps optional seconds to 1–60 (default 5 if 0) and sets file-static _minSamplesToCapture = seconds * 16000. Capture/save only runs inside AudioRecognizerProcessor::AudioSamplesCallback when an instance is receiving mic samples — it would write <savedAudioDir>/<epoch_ms>.wav. Tree-wide search shows the class is never constructed (only defined/linked via lib util audioUtil); SpeechRecognizerSystem/MicDataSystem do not use it. Therefore pressing the button only sets a static counter that no callback drains. Prefer RecordMicDataClip / MicData_* paths for real mic captures on Vector.",
+      "howTo": "Do not expect a WAV. For real robot mic dumps use RecordMicDataClip and related MicData console vars instead.",
+      "related": [
+        "RecordMicDataClip",
+        "MicData_ClipRecordTime_ms",
+        "ClearMicData"
+      ],
+      "evidence": "lib/util/source/anki/audioUtil/audioRecognizerProcessor.cpp:27-50,57-62,113-151; rg shows no AudioRecognizerProcessor construction outside that TU",
+      "category": "VoiceCommand",
+      "status": "dead",
+      "statusNote": "Handler runs and sets _minSamplesToCapture, but AudioRecognizerProcessor is never constructed in this repo, so AudioSamplesCallback never fires and no WAV is written. Orphan Cozmo-era voice-command utility still linked into anim.",
+      "tags": ["mic", "audio", "orphan", "dead", "dev-cheats", "console-func"]
+    },
+    "RemoveFakePlayingSource": {
+      "process": "anim",
+      "blurb": "Removes a fake Alexa playing source id previously inserted by AddFakePlayingSource (or a real source id if it happens to match). Clears that id from the Alexa “currently playing” set on the next Update.",
+      "detail": "Mirror of AddFakePlayingSource: stashes sRemoveFakeSourcePlaying, then AlexaImpl::Update erases the id from _playingSources. Same pending-slot / source≠0 rules and no immediate CheckForUXStateChange. When _playingSources becomes empty (and alerts/audio idle), Alexa UX can return to Idle per idle-delay logic.",
+      "howTo": "Call with the same source integer you added. If a remove is already pending, the second call logs an error and is ignored until the first applies.",
+      "related": [
+        "AddFakePlayingSource"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/alexa/alexaImpl.cpp:160-173,632-638,1089-1115",
+      "category": "Alexa.ImplWatchdog",
+      "status": "live",
+      "statusNote": "ANKI_DEV_CHEATS only. source=0 is a no-op.",
+      "tags": ["alexa", "watchdog", "dev-cheats", "console-func"]
+    },
+    "ResetFace": {
+      "process": "anim",
+      "blurb": "Resets procedural-face console sculpting back toward defaults: re-baselines override face data from the live animation face, restores default hue, and resets many ProcFace_* console vars to their compiled defaults.",
+      "detail": "Category Face.ParameterizedFace. Handler sets s_faceDataReset=true; on the next GetStreamableFace, code copies current procFace into s_faceDataOverride and s_faceDataBaseline, ProceduralFace::SetHue(DefaultHue), then NativeAnkiUtilConsoleResetValueToDefault for Gamma/scanline/eye spacing/noise/hotspot/glow/anti-alias knobs (and a few names that may not exist as console vars). Clears the reset flag. Use after ProcFace_Display Override sculpting or gamma experiments to get back to a known baseline without restarting anim.",
+      "howTo": "1) Tweak ProcFace_* / override display as needed. 2) Call ResetFace. 3) Face params and related console defaults should re-sync on the next face draw.",
+      "related": [
+        "ProcFace_Display",
+        "ProcFace_Hue",
+        "ProcFace_Gamma",
+        "ProcFace_GammaType",
+        "LoadFaceGammaLUT"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/animation/animationStreamer.cpp:89-103,1216-1258",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "procedural", "reset", "dev-cheats", "console-func"]
+    },
+    "SetFaceBrightness": {
+      "process": "anim",
+      "blurb": "Sets the face LCD backlight current level (0–20). Higher values make the eyes brighter and draw more power; 0 is off. Typical product levels are about 1, 5, 10, 15, or 20 mA.",
+      "detail": "Category FaceDisplay. Requires the FaceDisplayImpl to exist (after boot anim hands off the LCD). Console handler reads int val (optional default 1 in GetOptional); rejects values outside 0…20 with a warning. Calls lcd_set_brightness on VICOS (clamps 0–20, programs backlight devices). Separate from procedural-face gamma (ProcFace_Gamma*). Engine power-save / charger behaviors also request LCDBrightness via messages; this console path sets hardware directly and can be overwritten later by those requests.",
+      "howTo": "Call SetFaceBrightness with val=0 (off), 1 (dim/power-save style), 10 (normal-ish), or 20 (max). Watch the face panel brightness change immediately if the display is up.",
+      "related": [
+        "ProcFace_Gamma",
+        "ProcFace_GammaType"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/faceDisplay/faceDisplay.cpp:41-58,129-134; faceDisplayImpl_vicos.cpp:55-58; robot/core/src/lcd.c:390-406; robot/clad/src/clad/types/lcdTypes.clad",
+      "category": "FaceDisplay",
+      "status": "live",
+      "statusNote": "No-op until FaceDisplayImpl is created (boot anim finished). Engine power-state messages may change brightness again afterward.",
+      "tags": ["face", "lcd", "brightness", "hardware", "console-func"]
+    },
+    "ShowCurrentAnimation": {
+      "process": "anim",
+      "blurb": "Prints the name of the animation currently streaming on the face/body to the remote console log (HTML-wrapped). Does not start or stop anything.",
+      "detail": "Category Animations. Calls AnimationStreamer::GetStreamingAnimationName() and WriteLog. Empty string if nothing is streaming. Sibling buttons on the same category: ListAnimations, PlayAnimation, AddAnimation, AbortCurrentAnimation.",
+      "howTo": "Call while testing PlayAnimation or freeplay anims; read the console/web response for the name string.",
+      "related": [],
+      "evidence": "animProcess/src/cozmoAnim/animProcessMessages.cpp:162-183",
+      "category": "Animations",
+      "status": "live",
+      "tags": ["animation", "debug", "console-func"]
+    },
+    "ToggleKeepFaceAlive": {
+      "process": "anim",
+      "blurb": "Toggles whether idle “keep face alive” runs when no canned animation is streaming. On (default): small blinks/eye darts keep the eyes lively. Off: eyes stay frozen (last procedural face held) so animators can inspect static eye shapes without live overlays.",
+      "detail": "Category Face.ParameterizedFace. Flips s_enableKeepFaceAlive and logs ON/OFF. When true, SetKeepAliveIfAppropriate may call ProceduralTrackComponent::KeepFaceAlive or restore neutral eyes after interrupt; when false, KeepFaceTheSame and blank last procedural face if a new anim has no face track. EnableKeepFaceAlive(msg) from engine can also set the same flag. Useful for eye-shape tuning alongside ProcFace_Display overrides.",
+      "howTo": "Call once to disable alive motion; call again to re-enable. Confirm log line ConsoleFunc.ToggleKeepFaceAlive.",
+      "related": [
+        "ResetFace",
+        "ProcFace_Display"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/animation/animationStreamer.cpp:300-312,1096-1106,1931-1953,2085-2102",
+      "category": "Face.ParameterizedFace",
+      "status": "live",
+      "tags": ["face", "keepalive", "animation", "dev-cheats", "console-func"]
+    },
+    "ToggleManualControlOfAnimStreamer": {
+      "process": "anim",
+      "blurb": "Toggles manual frame-by-frame control of the animation streamer. When on, stream time freezes to a frame index you advance with IncrementPlaybackFrame instead of free-running at the anim tick rate.",
+      "detail": "Category ManualAnimationPlayback. Flips kIsInManualUpdateMode. On enter, seeds kCurrentManualFrameNumber from current _relativeStreamTime_ms / AnimTimeStepMS. In manual mode Update skips SetKeepAliveIfAppropriate and normal time advance; it re-renders the streaming animation at the locked relative time and can overlay the frame number if kShouldDisplayKeyframeNumber is true. New animations reset the frame counter to 0 on InitStreamingAnimation. Turn off again to resume normal playback timing.",
+      "howTo": "1) Start the animation of interest (PlayAnimation or freeplay). 2) Call ToggleManualControlOfAnimStreamer. 3) Step with IncrementPlaybackFrame; optionally CaptureFaceImage. 4) Toggle again to leave manual mode.",
+      "related": [
+        "IncrementPlaybackFrame",
+        "CaptureFaceImage",
+        "ClearCapturedFaces",
+        "kNumberOfFramesToIncrement",
+        "kShouldDisplayKeyframeNumber"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/animation/animationStreamer.cpp:201-234,1056,1987-2053",
+      "category": "ManualAnimationPlayback",
+      "status": "live",
+      "tags": ["animation", "manual-playback", "dev-cheats", "console-func"]
+    }
+  }
+}
