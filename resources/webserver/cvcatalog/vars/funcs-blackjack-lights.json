@@ -1,0 +1,179 @@
+{
+  "vars": {
+    "AnnounceDealerScore": {
+      "process": "engine",
+      "blurb": "Intended as a blackjack test hook to “announce” the dealer’s hand total, but the handler only reads GetDealerScore() and throws the integer away. Pressing it does not speak, log the score, or change the face.",
+      "detail": "Registered under BlackJackTestViz.AnnounceDealerScore. The console function forwards to BehaviorDevTestBlackjackViz::AnnounceDealerScore only when the DevTestBlackjackViz behavior instance exists (sThis set in that behavior’s constructor at factory load). That method is literally `_game.GetDealerScore();` with no use of the return value — unlike the real freeplay BehaviorBlackJack path, which builds TTS from GetDealerScore(). Even with the test behavior activated and cards dealt, this button has no robot-visible side effect.",
+      "howTo": "Do not use for scoring feedback. Watch Behaviors-channel logs from ScoreDealerHand when dealing, or run product BlackJack. Related getters update only when cards are dealt into this test game’s BlackJackGame.",
+      "related": ["AnnouncePlayerScore", "DealToDealer", "Flop", "DealToPlayer"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevTestBlackjackViz.cpp:111-118,240-243; blackJackSimulation.h:94 (GetDealerScore inline)",
+      "category": "BlackJackTestViz.AnnounceDealerScore",
+      "status": "dead",
+      "statusNote": "Handler discards GetDealerScore(); no TTS, print, or UI. rg shows no other effect from this console path.",
+      "tags": ["blackjack", "dev", "console-func", "noop", "dead"]
+    },
+    "AnnouncePlayerScore": {
+      "process": "engine",
+      "blurb": "Intended as a blackjack test hook to “announce” the player’s hand total, but the handler only reads GetPlayerScore() and ignores the result. Nothing is spoken or shown on the robot.",
+      "detail": "Registered under BlackJackTestViz.AnnouncePlayerScore. Same sThis gate as the other BlackJackTestViz buttons. BehaviorDevTestBlackjackViz::AnnouncePlayerScore is `_game.GetPlayerScore();` with an unused return. Product BehaviorBlackJack does real score TTS via localized strings; this console function does not call that path.",
+      "howTo": "Ignore for demos. Use DealToPlayer (scores update in simulation logs via ScorePlayerHand) or the product BlackJack behavior for spoken scores.",
+      "related": ["AnnounceDealerScore", "DealToPlayer", "Charlie"],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/devBehaviors/behaviorDevTestBlackjackViz.cpp:101-108,234-237; blackJackSimulation.h:93",
+      "category": "BlackJackTestViz.AnnouncePlayerScore",
+      "status": "dead",
+      "statusNote": "GetPlayerScore() return value discarded; no side effects.",
+      "tags": ["blackjack", "dev", "console-func", "noop", "dead"]
+    },
+    "Charlie": {
+      "process": "engine",
+      "blurb": "On the blackjack face test harness, paints the five-card “Charlie” win frame (sprite charlieframe) as a player-card overlay and plays the deal composite animation. Used to preview the five-card Charlie celebration art without playing a full hand.",
+      "detail": "Category BlackJackTestViz.Charlie. Requires the DevTestBlackjackViz behavior object (factory-loaded from devTestBlackjackViz.json; sThis). Calls BlackJackVisualizer::DisplayCharlieFrame: unlocks the face track, then PlayCompositeCardAnimationAndLock with PlayerCardOverlay / charlieframe. Product BlackJack shows this when the player has five cards without busting. Visualizer composite image is initialized in OnBehaviorActivated → visualizer.Init — activate DevTestBlackjackViz first so _compImg exists; otherwise deal/overlay paths can fault.",
+      "howTo": "1) Activate behavior DevTestBlackjackViz (dev boot / WebViz stack). 2) Optionally deal five player cards. 3) Press Charlie. 4) Clear with ClearCardsAndShuffle or ClearCardsToSortedDeck.",
+      "requires": [],
+      "related": ["DealToPlayer", "ClearCardsAndShuffle", "ClearCardsToSortedDeck", "SpreadPlayerCards"],
+      "paths": {
+        "assets": [
+          "resources/config/engine/behaviorComponent/behaviors/devBehaviors/devTestBlackjackViz.json"
+        ],
+        "notes": "Face sprite name hardcoded as charlieframe in blackJackVisualizer.cpp."
+      },
+      "evidence": "behaviorDevTestBlackjackViz.cpp:71-78,216-218; blackJackVisualizer.cpp:64,388-396; behaviorBlackJack.cpp:347-354 (product Charlie)",
+      "category": "BlackJackTestViz.Charlie",
+      "status": "partial",
+      "statusNote": "Works only when DevTestBlackjackViz instance exists and visualizer has been Init’d (behavior activated). No-op if sThis is null.",
+      "tags": ["blackjack", "dev", "face", "console-func"]
+    },
+    "ClearCardsAndShuffle": {
+      "process": "engine",
+      "blurb": "Resets the blackjack test game: clears player and dealer hands, rebuilds the face composite card layers, and re-inits the deck with a random shuffle. Next deals come from a freshly shuffled order (unless StackDeck is active).",
+      "detail": "BlackJackTestViz.ClearCardsAndShuffle → ClearCards(true) → _game.Init(&GetRNG()) then _visualizer.ClearCards and firstDealerCard=true. ClearCards unlocks the face track, clears all player/dealer composite layers plus PlayerCardOverlay, and re-Inits the visualizer image. If a static StackDeck order is set, BlackJackGame::Init still uses the stacked order instead of RNG (see StackDeck). Does not stop stacking.",
+      "howTo": "With DevTestBlackjackViz active, press after a test hand to wipe the face and reshuffle. Pair with StopStackingDeck if you previously stacked and want true random again.",
+      "related": ["ClearCardsToSortedDeck", "StackDeck", "StopStackingDeck", "DealToPlayer", "DealToDealer"],
+      "evidence": "behaviorDevTestBlackjackViz.cpp:91-98,222-231; blackJackVisualizer.cpp:496-511; blackJackSimulation.cpp:161-182",
+      "category": "BlackJackTestViz.ClearCardsAndShuffle",
+      "status": "partial",
+      "statusNote": "Requires DevTestBlackjackViz (sThis). Stacked deck still overrides shuffle on Init if StackDeck was used.",
+      "tags": ["blackjack", "dev", "console-func"]
+    },
+    "ClearCardsToSortedDeck": {
+      "process": "engine",
+      "blurb": "Same as ClearCardsAndShuffle for the face and hands, but re-inits the deck in sorted order 0…51 with no shuffle (no RNG). Handy for repeatable deal sequences without StackDeck.",
+      "detail": "ClearCards(false) → _game.Init() with null RNG: Deck::Init linear fill. Logs BlackJackSimulation.Init.NullRNG warning. Visualizer clear path matches ClearCardsAndShuffle. StackDeck static order still wins over sorted Init when set.",
+      "howTo": "Activate DevTestBlackjackViz, press to clear face and use sorted deck, then DealToPlayer/DealToDealer for predictable IDs (0,1,2… unless stacked).",
+      "related": ["ClearCardsAndShuffle", "StackDeck", "DealToPlayer", "DealToDealer"],
+      "evidence": "behaviorDevTestBlackjackViz.cpp:81-88,222-231; blackJackSimulation.cpp:109-116,161-174",
+      "category": "BlackJackTestViz.ClearCardsToSortedDeck",
+      "status": "partial",
+      "statusNote": "Requires DevTestBlackjackViz. Stacked deck overrides sorted order on Init if StackDeck is active.",
+      "tags": ["blackjack", "dev", "console-func"]
+    },
+    "DealToDealer": {
+      "process": "engine",
+      "blurb": "Deals the next deck card into the dealer’s hand on the blackjack test harness and plays the dealer deal animation on Vector’s face. The first dealer card is face-down (card back); later dealer cards are face-up.",
+      "detail": "BlackJackTestViz.DealToDealer: _game.DealToDealer(!_dVars.firstDealerCard) then visualizer DealToDealer. firstDealerCard starts true after activate/clear, so first call is face-down. Hand limit 5; empty deck returns error. Visualizer maps card ID 0–51 to dealer sprite assets (or card-back when face-down) and runs composite deal + flip sequence. Product BlackJack uses the same visualizer API.",
+      "howTo": "1) Activate DevTestBlackjackViz. 2) Optionally StackDeck / clear. 3) Press DealToDealer (and DealToPlayer as needed). 4) Use Flop to turn the hole card face-up.",
+      "related": ["DealToPlayer", "Flop", "ClearCardsAndShuffle", "StackDeck"],
+      "evidence": "behaviorDevTestBlackjackViz.cpp:41-48,195-200; blackJackSimulation.cpp:212-238; blackJackVisualizer.cpp:320-354",
+      "category": "BlackJackTestViz.DealToDealer",
+      "status": "partial",
+      "statusNote": "Needs DevTestBlackjackViz constructed and activated (Init composite image). Max 5 dealer cards.",
+      "tags": ["blackjack", "dev", "face", "console-func"]
+    },
+    "DealToPlayer": {
+      "process": "engine",
+      "blurb": "Deals the next deck card into the player’s hand on the blackjack test harness and plays the player deal animation on the face. Cards are face-up in player slots 1–5.",
+      "detail": "BlackJackTestViz.DealToPlayer: simulation DealToPlayer (pops deck, scores hand, Behaviors log with card name) then visualizer DealToPlayer with player sprite assets. Hand size limit 5 (five-card Charlie rule). Does not speak the score — use product BlackJack for TTS. Pair with StackDeck to force which card IDs appear.",
+      "howTo": "Activate DevTestBlackjackViz, clear/stack as needed, press DealToPlayer repeatedly (≤5). Watch face and Behaviors logs for card IDs.",
+      "related": ["DealToDealer", "Charlie", "StackDeck", "ClearCardsAndShuffle", "AnnouncePlayerScore"],
+      "evidence": "behaviorDevTestBlackjackViz.cpp:31-38,188-192; blackJackSimulation.cpp:185-208; blackJackVisualizer.cpp:292-317",
+      "category": "BlackJackTestViz.DealToPlayer",
+      "status": "partial",
+      "statusNote": "Needs DevTestBlackjackViz activated for safe visualizer Init. No-op if sThis null.",
+      "tags": ["blackjack", "dev", "face", "console-func"]
+    },
+    "Flop": {
+      "process": "engine",
+      "blurb": "Reveals the dealer’s face-down hole card: marks it face-up in the game model and plays the dealer card-turn animation on the face (first dealer slot).",
+      "detail": "BlackJackTestViz.Flop → _game.Flop() (SetFaceUp on dealerHand[0], _hasFlopped) and visualizer Flop with dealer turn sequence. Errors if dealer hand is empty. Call after at least one DealToDealer so a hole card exists.",
+      "howTo": "Deal at least one dealer card (first is face-down), then press Flop to flip it.",
+      "related": ["DealToDealer", "DealToPlayer", "ClearCardsAndShuffle"],
+      "evidence": "behaviorDevTestBlackjackViz.cpp:51-58,203-207; blackJackSimulation.h:86; blackJackVisualizer.cpp:363-385",
+      "category": "BlackJackTestViz.Flop",
+      "status": "partial",
+      "statusNote": "Requires DevTestBlackjackViz + non-empty dealer hand. Empty hand logs Flop.EmptyDealerHand.",
+      "tags": ["blackjack", "dev", "face", "console-func"]
+    },
+    "LockLight": {
+      "process": "engine",
+      "blurb": "While the Cube Spinner console test behavior is running, simulates a “lock” input (as if the cube was tapped): tries to lock the currently cycling cube light color. Success plays PounceSuccess; miss/error plays PounceFail and resets the mini-game; completing all locks plays FistBumpSuccess and resets.",
+      "detail": "Category CubeSpinnerDev. Handler only sets s_LockLightNextTick; BehaviorDevCubeSpinnerConsole::BehaviorUpdate (when activated and game started) calls cubeSpinnerGame->LockNow(). LockNow is ignored if the game has not started, is over, or phase is before CycleColorsUntilTap, and dedupes rapid locks. Same LockNow path as ObjectTapped on the active cube. Does nothing useful in freeplay unless this dev behavior is on the stack with a connected light cube.",
+      "howTo": "1) Activate DevCubeSpinnerConsole (devCubeSpinnerConsole.json). 2) Wait for game start + cycling lights on a connected cube. 3) Press LockLight when the cycle color matches the target (or deliberately miss to test fail). Cube tap also locks.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/behaviorComponent/behaviors/devBehaviors/devCubeSpinnerConsole.json",
+          "resources/config/engine/behaviorComponent/cubeSpinnerLightMaps.json"
+        ]
+      },
+      "related": ["SaveLights"],
+      "evidence": "behaviorDevCubeSpinnerConsole.cpp:31-38,128-166,193-201; cubeSpinnerGame.cpp:409-445",
+      "category": "CubeSpinnerDev",
+      "status": "partial",
+      "statusNote": "Flag always sets, but LockNow only runs while DevCubeSpinnerConsole is activated and hasGameStarted. Otherwise the press is effectively ignored next tick.",
+      "tags": ["cube", "spinner", "lights", "dev", "console-func"]
+    },
+    "SaveLights": {
+      "process": "engine",
+      "blurb": "While the cube-light design behavior is active, saves the current console-var LED pattern (LED1–4 state colors, holds, transitions, rotate) as a JSON file under the robot cache DevLights/ folder, named DevLights_H:M:S from local wall time.",
+      "detail": "Category CubeLightDesign (CONSOLE_GROUP). SaveLights sets s_shouldSaveNextTick; next BehaviorDevDesignCubeLights::BehaviorUpdate (only if that behavior IsActivated) builds ObjectLights from kLED*_s* console vars, then CubeLightComponent::SaveLightsToDisk. Path: DataPlatform Cache scope + \"DevLights/\" + filename (no extension in code; written via writeAsJson). Live preview also StopAndPlayLightAnim on a connected light cube when vars change. Without the design behavior activated, the flag never gets consumed (stuck true until that behavior runs a tick).",
+      "howTo": "1) Activate DevDesignCubeLights. 2) Tune LED1–4 / kRotate console vars under CubeLightDesign. 3) Connect a light cube to preview. 4) Press SaveLights. 5) Pull cache DevLights/DevLights_* JSON from the robot.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/DevLights/DevLights_<H>:<M>:<S>"
+        ],
+        "assets": [
+          "resources/config/engine/behaviorComponent/behaviors/devBehaviors/devDesignCubeLights.json"
+        ],
+        "notes": "Exact cache root is DataPlatform Scope::Cache; product path is typically under com.anki.victor cache. Filename uses local tm_hour:tm_min:tm_sec."
+      },
+      "related": ["LockLight"],
+      "evidence": "behaviorDevDesignCubeLights.cpp:103-112,171-208; cubeLightComponent.cpp:78-94",
+      "category": "CubeLightDesign",
+      "status": "partial",
+      "statusNote": "Save runs only on next tick of activated DevDesignCubeLights. Pressing outside that behavior does not write a file.",
+      "tags": ["cube", "lights", "dev", "paths", "console-func"]
+    },
+    "SpreadPlayerCards": {
+      "process": "engine",
+      "blurb": "Named as a blackjack face helper to spread the player’s cards, but the visualizer implementation is an empty TODO. Pressing it does nothing to the face or game state.",
+      "detail": "BlackJackTestViz.SpreadPlayerCards calls _visualizer.SpreadPlayerCards when sThis is set. BlackJackVisualizer::SpreadPlayerCards body is only `// TODO:(str) Implement this later.` — no layers, anims, or logs. Not used by product BehaviorBlackJack either.",
+      "related": ["DealToPlayer", "Charlie", "ClearCardsAndShuffle"],
+      "evidence": "behaviorDevTestBlackjackViz.cpp:61-68,210-213; blackJackVisualizer.cpp:357-360",
+      "category": "BlackJackTestViz.SpreadPlayerCards",
+      "status": "dead",
+      "statusNote": "Visualizer method is empty TODO; proven unused for any effect beyond the no-op call.",
+      "tags": ["blackjack", "dev", "console-func", "noop", "dead"]
+    },
+    "StackDeck": {
+      "process": "engine",
+      "blurb": "Forces the next blackjack deck initialization(s) to deal a fixed sequence of card IDs (0–51) instead of a random shuffle. Pass up to ten optional integer args card1…card10 in deal order. Affects both the product BlackJack game and the DevTestBlackjackViz harness when either calls game Init.",
+      "detail": "Category TestBlackJackBehavior.StackDeck(…). Static BlackJackGame::_stackedDeck holds the sequence until StopStackingDeck. Invalid empty input or IDs outside [0,51] warn and leave stacking unchanged. Duplicates allowed (test-only; not a real deck). Max useful length ~10 cards (5 player + 5 dealer under five-card Charlie). Card ID: rank = id%13 (0=Ace…12=King), suit = id/13 (0=Spades,1=Hearts,2=Diamonds,3=Clubs). Applied on BlackJackGame::Init when _stackedDeck non-null.",
+      "howTo": "1) Call StackDeck with e.g. card1=0,card2=12,card3=25 for Ace of Spades, King of Spades, Ace of Diamonds. 2) Start/clear a blackjack game so Init runs (product BlackJack or ClearCards* on the test viz). 3) Deal and observe forced order. 4) Call StopStackingDeck to restore shuffle on later Inits.",
+      "related": ["StopStackingDeck", "ClearCardsAndShuffle", "ClearCardsToSortedDeck", "DealToPlayer", "DealToDealer"],
+      "evidence": "blackJackSimulation.cpp:48-67,148,161-166,254-279; blackJackSimulation.h:116-117",
+      "category": "TestBlackJackBehavior.StackDeck(Up To Ten Comma Separated Integer Card ID's)",
+      "status": "live",
+      "tags": ["blackjack", "dev", "qa", "console-func"]
+    },
+    "StopStackingDeck": {
+      "process": "engine",
+      "blurb": "Clears a previously set StackDeck order so the next BlackJackGame::Init shuffles (or sorts if Init has no RNG) normally again.",
+      "detail": "TestBlackJackBehavior.StopStackingDeck sets static _stackedDeck to nullptr. Does not reshuffle an already-running hand — only affects subsequent Init calls. No-op if stacking was never set.",
+      "howTo": "After StackDeck testing, press StopStackingDeck, then clear/restart the game (or start a new BlackJack) so Init picks a random deck.",
+      "related": ["StackDeck", "ClearCardsAndShuffle", "ClearCardsToSortedDeck"],
+      "evidence": "blackJackSimulation.cpp:69-74,282-285",
+      "category": "TestBlackJackBehavior.StopStackingDeck",
+      "status": "live",
+      "tags": ["blackjack", "dev", "qa", "console-func"]
+    }
+  }
+}
