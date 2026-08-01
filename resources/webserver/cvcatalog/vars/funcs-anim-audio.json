@@ -1,0 +1,210 @@
+{
+  "vars": {
+    "DeleteAudioOutputCaptures": {
+      "process": "anim",
+      "blurb": "Deletes every Wwise audio output-capture file (all `.wav` files) from the anim process sound cache directory on the robot. Use after you have pulled useful captures, or to free flash when lab recording filled the folder.",
+      "detail": "Anim console function under Audio.Controller (REMOTE_CONSOLE_ENABLED). Lists files in sWritePath (DataPlatform Scope::Cache + \"sound\") whose extension is \"wav\", then FileUtils::DeleteFile on each. Does not stop an in-progress capture — call SetWriteAudioOutputCapture(false) first if recording is still on. Does not touch .prof profiler files (those are DeleteAudioProfilerCaptures). No arguments.",
+      "howTo": "1) If recording: SetWriteAudioOutputCapture writeOutput=false. 2) Pull any VictorOutputSession_*.wav you care about. 3) Call DeleteAudioOutputCaptures on anim :8889. 4) Confirm the cache/sound folder no longer has those WAVs.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/sound/*.wav"
+        ],
+        "notes": "sWritePath = Scope::Cache + \"sound\" (platform_config DataPlatformCachePath). Extension filter is \"wav\" only."
+      },
+      "related": [
+        "SetWriteAudioOutputCapture",
+        "WriteAudioOutputCapture",
+        "WriteAudioOutputMaxLogCount",
+        "DeleteAudioProfilerCaptures"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/audio/cozmoAudioController.cpp:59-60,152-166,232-233,256; platform/config/etc/config/platform_config.json DataPlatformCachePath",
+      "category": "Audio.Controller",
+      "status": "live",
+      "tags": ["audio", "wwise", "capture", "console-func", "paths", "destructive-files"]
+    },
+    "DeleteAudioProfilerCaptures": {
+      "process": "anim",
+      "blurb": "Deletes every Wwise profiler capture (all `.prof` files) from the anim sound cache directory. Clears lab profiler sessions so they do not accumulate on flash.",
+      "detail": "Same Audio.Controller path as DeleteAudioOutputCaptures but filters extension \"prof\". Removes VictorProfilerSession_*.prof and any other .prof under cache/sound. Does not stop an active profiler session — set SetWriteAudioProfilerCapture(false) first. Does not delete WAVs.",
+      "howTo": "1) Stop profiler with SetWriteAudioProfilerCapture writeProfiler=false if needed. 2) Pull any .prof you need for Wwise tools. 3) Call DeleteAudioProfilerCaptures on anim :8889.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/sound/*.prof"
+        ],
+        "notes": "Same sWritePath as output capture; extension \"prof\"."
+      },
+      "related": [
+        "SetWriteAudioProfilerCapture",
+        "WriteAudioProfilerCapture",
+        "WriteAudioProfilerMaxLogCount",
+        "DeleteAudioOutputCaptures"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/audio/cozmoAudioController.cpp:57-58,152-158,232,256",
+      "category": "Audio.Controller",
+      "status": "live",
+      "tags": ["audio", "wwise", "profiler", "console-func", "paths", "destructive-files"]
+    },
+    "PostAudioEvent": {
+      "process": "anim",
+      "blurb": "Plays one Wwise audio event by name through the anim process audio engine. Pass the full event string (for example Play__Dev_Robot__Pink_1Sec). Optional gameObjectId picks which registered audio “voice” object posts the event; default is the Default game object so you hear a normal one-shot without wiring behaviors.",
+      "detail": "Args: const char* event (required), optional uint64 gameObjectId (defaults to GameObjectType::Default). Hashes the event string with Wwise GetIDFromString and posts it. Requires CozmoAudioController constructed (sThis). With ANKI_DEV_CHEATS and a WebViz client on module \"audioevents\", also pushes a PostAudioEvent JSON line (time, eventName, gameObjectId). Unknown or unloaded event names fail quietly at the Wwise layer (invalid playing id). Event names match GenericEvent strings in audioEventTypes.clad (Play__Dev_Robot__*, Play__Robot_Vic_Sfx__*, Alexa prompts, etc.). Game object ids match AudioMetaData::GameObjectType (Default, Animation, Behavior, TextToSpeech, Alexa, …).",
+      "howTo": "1) On anim :8889 call PostAudioEvent with event=Play__Dev_Robot__Tone_1K_1Sec (or another bank event). 2) Leave gameObjectId empty for Default, or pass a numeric GameObjectType value if targeting TTS/Animation/etc. 3) Use StopAllAudioEvents if a loop keeps running. 4) Optional: open WebViz audioevents tab to watch posts.",
+      "paths": {
+        "assets": [
+          "robot/clad/src/clad/audio/audioEventTypes.clad",
+          "robot/clad/src/clad/audio/audioGameObjectTypes.clad",
+          "resources/sound (runtime banks under Scope::Resources sound)"
+        ],
+        "notes": "Sound banks load from DataPlatform Resources/sound at CozmoAudioController init."
+      },
+      "related": [
+        "StopAllAudioEvents",
+        "TestAudio_PinkNoise",
+        "SetAudioState",
+        "SetAudioSwitchState",
+        "SetAudioParameter"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/audio/cozmoAudioController.cpp:176-187,235,580-604; lib/audio/source/engine/audioEngineController.cpp:162-185,481-485; lib/audio/source/engine/wwiseComponent.cpp:788-802,997-1002; robot/clad/src/clad/audio/audioEventTypes.clad; audioGameObjectTypes.clad",
+      "category": "Audio.Controller",
+      "status": "live",
+      "tags": ["audio", "wwise", "event", "console-func", "dev"]
+    },
+    "SetAudioParameter": {
+      "process": "anim",
+      "blurb": "Sets a Wwise RTPC (real-time parameter) by name to a float value on the anim audio engine. Used to tweak volumes, motor-driven params, mood knobs, tone frequency, etc. without rebuilding sound banks.",
+      "detail": "Args: const char* parameter, float value, optional uint64 gameObjectId (default kInvalidAudioGameObject = global RTPC). Names are Wwise string IDs (see GameParameter::ParameterType names in audioParameterTypes.clad: Robot_Vic_Volume_Master, Robot_Vic_Stimulation, Event_Volume, Dev_Tone_Freq, Alexa volume params, …). Invalid/empty names hash to invalid IDs and no-op usefully. Does not validate ranges — extreme values can mute, distort, or make procedural SFX behave oddly until reset or process restart.",
+      "howTo": "1) Call SetAudioParameter parameter=Robot_Vic_Volume_Master value=<0–1-ish product range> (or another known RTPC). 2) Leave gameObjectId empty for global, or pass a game object for object-scoped params. 3) Post an event or run freeplay to hear the effect. 4) Restore the previous value when finished.",
+      "paths": {
+        "assets": [
+          "robot/clad/src/clad/audio/audioParameterTypes.clad"
+        ]
+      },
+      "related": [
+        "PostAudioEvent",
+        "SetAudioState",
+        "SetAudioSwitchState",
+        "StopAllAudioEvents"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/audio/cozmoAudioController.cpp:211-218,238; lib/audio/include/audioEngine/audioEngineController.h GetAudioIdFromString; robot/clad/src/clad/audio/audioParameterTypes.clad",
+      "category": "Audio.Controller",
+      "status": "live",
+      "tags": ["audio", "wwise", "rtpc", "console-func", "dev"]
+    },
+    "SetAudioState": {
+      "process": "anim",
+      "blurb": "Sets a global Wwise state group to a named state (volume tiers, quiet mode, language processing, petting level, system tests, etc.). Affects how subsequent and continuous audio is mixed or selected across the whole engine, not one game object.",
+      "detail": "Args: const char* stateGroup, const char* state. Both strings are hashed with GetAudioIdFromString and passed to SetState. Group names align with GameState::StateGroupType (Robot_Vic_Volume, Robot_Vic_Quiet, Robot_Vic_External_Language, Robot_Vic_Low_Power_Mode, Mood, Robot_Alexa_Locale, …). State name must match a state defined on that group in the Wwise project / clad enums. WebViz audioevents can log SetState when subscribed (dev cheats). Wrong strings silently fail to apply a useful state.",
+      "howTo": "1) Call SetAudioState with stateGroup and state names from the Wwise/clad state tables (e.g. volume or quiet states used by product). 2) Play or wait for ongoing audio to pick up the new state. 3) Restore the prior state when done testing.",
+      "paths": {
+        "assets": [
+          "robot/clad/src/clad/audio/audioStateTypes.clad"
+        ]
+      },
+      "related": [
+        "SetAudioSwitchState",
+        "SetAudioParameter",
+        "PostAudioEvent"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/audio/cozmoAudioController.cpp:189-197,236,647-664; robot/clad/src/clad/audio/audioStateTypes.clad StateGroupType",
+      "category": "Audio.Controller",
+      "status": "live",
+      "tags": ["audio", "wwise", "state", "console-func", "dev"]
+    },
+    "SetAudioSwitchState": {
+      "process": "anim",
+      "blurb": "Sets a Wwise switch group to a named switch value on a specific game object. Switches pick alternate sound paths (tread direction/speed, external input source for TTS/animation wave portals, head/lift direction, mood/stim switches, etc.).",
+      "detail": "Args: const char* switchGroup, const char* state, uint64 gameObjectId (required — not optional). Hashes group and state, then SetSwitchState on that object. Groups match SwitchGroupType (Robot_Vic_External_Input_Source, Robot_Vic_Tread_Drive, Robot_Vic_Mood_Switch, …). Product code already sets external input source to Streaming_Wave_Portal on TextToSpeech and Animation objects at boot; overriding those can break TTS or anim audio until restored. Wrong ids or unregistered game objects fail quietly.",
+      "howTo": "1) Choose switchGroup and state names from audioSwitchTypes.clad / Wwise. 2) Pass gameObjectId for the target (e.g. TextToSpeech or Animation numeric GameObjectType). 3) Post events on that object to hear the branch. 4) Restore product defaults when finished.",
+      "paths": {
+        "assets": [
+          "robot/clad/src/clad/audio/audioSwitchTypes.clad",
+          "robot/clad/src/clad/audio/audioGameObjectTypes.clad"
+        ]
+      },
+      "related": [
+        "SetAudioState",
+        "SetAudioParameter",
+        "PostAudioEvent"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/audio/cozmoAudioController.cpp:199-209,237,367-373,668-687; robot/clad/src/clad/audio/audioSwitchTypes.clad SwitchGroupType",
+      "category": "Audio.Controller",
+      "status": "live",
+      "tags": ["audio", "wwise", "switch", "console-func", "dev"]
+    },
+    "SetWriteAudioOutputCapture": {
+      "process": "anim",
+      "blurb": "Starts or stops recording Vector’s final Wwise speaker mix to a WAV file on the robot. Pass writeOutput=true to begin a new session file; false to stop. Prefer this button over flipping the WriteAudioOutputCapture console var alone after boot.",
+      "detail": "Arg: bool writeOutput. Assigns kWriteAudioOutputCapture then calls CozmoAudioController::WriteAudioOutputCapture. On true: prunes old .wav files using WriteAudioOutputMaxLogCount (keeps count−1, then adds one), builds VictorOutputSession_<UTC datetime>.wav under cache/sound, and AK::SoundEngine::StartOutputCapture. On false: StopOutputCapture. Leaving true runs continuous disk I/O and can fill flash. Init also auto-starts if the matching console var was already true at audio controller construct.",
+      "howTo": "1) Optional: set WriteAudioOutputMaxLogCount (1–5). 2) Call SetWriteAudioOutputCapture writeOutput=true. 3) Play events / freeplay. 4) Call writeOutput=false. 5) Pull /data/data/com.anki.victor/cache/sound/VictorOutputSession_*.wav. 6) Optional: DeleteAudioOutputCaptures.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/sound/VictorOutputSession_*.wav"
+        ],
+        "notes": "Write base path is Scope::Cache/sound; filename only is passed to Wwise StartOutputCapture."
+      },
+      "related": [
+        "WriteAudioOutputCapture",
+        "WriteAudioOutputMaxLogCount",
+        "DeleteAudioOutputCaptures",
+        "SetWriteAudioProfilerCapture"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/audio/cozmoAudioController.cpp:128-150,231,353-359,415-427; lib/audio/source/engine/wwiseComponent.cpp:499-517",
+      "category": "Audio.Controller",
+      "status": "live",
+      "tags": ["audio", "wwise", "capture", "console-func", "paths"]
+    },
+    "SetWriteAudioProfilerCapture": {
+      "process": "anim",
+      "blurb": "Starts or stops a Wwise profiler capture (.prof) for audio performance debugging. Pass writeProfiler=true to start a new session; false to stop. Use this after boot instead of only toggling WriteAudioProfilerCapture.",
+      "detail": "Arg: bool writeProfiler. Sets kWriteAudioProfilerCapture and WriteProfilerCapture. On true: prunes old .prof by WriteAudioProfilerMaxLogCount, names VictorProfilerSession_<UTC>.prof, StartProfilerCapture. On false: StopProfilerCapture. Files are for Wwise profiling tools, not for listening. Disk I/O while enabled; pair with DeleteAudioProfilerCaptures to clean up.",
+      "howTo": "1) Optional: set WriteAudioProfilerMaxLogCount. 2) SetWriteAudioProfilerCapture writeProfiler=true. 3) Exercise audio. 4) writeProfiler=false. 5) Pull .prof from cache/sound for Wwise. 6) Optional: DeleteAudioProfilerCaptures.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/cache/sound/VictorProfilerSession_*.prof"
+        ],
+        "notes": "Same cache/sound write path as output capture."
+      },
+      "related": [
+        "WriteAudioProfilerCapture",
+        "WriteAudioProfilerMaxLogCount",
+        "DeleteAudioProfilerCaptures",
+        "SetWriteAudioOutputCapture"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/audio/cozmoAudioController.cpp:128-142,230,353-356,399-411; lib/audio/source/engine/wwiseComponent.cpp:472-490",
+      "category": "Audio.Controller",
+      "status": "live",
+      "tags": ["audio", "wwise", "profiler", "console-func", "paths"]
+    },
+    "StopAllAudioEvents": {
+      "process": "anim",
+      "blurb": "Stops playing Wwise sounds. With no gameObjectId (default), stops essentially everything on the invalid/global game object path Wwise treats as “all.” With a specific id, stops only that object’s voices. Useful to silence a stuck loop after PostAudioEvent, but it can also cut product SFX/TTS/Alexa mid-utterance.",
+      "detail": "Arg: optional uint64 gameObjectId (default kInvalidAudioGameObject = (uint64)-1). Calls AK::SoundEngine::StopAll(gameObject). CozmoAudioController override also notifies WebViz audioevents under ANKI_DEV_CHEATS. Does not unload banks or reset states/switches/parameters — only stops active playback. Immediate audible silence for matching objects; freeplay/engine will post new events again on the next action.",
+      "howTo": "1) Call StopAllAudioEvents with no args to hard-stop broadly. 2) Or pass the same gameObjectId you used with PostAudioEvent for a targeted stop. 3) Expect ongoing behaviors to start new sounds soon after.",
+      "related": [
+        "PostAudioEvent",
+        "TestAudio_PinkNoise",
+        "SetAudioParameter"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/audio/cozmoAudioController.cpp:221-227,239,630-643; lib/audio/source/engine/audioEngineController.cpp:236-250; lib/audio/source/engine/wwiseComponent.cpp:809-815; cozmoAudioController.h kInvalidAudioGameObject",
+      "category": "Audio.Controller",
+      "status": "live",
+      "statusNote": "Disruptive to live product audio (not a crash helper). Default gameObjectId stops on invalid GO (Wwise StopAll semantics).",
+      "tags": ["audio", "wwise", "stop", "console-func", "dev"]
+    },
+    "TestAudio_PinkNoise": {
+      "process": "anim",
+      "blurb": "Plays a one-second pink-noise burst through the robot speaker via the stock Wwise event Play__Dev_Robot__Pink_1Sec on the Default game object. No arguments. Quick speaker / path check without typing an event name.",
+      "detail": "If CozmoAudioController exists, posts ToAudioEventId(GenericEvent::Play__Dev_Robot__Pink_1Sec) on GameObjectType::Default. Same stack as PostAudioEvent with that fixed event. Requires sound banks loaded (normal robot boot). Not a loop — about 1 s then ends. Related bank events include Pink_5Sec, Tone_1K_*, White_5Sec under Dev_Robot.",
+      "howTo": "1) Call TestAudio_PinkNoise on anim :8889. 2) Listen for ~1 s pink noise. 3) If silent: confirm anim audio initialized and banks present; try PostAudioEvent with Play__Dev_Robot__Tone_1K_1Sec; check volume states/parameters.",
+      "related": [
+        "PostAudioEvent",
+        "StopAllAudioEvents",
+        "SetWriteAudioOutputCapture"
+      ],
+      "evidence": "animProcess/src/cozmoAnim/audio/cozmoAudioController.cpp:168-174,234; robot/clad/src/clad/audio/audioEventTypes.clad Play__Dev_Robot__Pink_1Sec / Pink_1Sec",
+      "category": "Audio.Controller",
+      "status": "live",
+      "tags": ["audio", "wwise", "test", "console-func", "dev"]
+    }
+  }
+}
