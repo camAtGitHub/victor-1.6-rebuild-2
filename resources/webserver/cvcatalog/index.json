@@ -80,7 +80,10 @@
     "vars/funcs-debug-cloud-user.json",
     "vars/funcs-debug-settings.json",
     "vars/funcs-vision-anim-text.json",
-    "vars/funcs-alexa-trigger.json"
+    "vars/funcs-alexa-trigger.json",
+    "vars/funcs-onboarding.json",
+    "vars/funcs-anim-face-mic.json",
+    "vars/funcs-anim-audio.json"
   ],
   "categories": [
     "categories/vision.json",
