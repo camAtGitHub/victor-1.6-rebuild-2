@@ -77,7 +77,10 @@
     "vars/funcs-walltime.json",
     "vars/funcs-blackjack-lights.json",
     "vars/funcs-sleep-antic.json",
-    "vars/funcs-debug-cloud-user.json"
+    "vars/funcs-debug-cloud-user.json",
+    "vars/funcs-debug-settings.json",
+    "vars/funcs-vision-anim-text.json",
+    "vars/funcs-alexa-trigger.json"
   ],
   "categories": [
     "categories/vision.json",
