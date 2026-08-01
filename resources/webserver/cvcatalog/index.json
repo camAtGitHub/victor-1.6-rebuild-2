@@ -72,7 +72,9 @@
     "vars/engine-misc-a.json",
     "vars/engine-misc-b.json",
     "vars/engine-misc-c.json",
-    "vars/funcs-intentional-crash.json"
+    "vars/funcs-intentional-crash.json",
+    "vars/funcs-console-persist.json",
+    "vars/funcs-walltime.json"
   ],
   "categories": [
     "categories/vision.json",
