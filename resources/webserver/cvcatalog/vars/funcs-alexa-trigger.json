@@ -1,0 +1,81 @@
+{
+  "vars": {
+    "EnableDevTriggerWord": {
+      "process": "engine",
+      "blurb": "Dev button that forces Vector to treat the “Hey Vector” wake word as active for testing from any behavior. After you press it, hearing the wake word can play a listening get-in animation (optional), a wake SFX earcon, and optionally open the mic stream / stream lights — controlled by two companion console vars, not by this button’s arguments.",
+      "detail": "Registered only under ANKI_DEV_CHEATS in UserIntentComponent::SetupConsoleFuncs (category UserIntentComponent). Handler calls PushResponseToTriggerWord with id \"UserIntentComponent\": get-in is AnimationTrigger::VC_ListeningGetIn when PlayGetInAfterDevWakeWord is true, else Count (no get-in anim); stream/lights use StreamingEnabled when StreamAfterDevWakeWord is true, else StreamingDisabled; always posts Play__Robot_Vic_Sfx__Wake_Word_On. That push sends RobotInterface::SetTriggerWordResponse to the anim process and stacks the response under that id. Code comments note there is no matching pop for this helper — the push stays until something else replaces the same id, another behavior pops its own layer and leaves this one, or engine restarts. Does not enable Alexa; only the Vector trigger-word response path.",
+      "howTo": "1) Optionally set PlayGetInAfterDevWakeWord and/or StreamAfterDevWakeWord first. 2) Call EnableDevTriggerWord on engine (:8888). 3) Say “Hey Vector” (or the configured Vector wake word) from a context where the mic path is live. 4) Restart engine or push another trigger response if you need to undo the permanent stack entry.",
+      "requires": [],
+      "related": [
+        "PlayGetInAfterDevWakeWord",
+        "StreamAfterDevWakeWord"
+      ],
+      "evidence": "engine/aiComponent/behaviorComponent/userIntentComponent.cpp:65-66,891-948,1009-1048,1191-1210",
+      "category": "UserIntentComponent",
+      "status": "live",
+      "statusNote": "ANKI_DEV_CHEATS only. No pop helper — leaves a sticky trigger-word response on the stack until replaced or process restart.",
+      "tags": ["voice", "wake-word", "dev-cheats", "console-func", "intent"]
+    },
+    "ForceAlexaOptIn": {
+      "process": "engine",
+      "blurb": "Starts an Alexa sign-in / opt-in as if the companion app requested it. After a short delay Vector usually looks toward a face, then tells the anim process to turn Alexa on and begin Amazon authentication (code/URL pairing flow).",
+      "detail": "AlexaComponent console function (category Alexa) — always registered (not gated by ANKI_DEV_CHEATS). Sets request SignInApp and a ~4-tick timeout. While the request is pending, BehaviorAlexaSignInOut can activate (if not mid wake-word reaction and not off-treads/carrying): it ClaimRequest()s (cancels the auto timer), may run LookAtFaceOrUpInternal, then SignIn(). If nothing claims the request, UpdateDependent calls SignIn() when the timer expires. SignIn → SetAlexaOption(true) → EngineToRobot SetAlexaUsage(true). Anim Alexa::SetAlexaUsage creates the AVS client, starts auth, and sets authStartedByUser. Unlike the app gateway path, this console button does not check the features.json Alexa feature flag — product docs still expect that flag enabled for a working stack. If another sign-in/out request is already pending, this press is dropped with a warning. Upstream docs/development/alexa.md still call these “console vars”; they are console functions (buttons).",
+      "howTo": "1) Ensure features.json feature Alexa is on for a normal product stack. 2) Call ForceAlexaOptIn on engine. 3) Prefer freeplay on treads so BehaviorAlexaSignInOut can run the look-up ceremony; otherwise engine auto-signs-in after a few ticks. 4) Watch face for pairing code/URL or logs: victor_log | grep Alexa. 5) Complete amazon.com/us/code (or locale equivalent) auth.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/persistent/alexa"
+        ],
+        "assets": [
+          "resources/config/features.json"
+        ],
+        "notes": "Opt-in creates/uses Alexa persistent data under Scope::Persistent alexa; feature flag Alexa should be enabled for supported UX."
+      },
+      "related": [
+        "ForceAlexaOptOut",
+        "AcousticTestMode"
+      ],
+      "evidence": "engine/aiComponent/alexaComponent.cpp:94-101,169-181,214-242,523-549; engine/aiComponent/behaviorComponent/behaviors/alexa/behaviorAlexaSignInOut.cpp:55-157; animProcess/src/cozmoAnim/alexa/alexa.cpp:211-288; docs/development/alexa.md",
+      "category": "Alexa",
+      "status": "live",
+      "tags": ["alexa", "opt-in", "auth", "console-func"]
+    },
+    "ForceAlexaOptOut": {
+      "process": "engine",
+      "blurb": "Starts an Alexa sign-out / opt-out as if the app requested logout. Vector may play a short sign-out sequence, then the anim process logs out of Amazon, tears down the Alexa client, and deletes local Alexa user/opt-in files so Alexa stays off until you opt in again.",
+      "detail": "Same AlexaComponent request machinery as ForceAlexaOptIn but with SignOutApp. After ~4 ticks or after BehaviorAlexaSignInOut claims and finishes, SignOut() → SetAlexaOption(false) → SetAlexaUsage(false) and forces the backpack-button wake-word setting back to Hey Vector (not Alexa). On anim: CancelPendingAlexaAuth, AVS Logout if initialized, DeleteImpl, DeleteOptInFile, and when logging out DeleteUserFiles. Persistent Alexa data under /data/data/com.anki.victor/persistent/alexa is wiped for a clean re-pair. If a request is already pending, this call is ignored. Destructive to the current Alexa session/account link on this robot — not a process crash helper.",
+      "howTo": "1) Call ForceAlexaOptOut on engine when freeplay can run AlexaSignInOut (or accept auto sign-out after a few ticks). 2) Confirm anim logs opting out / auth Uninitialized. 3) Optional nuclear alternative from docs: delete the persistent alexa folder manually. Re-opt-in with ForceAlexaOptIn or the app when needed.",
+      "paths": {
+        "robot": [
+          "/data/data/com.anki.victor/persistent/alexa"
+        ],
+        "notes": "Logout path deletes opt-in marker and user files under the Alexa persistent directory (also documented in docs/development/alexa.md)."
+      },
+      "related": [
+        "ForceAlexaOptIn"
+      ],
+      "evidence": "engine/aiComponent/alexaComponent.cpp:98-101,169-181,222-241,523-549; behaviorAlexaSignInOut.cpp:55-167; animProcess/src/cozmoAnim/alexa/alexa.cpp:211-288; docs/development/alexa.md",
+      "category": "Alexa",
+      "status": "live",
+      "statusNote": "Wipes Alexa auth/session data on the robot; intentional product logout, not a crash helper.",
+      "tags": ["alexa", "opt-out", "auth", "console-func", "paths"]
+    },
+    "MoveToState": {
+      "process": "engine",
+      "blurb": "Forces HighLevelAI (Vector’s freeplay activity state machine) into a named freeplay state such as Observing, Exploring, Socializing, or PlayingWithCube. Pass the state name as a string argument; pass list to print every legal state name to the console log channel.",
+      "detail": "ANKI_DEV_CHEATS only. Registered by BehaviorHighLevelAI via InternalStatesBehavior::AddConsoleVarTransitions(\"MoveToState\", \"BehaviorHighLevelAI\") with signature const char* stateName. Matching is case-insensitive against the loaded JSON state map (highLevelAI.json). On a hit, stores _consoleFuncState; the next InternalStatesBehavior::BehaviorUpdate (while HighLevelAI has a valid current state) calls TransitionToState — same tick path as a normal condition-driven transition (so timing matches production). Unknown names write available states to the console and log a warning. Does nothing useful if HighLevelAI is not on the active behavior stack (value sits until HLAI updates again). Does not bypass global interruptions, sleep, or onboarding stacks above freeplay.",
+      "howTo": "1) Put the robot in freeplay so HighLevelAI is running (not deep sleep / pure onboarding-only). 2) Call MoveToState with stateName=list to see names. 3) Call again with e.g. Exploring, Observing, Socializing, PlayingWithCube, ObservingOnCharger, InvestigateHeldCube, BoredOfObserving, … (names from highLevelAI.json). 4) Watch freeplay switch activity; natural transitions may leave the forced state later.",
+      "paths": {
+        "assets": [
+          "resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/highLevelAI.json"
+        ],
+        "notes": "State names come from that JSON’s states[].name list loaded into HighLevelAI."
+      },
+      "related": [],
+      "evidence": "engine/aiComponent/behaviorComponent/behaviors/behaviorHighLevelAI.cpp:97; internalStatesBehavior.cpp:518-525,1006-1062; resources/config/engine/behaviorComponent/behaviors/victorBehaviorTree/highLevelAI.json",
+      "category": "BehaviorHighLevelAI",
+      "status": "partial",
+      "statusNote": "ANKI_DEV_CHEATS only. Applied only when HighLevelAI’s InternalStatesBehavior is updating with a valid current state; ignored if freeplay HLAI is not active.",
+      "tags": ["behaviors", "high-level-ai", "freeplay", "dev-cheats", "console-func"]
+    }
+  }
+}
