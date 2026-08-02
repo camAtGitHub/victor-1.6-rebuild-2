@@ -192,21 +192,40 @@
     if (!btn) {
       return;
     }
+    var pref = getPreference();
+    var followingSystem = pref === "system";
+    var next = effective === "dark" ? "light" : "dark";
+    // Title must make BrowserTools / OS "system" mode obvious — otherwise
+    // people think the toggle is broken when the browser is locked to dark/light.
+    var title;
+    if (followingSystem) {
+      title =
+        "Theme: " +
+        effective +
+        " (following system / browser). Click to force " +
+        next +
+        ".";
+    } else {
+      title =
+        "Theme: " +
+        effective +
+        " (forced). Click for " +
+        next +
+        ". Double-click to follow system.";
+    }
     if (effective === "light") {
       if (icon) {
-        icon.textContent = "\u263E"; // crescent moon
+        icon.textContent = "\u263E"; // crescent moon → click for dark
       }
-      btn.title = "Switch to dark theme";
-      btn.setAttribute("aria-label", "Switch to dark theme");
       btn.setAttribute("aria-pressed", "true");
     } else {
       if (icon) {
-        icon.textContent = "\u2600"; // sun
+        icon.textContent = "\u2600"; // sun → click for light
       }
-      btn.title = "Switch to light theme";
-      btn.setAttribute("aria-label", "Switch to light theme");
       btn.setAttribute("aria-pressed", "false");
     }
+    btn.title = title;
+    btn.setAttribute("aria-label", title);
   }
 
   /**
@@ -318,14 +337,17 @@
     var btn = document.getElementById("btnThemeToggle");
     if (btn && btn.getAttribute("data-wv-theme-wired") !== "1") {
       btn.setAttribute("data-wv-theme-wired", "1");
-      // Direct listener as well (Chrome path); doc delegation covers Firefox misses
+      // Direct listener; stopPropagation so document delegation does not double-toggle
       btn.addEventListener("click", function (ev) {
         ev.preventDefault();
-        // Don't double-fire if doc listener also runs: stopImmediate on button only
-        // when we handle here — actually both would toggle twice!
-        // Use only doc delegation OR only button. Prefer button stopPropagation.
         ev.stopPropagation();
         toggle();
+      });
+      // Escape hatch back to OS / BrowserTools appearance
+      btn.addEventListener("dblclick", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        setPreference("system");
       });
     }
     syncToggleUi(resolve(getPreference()));
