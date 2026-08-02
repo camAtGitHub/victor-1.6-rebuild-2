@@ -41,6 +41,9 @@
   var shouldFlashLog = false; // flash newest row once after pushTransition
   // Persist collapsible gate open state: key = owner + "\0" + label (P4)
   var openGates = Object.create(null);
+  // P5 client-only filters (hide DOM rows; do not drop state)
+  var logFilter = "";
+  var gatesFilter = "";
   var els = null;
   var lastRenderedLogHeadId = null;
   var lastRenderedStackKey = null;
@@ -416,10 +419,292 @@
     }
   }
 
+  /** True when active element should keep keyboard for typing (P5.1). */
+  function isTypingTarget(el) {
+    if (!el || !el.tagName) {
+      return false;
+    }
+    var tag = el.tagName.toLowerCase();
+    if (tag === "input" || tag === "textarea" || tag === "select") {
+      return true;
+    }
+    if (el.isContentEditable) {
+      return true;
+    }
+    return false;
+  }
+
+  /** Return to live stack/view (Live button, L, Escape when scrubbing). */
+  function goLive() {
+    liveMode = true;
+    viewStack = null;
+    selectedLogId = null;
+    ownerPinned = false;
+    selectedOwner = liveStack.length ? leafOf(liveStack) : null;
+    render(true);
+  }
+
+  /** Scrub to a transitionLog entry by index (newest-first list). */
+  function selectLogByIndex(idx) {
+    if (!transitionLog.length) {
+      return;
+    }
+    if (idx < 0) {
+      idx = 0;
+    }
+    if (idx >= transitionLog.length) {
+      idx = transitionLog.length - 1;
+    }
+    var entry = transitionLog[idx];
+    liveMode = false;
+    ownerPinned = false;
+    viewStack = entry.stack.slice();
+    selectedLogId = entry.id;
+    selectedOwner = entry.leaf || null;
+    render(true);
+    scrollLogSelectionIntoView();
+  }
+
+  /**
+   * Move scrub selection in log. delta +1 = older (down/j), -1 = newer (up/k).
+   * From live with no selection, either direction selects first visible row.
+   * Skips rows hidden by log filter (state still held; selection id intact).
+   */
+  function moveLogSelection(delta) {
+    if (!transitionLog.length) {
+      return;
+    }
+    var q = (logFilter || "").toLowerCase().trim();
+    var idx = -1;
+    var i;
+    if (selectedLogId != null && !liveMode) {
+      for (i = 0; i < transitionLog.length; i++) {
+        if (transitionLog[i].id === selectedLogId) {
+          idx = i;
+          break;
+        }
+      }
+    }
+    if (idx < 0 || liveMode) {
+      // Enter scrub: first matching from newest
+      for (i = 0; i < transitionLog.length; i++) {
+        if (logEntryMatches(transitionLog[i], q)) {
+          selectLogByIndex(i);
+          return;
+        }
+      }
+      return;
+    }
+    var next = idx + delta;
+    while (next >= 0 && next < transitionLog.length) {
+      if (logEntryMatches(transitionLog[next], q)) {
+        selectLogByIndex(next);
+        return;
+      }
+      next += delta;
+    }
+    // No further match in that direction — keep current selection
+  }
+
+  function scrollLogSelectionIntoView() {
+    if (!els || !els.logList || selectedLogId == null) {
+      return;
+    }
+    var row = els.logList.querySelector(
+      '[data-log-id="' + String(selectedLogId) + '"]'
+    );
+    if (row && typeof row.scrollIntoView === "function") {
+      try {
+        row.scrollIntoView({ block: "nearest" });
+      } catch (e) {
+        row.scrollIntoView(false);
+      }
+    }
+  }
+
+  function logEntryMatches(e, q) {
+    if (!q) {
+      return true;
+    }
+    var parts = [e.leaf || "", e.fromLeaf || ""];
+    var i;
+    for (i = 0; i < parts.length; i++) {
+      if (String(parts[i]).toLowerCase().indexOf(q) >= 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Hide non-matching log rows; does not drop transitionLog state. */
+  function applyLogFilter() {
+    if (!els || !els.logList) {
+      return;
+    }
+    var q = (logFilter || "").toLowerCase().trim();
+    var rows = els.logList.querySelectorAll(".fp-log-row");
+    var i;
+    for (i = 0; i < rows.length; i++) {
+      var e = transitionLog[i];
+      var match = e ? logEntryMatches(e, q) : true;
+      rows[i].style.display = match ? "" : "none";
+    }
+  }
+
+  /** Hide non-matching gate cards by condition label; state retained. */
+  function applyGatesFilter() {
+    if (!els || !els.gatesList) {
+      return;
+    }
+    var q = (gatesFilter || "").toLowerCase().trim();
+    var cards = els.gatesList.querySelectorAll(".fp-gate");
+    var i;
+    for (i = 0; i < cards.length; i++) {
+      var lab = cards[i].getAttribute("data-gate-label") || "";
+      var match = !q || lab.toLowerCase().indexOf(q) >= 0;
+      cards[i].style.display = match ? "" : "none";
+    }
+  }
+
+  /** Clear client transition log only (not wire / not engine). */
+  function clearTransitionLog() {
+    transitionLog = [];
+    lastRenderedLogHeadId = null;
+    lastRenderedSelectedLogId = null;
+    shouldFlashLog = false;
+    // Scrub target may be gone — return to live
+    if (!liveMode) {
+      liveMode = true;
+      viewStack = null;
+      selectedLogId = null;
+      ownerPinned = false;
+      selectedOwner = liveStack.length ? leafOf(liveStack) : null;
+    } else {
+      selectedLogId = null;
+    }
+    render(true);
+  }
+
+  /** Dev tools: copy transitionLog JSON (silent fail → console). */
+  function copyLogJson() {
+    var payload;
+    try {
+      payload = JSON.stringify(transitionLog, null, 2);
+    } catch (e) {
+      if (typeof console !== "undefined" && console.warn) {
+        console.warn("[freeplay] copy log stringify failed", e);
+      }
+      return;
+    }
+    if (
+      typeof navigator !== "undefined" &&
+      navigator.clipboard &&
+      typeof navigator.clipboard.writeText === "function"
+    ) {
+      navigator.clipboard.writeText(payload).catch(function (err) {
+        if (typeof console !== "undefined" && console.warn) {
+          console.warn("[freeplay] clipboard write failed", err);
+        }
+      });
+      return;
+    }
+    try {
+      var ta = document.createElement("textarea");
+      ta.value = payload;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    } catch (e2) {
+      if (typeof console !== "undefined" && console.warn) {
+        console.warn("[freeplay] clipboard fallback failed", e2);
+      }
+    }
+  }
+
+  function updateSilenceBanner() {
+    if (!els || !els.silenceBanner) {
+      return;
+    }
+    var bothSilent = isStale("behaviors") && isStale("behaviorconds");
+    if (bothSilent) {
+      els.silenceBanner.hidden = false;
+      els.silenceBanner.removeAttribute("hidden");
+    } else {
+      els.silenceBanner.hidden = true;
+      els.silenceBanner.setAttribute("hidden", "");
+    }
+  }
+
+  /**
+   * P5.1 keyboard on .fp-root when focus is within root.
+   * Bound on root only (not window) so re-init via buildDom cannot double-bind.
+   */
+  function onRootKeydown(ev) {
+    if (!els || !els.root) {
+      return;
+    }
+    var ae = document.activeElement;
+    if (ae !== els.root && !els.root.contains(ae)) {
+      return;
+    }
+    if (isTypingTarget(ae)) {
+      // Do not steal keys from filter/inputs (Escape blurs filter → root)
+      if (
+        ev.key === "Escape" &&
+        ae &&
+        ae.getAttribute &&
+        (ae.getAttribute("data-fp") === "logFilter" ||
+          ae.getAttribute("data-fp") === "gatesFilter")
+      ) {
+        ae.blur();
+        if (els.root.focus) {
+          els.root.focus();
+        }
+        ev.preventDefault();
+      }
+      return;
+    }
+
+    var key = ev.key;
+    if (key === "/" ) {
+      if (els.logFilter) {
+        ev.preventDefault();
+        els.logFilter.focus();
+        if (typeof els.logFilter.select === "function") {
+          els.logFilter.select();
+        }
+      }
+      return;
+    }
+    if ((key === "l" || key === "L" || key === "Escape") && !liveMode) {
+      ev.preventDefault();
+      goLive();
+      return;
+    }
+    if (key === "j" || key === "ArrowDown") {
+      ev.preventDefault();
+      moveLogSelection(1);
+      return;
+    }
+    if (key === "k" || key === "ArrowUp") {
+      ev.preventDefault();
+      moveLogSelection(-1);
+      return;
+    }
+  }
+
   function buildDom(elem) {
+    // Clears prior root + listeners (re-init safe; no window-level binds)
     elem.innerHTML = "";
     var root = document.createElement("div");
     root.className = "fp-root";
+    root.tabIndex = 0;
+    root.setAttribute("role", "region");
+    root.setAttribute("aria-label", "FreePlay console");
     // Ops layout: header + workspace (stack|log top, gates bottom) + collapsible dev
     root.innerHTML =
       '<header class="fp-header">' +
@@ -436,11 +721,14 @@
       '  <div class="fp-header-row fp-pills-row">' +
       '    <span class="fp-pill" data-fp="pill-behaviors" title="behaviors channel">behaviors</span>' +
       '    <span class="fp-pill" data-fp="pill-behaviorconds" title="behaviorconds channel">conds</span>' +
-      '    <button type="button" class="fp-live-btn" data-fp="liveBtn" title="Return to live stack">Live</button>' +
+      '    <button type="button" class="fp-live-btn" data-fp="liveBtn" title="Return to live stack" aria-pressed="true">Live</button>' +
       '    <span class="fp-mode" data-fp="mode">live</span>' +
       "  </div>" +
       '  <div class="fp-debug-line" data-fp="debugState"></div>' +
       "</header>" +
+      '<div class="fp-silence-banner" data-fp="silenceBanner" hidden role="status">' +
+      "No freeplay stream (both channels silent)" +
+      "</div>" +
       '<div class="fp-workspace">' +
       '  <div class="fp-ops-top">' +
       '    <section class="fp-panel fp-stack" aria-label="Live stack">' +
@@ -451,9 +739,15 @@
       "      </div>" +
       "    </section>" +
       '    <section class="fp-panel fp-log" aria-label="Transition log">' +
-      '      <div class="fp-panel-title">Transition log <span class="fp-meta" data-fp="logMeta">0/' +
+      '      <div class="fp-panel-head">' +
+      '        <div class="fp-panel-title fp-panel-title-inline">Transition log <span class="fp-meta" data-fp="logMeta">0/' +
       MAX_LOG +
       "</span></div>" +
+      '        <div class="fp-panel-tools">' +
+      '          <input type="search" class="fp-filter" data-fp="logFilter" placeholder="Filter log…" aria-label="Filter transition log" autocomplete="off" />' +
+      '          <button type="button" class="fp-tool-btn" data-fp="clearLog" title="Clear transition log (client only)">Clear log</button>' +
+      "        </div>" +
+      "      </div>" +
       '      <div class="fp-panel-body" data-fp="logBody">' +
       '        <div class="fp-log-list" data-fp="logList"></div>' +
       "      </div>" +
@@ -464,6 +758,7 @@
       '    <div class="fp-panel-body fp-gates-panel-body">' +
       '      <div class="fp-gates-toolbar">' +
       '        <span class="fp-gates-focus" data-fp="gatesOwner"></span>' +
+      '        <input type="search" class="fp-filter fp-filter-gates" data-fp="gatesFilter" placeholder="Filter gates…" aria-label="Filter gates by condition label" autocomplete="off" />' +
       "      </div>" +
       '      <div class="fp-gates-scroll">' +
       '        <div class="fp-gates-list" data-fp="gatesList"></div>' +
@@ -474,10 +769,11 @@
       "</div>" +
       '<details class="fp-dev" data-fp="devDetails">' +
       "  <summary>Dev tools</summary>" +
-      '  <p class="fp-dev-hint">Force-run / inject: use stock tabs (FreePlay is read-only).</p>' +
+      '  <p class="fp-dev-hint">Force-run / inject: use stock tabs (FreePlay is read-only). Keys (focus FreePlay): L/Esc → Live · j/k or ↓/↑ log scrub · / filter log.</p>' +
       '  <div class="fp-dev-links">' +
       '    <button type="button" class="fp-dev-link" data-fp="openBehaviors">Open Behaviors</button>' +
       '    <button type="button" class="fp-dev-link" data-fp="openConds">Open BehaviorConds</button>' +
+      '    <button type="button" class="fp-dev-link" data-fp="copyLog" title="Copy transitionLog JSON to clipboard">Copy log JSON</button>' +
       "  </div>" +
       '  <div class="fp-raw-wrap"><div class="fp-raw-label">Last behaviors</div><pre class="fp-raw" data-fp="rawBehaviors">—</pre></div>' +
       '  <div class="fp-raw-wrap"><div class="fp-raw-label">Last behaviorconds</div><pre class="fp-raw" data-fp="rawConds">—</pre></div>' +
@@ -495,13 +791,17 @@
       liveBtn: root.querySelector('[data-fp="liveBtn"]'),
       mode: root.querySelector('[data-fp="mode"]'),
       debugState: root.querySelector('[data-fp="debugState"]'),
+      silenceBanner: root.querySelector('[data-fp="silenceBanner"]'),
       stackList: root.querySelector('[data-fp="stackList"]'),
       stackEmpty: root.querySelector('[data-fp="stackEmpty"]'),
       logMeta: root.querySelector('[data-fp="logMeta"]'),
       logBody: root.querySelector('[data-fp="logBody"]'),
       logList: root.querySelector('[data-fp="logList"]'),
+      logFilter: root.querySelector('[data-fp="logFilter"]'),
+      clearLog: root.querySelector('[data-fp="clearLog"]'),
       gatesCount: root.querySelector('[data-fp="gatesCount"]'),
       gatesOwner: root.querySelector('[data-fp="gatesOwner"]'),
+      gatesFilter: root.querySelector('[data-fp="gatesFilter"]'),
       gatesList: root.querySelector('[data-fp="gatesList"]'),
       gatesEmpty: root.querySelector('[data-fp="gatesEmpty"]'),
       rawBehaviors: root.querySelector('[data-fp="rawBehaviors"]'),
@@ -509,15 +809,11 @@
       devDetails: root.querySelector('[data-fp="devDetails"]'),
       openBehaviors: root.querySelector('[data-fp="openBehaviors"]'),
       openConds: root.querySelector('[data-fp="openConds"]'),
+      copyLog: root.querySelector('[data-fp="copyLog"]'),
     };
 
     els.liveBtn.addEventListener("click", function () {
-      liveMode = true;
-      viewStack = null;
-      selectedLogId = null;
-      ownerPinned = false;
-      selectedOwner = liveStack.length ? leafOf(liveStack) : null;
-      render(true);
+      goLive();
     });
 
     els.openBehaviors.addEventListener("click", function () {
@@ -526,6 +822,31 @@
     els.openConds.addEventListener("click", function () {
       openStockTab("behaviorconds");
     });
+    if (els.copyLog) {
+      els.copyLog.addEventListener("click", function () {
+        copyLogJson();
+      });
+    }
+    if (els.clearLog) {
+      els.clearLog.addEventListener("click", function () {
+        clearTransitionLog();
+      });
+    }
+    if (els.logFilter) {
+      els.logFilter.addEventListener("input", function () {
+        logFilter = els.logFilter.value || "";
+        applyLogFilter();
+      });
+    }
+    if (els.gatesFilter) {
+      els.gatesFilter.addEventListener("input", function () {
+        gatesFilter = els.gatesFilter.value || "";
+        applyGatesFilter();
+      });
+    }
+
+    // Keyboard on root only (tabIndex=0); destroyed with DOM on re-init
+    root.addEventListener("keydown", onRootKeydown);
 
     // Refresh raw JSON when user expands Dev tools
     els.devDetails.addEventListener("toggle", function () {
@@ -547,6 +868,8 @@
     els.mode.className = "fp-mode" + (liveMode ? " fp-mode-live" : " fp-mode-scrub");
     els.liveBtn.className =
       "fp-live-btn" + (liveMode ? " fp-live-btn-on" : "");
+    // P5.6 a11y
+    els.liveBtn.setAttribute("aria-pressed", liveMode ? "true" : "false");
     els.debugState.textContent = debugState
       ? "debugState: " + debugState
       : "";
@@ -556,6 +879,7 @@
     els.pillConds.className =
       "fp-pill" +
       (isStale("behaviorconds") ? " fp-pill-stale" : " fp-pill-fresh");
+    updateSilenceBanner();
   }
 
   function renderStack() {
@@ -724,10 +1048,12 @@
       var rows = els.logList.querySelectorAll(".fp-log-row");
       var ri;
       for (ri = 0; ri < rows.length && ri < transitionLog.length; ri++) {
-        rows[ri].className =
-          "fp-log-row" + (logRowSelected(transitionLog[ri]) ? " fp-log-selected" : "");
+        var sel = logRowSelected(transitionLog[ri]);
+        rows[ri].className = "fp-log-row" + (sel ? " fp-log-selected" : "");
+        rows[ri].setAttribute("aria-selected", sel ? "true" : "false");
       }
       lastRenderedSelectedLogId = selectedLogId;
+      applyLogFilter();
       return;
     }
 
@@ -763,6 +1089,7 @@
         row.className += " fp-log-flash";
       }
       row.setAttribute("data-log-id", String(e.id));
+      row.setAttribute("aria-selected", logRowSelected(e) ? "true" : "false");
 
       var fromLabel = leafDisplay(e.fromLeaf);
       var toLabel = leafDisplay(e.leaf);
@@ -813,6 +1140,8 @@
       );
       els.logList.appendChild(row);
     }
+
+    applyLogFilter();
 
     if (els.logBody) {
       if (pinToNewest) {
@@ -920,6 +1249,7 @@
 
       var card = document.createElement("div");
       card.className = "fp-gate" + (isOpen ? " fp-gate-open" : "");
+      card.setAttribute("data-gate-label", lab);
 
       var head = document.createElement("button");
       head.type = "button";
@@ -1011,6 +1341,8 @@
       more.textContent = "+" + truncated + " more (capped at " + MAX_GATES_DISPLAY + ")";
       els.gatesList.appendChild(more);
     }
+
+    applyGatesFilter();
   }
 
   function renderRaw(force) {
@@ -1114,6 +1446,8 @@
     logSeq = 0;
     shouldFlashLog = false;
     openGates = Object.create(null);
+    logFilter = "";
+    gatesFilter = "";
     lastRenderedLogHeadId = null;
     lastRenderedStackKey = null;
     lastRenderedOwner = null;
@@ -1137,6 +1471,13 @@
     }
     clearSessionState();
     if (els && hostElem) {
+      // Sync filter inputs cleared by clearSessionState (DOM kept on reset)
+      if (els.logFilter) {
+        els.logFilter.value = "";
+      }
+      if (els.gatesFilter) {
+        els.gatesFilter.value = "";
+      }
       render(true);
     }
   };
@@ -1185,12 +1526,13 @@
     if (!els) {
       return;
     }
-    // Refresh stream pill stale state
+    // Refresh stream pill stale state + dual-silence banner (P5.4)
     els.pillBehaviors.className =
       "fp-pill" + (isStale("behaviors") ? " fp-pill-stale" : " fp-pill-fresh");
     els.pillConds.className =
       "fp-pill" +
       (isStale("behaviorconds") ? " fp-pill-stale" : " fp-pill-fresh");
+    updateSilenceBanner();
   };
 
   myMethods.getStyles = function () {
@@ -1209,7 +1551,13 @@
       "  flex-direction: column;" +
       "  overflow: hidden;" +
       "  gap: var(--wv-space-2);" +
+      "  outline: none;" +
       "}" +
+      ".fp-root:focus {" +
+      "  outline: 2px solid var(--wv-accent);" +
+      "  outline-offset: 1px;" +
+      "}" +
+      ".fp-root:focus:not(:focus-visible) { outline: none; }" +
       ".fp-header {" +
       "  flex-shrink: 0;" +
       "  padding: var(--wv-space-2) var(--wv-space-3);" +
@@ -1218,6 +1566,18 @@
       "  background: var(--wv-content-bg);" +
       "  box-shadow: var(--wv-shadow-sm);" +
       "}" +
+      /* P5.4 dual-channel silence banner (under header; pills stay) */
+      ".fp-silence-banner {" +
+      "  flex-shrink: 0;" +
+      "  padding: var(--wv-space-1) var(--wv-space-2);" +
+      "  border: 1px solid var(--wv-warn);" +
+      "  border-radius: var(--wv-radius-sm);" +
+      "  color: var(--wv-warn);" +
+      "  font-size: 12px;" +
+      "  font-weight: 600;" +
+      "  background: var(--wv-content-bg);" +
+      "}" +
+      ".fp-silence-banner[hidden] { display: none !important; }" +
       ".fp-header-row {" +
       "  display: flex;" +
       "  flex-wrap: wrap;" +
@@ -1318,6 +1678,66 @@
       "  letter-spacing: 0.04em;" +
       "  padding: var(--wv-space-1) var(--wv-space-2);" +
       "  border-bottom: 1px solid var(--wv-content-line);" +
+      "}" +
+      /* P5.2/5.3 log head: title + filter + clear (no double border) */
+      ".fp-panel-head {" +
+      "  flex-shrink: 0;" +
+      "  display: flex;" +
+      "  flex-direction: column;" +
+      "  gap: var(--wv-space-1);" +
+      "  padding: var(--wv-space-1) var(--wv-space-2);" +
+      "  border-bottom: 1px solid var(--wv-content-line);" +
+      "  min-width: 0;" +
+      "}" +
+      ".fp-panel-title-inline {" +
+      "  padding: 0;" +
+      "  border-bottom: none;" +
+      "}" +
+      ".fp-panel-tools {" +
+      "  display: flex;" +
+      "  flex-wrap: nowrap;" +
+      "  align-items: center;" +
+      "  gap: var(--wv-space-1);" +
+      "  min-width: 0;" +
+      "}" +
+      ".fp-filter {" +
+      "  flex: 1 1 auto;" +
+      "  min-width: 0;" +
+      "  box-sizing: border-box;" +
+      "  font: inherit;" +
+      "  font-size: 11px;" +
+      "  font-family: var(--wv-mono);" +
+      "  padding: 2px 6px;" +
+      "  border: 1px solid var(--wv-content-line);" +
+      "  border-radius: var(--wv-radius-sm);" +
+      "  background: var(--wv-content-bg);" +
+      "  color: var(--wv-content-text);" +
+      "}" +
+      ".fp-filter:focus {" +
+      "  outline: 2px solid var(--wv-accent);" +
+      "  outline-offset: 0;" +
+      "}" +
+      ".fp-filter-gates {" +
+      "  flex: 0 1 140px;" +
+      "  max-width: 160px;" +
+      "}" +
+      ".fp-tool-btn {" +
+      "  flex-shrink: 0;" +
+      "  font: inherit;" +
+      "  font-size: 11px;" +
+      "  font-weight: 600;" +
+      "  padding: 2px 8px;" +
+      "  border-radius: var(--wv-radius-sm);" +
+      "  border: 1px solid var(--wv-content-line);" +
+      "  background: var(--wv-content-bg);" +
+      "  color: var(--wv-content-text);" +
+      "  cursor: pointer;" +
+      "  white-space: nowrap;" +
+      "}" +
+      ".fp-tool-btn:hover { background: var(--wv-accent-dim); }" +
+      ".fp-tool-btn:focus {" +
+      "  outline: 2px solid var(--wv-accent);" +
+      "  outline-offset: 1px;" +
       "}" +
       ".fp-meta { font-weight: 400; opacity: 0.55; text-transform: none; letter-spacing: 0; }" +
       ".fp-panel-body {" +
@@ -1531,6 +1951,7 @@
       "  font-weight: 500;" +
       "  color: var(--wv-content-text);" +
       "  opacity: 0.75;" +
+      "  flex: 1 1 auto;" +
       "  min-width: 0;" +
       "  overflow: hidden;" +
       "  text-overflow: ellipsis;" +
