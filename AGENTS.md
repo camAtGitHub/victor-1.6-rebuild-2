@@ -239,6 +239,8 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 | `docs/mapping/ENGINE-OBSERVING-AND-INTENTS.md` | Observing freeplay branch + voice/user-intent claim path |
 | `docs/mapping/ENGINE-PATH-PLANNING.md` | Drive-to-pose: PathComponent planner selection |
 | `docs/mapping/WEBVIZ-BEHAVIORS-REVIEW.md` | WebViz Behaviors/BehaviorConds review notes |
+| `docs/mapping/WEBVIZ-FREEPLAY-DESIGN.md` | FreePlay WebViz module design (no-C++; multi-subscribe; dual-theme) |
+| `docs/mapping/WEBVIZ-FREEPLAY-PLAN.md` | FreePlay implementation plan (phased; Allowed APIs; S1–S9) |
 | `docs/mapping/GLOSSARY.md` | ~130 repo terms |
 | `docs/mapping/IDEA-backpack-lights-flags.md` | Idea: Anki lights flag + customBackpackLights folder + Wired option |
 | `engine/components/cubes/` | L2 cube BLE/coordinator/lights stack |
@@ -339,6 +341,8 @@ if you ran out of context mid-folder, say so here.
 | 2026-07-28 | Grok (+ 7 subagents) | Top-level L1 closeout + engine L3 (observing/intents/path/cubes). Glossary ~134. | High-value L2: anim + robot. |
 | 2026-07-28 | Grok (+ 3 subagents) | **High-value finish:** `animProcess/` → mapped-L2 (8 child READMEs: animation, face, mic, speechRecognizer, audio, TTS, backpack, alexa; Picovoice wake word). `robot/` → mapped-L2 (supervisor, HAL/spine, clad, core; syscon L1 shallow). `docs/mapping/PROCESS-IPC.md` (sockets + anim relay). Quick answers updated. | Mapping phase complete for high-value paths. Remaining optional: intent-graph 1.8 diff, deep asset trees, syscon firmware internals. |
 | 2026-07-29 | Grok | Captured idea: Anki backpack lights via `/data/data/enableankilights` + auto custom lights from `/data/data/customBackpackLights/*` (Wired option) → `docs/mapping/IDEA-backpack-lights-flags.md`. Links existing CCIS/CHANGES. | Feature phase: verify if already coded; else implement flag/folder + Wired. |
+| 2026-08-02 | Grok | Brainstormed no-C++ WebViz modules; designed **FreePlay** (multi-subscribe behaviors+behaviorconds; stock tabs stay; token dual-theme). Spec: `docs/mapping/WEBVIZ-FREEPLAY-DESIGN.md`. | User approved LGTM; rename WEBVIZ-* group; implementation plan next. |
+| 2026-08-02 | Grok | Wrote **implementation plan** `docs/mapping/WEBVIZ-FREEPLAY-PLAN.md` (Phase 0 Allowed APIs + Phases 1–6 shell/CSS/registry/module/verify; success S1–S9). | Execute plan (shell multi-channel → freeplay.js → S1–S9). |
 
 ---
 

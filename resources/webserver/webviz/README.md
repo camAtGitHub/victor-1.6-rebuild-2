@@ -37,7 +37,7 @@ Selectable chrome color scheme on the modern shell (`webViz.html` / `webViz.beta
 |---|---|
 | `css/tokens.css` | SoT: dark on `:root`; light under `html[data-theme="light"]` / `html.wv-theme-light` |
 | `js/theme.js` | `WebVizTheme`: get/set/toggle/apply; applies light vars via `style.setProperty`; wires footer button |
-| `webViz.html` / `webViz.beta.html` | FOUC in `<head>` (attr + class + early light vars); cache-bust `?v=theme3` on CSS/JS |
+| `webViz.html` / `webViz.beta.html` | FOUC in `<head>` (attr + class + early light vars) |
 
 Path A mirror: `../cv-tokens.css` — keep in sync. Consolevars has no theme UI in v1.
 

@@ -215,12 +215,14 @@
     }
     if (effective === "light") {
       if (icon) {
-        icon.textContent = "\u263E"; // crescent moon → click for dark
+        // U+1F317 last quarter moon — click for dark
+        icon.textContent = "\uD83C\uDF17";
       }
       btn.setAttribute("aria-pressed", "true");
     } else {
       if (icon) {
-        icon.textContent = "\u2600"; // sun → click for light
+        // U+1F313 first quarter moon — click for light
+        icon.textContent = "\uD83C\uDF13";
       }
       btn.setAttribute("aria-pressed", "false");
     }
