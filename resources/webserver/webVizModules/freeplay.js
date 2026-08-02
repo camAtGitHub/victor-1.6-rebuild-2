@@ -489,40 +489,79 @@
     els.stackEmpty.style.display = "none";
     els.stackList.style.display = "block";
 
+    var leafName = leafOf(stack);
     var i;
     for (i = 0; i < stack.length; i++) {
       var name = stack[i];
+      var isLeaf = i === stack.length - 1;
       var li = document.createElement("li");
       li.className = "fp-stack-li";
       var btn = document.createElement("button");
       btn.type = "button";
       btn.className = "fp-stack-item";
-      if (i === stack.length - 1) {
+      if (isLeaf) {
         btn.className += " fp-stack-leaf";
       }
       if (selectedOwner && name === selectedOwner) {
         btn.className += " fp-stack-selected";
       }
       btn.setAttribute("data-owner", name);
-      btn.textContent = name;
-      if (i === stack.length - 1) {
-        var mark = document.createElement("span");
-        mark.className = "fp-leaf-mark";
-        mark.textContent = " ◀";
-        btn.appendChild(mark);
+      btn.setAttribute("aria-selected", selectedOwner && name === selectedOwner ? "true" : "false");
+
+      // Depth gutters with tree connectors (content-line color via CSS)
+      var d;
+      for (d = 0; d < i; d++) {
+        var gut = document.createElement("span");
+        gut.className = "fp-stack-indent";
+        gut.setAttribute("aria-hidden", "true");
+        var connV = document.createElement("span");
+        connV.className = "fp-stack-connector";
+        var connH = document.createElement("span");
+        connH.className = "fp-stack-connector-h";
+        gut.appendChild(connV);
+        gut.appendChild(connH);
+        btn.appendChild(gut);
       }
+
+      var main = document.createElement("span");
+      main.className = "fp-stack-main";
+      var nameEl = document.createElement("span");
+      nameEl.className = "fp-stack-name";
+      nameEl.textContent = name;
+      main.appendChild(nameEl);
+
+      // Honest meta only: depth index; parent name from previous stack entry (not mock roles)
+      var meta = document.createElement("span");
+      meta.className = "fp-stack-meta";
+      if (i === 0) {
+        meta.textContent = "L0 · root";
+      } else {
+        meta.textContent = "L" + i + " · " + stack[i - 1];
+      }
+      main.appendChild(meta);
+      btn.appendChild(main);
+
+      if (isLeaf) {
+        var badge = document.createElement("span");
+        badge.className = "fp-stack-badge";
+        badge.textContent = "leaf";
+        btn.appendChild(badge);
+      }
+
       btn.addEventListener(
         "click",
-        (function (owner) {
+        (function (owner, leaf) {
           return function () {
-            selectedOwner = owner;
-            // Stay live; pin so subsequent stack ticks do not wipe gates target
+            var isLeafClick = owner === leaf;
+            selectedOwner = isLeafClick ? leaf : owner;
+            // Live: pin only non-leaf frames so later ticks keep gates target.
+            // Leaf click (incl. re-click) clears pin → gates follow live leaf.
             if (liveMode) {
-              ownerPinned = true;
+              ownerPinned = !isLeafClick;
             }
             render(true);
           };
-        })(name)
+        })(name, leafName)
       );
       li.appendChild(btn);
       els.stackList.appendChild(li);
@@ -1029,35 +1068,103 @@
       "  overscroll-behavior: contain;" +
       "  padding: var(--wv-space-1) var(--wv-space-2);" +
       "}" +
+      /* P2 stack hierarchy: indent gutters, connectors, leaf badge, depth meta */
       ".fp-stack-list {" +
       "  list-style: none;" +
       "  margin: 0;" +
       "  padding: 0;" +
+      "  display: flex;" +
+      "  flex-direction: column;" +
+      "  gap: 1px;" +
       "}" +
-      ".fp-stack-li { margin: 0; padding: 0; }" +
+      ".fp-stack-li { margin: 0; padding: 0; min-width: 0; }" +
       ".fp-stack-item {" +
-      "  display: block;" +
+      "  display: flex;" +
+      "  align-items: stretch;" +
       "  width: 100%;" +
       "  text-align: left;" +
       "  box-sizing: border-box;" +
       "  font: inherit;" +
-      "  font-family: var(--wv-mono);" +
-      "  font-size: 12px;" +
-      "  padding: var(--wv-space-1) var(--wv-space-2);" +
+      "  padding: 0;" +
       "  border-radius: var(--wv-radius-sm);" +
       "  cursor: pointer;" +
       "  border: 1px solid transparent;" +
       "  background: transparent;" +
       "  color: var(--wv-content-text);" +
+      "  min-width: 0;" +
       "}" +
       ".fp-stack-item:hover { background: var(--wv-accent-dim); }" +
       ".fp-stack-item:focus { outline: 2px solid var(--wv-accent); outline-offset: 1px; }" +
-      ".fp-stack-leaf { color: var(--wv-accent); font-weight: 600; }" +
+      ".fp-stack-indent {" +
+      "  width: 12px;" +
+      "  flex-shrink: 0;" +
+      "  position: relative;" +
+      "}" +
+      ".fp-stack-connector {" +
+      "  position: absolute;" +
+      "  left: 5px;" +
+      "  top: 0;" +
+      "  bottom: 50%;" +
+      "  width: 1px;" +
+      "  background: var(--wv-content-line);" +
+      "}" +
+      ".fp-stack-connector-h {" +
+      "  position: absolute;" +
+      "  left: 5px;" +
+      "  top: 50%;" +
+      "  width: 7px;" +
+      "  height: 1px;" +
+      "  background: var(--wv-content-line);" +
+      "}" +
+      ".fp-stack-main {" +
+      "  flex: 1 1 auto;" +
+      "  min-width: 0;" +
+      "  padding: var(--wv-space-1) var(--wv-space-1) var(--wv-space-1) 2px;" +
+      "  display: flex;" +
+      "  flex-direction: column;" +
+      "  justify-content: center;" +
+      "}" +
+      ".fp-stack-name {" +
+      "  font-family: var(--wv-mono);" +
+      "  font-size: 11.5px;" +
+      "  font-weight: 500;" +
+      "  white-space: nowrap;" +
+      "  overflow: hidden;" +
+      "  text-overflow: ellipsis;" +
+      "}" +
+      ".fp-stack-meta {" +
+      "  font-size: 10px;" +
+      "  opacity: 0.5;" +
+      "  margin-top: 1px;" +
+      "  white-space: nowrap;" +
+      "  overflow: hidden;" +
+      "  text-overflow: ellipsis;" +
+      "}" +
+      ".fp-stack-leaf { background: var(--wv-accent-dim); }" +
+      ".fp-stack-leaf .fp-stack-name {" +
+      "  color: var(--wv-accent);" +
+      "  font-weight: 600;" +
+      "}" +
       ".fp-stack-selected {" +
       "  background: var(--wv-accent-dim);" +
       "  border-color: var(--wv-content-line);" +
       "}" +
-      ".fp-leaf-mark { opacity: 0.7; }" +
+      ".fp-stack-leaf.fp-stack-selected {" +
+      "  border-color: var(--wv-accent);" +
+      "}" +
+      ".fp-stack-badge {" +
+      "  align-self: center;" +
+      "  flex-shrink: 0;" +
+      "  margin-right: var(--wv-space-1);" +
+      "  font-size: 9px;" +
+      "  font-weight: 600;" +
+      "  text-transform: uppercase;" +
+      "  letter-spacing: 0.04em;" +
+      "  color: var(--wv-accent);" +
+      "  background: var(--wv-accent-dim);" +
+      "  padding: 2px 5px;" +
+      "  border-radius: var(--wv-radius-sm);" +
+      "}" +
       ".fp-empty {" +
       "  opacity: 0.55;" +
       "  font-size: 12px;" +
