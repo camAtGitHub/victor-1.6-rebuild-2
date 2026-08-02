@@ -288,12 +288,8 @@
       });
     }
 
-    var themeSel = document.getElementById("themeSel");
-    if (themeSel && window.WebVizTheme) {
-      themeSel.value = window.WebVizTheme.getPreference();
-      themeSel.addEventListener("change", function () {
-        window.WebVizTheme.setPreference(themeSel.value);
-      });
+    if (window.WebVizTheme && typeof window.WebVizTheme.wireToggleButton === "function") {
+      window.WebVizTheme.wireToggleButton();
     }
 
     var search = document.getElementById("moduleSearch");

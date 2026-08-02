@@ -3,7 +3,7 @@
    does not require the webviz/ tree on the robot. Keep in sync with
    webviz/css/tokens.css when palette changes.
 
-   Theme: dark defaults on :root. Light overrides via html[data-theme="light"]. */
+   Theme: dark defaults on :root. Light via html[data-theme="light"] / .wv-theme-light. */
 
 :root {
   color-scheme: dark;
@@ -84,12 +84,15 @@
   --wv-z-modal: 90;
 }
 
-html[data-theme="dark"] {
+html[data-theme="dark"],
+html.wv-theme-dark {
   color-scheme: dark;
 }
 
-/* Light chrome — same token names, reassigned. Geometry/type/z/motion inherit. */
-html[data-theme="light"] {
+/* Light chrome — same token names, reassigned. Geometry/type/z/motion inherit.
+   Match both data-theme and .wv-theme-light (theme.js sets both). */
+html[data-theme="light"],
+html.wv-theme-light {
   color-scheme: light;
 
   /* Surfaces */

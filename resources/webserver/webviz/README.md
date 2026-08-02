@@ -17,8 +17,8 @@ Modular **host shell** for WebViz. Entry page is still `../webViz.html` (served 
 | `js/socket.js` | WebSocket + reconnect + resubscribe |
 | `js/loader.js` | Sequential load of `webVizModules/*.js` IIFEs + scoped CSS |
 | `js/shell-ui.js` | Nav / surfaces / toasts DOM |
-| `js/theme.js` | Color scheme preference + `data-theme` apply (`WebVizTheme`) |
-| `js/app.js` | Bootstrap + lifecycle (wires `#themeSel`) |
+| `js/theme.js` | Color scheme preference + apply (`WebVizTheme`); footer toggle |
+| `js/app.js` | Bootstrap + lifecycle |
 
 ## Theme
 
@@ -27,19 +27,19 @@ Selectable chrome color scheme on the modern shell (`webViz.html` / `webViz.beta
 | Concept | Mechanism |
 |---|---|
 | Preference | `localStorage` key **`webviz.colorScheme`** ∈ `"system"` \| `"dark"` \| `"light"` (default **system**) |
-| UI control | Top bar `<select id="themeSel">` — System / Dark / Light; `app.js` → `WebVizTheme.setPreference` |
-| Effective theme | `html[data-theme="dark"]` or `html[data-theme="light"]` only (never `"system"` on the attribute) |
+| UI control | Footer icon `#btnThemeToggle` (right of `#statusRight`) — **toggles** dark ↔ light via `WebVizTheme.toggle()` |
+| Effective theme | `html[data-theme]` + class `wv-theme-dark` / `wv-theme-light`; **inline CSS vars on `<html>`** for light (works even if tokens.css is stale) |
 | Resolve | System → `prefers-color-scheme`; missing media API → **dark** (historic default) |
 
 ### Files
 
 | File | Role |
 |---|---|
-| `css/tokens.css` | SoT: dark values on `:root`; light reassigns same `--wv-*` names under `html[data-theme="light"]` |
-| `js/theme.js` | `WebVizTheme` API: get/set preference, apply, OS listener; self-inits |
-| `webViz.html` / `webViz.beta.html` | Inline **FOUC** script in `<head>` before CSS sets `data-theme` from storage + `matchMedia` |
+| `css/tokens.css` | SoT: dark on `:root`; light under `html[data-theme="light"]` / `html.wv-theme-light` |
+| `js/theme.js` | `WebVizTheme`: get/set/toggle/apply; applies light vars via `style.setProperty`; wires footer button |
+| `webViz.html` / `webViz.beta.html` | FOUC in `<head>` (attr + class + early light vars); cache-bust `?v=theme3` on CSS/JS |
 
-Path A mirror (console vars): `../cv-tokens.css` — keep in sync when the palette changes. Consolevars has **no** theme UI in v1; setting `data-theme` in DevTools (or later FOUC) is enough for token-driven chrome.
+Path A mirror: `../cv-tokens.css` — keep in sync. Consolevars has no theme UI in v1.
 
 ### Invariant — chrome vs module hosts
 
@@ -52,7 +52,7 @@ Modules must **not** depend on `WebVizTheme`. Dual-theme chart canvases are out 
 
 ### Manual smoke list (no robot browser from agents)
 
-After scp / hard-refresh, flip System / Dark / Light and spot-check:
+After scp / hard-refresh, click the footer sun/moon toggle and spot-check:
 
 | Module | Why |
 |---|---|

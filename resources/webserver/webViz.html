@@ -5,25 +5,55 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Victor WebViz</title>
 
-  <!-- FOUC: set data-theme before any stylesheet that uses tokens -->
+  <!-- FOUC: set data-theme + class before any stylesheet that uses tokens -->
   <script>
   (function () {
+    var root = document.documentElement;
+    var dark = true;
     try {
       var p = localStorage.getItem("webviz.colorScheme") || "system";
-      var dark;
       if (p === "light") dark = false;
       else if (p === "dark") dark = true;
-      else {
-        // system
-        if (window.matchMedia) {
-          dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        } else {
-          dark = true; // historic WebViz default
-        }
+      else if (window.matchMedia) {
+        dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
       }
-      document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
     } catch (e) {
-      document.documentElement.setAttribute("data-theme", "dark");
+      dark = true;
+    }
+    var t = dark ? "dark" : "light";
+    root.setAttribute("data-theme", t);
+    root.classList.remove("wv-theme-light", "wv-theme-dark");
+    root.classList.add(dark ? "wv-theme-dark" : "wv-theme-light");
+    /* Inline light vars early so paint is correct even if tokens.css is cached without light block */
+    if (!dark) {
+      var L = {
+        "--wv-bg": "#f0f2f6",
+        "--wv-bg-elev": "#ffffff",
+        "--wv-bg-panel": "#e8ecf2",
+        "--wv-bg-hover": "#dde3ec",
+        "--wv-bg-active": "#d0d8e4",
+        "--wv-bg-input": "#ffffff",
+        "--wv-line": "#c5ccd8",
+        "--wv-line-soft": "#d8dee8",
+        "--wv-line-strong": "#9aa6b8",
+        "--wv-text": "#1a1d24",
+        "--wv-text-dim": "#5c667a",
+        "--wv-text-faint": "#8b95a8",
+        "--wv-text-inv": "#ffffff",
+        "--wv-accent-strong": "#3d87c4",
+        "--wv-content-bg": "#ffffff",
+        "--wv-content-text": "#1a1d24",
+        "--wv-content-line": "#c5cad3",
+        "--wv-toast-error-bg": "#fdecee",
+        "--wv-shadow-sm": "0 1px 2px rgba(0,0,0,0.08)",
+        "--wv-shadow-md": "0 8px 24px rgba(0,0,0,0.1)"
+      };
+      for (var k in L) {
+        if (Object.prototype.hasOwnProperty.call(L, k)) root.style.setProperty(k, L[k]);
+      }
+      root.style.colorScheme = "light";
+    } else {
+      root.style.colorScheme = "dark";
     }
   })();
   </script>
@@ -47,8 +77,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="webviz/css/tokens.css" />
-  <link rel="stylesheet" href="webviz/css/shell.css" />
+  <link rel="stylesheet" href="webviz/css/tokens.css?v=theme3" />
+  <link rel="stylesheet" href="webviz/css/shell.css?v=theme3" />
 </head>
 <body>
   <div class="app" id="app">
@@ -78,14 +108,6 @@
 
       <div class="top-actions">
         <button type="button" class="btn btn-icon" id="btnNavToggle" title="Collapse sidebar" aria-label="Collapse sidebar">☰</button>
-        <label class="theme-sel" title="Color scheme">
-          <span class="visually-hidden" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Color scheme</span>
-          <select id="themeSel" aria-label="Color scheme" title="Color scheme">
-            <option value="system">System</option>
-            <option value="dark">Dark</option>
-            <option value="light">Light</option>
-          </select>
-        </label>
         <button type="button" class="btn" id="btnReconnect" title="Force reconnect">Reconnect</button>
         <a class="btn btn-link" href="/" title="Web server home">Home</a>
       </div>
@@ -151,7 +173,19 @@
 
     <footer class="status" role="contentinfo">
       <span class="left" id="statusLeft">Starting…</span>
-      <span class="right" id="statusRight">—</span>
+      <span class="status-end">
+        <span class="right" id="statusRight">—</span>
+        <button
+          type="button"
+          class="btn btn-icon theme-toggle"
+          id="btnThemeToggle"
+          title="Switch to light theme"
+          aria-label="Switch to light theme"
+          aria-pressed="false"
+        >
+          <span id="themeToggleIcon" aria-hidden="true">☀</span>
+        </button>
+      </span>
     </footer>
   </div>
 
@@ -159,7 +193,7 @@
 
   <!-- Shell (order matters) -->
   <script src="webviz/js/config.js"></script>
-  <script src="webviz/js/theme.js"></script>
+  <script src="webviz/js/theme.js?v=theme3"></script>
   <script src="webviz/js/socket.js"></script>
   <script src="webviz/js/loader.js"></script>
   <script src="webviz/js/shell-ui.js"></script>
