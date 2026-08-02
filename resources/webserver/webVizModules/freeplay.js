@@ -7,7 +7,8 @@
  * Stock Behaviors / BehaviorConds tabs stay untouched as power tools.
  * Styles: content tokens only (--wv-content-*) on light .module-host.
  *
- * Manual verify (S1–S9): plan Phase 6. No automated harness in this tree.
+ * Manual verify (S1–S9 + UX U1–U11): WEBVIZ-FREEPLAY-PLAN / UX-PLAN. No automated harness.
+ * P6: optional secondary timeline (collapsed details; canvas bars; click scrub).
  */
 (function (myMethods, sendData) {
   "use strict";
@@ -17,6 +18,8 @@
   var MAX_CONDS_PER_OWNER = 50;
   var MAX_OWNERS = 100;
   var MAX_GATES_DISPLAY = 50;
+  // P6 secondary timeline: last N log rows (demo uses 40)
+  var MAX_TIMELINE = 40;
 
   var liveStack = [];
   var bsTime = null;
@@ -49,6 +52,13 @@
   var lastRenderedStackKey = null;
   var lastRenderedOwner = null;
   var lastRenderedSelectedLogId = null;
+  // P6 timeline dirty cache (redraw only on log head/count/selection/size, not cond ticks)
+  var lastTimelineHeadId = null;
+  var lastTimelineCount = -1;
+  var lastTimelineSelectedLogId = null;
+  var lastTimelineCssW = 0;
+  // Click hit bands in CSS pixels after dpr transform: { id, x0, x1 }
+  var timelineHits = [];
 
   // Multi-channel shell contract (app.js wireRetain / onChannelData)
   myMethods.channels = ["behaviors", "behaviorconds"];
@@ -465,6 +475,20 @@
     scrollLogSelectionIntoView();
   }
 
+  /** Scrub by entry id (timeline click → same path as log row). */
+  function selectLogById(id) {
+    if (id == null) {
+      return;
+    }
+    var i;
+    for (i = 0; i < transitionLog.length; i++) {
+      if (transitionLog[i].id === id) {
+        selectLogByIndex(i);
+        return;
+      }
+    }
+  }
+
   /**
    * Move scrub selection in log. delta +1 = older (down/j), -1 = newer (up/k).
    * From live with no selection, either direction selects first visible row.
@@ -571,6 +595,10 @@
     transitionLog = [];
     lastRenderedLogHeadId = null;
     lastRenderedSelectedLogId = null;
+    lastTimelineHeadId = null;
+    lastTimelineCount = -1;
+    lastTimelineSelectedLogId = null;
+    timelineHits = [];
     shouldFlashLog = false;
     // Scrub target may be gone — return to live
     if (!liveMode) {
@@ -767,9 +795,17 @@
       "    </div>" +
       "  </section>" +
       "</div>" +
+      /* P6 secondary timeline: collapsed by default; does not replace Ops */
+      '<details class="fp-timeline" data-fp="timelineDetails">' +
+      "  <summary>Timeline (secondary)</summary>" +
+      '  <div class="fp-timeline-wrap">' +
+      '    <canvas class="fp-timeline-canvas" data-fp="timelineCanvas" role="img" aria-label="Transition history timeline — click a band to scrub"></canvas>' +
+      '    <p class="fp-timeline-caption">Secondary history — primary debugging stays on Ops.</p>' +
+      "  </div>" +
+      "</details>" +
       '<details class="fp-dev" data-fp="devDetails">' +
       "  <summary>Dev tools</summary>" +
-      '  <p class="fp-dev-hint">Force-run / inject: use stock tabs (FreePlay is read-only). Keys (focus FreePlay): L/Esc → Live · j/k or ↓/↑ log scrub · / filter log.</p>' +
+      '  <p class="fp-dev-hint">Force-run / inject: use stock tabs (FreePlay is read-only). Keys (focus FreePlay): L/Esc → Live · j/k or ↓/↑ log scrub · / filter log. Timeline (secondary) is under Ops when expanded.</p>' +
       '  <div class="fp-dev-links">' +
       '    <button type="button" class="fp-dev-link" data-fp="openBehaviors">Open Behaviors</button>' +
       '    <button type="button" class="fp-dev-link" data-fp="openConds">Open BehaviorConds</button>' +
@@ -806,6 +842,8 @@
       gatesEmpty: root.querySelector('[data-fp="gatesEmpty"]'),
       rawBehaviors: root.querySelector('[data-fp="rawBehaviors"]'),
       rawConds: root.querySelector('[data-fp="rawConds"]'),
+      timelineDetails: root.querySelector('[data-fp="timelineDetails"]'),
+      timelineCanvas: root.querySelector('[data-fp="timelineCanvas"]'),
       devDetails: root.querySelector('[data-fp="devDetails"]'),
       openBehaviors: root.querySelector('[data-fp="openBehaviors"]'),
       openConds: root.querySelector('[data-fp="openConds"]'),
@@ -815,6 +853,20 @@
     els.liveBtn.addEventListener("click", function () {
       goLive();
     });
+
+    // P6: draw when expanded; click canvas band → scrub by log id
+    if (els.timelineDetails) {
+      els.timelineDetails.addEventListener("toggle", function () {
+        if (els.timelineDetails.open) {
+          lastTimelineHeadId = null;
+          lastTimelineCssW = 0;
+          renderTimeline(true);
+        }
+      });
+    }
+    if (els.timelineCanvas) {
+      els.timelineCanvas.addEventListener("click", onTimelineClick);
+    }
 
     els.openBehaviors.addEventListener("click", function () {
       openStockTab("behaviors");
@@ -1054,6 +1106,8 @@
       }
       lastRenderedSelectedLogId = selectedLogId;
       applyLogFilter();
+      // P6: selection highlight on open timeline (no log head change)
+      renderTimeline(false);
       return;
     }
 
@@ -1345,6 +1399,269 @@
     applyGatesFilter();
   }
 
+  /**
+   * Read a CSS custom property from the FreePlay root (content tokens).
+   * Canvas cannot use CSS vars directly — sample via getComputedStyle.
+   */
+  function readCssVar(name, fallback) {
+    var el = (els && els.root) || document.documentElement;
+    var v = "";
+    try {
+      v = getComputedStyle(el).getPropertyValue(name).trim();
+    } catch (e) {
+      v = "";
+    }
+    return v || fallback || "";
+  }
+
+  /** Colors for P6 canvas — content tokens only (no dark-hex palette). */
+  function timelineTheme() {
+    return {
+      bg: readCssVar("--wv-content-bg", "#ffffff"),
+      text: readCssVar("--wv-content-text", "#222222"),
+      line: readCssVar("--wv-content-line", "#cccccc"),
+      accent: readCssVar("--wv-accent", "#5b9fd4"),
+      warn: readCssVar("--wv-warn", "#c9892d"),
+    };
+  }
+
+  /**
+   * P6: map canvas click (CSS pixels) to a log-entry band and scrub.
+   * Improves on demo timeline which is passive / display-only.
+   */
+  function onTimelineClick(ev) {
+    if (!els || !els.timelineCanvas || !timelineHits.length) {
+      return;
+    }
+    var canvas = els.timelineCanvas;
+    var rect = canvas.getBoundingClientRect();
+    if (!rect.width) {
+      return;
+    }
+    // Hits stored in logical CSS pixels after ctx.setTransform(dpr,…)
+    var x = ((ev.clientX - rect.left) / rect.width) * (lastTimelineCssW || rect.width);
+    var best = null;
+    var i;
+    for (i = 0; i < timelineHits.length; i++) {
+      var h = timelineHits[i];
+      if (x >= h.x0 && x < h.x1) {
+        best = h;
+        break;
+      }
+    }
+    if (!best) {
+      // Nearest band mid (edge clicks)
+      var bestDist = Infinity;
+      for (i = 0; i < timelineHits.length; i++) {
+        var mid = (timelineHits[i].x0 + timelineHits[i].x1) * 0.5;
+        var d = Math.abs(x - mid);
+        if (d < bestDist) {
+          bestDist = d;
+          best = timelineHits[i];
+        }
+      }
+    }
+    if (best && best.id != null) {
+      selectLogById(best.id);
+    }
+  }
+
+  /**
+   * P6 secondary timeline: last MAX_TIMELINE log rows as stacked horizontal bars.
+   * Only when details open. Skip redraw when head/count/selection/width unchanged.
+   * @param {boolean} [force]
+   */
+  function renderTimeline(force) {
+    if (!els || !els.timelineCanvas || !els.timelineDetails) {
+      return;
+    }
+    // Collapsed: do not paint; invalidate cache so open always draws fresh
+    if (!els.timelineDetails.open) {
+      return;
+    }
+
+    var headId = transitionLog.length ? transitionLog[0].id : null;
+    var count = transitionLog.length;
+    var canvas = els.timelineCanvas;
+    var wrap = canvas.parentElement;
+    var cssW = wrap ? Math.max(200, wrap.clientWidth - 4) : 200;
+    var selKey = selectedLogId;
+
+    if (
+      !force &&
+      headId === lastTimelineHeadId &&
+      count === lastTimelineCount &&
+      selKey === lastTimelineSelectedLogId &&
+      cssW === lastTimelineCssW &&
+      canvas.width > 0
+    ) {
+      return;
+    }
+
+    lastTimelineHeadId = headId;
+    lastTimelineCount = count;
+    lastTimelineSelectedLogId = selKey;
+    lastTimelineCssW = cssW;
+    timelineHits = [];
+
+    var cssH = wrap
+      ? Math.max(100, (wrap.clientHeight || 140) - 28)
+      : 120;
+    var dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.floor(cssW * dpr);
+    canvas.height = Math.floor(cssH * dpr);
+    canvas.style.width = cssW + "px";
+    canvas.style.height = cssH + "px";
+
+    var ctx = canvas.getContext("2d");
+    if (!ctx) {
+      return;
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    var theme = timelineTheme();
+    ctx.fillStyle = theme.bg;
+    ctx.fillRect(0, 0, cssW, cssH);
+
+    // Newest-first log → reverse to oldest-left for time axis (matches demo)
+    var recent = transitionLog.slice(0, MAX_TIMELINE).reverse();
+    if (!recent.length) {
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = theme.text;
+      ctx.font = "12px " + (readCssVar("--wv-sans", "system-ui") || "system-ui");
+      ctx.fillText("No transitions yet", 12, 28);
+      ctx.globalAlpha = 1;
+      return;
+    }
+
+    // Unique behavior names in first-seen order across recent stacks
+    var names = [];
+    var seen = Object.create(null);
+    var ri;
+    for (ri = 0; ri < recent.length; ri++) {
+      var st = recent[ri].stack || [];
+      var si;
+      for (si = 0; si < st.length; si++) {
+        var b = st[si];
+        if (b != null && !seen[b]) {
+          seen[b] = true;
+          names.push(String(b));
+        }
+      }
+    }
+
+    var labelW = Math.min(140, Math.floor(cssW * 0.28));
+    var rowH = Math.min(
+      20,
+      Math.max(12, (cssH - 24) / Math.max(names.length, 1))
+    );
+    var t0 = typeof recent[0].t === "number" && isFinite(recent[0].t) ? recent[0].t : 0;
+    var lastT = recent[recent.length - 1].t;
+    var t1 =
+      typeof lastT === "number" && isFinite(lastT)
+        ? lastT
+        : t0;
+    // Prefer live BS time as right edge when newer
+    if (typeof bsTime === "number" && isFinite(bsTime) && bsTime > t1) {
+      t1 = bsTime;
+    }
+    if (t1 <= t0) {
+      t1 = t0 + 0.01;
+    }
+    var span = t1 - t0;
+    var plotW = cssW - labelW - 12;
+
+    var mono =
+      "10px " + (readCssVar("--wv-mono", "ui-monospace, monospace") || "monospace");
+    ctx.font = mono;
+
+    // Row labels + guide lines
+    var ni;
+    for (ni = 0; ni < names.length; ni++) {
+      var y = 12 + ni * rowH;
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = theme.text;
+      var label = names[ni];
+      if (label.length > 16) {
+        label = label.slice(0, 14) + "…";
+      }
+      ctx.fillText(label, 6, y + Math.min(12, rowH - 2));
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = theme.line;
+      ctx.beginPath();
+      ctx.moveTo(labelW, y + rowH - 2);
+      ctx.lineTo(cssW - 6, y + rowH - 2);
+      ctx.stroke();
+    }
+
+    // Time bands + stack bars; record hit regions for scrub
+    for (ri = 0; ri < recent.length; ri++) {
+      var r = recent[ri];
+      var tStart =
+        typeof r.t === "number" && isFinite(r.t) ? r.t : t0 + (ri / recent.length) * span;
+      var tEnd;
+      if (ri + 1 < recent.length) {
+        var nt = recent[ri + 1].t;
+        tEnd =
+          typeof nt === "number" && isFinite(nt)
+            ? nt
+            : tStart + span / recent.length;
+      } else if (typeof bsTime === "number" && isFinite(bsTime) && bsTime > tStart) {
+        tEnd = bsTime;
+      } else {
+        tEnd = t1;
+      }
+      if (tEnd < tStart) {
+        tEnd = tStart;
+      }
+      var x0 = labelW + ((tStart - t0) / span) * plotW;
+      var x1 = labelW + ((tEnd - t0) / span) * plotW;
+      var bandW = Math.max(2, x1 - x0 - 1);
+
+      timelineHits.push({ id: r.id, x0: x0, x1: Math.max(x0 + 2, x1) });
+
+      // Selection highlight (full vertical band) — improve on passive demo
+      if (!liveMode && selectedLogId != null && r.id === selectedLogId) {
+        ctx.globalAlpha = 0.12;
+        ctx.fillStyle = theme.warn;
+        ctx.fillRect(x0, 6, bandW + 1, cssH - 14);
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = theme.warn;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x0 + 0.5, 6.5, bandW, cssH - 15);
+        ctx.lineWidth = 1;
+      }
+
+      var leaf = r.leaf || "";
+      var stack = r.stack || [];
+      for (si = 0; si < stack.length; si++) {
+        var name = String(stack[si]);
+        var rowIdx = names.indexOf(name);
+        if (rowIdx < 0) {
+          continue;
+        }
+        var by = 12 + rowIdx * rowH + 3;
+        var isLeaf = name === leaf;
+        ctx.globalAlpha = isLeaf ? 0.75 : 0.35;
+        ctx.fillStyle = theme.accent;
+        ctx.fillRect(x0, by, bandW, Math.max(4, rowH - 8));
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // "Now" line at bsTime when available
+    if (typeof bsTime === "number" && isFinite(bsTime) && bsTime >= t0) {
+      var xNow = labelW + ((bsTime - t0) / span) * plotW;
+      ctx.globalAlpha = 0.7;
+      ctx.strokeStyle = theme.warn;
+      ctx.beginPath();
+      ctx.moveTo(xNow, 6);
+      ctx.lineTo(xNow, cssH - 8);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+
   function renderRaw(force) {
     if (!els) {
       return;
@@ -1382,10 +1699,13 @@
       lastRenderedLogHeadId = null;
       lastRenderedStackKey = null;
       lastRenderedSelectedLogId = null;
+      lastTimelineHeadId = null;
+      lastTimelineCssW = 0;
       renderHeader();
       renderStack();
       renderLog();
       renderGates();
+      renderTimeline(true);
       renderRaw(false);
       return;
     }
@@ -1400,6 +1720,8 @@
     }
     if (dirty.log) {
       renderLog();
+      // P6: timeline follows log head/count only — not gates/cond ticks
+      renderTimeline(false);
     }
     if (dirty.gates) {
       renderGates();
@@ -1452,6 +1774,11 @@
     lastRenderedStackKey = null;
     lastRenderedOwner = null;
     lastRenderedSelectedLogId = null;
+    lastTimelineHeadId = null;
+    lastTimelineCount = -1;
+    lastTimelineSelectedLogId = null;
+    lastTimelineCssW = 0;
+    timelineHits = [];
   }
 
   myMethods.init = function (elem) {
@@ -2052,6 +2379,59 @@
       "  opacity: 0.55;" +
       "  padding: var(--wv-space-1) 0;" +
       "  font-family: var(--wv-mono);" +
+      "}" +
+      /* P6 secondary timeline: collapsed by default under ops workspace */
+      ".fp-timeline {" +
+      "  flex-shrink: 0;" +
+      "  border: 1px solid var(--wv-content-line);" +
+      "  border-radius: var(--wv-radius);" +
+      "  background: var(--wv-content-bg);" +
+      "  padding: var(--wv-space-2) var(--wv-space-3);" +
+      "  box-shadow: var(--wv-shadow-sm);" +
+      "  overflow: hidden;" +
+      "}" +
+      ".fp-timeline summary {" +
+      "  cursor: pointer;" +
+      "  font-weight: 600;" +
+      "  font-size: 12px;" +
+      "  text-transform: uppercase;" +
+      "  letter-spacing: 0.03em;" +
+      "  color: var(--wv-content-text);" +
+      "  user-select: none;" +
+      "}" +
+      ".fp-timeline summary:focus {" +
+      "  outline: 2px solid var(--wv-accent);" +
+      "  outline-offset: 1px;" +
+      "}" +
+      ".fp-timeline-wrap {" +
+      "  display: flex;" +
+      "  flex-direction: column;" +
+      "  min-height: 0;" +
+      "  height: 160px;" +
+      "  margin-top: var(--wv-space-2);" +
+      "  overflow: hidden;" +
+      "}" +
+      ".fp-timeline-canvas {" +
+      "  flex: 1 1 auto;" +
+      "  min-height: 100px;" +
+      "  width: 100%;" +
+      "  max-height: 100%;" +
+      "  display: block;" +
+      "  cursor: pointer;" +
+      "  box-sizing: border-box;" +
+      "  border: 1px solid var(--wv-content-line);" +
+      "  border-radius: var(--wv-radius-sm);" +
+      "  background: var(--wv-content-bg);" +
+      "}" +
+      ".fp-timeline-caption {" +
+      "  flex-shrink: 0;" +
+      "  margin: var(--wv-space-1) 0 0 0;" +
+      "  font-size: 11px;" +
+      "  opacity: 0.55;" +
+      "  color: var(--wv-content-text);" +
+      "  white-space: nowrap;" +
+      "  overflow: hidden;" +
+      "  text-overflow: ellipsis;" +
       "}" +
       /* Dev tools: collapsed = summary only; open may grow into host scroll */
       ".fp-dev {" +
