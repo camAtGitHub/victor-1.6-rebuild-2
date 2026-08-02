@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Victor WebViz</title>
+
+  <!--
+    WebViz shell (rebuild).
+    - Hosts stock modules in webVizModules/ via the same WS protocol.
+    - Engine :8888 vs Anim :8889 module sets (see webviz/js/config.js).
+    - Legacy UI: webViz.legacy.html
+  -->
+
+  <!-- Module runtime deps (same libs stock modules expect) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/4.13.0/d3.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  <script src="/p5.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/flot/0.8.3/jquery.flot.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/datatables/1.10.16/js/jquery.dataTables.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/datatables/1.10.16/css/jquery.dataTables.min.css" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="webviz/css/tokens.css" />
+  <link rel="stylesheet" href="webviz/css/shell.css" />
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="top" role="banner">
+      <div class="brand" title="Vector WebViz">
+        <div class="mark" aria-hidden="true">V</div>
+        <span class="title">WebViz <em id="brandSubtitle">Engine</em></span>
+      </div>
+
+      <div class="conn is-connecting" id="conn" title="WebSocket connection">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="connLabel">connecting…</span>
+      </div>
+
+      <div class="meta-pills" aria-label="Session meta">
+        <span class="pill" id="pillProcess">—</span>
+        <span class="pill" id="pillPort">—</span>
+        <span class="pill pill-secondary" id="pillModuleCount">—</span>
+        <span class="pill pill-secondary" id="pillActive">Overview</span>
+      </div>
+
+      <label class="search" title="Filter modules (Ctrl/Cmd+K)">
+        <span class="visually-hidden" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Filter modules</span>
+        <input type="search" id="moduleSearch" placeholder="Filter modules…" autocomplete="off" />
+        <kbd>⌘K</kbd>
+      </label>
+
+      <div class="top-actions">
+        <button type="button" class="btn btn-icon" id="btnNavToggle" title="Collapse sidebar" aria-label="Collapse sidebar">☰</button>
+        <button type="button" class="btn" id="btnReconnect" title="Force reconnect">Reconnect</button>
+        <a class="btn btn-link" href="/" title="Web server home">Home</a>
+      </div>
+    </header>
+
+    <div class="body">
+      <nav class="nav" aria-label="WebViz modules">
+        <div class="nav-head">
+          <h2>Modules</h2>
+        </div>
+        <div class="nav-scroll" id="navScroll">
+          <!-- filled by shell-ui -->
+        </div>
+        <div class="nav-foot">
+          <!-- Hidden unless remote feed: ?host=…, stored host, or WebViz.connect / useLocal -->
+          <div id="feedControls" class="feed-controls" hidden>
+            <div class="nav-foot-text">Robot feed</div>
+            <label class="visually-hidden" for="feedHost" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Robot IP</label>
+            <input
+              type="text"
+              id="feedHost"
+              class="feed-input"
+              spellcheck="false"
+              autocomplete="off"
+              placeholder="robot IP (blank = this host)"
+              title="WebSocket host. Leave blank to use this page's host. Console: WebViz.connect('ip')"
+            />
+            <div class="feed-row">
+              <button type="button" class="btn" id="btnFeedApply" title="Apply robot feed">Apply</button>
+              <button type="button" class="btn" id="btnFeedClear" title="Use this page as feed">Local</button>
+            </div>
+            <div class="nav-foot-text" id="feedHint" style="margin-top:8px;word-break:break-all;line-height:1.35">
+              console: WebViz.connect('robot-ip')
+            </div>
+          </div>
+          <div class="nav-foot-text">Process port</div>
+          <label class="visually-hidden" for="portSel" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Port</label>
+          <select id="portSel" title="Engine 8888 / Anim 8889">
+            <option value="8888">Engine :8888</option>
+            <option value="8889">Anim :8889</option>
+          </select>
+          <div class="nav-foot-text" style="margin-top:6px">
+            Also: <a id="otherProcessLink" href="#">other process</a>
+          </div>
+        </div>
+      </nav>
+
+      <main class="stage" id="stage">
+        <section class="surface is-active" data-mod="overview" id="surface-overview">
+          <div class="surface-head">
+            <h1>Overview</h1>
+            <span class="desc">Shell status and module index</span>
+          </div>
+          <div class="module-host">
+            <div class="state-msg">
+              <h3>Loading…</h3>
+              <p>Fetching module scripts and opening the WebSocket.</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <footer class="status" role="contentinfo">
+      <span class="left" id="statusLeft">Starting…</span>
+      <span class="right" id="statusRight">—</span>
+    </footer>
+  </div>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <!-- Shell (order matters) -->
+  <script src="webviz/js/config.js"></script>
+  <script src="webviz/js/socket.js"></script>
+  <script src="webviz/js/loader.js"></script>
+  <script src="webviz/js/shell-ui.js"></script>
+  <script src="webviz/js/app.js"></script>
+</body>
+</html>
