@@ -1,0 +1,1714 @@
+<!DOCTYPE html>
+<!-- Reference Ops/Timeline mock only — not robot-deployed.
+     Production FreePlay WebViz module: resources/webserver/webVizModules/freeplay.js
+     Design/UX: docs/mapping/WEBVIZ-FREEPLAY-DESIGN.md, WEBVIZ-FREEPLAY-UX-PLAN.md -->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WebViz UX Demo — Freeplay Behavior Debugger</title>
+  <style>
+    :root {
+      --bg: #0f1218;
+      --bg-elev: #171b24;
+      --bg-elev-2: #1e2430;
+      --border: #2a3142;
+      --border-soft: #222836;
+      --text: #e8ecf4;
+      --text-dim: #8b95a8;
+      --text-faint: #5c667a;
+      --accent: #5b9fd4;
+      --accent-soft: rgba(91, 159, 212, 0.15);
+      --good: #3ecf8e;
+      --good-soft: rgba(62, 207, 142, 0.12);
+      --bad: #f07178;
+      --bad-soft: rgba(240, 113, 120, 0.12);
+      --warn: #e6b450;
+      --warn-soft: rgba(230, 180, 80, 0.12);
+      --leaf: #c792ea;
+      --leaf-soft: rgba(199, 146, 234, 0.15);
+      --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+      --sans: "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      --radius: 8px;
+      --topbar-h: 52px;
+      --footer-h: 36px;
+      --banner-h: 28px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ═══════════════════════════════════════════════════════════
+       VIEWPORT LOCK — page never grows; only panels scroll
+       ═══════════════════════════════════════════════════════════ */
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.4;
+      font-size: 13px;
+    }
+
+    .app {
+      height: 100%;
+      height: 100dvh;
+      max-height: 100dvh;
+      display: grid;
+      /* topbar | optional banner | main workspace | footer */
+      grid-template-rows: auto auto minmax(0, 1fr) var(--footer-h);
+      min-height: 0;
+    }
+
+    /* —— Top bar: single row, overflow ellipsis, no wrap growth —— */
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 10px 14px;
+      padding: 0 12px;
+      height: var(--topbar-h);
+      min-height: var(--topbar-h);
+      max-height: var(--topbar-h);
+      background: var(--bg-elev);
+      border-bottom: 1px solid var(--border);
+      min-width: 0;
+      overflow: hidden;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      font-size: 13px;
+      flex-shrink: 0;
+      letter-spacing: -0.02em;
+    }
+    .brand .logo {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, var(--accent), var(--leaf));
+      display: grid;
+      place-items: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: #0a0c10;
+    }
+    .brand .title { white-space: nowrap; }
+    .brand small {
+      display: none; /* reclaim space; demo note lives in banner */
+    }
+
+    .status-pills {
+      display: flex;
+      gap: 6px;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--bg-elev-2);
+      border: 1px solid var(--border-soft);
+      font-size: 11px;
+      color: var(--text-dim);
+      font-family: var(--mono);
+      white-space: nowrap;
+      flex-shrink: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+    .pill strong { color: var(--text); font-weight: 500; }
+    .pill .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--text-faint);
+      flex-shrink: 0;
+    }
+    .pill.live .dot {
+      background: var(--good);
+      box-shadow: 0 0 0 3px var(--good-soft);
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+    .pill.paused .dot { background: var(--warn); }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.45; }
+    }
+    /* Hide lower-priority pills before the bar wraps/grows */
+    @media (max-width: 1100px) {
+      .pill-mood, .pill-log { display: none; }
+    }
+    @media (max-width: 820px) {
+      .pill-feature { display: none; }
+      .brand .title { display: none; }
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    button {
+      font: inherit;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg-elev-2);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 11px;
+      white-space: nowrap;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    button:hover {
+      background: #262d3c;
+      border-color: #3a4458;
+    }
+    button.primary {
+      background: var(--accent-soft);
+      border-color: rgba(91, 159, 212, 0.4);
+      color: #9ec9ea;
+    }
+    button.primary:hover { background: rgba(91, 159, 212, 0.25); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button.active-toggle {
+      background: var(--good-soft);
+      border-color: rgba(62, 207, 142, 0.4);
+      color: var(--good);
+    }
+
+    .view-modes {
+      display: inline-flex;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 2px;
+      gap: 1px;
+    }
+    .view-modes button {
+      border: none;
+      background: transparent;
+      padding: 4px 8px;
+      border-radius: 4px;
+      color: var(--text-dim);
+    }
+    .view-modes button.on {
+      background: var(--bg-elev-2);
+      color: var(--text);
+    }
+
+    /* —— Compact banner (fixed one line, dismissible) —— */
+    .banner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      height: var(--banner-h);
+      min-height: var(--banner-h);
+      max-height: var(--banner-h);
+      padding: 0 12px;
+      background: var(--accent-soft);
+      border-bottom: 1px solid rgba(91, 159, 212, 0.25);
+      color: #b8d4ea;
+      font-size: 11px;
+      min-width: 0;
+      overflow: hidden;
+    }
+    .banner[hidden] { display: none !important; }
+    .banner p {
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .banner code {
+      font-family: var(--mono);
+      font-size: 10px;
+      background: rgba(0,0,0,0.25);
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+    .banner button {
+      flex-shrink: 0;
+      padding: 2px 8px;
+      font-size: 10px;
+    }
+
+    /* —— Main workspace: fills remaining viewport —— */
+    .workspace {
+      min-height: 0;
+      min-width: 0;
+      overflow: hidden;
+      display: grid;
+      padding: 8px;
+      gap: 8px;
+    }
+
+    /* Ops: 2-row fixed split inside remaining height
+         top ~48%  stack | log
+         bottom ~52% gates (full width)
+       All rows use minmax(0,1fr) so content scrolls inside panels */
+    #view-ops {
+      min-height: 0;
+      min-width: 0;
+      height: 100%;
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) minmax(0, 1.15fr);
+      gap: 8px;
+      overflow: hidden;
+    }
+    .ops-top {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+      gap: 8px;
+      overflow: hidden;
+    }
+    .ops-bottom {
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #view-timeline {
+      min-height: 0;
+      height: 100%;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    #view-timeline[hidden] { display: none !important; }
+    #view-ops[hidden] { display: none !important; }
+
+    /* —— Panels: header fixed, body is the only scroller —— */
+    .panel {
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      min-width: 0;
+      overflow: hidden;
+    }
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border-soft);
+      background: rgba(255,255,255,0.02);
+      flex-shrink: 0;
+    }
+    .panel-head h2 {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-dim);
+    }
+    .panel-head .meta {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-faint);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+    .panel-body {
+      padding: 6px 8px;
+      overflow: auto;           /* ← internal scroll only */
+      flex: 1;
+      min-height: 0;
+      overscroll-behavior: contain;
+    }
+
+    /* Subtle scroll affordance */
+    .panel-body {
+      background:
+        linear-gradient(var(--bg-elev) 30%, transparent) center top,
+        linear-gradient(transparent, var(--bg-elev) 70%) center bottom,
+        radial-gradient(farthest-side at 50% 0, rgba(255,255,255,0.08), transparent) center top,
+        radial-gradient(farthest-side at 50% 100%, rgba(255,255,255,0.08), transparent) center bottom;
+      background-repeat: no-repeat;
+      background-size: 100% 16px, 100% 16px, 100% 8px, 100% 8px;
+      background-attachment: local, local, scroll, scroll;
+    }
+
+    /* —— Stack —— */
+    .stack-list { list-style: none; display: flex; flex-direction: column; gap: 1px; }
+    .stack-item {
+      display: flex;
+      align-items: stretch;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .stack-item:hover { background: var(--bg-elev-2); }
+    .stack-item.selected {
+      background: var(--accent-soft);
+      border-color: rgba(91, 159, 212, 0.35);
+    }
+    .stack-item.leaf { background: var(--leaf-soft); }
+    .stack-item.leaf.selected { border-color: rgba(199, 146, 234, 0.5); }
+    .stack-indent {
+      width: 12px;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .stack-item .connector {
+      position: absolute;
+      left: 5px;
+      top: 0;
+      bottom: 50%;
+      width: 1px;
+      background: var(--border);
+    }
+    .stack-item .connector-h {
+      position: absolute;
+      left: 5px;
+      top: 50%;
+      width: 7px;
+      height: 1px;
+      background: var(--border);
+    }
+    .stack-item:first-child .connector { display: none; }
+    .stack-main {
+      flex: 1;
+      padding: 5px 6px 5px 2px;
+      min-width: 0;
+    }
+    .stack-name {
+      font-family: var(--mono);
+      font-size: 11.5px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .stack-item.leaf .stack-name { color: var(--leaf); }
+    .stack-sub {
+      font-size: 10px;
+      color: var(--text-faint);
+      margin-top: 1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .stack-badge {
+      align-self: center;
+      margin-right: 6px;
+      font-size: 9px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--leaf);
+      padding: 2px 5px;
+      border-radius: 3px;
+      background: rgba(199, 146, 234, 0.12);
+      flex-shrink: 0;
+    }
+
+    /* —— Transition log —— */
+    .log-list { list-style: none; display: flex; flex-direction: column; gap: 2px; }
+    .log-row {
+      display: grid;
+      grid-template-columns: 58px 14px minmax(0, 1fr) auto;
+      gap: 6px;
+      align-items: start;
+      padding: 5px 8px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+    .log-row:hover { background: var(--bg-elev-2); }
+    .log-row.selected {
+      background: var(--accent-soft);
+      border-color: rgba(91, 159, 212, 0.3);
+    }
+    .log-row.flash { animation: flash-in 0.45s ease; }
+    @keyframes flash-in {
+      from { background: rgba(91, 159, 212, 0.35); }
+      to { background: transparent; }
+    }
+    .log-time { color: var(--text-faint); }
+    .log-arrow { color: var(--accent); }
+    .log-body { min-width: 0; }
+    .log-to {
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .log-from {
+      color: var(--text-faint);
+      font-size: 10px;
+      margin-top: 1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .log-tags {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 3px;
+      justify-content: flex-end;
+      max-width: 140px;
+      overflow: hidden;
+    }
+    .tag {
+      font-size: 9px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+    .tag.t { background: var(--good-soft); border-color: rgba(62,207,142,0.35); color: var(--good); }
+    .tag.f { background: var(--bad-soft); border-color: rgba(240,113,120,0.35); color: var(--bad); }
+    .tag.sys { background: var(--warn-soft); border-color: rgba(230,180,80,0.3); color: var(--warn); }
+
+    .empty-hint {
+      color: var(--text-faint);
+      font-size: 12px;
+      padding: 16px 8px;
+      text-align: center;
+    }
+
+    /* —— Gates —— */
+    .gates-toolbar {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 6px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border-soft);
+      flex-shrink: 0;
+      min-width: 0;
+    }
+    .gates-toolbar .focus-label {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--leaf);
+      font-weight: 500;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .gates-toolbar .hint {
+      color: var(--text-faint);
+      font-size: 11px;
+      margin-left: auto;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+    @media (max-width: 700px) {
+      .gates-toolbar .hint { display: none; }
+    }
+
+    /* Gates panel body holds toolbar + scroll region */
+    .gates-panel-body {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+      padding: 6px 8px;
+      flex: 1;
+    }
+    .gates-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      overscroll-behavior: contain;
+    }
+
+    .gate {
+      border: 1px solid var(--border-soft);
+      border-radius: 6px;
+      margin-bottom: 4px;
+      overflow: hidden;
+      background: var(--bg);
+    }
+    .gate-head {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      cursor: pointer;
+      user-select: none;
+      min-width: 0;
+    }
+    .gate-head:hover { background: var(--bg-elev-2); }
+    .gate-verdict {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      min-width: 34px;
+      text-align: center;
+      padding: 2px 0;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    .gate-verdict.t { background: var(--good-soft); color: var(--good); }
+    .gate-verdict.f { background: var(--bad-soft); color: var(--bad); }
+    .gate-name {
+      font-family: var(--mono);
+      font-size: 11.5px;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .gate-chevron {
+      color: var(--text-faint);
+      font-size: 10px;
+      transition: transform 0.15s;
+      flex-shrink: 0;
+    }
+    .gate.open .gate-chevron { transform: rotate(90deg); }
+    .gate-body {
+      display: none;
+      padding: 0 8px 8px 48px;
+      border-top: 1px solid var(--border-soft);
+    }
+    .gate.open .gate-body { display: block; }
+    .factor-row {
+      display: grid;
+      grid-template-columns: minmax(80px, 120px) minmax(0, 1fr);
+      gap: 6px;
+      padding: 3px 0;
+      font-family: var(--mono);
+      font-size: 11px;
+      border-bottom: 1px solid var(--border-soft);
+    }
+    .factor-row:last-child { border-bottom: none; }
+    .factor-key { color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; }
+    .factor-val { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .gate-children {
+      margin-top: 6px;
+      padding-left: 6px;
+      border-left: 2px solid var(--border);
+    }
+
+    /* —— Timeline —— */
+    .timeline-wrap {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      padding: 6px 8px;
+    }
+    .timeline-wrap canvas {
+      flex: 1;
+      min-height: 0;
+      width: 100% !important;
+      max-height: 100%;
+    }
+    .timeline-caption {
+      flex-shrink: 0;
+      font-size: 11px;
+      color: var(--text-faint);
+      padding-top: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* —— Footer strip (never grows the page) —— */
+    .footer {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 12px;
+      height: var(--footer-h);
+      border-top: 1px solid var(--border);
+      background: var(--bg-elev);
+      font-size: 11px;
+      color: var(--text-faint);
+      min-width: 0;
+    }
+    .footer .hint {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .footer code { font-family: var(--mono); font-size: 10px; color: var(--text-dim); }
+
+    /* —— Dev drawer: overlay, does not resize layout —— */
+    .dev-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 40;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s;
+    }
+    .dev-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .dev-drawer {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 50;
+      max-height: min(42vh, 320px);
+      background: var(--bg-elev);
+      border-top: 1px solid var(--border);
+      box-shadow: 0 -12px 40px rgba(0,0,0,0.4);
+      transform: translateY(100%);
+      transition: transform 0.18s ease;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .dev-drawer.open { transform: translateY(0); }
+    .dev-drawer-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-soft);
+      flex-shrink: 0;
+    }
+    .dev-drawer-head h3 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-dim);
+    }
+    .dev-drawer-body {
+      padding: 10px 12px;
+      overflow: auto;
+      min-height: 0;
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr minmax(0, 1.2fr);
+      gap: 10px;
+      overscroll-behavior: contain;
+    }
+    @media (max-width: 800px) {
+      .dev-drawer-body { grid-template-columns: 1fr 1fr; }
+      .dev-raw { grid-column: 1 / -1; }
+    }
+    .dev-drawer-body label {
+      display: block;
+      font-size: 10px;
+      color: var(--text-faint);
+      margin-bottom: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .dev-drawer-body select {
+      width: 100%;
+      font: inherit;
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+    }
+    .dev-row {
+      display: flex;
+      gap: 6px;
+      align-items: flex-end;
+    }
+    .dev-row > *:first-child { flex: 1; min-width: 0; }
+    .dev-row button { flex: 0 0 auto; height: 30px; }
+    .dev-raw pre {
+      font-family: var(--mono);
+      font-size: 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px;
+      max-height: 140px;
+      overflow: auto;
+      color: var(--text-dim);
+      overscroll-behavior: contain;
+    }
+
+    /* Resize handle between ops top/bottom (demo of user-controlled split) */
+    .split-handle {
+      height: 5px;
+      margin: -2px 0;
+      cursor: row-resize;
+      position: relative;
+      z-index: 5;
+      flex-shrink: 0;
+      touch-action: none;
+    }
+    .split-handle::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 1px;
+      transform: translateX(-50%);
+      width: 36px;
+      height: 3px;
+      border-radius: 2px;
+      background: var(--border);
+    }
+    .split-handle:hover::after { background: var(--accent); }
+
+    #view-ops.custom-split {
+      grid-template-rows: var(--ops-top-fr, 1fr) 5px var(--ops-bot-fr, 1.15fr);
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">V</div>
+        <span class="title">Freeplay Behavior Debugger</span>
+      </div>
+
+      <div class="status-pills">
+        <span class="pill live" id="connPill"><span class="dot"></span>&nbsp;Demo</span>
+        <span class="pill">t=<strong id="clock">0.000</strong>s</span>
+        <span class="pill pill-feature">Feat <strong id="featurePill">Exploring</strong></span>
+        <span class="pill pill-mood">Mood <strong id="moodPill">Happy</strong></span>
+        <span class="pill pill-log">Log <strong id="logCount">0</strong>/<span id="logCap">200</span></span>
+      </div>
+
+      <div class="top-actions">
+        <div class="view-modes" title="View mode">
+          <button type="button" class="on" id="viewOps">Ops</button>
+          <button type="button" id="viewTimeline">Timeline</button>
+        </div>
+        <button type="button" id="btnPause" class="active-toggle">Pause</button>
+        <button type="button" id="btnStep" disabled>Step</button>
+        <button type="button" class="primary" id="btnReset">Reset</button>
+        <button type="button" id="btnDev">Dev</button>
+      </div>
+    </header>
+
+    <div class="banner" id="banner">
+      <p>
+        Viewport-locked demo: page never scrolls — only panels do.
+        Layout = live stack + transition log + leaf gates inside fixed fractions of the window.
+      </p>
+      <button type="button" id="btnDismissBanner" title="Dismiss">✕</button>
+    </div>
+
+    <main class="workspace">
+      <!-- OPS VIEW -->
+      <div id="view-ops" class="custom-split">
+        <div class="ops-top">
+          <section class="panel" aria-label="Live stack">
+            <div class="panel-head">
+              <h2>Stack · live</h2>
+              <span class="meta" id="stackDepth">depth 0</span>
+            </div>
+            <div class="panel-body" id="stackBody">
+              <ul class="stack-list" id="stackList"></ul>
+            </div>
+          </section>
+
+          <section class="panel" aria-label="Transition log">
+            <div class="panel-head">
+              <h2>Transition log</h2>
+              <span class="meta">newest first · ring · scrolls here</span>
+            </div>
+            <div class="panel-body" id="logBody">
+              <ul class="log-list" id="logList"></ul>
+            </div>
+          </section>
+        </div>
+
+        <div class="split-handle" id="splitHandle" title="Drag to resize stack/log vs gates"></div>
+
+        <section class="panel ops-bottom" aria-label="Activation gates">
+          <div class="panel-head">
+            <h2>Gates</h2>
+            <span class="meta" id="gatesContext">selected: leaf</span>
+          </div>
+          <div class="gates-panel-body">
+            <div class="gates-toolbar">
+              <span style="color:var(--text-faint);font-size:11px">Focus</span>
+              <span class="focus-label" id="gatesFocus">—</span>
+              <span class="hint">Click stack or log · expand for factors · false gates open</span>
+            </div>
+            <div class="gates-scroll" id="gatesRoot"></div>
+          </div>
+        </section>
+      </div>
+
+      <!-- TIMELINE VIEW -->
+      <div id="view-timeline" hidden>
+        <section class="panel" style="height:100%">
+          <div class="panel-head">
+            <h2>Stack timeline (secondary)</h2>
+            <span class="meta">fits canvas to panel · not a growing page</span>
+          </div>
+          <div class="timeline-wrap">
+            <canvas id="timelineCanvas"></canvas>
+            <p class="timeline-caption">
+              Secondary history view. Primary debugging stays on Ops — this scales to the panel, not the document.
+            </p>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <span class="hint">
+        Viewport-fixed shell · internal panel scroll only ·
+        <code>webviz-ux-demo.html</code>
+      </span>
+      <span id="viewportMeta" class="meta" style="font-family:var(--mono);font-size:10px"></span>
+    </footer>
+  </div>
+
+  <!-- Dev overlay (does not steal permanent layout height) -->
+  <div class="dev-backdrop" id="devBackdrop"></div>
+  <aside class="dev-drawer" id="devDrawer" aria-hidden="true">
+    <div class="dev-drawer-head">
+      <h3>Dev tools</h3>
+      <button type="button" id="btnDevClose">Close</button>
+    </div>
+    <div class="dev-drawer-body">
+      <div>
+        <label for="forceBehavior">Force behavior</label>
+        <div class="dev-row">
+          <select id="forceBehavior"></select>
+          <button type="button" id="btnForce">Run</button>
+        </div>
+      </div>
+      <div>
+        <label for="forceIntent">Inject intent</label>
+        <div class="dev-row">
+          <select id="forceIntent"></select>
+          <button type="button" id="btnIntent">Pending</button>
+        </div>
+      </div>
+      <div class="dev-raw">
+        <label>Last event (raw JSON)</label>
+        <pre id="rawJson">{}</pre>
+      </div>
+    </div>
+  </aside>
+
+  <script>
+(function () {
+  "use strict";
+
+  // ── Demo catalog ─────────────────────────────────────────────────────
+  const BEHAVIORS = {
+    InitNormalOperation: { role: "boot" },
+    ModeSelector: { role: "router" },
+    SleepCycle: { role: "coord" },
+    GlobalInterruptions: { role: "interrupt" },
+    HighLevelAI: { role: "ai" },
+    Observing: { role: "state" },
+    Exploring: { role: "state" },
+    Socializing: { role: "state" },
+    ReactToFace: { role: "react" },
+    ReactToPickup: { role: "react" },
+    DriveOffCharger: { role: "utility" },
+    LookAtFaceInFront: { role: "utility" },
+    EnrollFace: { role: "utility" },
+    GoHome: { role: "utility" },
+    Sleeping: { role: "state" },
+  };
+
+  const INTENTS = [
+    "imperative_come",
+    "imperative_findcube",
+    "greeting_hello",
+    "imperative_quiet",
+    "explore_start",
+  ];
+
+  const FEATURES = ["Exploring", "Observing", "Socializing", "Reacting", "Sleeping", "Onboarding"];
+  const MOODS = ["Happy", "Calm", "Stimulated", "Frustrated", "Sleepy"];
+
+  const GATES_BY_BEHAVIOR = {
+    Observing: [
+      { name: "ConditionTimerInRange", met: true, factors: { elapsed_s: 4.2, min_s: 0, max_s: 30 } },
+      { name: "ConditionFaceKnown", met: false, factors: { lastSeen_s: 12.4, maxAge_s: 5, faceId: "—" } },
+      {
+        name: "ConditionCompound AND",
+        met: true,
+        factors: { operands: 2 },
+        children: [
+          { name: "ConditionRobotHeldInPalm", met: false, factors: { held: false } },
+          { name: "ConditionOnCharger", met: false, factors: { onCharger: false } },
+        ],
+      },
+    ],
+    Exploring: [
+      { name: "ConditionMotionDetected", met: true, factors: { area: "left", strength: 0.62 } },
+      { name: "ConditionCliffDetected", met: false, factors: { anyCliff: false } },
+      { name: "ConditionBatteryLevel", met: true, factors: { pct: 78, minPct: 15 } },
+    ],
+    Socializing: [
+      { name: "ConditionFaceKnown", met: true, factors: { faceId: 3, name: "Alex", lastSeen_s: 0.4 } },
+      { name: "ConditionUserIntentPending", met: false, factors: { pending: "none" } },
+    ],
+    ReactToFace: [
+      { name: "ConditionFacePositionUpdated", met: true, factors: { dx: 0.12, dy: -0.03 } },
+    ],
+    ReactToPickup: [
+      { name: "ConditionRobotPickedUp", met: true, factors: { offTreads: true } },
+    ],
+    HighLevelAI: [
+      { name: "ConditionIsFreeplay", met: true, factors: { mode: "normal" } },
+    ],
+    GlobalInterruptions: [
+      { name: "ConditionSevereBattery", met: false, factors: { pct: 78, threshold: 5 } },
+      { name: "ConditionStuck", met: false, factors: { stuck: false } },
+    ],
+    Sleeping: [
+      { name: "ConditionSleepPressure", met: true, factors: { pressure: 0.91, threshold: 0.8 } },
+    ],
+    LookAtFaceInFront: [
+      { name: "ConditionFaceInFOV", met: true, factors: { conf: 0.88 } },
+    ],
+    DriveOffCharger: [
+      { name: "ConditionOnCharger", met: true, factors: { onCharger: true } },
+    ],
+    GoHome: [
+      { name: "ConditionBatteryLevel", met: true, factors: { pct: 12, minPct: 15 } },
+    ],
+    EnrollFace: [
+      { name: "ConditionUserIntentPending", met: true, factors: { pending: "meet_victor" } },
+    ],
+    InitNormalOperation: [{ name: "ConditionAlways", met: true, factors: {} }],
+    ModeSelector: [{ name: "ConditionBootComplete", met: true, factors: { stage: "done" } }],
+    SleepCycle: [{ name: "ConditionNotSleeping", met: true, factors: {} }],
+  };
+
+  const BASE_STACK = [
+    "InitNormalOperation",
+    "ModeSelector",
+    "SleepCycle",
+    "GlobalInterruptions",
+    "HighLevelAI",
+  ];
+
+  const SCRIPT = [
+    { leaf: "Observing", feature: "Observing", mood: "Calm", gateFlip: null, tag: null, delay: 1.1 },
+    { leaf: "Exploring", feature: "Exploring", mood: "Stimulated", gateFlip: { beh: "Observing", name: "ConditionFaceKnown", met: false }, tag: { t: false, label: "FaceKnown" }, delay: 1.4 },
+    { leaf: "Exploring", feature: "Exploring", mood: "Stimulated", gateFlip: { beh: "Exploring", name: "ConditionMotionDetected", met: true }, tag: { t: true, label: "Motion" }, delay: 0.9, sameStack: true },
+    { leaf: "ReactToFace", feature: "Reacting", mood: "Happy", gateFlip: { beh: "ReactToFace", name: "ConditionFacePositionUpdated", met: true }, tag: { t: true, label: "FacePos" }, delay: 1.2 },
+    { leaf: "Socializing", feature: "Socializing", mood: "Happy", gateFlip: { beh: "Socializing", name: "ConditionFaceKnown", met: true }, tag: { t: true, label: "FaceKnown" }, delay: 1.5 },
+    { leaf: "Observing", feature: "Observing", mood: "Calm", gateFlip: null, tag: { sys: true, label: "timeout" }, delay: 1.0 },
+    { leaf: "ReactToPickup", feature: "Reacting", mood: "Stimulated", gateFlip: { beh: "ReactToPickup", name: "ConditionRobotPickedUp", met: true }, tag: { t: true, label: "Pickup" }, delay: 0.8 },
+    { leaf: "Exploring", feature: "Exploring", mood: "Happy", gateFlip: null, tag: { sys: true, label: "resume" }, delay: 1.1 },
+    { leaf: "GoHome", feature: "Exploring", mood: "Sleepy", gateFlip: { beh: "GoHome", name: "ConditionBatteryLevel", met: true }, tag: { t: true, label: "Battery" }, delay: 1.3 },
+    { leaf: "Sleeping", feature: "Sleeping", mood: "Sleepy", gateFlip: { beh: "Sleeping", name: "ConditionSleepPressure", met: true }, tag: { t: true, label: "Sleep" }, delay: 1.6 },
+    { leaf: "Observing", feature: "Observing", mood: "Calm", gateFlip: null, tag: { sys: true, label: "wake" }, delay: 1.2 },
+    { leaf: "LookAtFaceInFront", feature: "Socializing", mood: "Happy", gateFlip: { beh: "LookAtFaceInFront", name: "ConditionFaceInFOV", met: true }, tag: { t: true, label: "FOV" }, delay: 1.0 },
+    { leaf: "EnrollFace", feature: "Onboarding", mood: "Stimulated", gateFlip: { beh: "EnrollFace", name: "ConditionUserIntentPending", met: true }, tag: { t: true, label: "Intent" }, delay: 1.4 },
+    { leaf: "Socializing", feature: "Socializing", mood: "Happy", gateFlip: null, tag: { sys: true, label: "enrolled" }, delay: 1.1 },
+  ];
+
+  const LOG_CAP = 200;
+
+  const state = {
+    t: 12.0,
+    live: true,
+    feature: "Observing",
+    mood: "Calm",
+    stack: BASE_STACK.concat(["Observing"]),
+    selectedBehavior: null,
+    selectedLogId: null,
+    log: [],
+    scriptIdx: 0,
+    nextEventAt: 13.1,
+    gateOverrides: {},
+    lastRaw: {},
+    view: "ops",
+    openGates: {}, // name -> bool, preserve expand across re-renders when possible
+  };
+
+  let logIdSeq = 0;
+  let lastTs = null;
+  let pinLogScroll = true; // auto-stick to top (newest) unless user scrolled down
+
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    clock: $("clock"),
+    featurePill: $("featurePill"),
+    moodPill: $("moodPill"),
+    logCount: $("logCount"),
+    logCap: $("logCap"),
+    connPill: $("connPill"),
+    stackList: $("stackList"),
+    stackDepth: $("stackDepth"),
+    logList: $("logList"),
+    logBody: $("logBody"),
+    gatesRoot: $("gatesRoot"),
+    gatesFocus: $("gatesFocus"),
+    gatesContext: $("gatesContext"),
+    btnPause: $("btnPause"),
+    btnStep: $("btnStep"),
+    btnReset: $("btnReset"),
+    forceBehavior: $("forceBehavior"),
+    forceIntent: $("forceIntent"),
+    btnForce: $("btnForce"),
+    btnIntent: $("btnIntent"),
+    rawJson: $("rawJson"),
+    viewOps: $("viewOps"),
+    viewTimeline: $("viewTimeline"),
+    viewOpsPanel: $("view-ops"),
+    viewTimelinePanel: $("view-timeline"),
+    timelineCanvas: $("timelineCanvas"),
+    viewportMeta: $("viewportMeta"),
+    banner: $("banner"),
+    btnDismissBanner: $("btnDismissBanner"),
+    btnDev: $("btnDev"),
+    btnDevClose: $("btnDevClose"),
+    devDrawer: $("devDrawer"),
+    devBackdrop: $("devBackdrop"),
+    splitHandle: $("splitHandle"),
+  };
+
+  els.logCap.textContent = String(LOG_CAP);
+
+  Object.keys(BEHAVIORS).forEach((id) => {
+    const o = document.createElement("option");
+    o.value = id;
+    o.textContent = id;
+    els.forceBehavior.appendChild(o);
+  });
+  INTENTS.forEach((id) => {
+    const o = document.createElement("option");
+    o.value = id;
+    o.textContent = id;
+    els.forceIntent.appendChild(o);
+  });
+
+  function leafOf(stack) { return stack[stack.length - 1] || "—"; }
+  function focusBehavior() { return state.selectedBehavior || leafOf(state.stack); }
+
+  function cloneGates(beh) {
+    const src = GATES_BY_BEHAVIOR[beh] || [
+      { name: "ConditionUnknown", met: true, factors: { note: "no demo gates" } },
+    ];
+    return JSON.parse(JSON.stringify(src));
+  }
+
+  function applyGateOverrides(beh, gates) {
+    const ov = state.gateOverrides[beh];
+    if (!ov) return gates;
+    const walk = (list) => {
+      list.forEach((g) => {
+        if (ov[g.name] !== undefined) g.met = ov[g.name];
+        if (g.children) walk(g.children);
+      });
+    };
+    walk(gates);
+    return gates;
+  }
+
+  function setGateOverride(beh, name, met) {
+    if (!state.gateOverrides[beh]) state.gateOverrides[beh] = {};
+    state.gateOverrides[beh][name] = met;
+  }
+
+  function pushLog(entry) {
+    const row = Object.assign({ id: ++logIdSeq }, entry);
+    state.log.unshift(row);
+    if (state.log.length > LOG_CAP) state.log.length = LOG_CAP;
+    state.selectedLogId = row.id;
+    state.lastRaw = row;
+    return row;
+  }
+
+  function transitionTo(newStack, meta) {
+    const from = state.stack.slice();
+    const to = newStack.slice();
+    const same = from.length === to.length && from.every((b, i) => b === to[i]);
+
+    state.stack = to;
+    if (meta.feature) state.feature = meta.feature;
+    if (meta.mood) state.mood = meta.mood;
+    if (meta.gateFlip) {
+      setGateOverride(meta.gateFlip.beh, meta.gateFlip.name, meta.gateFlip.met);
+    }
+    jitterFactors(leafOf(to));
+
+    if (!same || meta.forceLog) {
+      pushLog({
+        t: state.t,
+        fromStack: from,
+        toStack: to,
+        fromLeaf: leafOf(from),
+        toLeaf: leafOf(to),
+        tag: meta.tag || null,
+        reason: meta.reason || null,
+      });
+    }
+
+    if (!state.selectedBehavior || !to.includes(state.selectedBehavior)) {
+      state.selectedBehavior = null;
+    }
+
+    state.lastRaw = {
+      time: +state.t.toFixed(3),
+      stack: to,
+      feature: state.feature,
+      mood: state.mood,
+      gates: applyGateOverrides(leafOf(to), cloneGates(leafOf(to))),
+      tag: meta.tag,
+    };
+  }
+
+  function jitterFactors(beh) {
+    const gates = GATES_BY_BEHAVIOR[beh];
+    if (!gates) return;
+    gates.forEach((g) => {
+      Object.keys(g.factors || {}).forEach((k) => {
+        const v = g.factors[k];
+        if (typeof v === "number" && !Number.isInteger(v)) {
+          g.factors[k] = Math.round((v + (Math.random() - 0.5) * 0.08) * 1000) / 1000;
+        }
+      });
+    });
+  }
+
+  function runScriptStep() {
+    const step = SCRIPT[state.scriptIdx % SCRIPT.length];
+    state.scriptIdx++;
+
+    if (step.sameStack) {
+      const newStack = state.stack.slice();
+      if (step.gateFlip) setGateOverride(step.gateFlip.beh, step.gateFlip.name, step.gateFlip.met);
+      jitterFactors(leafOf(newStack));
+      pushLog({
+        t: state.t,
+        fromStack: state.stack.slice(),
+        toStack: newStack,
+        fromLeaf: leafOf(state.stack),
+        toLeaf: leafOf(newStack),
+        tag: step.tag,
+        reason: "condition_update",
+      });
+      if (step.feature) state.feature = step.feature;
+      if (step.mood) state.mood = step.mood;
+      state.lastRaw = {
+        time: +state.t.toFixed(3),
+        type: "condition_update",
+        stack: newStack,
+        tag: step.tag,
+      };
+    } else {
+      transitionTo(BASE_STACK.concat([step.leaf]), {
+        feature: step.feature,
+        mood: step.mood,
+        gateFlip: step.gateFlip,
+        tag: step.tag,
+        forceLog: true,
+      });
+    }
+    state.nextEventAt = state.t + step.delay + Math.random() * 0.35;
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────
+  function renderPills() {
+    els.clock.textContent = state.t.toFixed(3);
+    els.featurePill.textContent = state.feature;
+    els.moodPill.textContent = state.mood;
+    els.logCount.textContent = String(state.log.length);
+
+    els.connPill.classList.toggle("live", state.live);
+    els.connPill.classList.toggle("paused", !state.live);
+    // keep short labels so topbar never wraps
+    const label = state.live ? "\u00a0Demo" : "\u00a0Paused";
+    els.connPill.childNodes[1].textContent = label;
+
+    els.btnPause.textContent = state.live ? "Pause" : "Resume";
+    els.btnPause.classList.toggle("active-toggle", state.live);
+    els.btnStep.disabled = state.live;
+    els.rawJson.textContent = JSON.stringify(state.lastRaw, null, 2);
+
+    els.viewportMeta.textContent =
+      Math.round(window.innerWidth) + "×" + Math.round(window.innerHeight) +
+      " · page scroll locked";
+  }
+
+  function renderStack() {
+    const stack = state.stack;
+    const leaf = leafOf(stack);
+    const focus = focusBehavior();
+    els.stackDepth.textContent = "depth " + stack.length;
+    els.stackList.innerHTML = "";
+
+    stack.forEach((id, i) => {
+      const li = document.createElement("li");
+      li.className = "stack-item";
+      if (id === leaf) li.classList.add("leaf");
+      if (id === focus && state.selectedLogId == null) li.classList.add("selected");
+      li.dataset.behavior = id;
+
+      let indents = "";
+      for (let d = 0; d < i; d++) {
+        indents +=
+          '<span class="stack-indent"><span class="connector"></span><span class="connector-h"></span></span>';
+      }
+
+      li.innerHTML =
+        indents +
+        '<div class="stack-main">' +
+        '<div class="stack-name">' + escapeHtml(id) + "</div>" +
+        '<div class="stack-sub">' +
+        escapeHtml((BEHAVIORS[id] && BEHAVIORS[id].role) || "behavior") +
+        (i === 0 ? " · root" : "") +
+        "</div></div>" +
+        (id === leaf ? '<span class="stack-badge">leaf</span>' : "");
+
+      li.addEventListener("click", () => {
+        state.selectedBehavior = id === leaf ? null : id;
+        state.selectedLogId = null;
+        state._historicalLeaf = null;
+        render();
+      });
+      els.stackList.appendChild(li);
+    });
+  }
+
+  function renderLog() {
+    const prevTop = els.logBody.scrollTop;
+    els.logList.innerHTML = "";
+    if (!state.log.length) {
+      els.logList.innerHTML =
+        '<li class="empty-hint">Transitions appear here. Panel scrolls — page does not.</li>';
+      return;
+    }
+
+    state.log.forEach((row, idx) => {
+      const li = document.createElement("li");
+      li.className = "log-row" + (row.id === state.selectedLogId ? " selected" : "");
+      if (idx === 0 && state.live) li.classList.add("flash");
+
+      const tags = document.createElement("div");
+      tags.className = "log-tags";
+      if (row.reason === "condition_update") {
+        tags.innerHTML += '<span class="tag sys">cond</span>';
+      }
+      if (row.tag) {
+        if (row.tag.sys) {
+          tags.innerHTML +=
+            '<span class="tag sys">' + escapeHtml(row.tag.label) + "</span>";
+        } else if (row.tag.t === true) {
+          tags.innerHTML +=
+            '<span class="tag t">[T] ' + escapeHtml(row.tag.label) + "</span>";
+        } else if (row.tag.t === false) {
+          tags.innerHTML +=
+            '<span class="tag f">[F] ' + escapeHtml(row.tag.label) + "</span>";
+        }
+      }
+
+      li.innerHTML =
+        '<span class="log-time">' + row.t.toFixed(3) + "</span>" +
+        '<span class="log-arrow">→</span>' +
+        '<div class="log-body">' +
+        '<div class="log-to">' + escapeHtml(row.toLeaf) + "</div>" +
+        '<div class="log-from">from ' + escapeHtml(row.fromLeaf) +
+        (row.fromLeaf === row.toLeaf ? " (same)" : "") +
+        "</div></div>";
+      li.appendChild(tags);
+
+      li.addEventListener("click", () => {
+        state.selectedLogId = row.id;
+        state.selectedBehavior = null;
+        state._historicalLeaf = row.toLeaf;
+        state._historicalStack = row.toStack;
+        render();
+      });
+
+      els.logList.appendChild(li);
+    });
+
+    // Stick to newest (top) unless user scrolled into history
+    if (pinLogScroll) {
+      els.logBody.scrollTop = 0;
+    } else {
+      els.logBody.scrollTop = prevTop;
+    }
+  }
+
+  // Track whether user left the "live edge" of the log
+  els.logBody.addEventListener("scroll", () => {
+    pinLogScroll = els.logBody.scrollTop < 8;
+  });
+
+  function renderGateNode(g, depth) {
+    const wrap = document.createElement("div");
+    wrap.className = "gate";
+    const metClass = g.met ? "t" : "f";
+    const key = g.name;
+    const wasOpen =
+      state.openGates[key] !== undefined
+        ? state.openGates[key]
+        : !g.met || depth === 0;
+    if (wasOpen) wrap.classList.add("open");
+
+    const head = document.createElement("div");
+    head.className = "gate-head";
+    head.innerHTML =
+      '<span class="gate-verdict ' + metClass + '">' + (g.met ? "[T]" : "[F]") + "</span>" +
+      '<span class="gate-name" title="' + escapeHtml(g.name) + '">' + escapeHtml(g.name) + "</span>" +
+      '<span class="gate-chevron">▶</span>';
+
+    const body = document.createElement("div");
+    body.className = "gate-body";
+
+    const factors = g.factors || {};
+    const keys = Object.keys(factors);
+    if (!keys.length) {
+      body.innerHTML =
+        '<div class="factor-row"><span class="factor-key">—</span><span class="factor-val">no factors</span></div>';
+    } else {
+      keys.forEach((k) => {
+        const row = document.createElement("div");
+        row.className = "factor-row";
+        row.innerHTML =
+          '<span class="factor-key" title="' + escapeHtml(k) + '">' + escapeHtml(k) + "</span>" +
+          '<span class="factor-val" title="' + escapeHtml(String(factors[k])) + '">' +
+          escapeHtml(String(factors[k])) + "</span>";
+        body.appendChild(row);
+      });
+    }
+
+    if (g.children && g.children.length) {
+      const ch = document.createElement("div");
+      ch.className = "gate-children";
+      g.children.forEach((c) => ch.appendChild(renderGateNode(c, depth + 1)));
+      body.appendChild(ch);
+    }
+
+    head.addEventListener("click", () => {
+      wrap.classList.toggle("open");
+      state.openGates[key] = wrap.classList.contains("open");
+    });
+
+    wrap.appendChild(head);
+    wrap.appendChild(body);
+    return wrap;
+  }
+
+  function renderGates() {
+    let beh;
+    let context;
+
+    if (state.selectedLogId != null && state._historicalLeaf) {
+      beh = state._historicalLeaf;
+      context = "log snapshot · " + beh;
+    } else {
+      beh = focusBehavior();
+      context =
+        state.selectedBehavior == null
+          ? "selected: leaf (default)"
+          : "selected: stack entry";
+      state._historicalLeaf = null;
+      state._historicalStack = null;
+    }
+
+    els.gatesFocus.textContent = beh;
+    els.gatesContext.textContent = context;
+    els.gatesRoot.innerHTML = "";
+
+    const gates = applyGateOverrides(beh, cloneGates(beh));
+    if (!gates.length) {
+      els.gatesRoot.innerHTML =
+        '<p class="empty-hint">No gates for this behavior in the demo catalog.</p>';
+      return;
+    }
+    gates.forEach((g) => els.gatesRoot.appendChild(renderGateNode(g, 0)));
+  }
+
+  function renderTimeline() {
+    const canvas = els.timelineCanvas;
+    const wrap = canvas.parentElement;
+    // Size canvas to the *panel*, not document height
+    const w = Math.max(200, wrap.clientWidth - 4);
+    const h = Math.max(120, wrap.clientHeight - 28); // leave caption room
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.floor(w * dpr);
+    canvas.height = Math.floor(h * dpr);
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    ctx.fillStyle = "#0f1218";
+    ctx.fillRect(0, 0, w, h);
+
+    const recent = state.log.slice(0, 40).reverse();
+    if (!recent.length) {
+      ctx.fillStyle = "#5c667a";
+      ctx.font = "12px system-ui";
+      ctx.fillText("No transitions yet — resume or Step.", 12, 28);
+      return;
+    }
+
+    const names = [];
+    const seen = new Set();
+    recent.forEach((r) => {
+      r.toStack.forEach((b) => {
+        if (!seen.has(b)) {
+          seen.add(b);
+          names.push(b);
+        }
+      });
+    });
+
+    const labelW = Math.min(140, Math.floor(w * 0.28));
+    const rowH = Math.min(20, Math.max(12, (h - 24) / Math.max(names.length, 1)));
+    const t0 = recent[0].t;
+    const t1 = Math.max(recent[recent.length - 1].t, t0 + 0.01);
+    const span = t1 - t0;
+
+    ctx.font = "10px ui-monospace, monospace";
+    names.forEach((name, i) => {
+      const y = 12 + i * rowH;
+      ctx.fillStyle = "#8b95a8";
+      const label = name.length > 16 ? name.slice(0, 14) + "…" : name;
+      ctx.fillText(label, 6, y + Math.min(12, rowH - 2));
+      ctx.strokeStyle = "#222836";
+      ctx.beginPath();
+      ctx.moveTo(labelW, y + rowH - 2);
+      ctx.lineTo(w - 6, y + rowH - 2);
+      ctx.stroke();
+    });
+
+    recent.forEach((r, idx) => {
+      const tStart = r.t;
+      const tEnd = idx + 1 < recent.length ? recent[idx + 1].t : state.t;
+      const x0 = labelW + ((tStart - t0) / span) * (w - labelW - 12);
+      const x1 = labelW + ((tEnd - t0) / span) * (w - labelW - 12);
+      const leaf = r.toLeaf;
+      r.toStack.forEach((b) => {
+        const i = names.indexOf(b);
+        if (i < 0) return;
+        const y = 12 + i * rowH + 3;
+        ctx.fillStyle =
+          b === leaf ? "rgba(199,146,234,0.75)" : "rgba(91,159,212,0.35)";
+        ctx.fillRect(x0, y, Math.max(2, x1 - x0 - 1), Math.max(4, rowH - 8));
+      });
+    });
+
+    const xNow = labelW + ((state.t - t0) / span) * (w - labelW - 12);
+    ctx.strokeStyle = "rgba(240,113,120,0.7)";
+    ctx.beginPath();
+    ctx.moveTo(xNow, 6);
+    ctx.lineTo(xNow, h - 8);
+    ctx.stroke();
+  }
+
+  function render() {
+    renderPills();
+    renderStack();
+    renderLog();
+    renderGates();
+    if (state.view === "timeline") renderTimeline();
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  // ── Controls ─────────────────────────────────────────────────────────
+  els.btnPause.addEventListener("click", () => {
+    state.live = !state.live;
+    lastTs = null;
+    render();
+  });
+
+  els.btnStep.addEventListener("click", () => {
+    if (state.live) return;
+    state.t += 0.25;
+    runScriptStep();
+    render();
+  });
+
+  els.btnReset.addEventListener("click", () => resetDemo());
+
+  els.btnForce.addEventListener("click", () => {
+    const id = els.forceBehavior.value;
+    transitionTo(BASE_STACK.concat([id]), {
+      feature: FEATURES[Math.floor(Math.random() * FEATURES.length)],
+      mood: MOODS[Math.floor(Math.random() * MOODS.length)],
+      tag: { sys: true, label: "force" },
+      reason: "force_behavior",
+      forceLog: true,
+    });
+    render();
+  });
+
+  els.btnIntent.addEventListener("click", () => {
+    const intent = els.forceIntent.value;
+    const leaf = intent.indexOf("explore") >= 0 ? "Exploring" : "Socializing";
+    transitionTo(BASE_STACK.concat([leaf]), {
+      feature: leaf === "Exploring" ? "Exploring" : "Socializing",
+      mood: "Stimulated",
+      tag: { t: true, label: intent.split("_").pop() },
+      reason: "intent:" + intent,
+      forceLog: true,
+    });
+    setGateOverride("Socializing", "ConditionUserIntentPending", true);
+    if (GATES_BY_BEHAVIOR.Socializing[1]) {
+      GATES_BY_BEHAVIOR.Socializing[1].factors.pending = intent;
+    }
+    render();
+  });
+
+  function setView(name) {
+    state.view = name;
+    els.viewOps.classList.toggle("on", name === "ops");
+    els.viewTimeline.classList.toggle("on", name === "timeline");
+    els.viewOpsPanel.hidden = name !== "ops";
+    els.viewTimelinePanel.hidden = name !== "timeline";
+    render();
+  }
+  els.viewOps.addEventListener("click", () => setView("ops"));
+  els.viewTimeline.addEventListener("click", () => setView("timeline"));
+
+  els.btnDismissBanner.addEventListener("click", () => {
+    els.banner.hidden = true;
+    // force layout recompute for timeline if open
+    requestAnimationFrame(() => {
+      if (state.view === "timeline") renderTimeline();
+    });
+  });
+
+  function setDevOpen(open) {
+    els.devDrawer.classList.toggle("open", open);
+    els.devBackdrop.classList.toggle("open", open);
+    els.devDrawer.setAttribute("aria-hidden", open ? "false" : "true");
+  }
+  els.btnDev.addEventListener("click", () => setDevOpen(true));
+  els.btnDevClose.addEventListener("click", () => setDevOpen(false));
+  els.devBackdrop.addEventListener("click", () => setDevOpen(false));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") setDevOpen(false);
+  });
+
+  // Drag split: redistribute fixed viewport between top (stack|log) and gates
+  (function initSplit() {
+    const root = els.viewOpsPanel;
+    let dragging = false;
+    // fraction of workspace for top region (0.25–0.75)
+    let topFrac = 0.46;
+
+    function apply() {
+      // use fr units via style on grid
+      root.style.setProperty("--ops-top-fr", topFrac + "fr");
+      root.style.setProperty("--ops-bot-fr", 1 - topFrac + "fr");
+    }
+    apply();
+
+    els.splitHandle.addEventListener("pointerdown", (e) => {
+      dragging = true;
+      els.splitHandle.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    els.splitHandle.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      const rect = root.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+      topFrac = Math.min(0.75, Math.max(0.22, y / rect.height));
+      apply();
+      if (state.view === "timeline") renderTimeline();
+    });
+    els.splitHandle.addEventListener("pointerup", () => {
+      dragging = false;
+    });
+    els.splitHandle.addEventListener("pointercancel", () => {
+      dragging = false;
+    });
+  })();
+
+  window.addEventListener("resize", () => {
+    renderPills();
+    if (state.view === "timeline") renderTimeline();
+  });
+
+  function resetDemo() {
+    state.t = 12.0;
+    state.live = true;
+    state.feature = "Observing";
+    state.mood = "Calm";
+    state.stack = BASE_STACK.concat(["Observing"]);
+    state.selectedBehavior = null;
+    state.selectedLogId = null;
+    state.log = [];
+    state.scriptIdx = 0;
+    state.nextEventAt = 13.1;
+    state.gateOverrides = {};
+    state.openGates = {};
+    state._historicalLeaf = null;
+    state.lastRaw = { time: 12, stack: state.stack, note: "reset" };
+    logIdSeq = 0;
+    lastTs = null;
+    pinLogScroll = true;
+
+    pushLog({
+      t: state.t,
+      fromStack: BASE_STACK.concat(["Exploring"]),
+      toStack: state.stack.slice(),
+      fromLeaf: "Exploring",
+      toLeaf: "Observing",
+      tag: { sys: true, label: "demo start" },
+      reason: "reset",
+    });
+    render();
+  }
+
+  function tick(ts) {
+    if (lastTs == null) lastTs = ts;
+    const dt = Math.min(0.1, (ts - lastTs) / 1000);
+    lastTs = ts;
+
+    if (state.live) {
+      state.t += dt;
+      if (Math.random() < 0.02) jitterFactors(leafOf(state.stack));
+      while (state.t >= state.nextEventAt) runScriptStep();
+      render();
+    }
+    requestAnimationFrame(tick);
+  }
+
+  resetDemo();
+  requestAnimationFrame(tick);
+})();
+  </script>
+</body>
+</html>

@@ -239,8 +239,11 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 | `docs/mapping/ENGINE-OBSERVING-AND-INTENTS.md` | Observing freeplay branch + voice/user-intent claim path |
 | `docs/mapping/ENGINE-PATH-PLANNING.md` | Drive-to-pose: PathComponent planner selection |
 | `docs/mapping/WEBVIZ-BEHAVIORS-REVIEW.md` | WebViz Behaviors/BehaviorConds review notes |
-| `docs/mapping/WEBVIZ-FREEPLAY-DESIGN.md` | FreePlay WebViz module design (no-C++; multi-subscribe; dual-theme) |
-| `docs/mapping/WEBVIZ-FREEPLAY-PLAN.md` | FreePlay implementation plan (phased; Allowed APIs; S1–S9) |
+| `docs/mapping/WEBVIZ-FREEPLAY-DESIGN.md` | FreePlay WebViz module design (no-C++; multi-subscribe; Ops grid §5; dual-theme) |
+| `docs/mapping/WEBVIZ-FREEPLAY-PLAN.md` | FreePlay v1 implementation plan (phased; Allowed APIs; S1–S9) — **shipped** |
+| `docs/mapping/WEBVIZ-FREEPLAY-UX-PLAN.md` | FreePlay Ops UX uplift (P1–P6) — **implemented**; P7 docs closeout |
+| `resources/webserver/webVizModules/freeplay.js` | Production FreePlay: Ops stack\|log + gates; client log tags; latest-factor gates; secondary timeline |
+| `webviz-ux-demo.html` | Standalone Ops vs Timeline mock (reference only; not robot-deployed) |
 | `docs/mapping/GLOSSARY.md` | ~130 repo terms |
 | `docs/mapping/IDEA-backpack-lights-flags.md` | Idea: Anki lights flag + customBackpackLights folder + Wired option |
 | `engine/components/cubes/` | L2 cube BLE/coordinator/lights stack |
@@ -316,6 +319,12 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 - **How does freeplay / voice work?** — `ENGINE-BEHAVIOR-TREE.md` +
   `ENGINE-OBSERVING-AND-INTENTS.md`. Wake word in anim: **Picovoice** (rebuild; stock docs
   said Sensory). Cloud intent → pending UserIntent → claim or unclaimed.
+- **Where is FreePlay WebViz (debug UI)?** — Tab **FreePlay** on engine WebViz (`:8888`):
+  `webVizModules/freeplay.js` multi-subscribes `behaviors` + `behaviorconds` (no C++
+  producer). **Ops layout:** narrow stack \| wide transition log (from→to, client tags) +
+  full-width gates (**latest factors** for owner — not time-aligned to scrubbed log).
+  Secondary collapsed timeline optional. Design: `WEBVIZ-FREEPLAY-DESIGN.md` §5; UX plan
+  P1–P6 shipped: `WEBVIZ-FREEPLAY-UX-PLAN.md`. Stock Behaviors/BehaviorConds tabs stay.
 - **How does drive-to-pose work?** — `ENGINE-PATH-PLANNING.md`: ≥40 mm → `XYPlanner` (threaded);
   short moves → FaceAndApproach / MinimalAngle. Robot path follower runs on `vic-robot`.
 - **Which parts are rebuild-specific vs. stock Anki 1.6?** — `CHANGES.md`. Observed: wirepod
@@ -345,6 +354,8 @@ if you ran out of context mid-folder, say so here.
 | 2026-08-02 | Grok | Wrote **implementation plan** `docs/mapping/WEBVIZ-FREEPLAY-PLAN.md` (Phase 0 Allowed APIs + Phases 1–6 shell/CSS/registry/module/verify; success S1–S9). | Execute plan (shell multi-channel → freeplay.js → S1–S9). |
 | 2026-08-02 | Grok | Theme catch-up: FreePlay design+plan drop `module-host--ops`; light `.module-host` + content tokens; shell dark/light via `WebVizTheme`/`#btnThemeToggle` already shipped. | Execute updated plan. |
 | 2026-08-02 | Grok | **FreePlay implemented:** shell multi-channel retain/fan-out (`app.js`), registry (`config.js`), `webVizModules/freeplay.js` (stack/log/gates; content tokens; no C++). Design status → implemented. | Runtime S1–S9 on robot/devData; optional README one-liner. |
+| 2026-08-02 | Grok | Reviewed `webviz-ux-demo.html`: **Ops > Timeline** for freeplay debug. Wrote UX uplift plan `docs/mapping/WEBVIZ-FREEPLAY-UX-PLAN.md` (Ops layout, stack/log/gates polish, nice-to-haves beyond demo; timeline optional). | Execute UX plan P1 layout first (`freeplay.js` only). |
+| 2026-08-02 | Grok | **FreePlay UX P1–P6 complete** in `freeplay.js` (Ops grid, stack/log/gates polish, P5 filters/keyboard/silence, P6 secondary timeline). **P7 docs closeout:** UX plan status→implemented; design §5 Ops wireframe + honesty notes; AGENTS landmarks/quick answers; demo HTML pointer comment. | Runtime U1–U11 on robot/devData if desired; no further UX-plan phases. |
 
 ---
 
