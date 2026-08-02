@@ -4,8 +4,8 @@
  * Preference (localStorage webviz.colorScheme): "system" | "dark" | "light"
  * Effective theme on <html data-theme class="wv-theme-*">: "dark" | "light"
  *
- * Light tokens are applied both via CSS (html[data-theme="light"]) and via
- * inline custom properties on <html> so theme still flips if CSS is stale/cached.
+ * Light tokens are applied via CSS selectors AND inline custom properties on
+ * <html> (and body) so Firefox/Chrome both repaint even with stale CSS.
  *
  * FOUC: webViz*.html also sets data-theme + class inline in <head> before CSS.
  */
@@ -16,6 +16,7 @@
   var VALID = { system: true, dark: true, light: true };
   var mediaQuery = null;
   var mediaBound = false;
+  var docClickBound = false;
 
   /**
    * Light palette — keep in sync with tokens.css html[data-theme="light"].
@@ -97,38 +98,88 @@
       return "dark";
     }
     if (global.matchMedia) {
-      return global.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
-        : "light";
+      try {
+        return global.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+      } catch (e) {
+        return "dark";
+      }
     }
     return "dark";
   }
 
-  function applyInlineVars(effective) {
-    var root = document.documentElement;
+  /**
+   * Set or clear vars on an element. Uses setProperty only (Firefox-safe;
+   * avoid style.colorScheme IDL which is missing or flaky in some FF builds).
+   */
+  function writeVarsOn(el, effective) {
+    if (!el || !el.style) {
+      return;
+    }
     var key;
     if (effective === "light") {
       for (key in LIGHT_VARS) {
         if (Object.prototype.hasOwnProperty.call(LIGHT_VARS, key)) {
-          root.style.setProperty(key, LIGHT_VARS[key]);
+          el.style.setProperty(key, LIGHT_VARS[key]);
         }
       }
-      root.style.colorScheme = "light";
+      el.style.setProperty("color-scheme", "light");
     } else {
       for (key in LIGHT_VARS) {
         if (Object.prototype.hasOwnProperty.call(LIGHT_VARS, key)) {
-          root.style.removeProperty(key);
+          el.style.removeProperty(key);
         }
       }
-      root.style.colorScheme = "dark";
+      el.style.setProperty("color-scheme", "dark");
+    }
+  }
+
+  function applyInlineVars(effective) {
+    var root = document.documentElement;
+    var body = document.body;
+    writeVarsOn(root, effective);
+    // Firefox: also stamp body so var() consumers under body always inherit
+    // the same values even if html/root cascade is quirky.
+    if (body) {
+      writeVarsOn(body, effective);
     }
   }
 
   function applyDomMarkers(effective) {
     var root = document.documentElement;
     root.setAttribute("data-theme", effective);
-    root.classList.remove("wv-theme-light", "wv-theme-dark");
+    // One-arg remove for widest engine support
+    root.classList.remove("wv-theme-light");
+    root.classList.remove("wv-theme-dark");
     root.classList.add(effective === "light" ? "wv-theme-light" : "wv-theme-dark");
+    if (document.body) {
+      document.body.setAttribute("data-theme", effective);
+      document.body.classList.remove("wv-theme-light");
+      document.body.classList.remove("wv-theme-dark");
+      document.body.classList.add(
+        effective === "light" ? "wv-theme-light" : "wv-theme-dark"
+      );
+    }
+  }
+
+  /**
+   * Nudge layout so Firefox recomputes var() backgrounds after custom props change.
+   */
+  function forceRepaint() {
+    var root = document.documentElement;
+    var body = document.body;
+    try {
+      // Touch a non-custom property that shell already uses via tokens
+      if (body) {
+        body.style.backgroundColor = "";
+        // re-read to force style flush
+        void (body.offsetHeight);
+      }
+      void (root.offsetHeight);
+    } catch (e) {
+      /* ignore */
+    }
   }
 
   /**
@@ -142,7 +193,6 @@
       return;
     }
     if (effective === "light") {
-      // currently light → offer dark
       if (icon) {
         icon.textContent = "\u263E"; // crescent moon
       }
@@ -169,9 +219,16 @@
       pref = getPreference();
     }
     var effective = resolve(pref);
-    applyDomMarkers(effective);
-    applyInlineVars(effective);
-    syncToggleUi(effective);
+    try {
+      applyDomMarkers(effective);
+      applyInlineVars(effective);
+      forceRepaint();
+      syncToggleUi(effective);
+    } catch (e) {
+      if (global.console && console.warn) {
+        console.warn("[WebVizTheme] apply failed", e);
+      }
+    }
     return effective;
   }
 
@@ -204,30 +261,80 @@
     if (mediaBound || !global.matchMedia) {
       return;
     }
-    mediaQuery = global.matchMedia("(prefers-color-scheme: dark)");
+    try {
+      mediaQuery = global.matchMedia("(prefers-color-scheme: dark)");
+    } catch (e) {
+      return;
+    }
+    // Prefer addListener first — more reliable on older Firefox; both if present.
+    if (typeof mediaQuery.addListener === "function") {
+      try {
+        mediaQuery.addListener(onMediaChange);
+      } catch (e1) {
+        /* ignore */
+      }
+    }
     if (typeof mediaQuery.addEventListener === "function") {
-      mediaQuery.addEventListener("change", onMediaChange);
-    } else if (typeof mediaQuery.addListener === "function") {
-      mediaQuery.addListener(onMediaChange);
+      try {
+        mediaQuery.addEventListener("change", onMediaChange);
+      } catch (e2) {
+        /* ignore */
+      }
     }
     mediaBound = true;
   }
 
-  function wireToggleButton() {
-    var btn = document.getElementById("btnThemeToggle");
-    if (!btn || btn.getAttribute("data-wv-theme-wired") === "1") {
+  function onDocClick(ev) {
+    var t = ev.target;
+    if (!t) {
       return;
     }
-    btn.setAttribute("data-wv-theme-wired", "1");
-    btn.addEventListener("click", function () {
-      toggle();
-    });
+    // Walk up in case click lands on icon span inside the button
+    var el = t.nodeType === 1 ? t : t.parentElement;
+    while (el && el !== document.documentElement) {
+      if (el.id === "btnThemeToggle") {
+        ev.preventDefault();
+        toggle();
+        return;
+      }
+      el = el.parentElement;
+    }
+  }
+
+  /**
+   * Document-level delegation so the toggle works even if the button is
+   * re-created or direct wiring raced DOMContentLoaded (Firefox edge cases).
+   */
+  function bindDocClick() {
+    if (docClickBound) {
+      return;
+    }
+    docClickBound = true;
+    document.addEventListener("click", onDocClick, false);
+  }
+
+  function wireToggleButton() {
+    bindDocClick();
+    var btn = document.getElementById("btnThemeToggle");
+    if (btn && btn.getAttribute("data-wv-theme-wired") !== "1") {
+      btn.setAttribute("data-wv-theme-wired", "1");
+      // Direct listener as well (Chrome path); doc delegation covers Firefox misses
+      btn.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        // Don't double-fire if doc listener also runs: stopImmediate on button only
+        // when we handle here — actually both would toggle twice!
+        // Use only doc delegation OR only button. Prefer button stopPropagation.
+        ev.stopPropagation();
+        toggle();
+      });
+    }
     syncToggleUi(resolve(getPreference()));
   }
 
   function init() {
     apply();
     bindMediaListener();
+    bindDocClick();
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", wireToggleButton);
     } else {
