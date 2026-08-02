@@ -111,7 +111,7 @@
       makeNavItem({
         key: "overview",
         label: "Overview",
-        glyph: "⌂",
+        glyph: "🏠",
         group: null,
       })
     );
