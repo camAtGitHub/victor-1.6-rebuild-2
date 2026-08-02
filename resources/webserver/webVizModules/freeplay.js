@@ -22,7 +22,9 @@
   var bsTime = null;
   var activeFeature = "";
   var debugState = "";
-  var transitionLog = []; // newest first: { t, stack, leaf, id }
+  // newest first: { id, t, stack, leaf, fromLeaf, fromDepth, toDepth, tag }
+  // tag is client-derived only: { kind, label } or null — never engine [T]/[F]
+  var transitionLog = [];
   var lastStackKey = null;
   var factorsByOwner = Object.create(null); // owner → { label → factorsObj }
   var inactiveByOwner = Object.create(null); // owner → { label → true }
@@ -36,6 +38,7 @@
   var lastRaw = { behaviors: null, behaviorconds: null };
   var hostElem = null;
   var logSeq = 0;
+  var shouldFlashLog = false; // flash newest row once after pushTransition
   var els = null;
   var lastRenderedLogHeadId = null;
   var lastRenderedStackKey = null;
@@ -71,17 +74,56 @@
     return out;
   }
 
+  /**
+   * Client-only transition kind from stack depth / leaf change.
+   * Does not invent condition [T]/[F] — those need factor data we do not log.
+   * @returns {{ kind: string, label: string }|null}
+   */
+  function deriveTransitionTag(fromDepth, toDepth, fromLeaf, toLeaf) {
+    if (toDepth === 0) {
+      return { kind: "empty", label: "clear" };
+    }
+    if (fromDepth === 0) {
+      return { kind: "enter", label: "enter" };
+    }
+    if (toDepth > fromDepth) {
+      return { kind: "deeper", label: "deeper" };
+    }
+    if (toDepth < fromDepth) {
+      return { kind: "shallower", label: "shallower" };
+    }
+    // same depth, different leaf (or identical — key change would not call us)
+    if (fromLeaf !== toLeaf) {
+      return { kind: "same-depth", label: "swap" };
+    }
+    return null;
+  }
+
+  /**
+   * Push stack-identity transition. Caller must still hold previous liveStack.
+   * Cond-only messages must not call this.
+   */
   function pushTransition(t, stack) {
+    var fromStack = liveStack;
+    var fromDepth = fromStack.length;
+    var toDepth = stack.length;
+    var fromLeaf = leafOf(fromStack);
+    var toLeaf = leafOf(stack);
     var entry = {
       id: ++logSeq,
       t: t,
       stack: stack.slice(),
-      leaf: leafOf(stack),
+      leaf: toLeaf,
+      fromLeaf: fromLeaf,
+      fromDepth: fromDepth,
+      toDepth: toDepth,
+      tag: deriveTransitionTag(fromDepth, toDepth, fromLeaf, toLeaf),
     };
     transitionLog.unshift(entry);
     if (transitionLog.length > MAX_LOG) {
       transitionLog.length = MAX_LOG;
     }
+    shouldFlashLog = true;
     return entry;
   }
 
@@ -363,10 +405,10 @@
       "      </div>" +
       "    </section>" +
       '    <section class="fp-panel fp-log" aria-label="Transition log">' +
-      '      <div class="fp-panel-title">Transition log <span class="fp-meta">(newest first, max ' +
+      '      <div class="fp-panel-title">Transition log <span class="fp-meta" data-fp="logMeta">0/' +
       MAX_LOG +
-      ")</span></div>" +
-      '      <div class="fp-panel-body">' +
+      "</span></div>" +
+      '      <div class="fp-panel-body" data-fp="logBody">' +
       '        <div class="fp-log-list" data-fp="logList"></div>' +
       "      </div>" +
       "    </section>" +
@@ -404,6 +446,8 @@
       debugState: root.querySelector('[data-fp="debugState"]'),
       stackList: root.querySelector('[data-fp="stackList"]'),
       stackEmpty: root.querySelector('[data-fp="stackEmpty"]'),
+      logMeta: root.querySelector('[data-fp="logMeta"]'),
+      logBody: root.querySelector('[data-fp="logBody"]'),
       logList: root.querySelector('[data-fp="logList"]'),
       gatesOwner: root.querySelector('[data-fp="gatesOwner"]'),
       gatesList: root.querySelector('[data-fp="gatesList"]'),
@@ -572,16 +616,49 @@
     return !liveMode && selectedLogId != null && entry && entry.id === selectedLogId;
   }
 
+  function leafDisplay(name) {
+    return name ? String(name) : "(empty)";
+  }
+
+  function tagClassForKind(kind) {
+    if (kind === "empty") {
+      return " fp-log-tag-empty";
+    }
+    if (kind === "enter") {
+      return " fp-log-tag-enter";
+    }
+    if (kind === "deeper") {
+      return " fp-log-tag-deeper";
+    }
+    if (kind === "shallower") {
+      return " fp-log-tag-shallower";
+    }
+    if (kind === "same-depth") {
+      return " fp-log-tag-swap";
+    }
+    return "";
+  }
+
+  function updateLogMeta() {
+    if (!els || !els.logMeta) {
+      return;
+    }
+    els.logMeta.textContent = transitionLog.length + "/" + MAX_LOG;
+  }
+
   function renderLog() {
     if (!els) {
       return;
     }
+    updateLogMeta();
+
     var headId = transitionLog.length ? transitionLog[0].id : null;
     if (
       headId === lastRenderedLogHeadId &&
       lastRenderedSelectedLogId === selectedLogId &&
       els.logList.childNodes.length === transitionLog.length &&
-      transitionLog.length > 0
+      transitionLog.length > 0 &&
+      !shouldFlashLog
     ) {
       return;
     }
@@ -589,7 +666,8 @@
     if (
       headId === lastRenderedLogHeadId &&
       els.logList.childNodes.length === transitionLog.length &&
-      transitionLog.length > 0
+      transitionLog.length > 0 &&
+      !shouldFlashLog
     ) {
       var rows = els.logList.querySelectorAll(".fp-log-row");
       var ri;
@@ -600,6 +678,11 @@
       lastRenderedSelectedLogId = selectedLogId;
       return;
     }
+
+    // Pin to newest (top) only if user has not scrolled into history
+    var prevTop = els.logBody ? els.logBody.scrollTop : 0;
+    var pinToNewest = prevTop < 8;
+
     lastRenderedLogHeadId = headId;
     lastRenderedSelectedLogId = selectedLogId;
 
@@ -609,8 +692,12 @@
       empty.className = "fp-empty";
       empty.textContent = "No transitions yet";
       els.logList.appendChild(empty);
+      shouldFlashLog = false;
       return;
     }
+    var doFlash = shouldFlashLog;
+    shouldFlashLog = false;
+
     var i;
     for (i = 0; i < transitionLog.length; i++) {
       var e = transitionLog[i];
@@ -620,18 +707,45 @@
       if (logRowSelected(e)) {
         row.className += " fp-log-selected";
       }
+      if (doFlash && i === 0) {
+        row.className += " fp-log-flash";
+      }
       row.setAttribute("data-log-id", String(e.id));
-      var leafLabel = e.leaf || "(empty)";
+
+      var fromLabel = leafDisplay(e.fromLeaf);
+      var toLabel = leafDisplay(e.leaf);
       var tLabel = formatTime(e.t);
-      var depth = e.stack.length;
+      var depth =
+        typeof e.toDepth === "number" ? e.toDepth : e.stack ? e.stack.length : 0;
+      var sameLeaf = fromLabel === toLabel;
+      var fromLine =
+        "from " + escapeHtml(fromLabel) + (sameLeaf ? " (same)" : "");
+
+      var tagsHtml =
+        '<span class="fp-log-tag fp-log-tag-meta">n=' + depth + "</span>";
+      if (e.tag && e.tag.label) {
+        tagsHtml +=
+          '<span class="fp-log-tag' +
+          tagClassForKind(e.tag.kind) +
+          '">' +
+          escapeHtml(e.tag.label) +
+          "</span>";
+      }
+
       row.innerHTML =
         '<span class="fp-log-time">' +
         tLabel +
-        '</span><span class="fp-log-leaf">' +
-        escapeHtml(leafLabel) +
-        '</span><span class="fp-log-depth">n=' +
-        depth +
-        "</span>";
+        '</span><span class="fp-log-arrow" aria-hidden="true">→</span>' +
+        '<div class="fp-log-body">' +
+        '<div class="fp-log-to">' +
+        escapeHtml(toLabel) +
+        '</div><div class="fp-log-from">' +
+        fromLine +
+        "</div></div>" +
+        '<div class="fp-log-tags">' +
+        tagsHtml +
+        "</div>";
+
       row.addEventListener(
         "click",
         (function (entry) {
@@ -646,6 +760,14 @@
         })(e)
       );
       els.logList.appendChild(row);
+    }
+
+    if (els.logBody) {
+      if (pinToNewest) {
+        els.logBody.scrollTop = 0;
+      } else {
+        els.logBody.scrollTop = prevTop;
+      }
     }
   }
 
@@ -855,6 +977,7 @@
     lastMsgAt = { behaviors: 0, behaviorconds: 0 };
     lastRaw = { behaviors: null, behaviorconds: null };
     logSeq = 0;
+    shouldFlashLog = false;
     lastRenderedLogHeadId = null;
     lastRenderedStackKey = null;
     lastRenderedOwner = null;
@@ -1170,6 +1293,7 @@
       "  font-size: 12px;" +
       "  padding: var(--wv-space-2) 0;" +
       "}" +
+      /* P3 transition log: time | → | from→to | tags; flash newest; pin scroll in logBody */
       ".fp-log-list {" +
       "  display: flex;" +
       "  flex-direction: column;" +
@@ -1177,15 +1301,16 @@
       "}" +
       ".fp-log-row {" +
       "  display: grid;" +
-      "  grid-template-columns: 72px 1fr auto;" +
-      "  gap: var(--wv-space-2);" +
-      "  align-items: center;" +
+      "  grid-template-columns: 58px 14px minmax(0, 1fr) auto;" +
+      "  gap: 6px;" +
+      "  align-items: start;" +
       "  text-align: left;" +
       "  width: 100%;" +
+      "  box-sizing: border-box;" +
       "  font: inherit;" +
       "  font-family: var(--wv-mono);" +
       "  font-size: 11px;" +
-      "  padding: var(--wv-space-1) var(--wv-space-2);" +
+      "  padding: 5px 8px;" +
       "  border: 1px solid transparent;" +
       "  border-radius: var(--wv-radius-sm);" +
       "  background: transparent;" +
@@ -1198,9 +1323,54 @@
       "  background: var(--wv-accent-dim);" +
       "  border-color: var(--wv-content-line);" +
       "}" +
+      ".fp-log-flash { animation: fp-log-flash-in 0.45s ease; }" +
+      "@keyframes fp-log-flash-in {" +
+      "  from { background: var(--wv-accent-dim); }" +
+      "  to { background: transparent; }" +
+      "}" +
+      "@media (prefers-reduced-motion: reduce) {" +
+      "  .fp-log-flash { animation: none; }" +
+      "}" +
       ".fp-log-time { opacity: 0.55; }" +
-      ".fp-log-leaf { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }" +
-      ".fp-log-depth { opacity: 0.45; }" +
+      ".fp-log-arrow { color: var(--wv-accent); }" +
+      ".fp-log-body { min-width: 0; }" +
+      ".fp-log-to {" +
+      "  font-weight: 600;" +
+      "  white-space: nowrap;" +
+      "  overflow: hidden;" +
+      "  text-overflow: ellipsis;" +
+      "}" +
+      ".fp-log-from {" +
+      "  opacity: 0.55;" +
+      "  font-size: 10px;" +
+      "  margin-top: 1px;" +
+      "  white-space: nowrap;" +
+      "  overflow: hidden;" +
+      "  text-overflow: ellipsis;" +
+      "}" +
+      ".fp-log-tags {" +
+      "  display: flex;" +
+      "  flex-wrap: nowrap;" +
+      "  gap: 3px;" +
+      "  justify-content: flex-end;" +
+      "  max-width: 140px;" +
+      "  overflow: hidden;" +
+      "}" +
+      ".fp-log-tag {" +
+      "  font-size: 9px;" +
+      "  padding: 1px 5px;" +
+      "  border-radius: 3px;" +
+      "  border: 1px solid var(--wv-content-line);" +
+      "  color: var(--wv-content-text);" +
+      "  opacity: 0.75;" +
+      "  white-space: nowrap;" +
+      "}" +
+      ".fp-log-tag-meta { opacity: 0.5; }" +
+      ".fp-log-tag-empty { opacity: 1; color: var(--wv-warn); }" +
+      ".fp-log-tag-enter { opacity: 1; color: var(--wv-good); }" +
+      ".fp-log-tag-deeper { opacity: 1; color: var(--wv-accent); }" +
+      ".fp-log-tag-shallower { opacity: 1; color: var(--wv-warn); }" +
+      ".fp-log-tag-swap { opacity: 0.85; }" +
       ".fp-gates-list {" +
       "  display: flex;" +
       "  flex-direction: column;" +
