@@ -204,7 +204,11 @@
       parts.push("host=" + encodeURIComponent(host));
     }
     if (port) {
-      parts.push("port=" + encodeURIComponent(port));
+      var cleanPort =
+        Cfg.sanitizePort && typeof Cfg.sanitizePort === "function"
+          ? Cfg.sanitizePort(port, "8888")
+          : String(port).replace(/[^\d].*$/, "") || "8888";
+      parts.push("port=" + encodeURIComponent(cleanPort));
     }
     if (q.tab) {
       parts.push("tab=" + encodeURIComponent(q.tab));

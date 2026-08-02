@@ -120,7 +120,7 @@
   function portFromLocation() {
     var q = parseQuery(window.location.search);
     if (q.port) {
-      return String(q.port);
+      return sanitizePort(q.port, "8888");
     }
     var p = String(window.location.port || "");
     if (p === "8889" || p === "8888" || p === "8887") {
@@ -139,10 +139,24 @@
     if (!s) {
       return query;
     }
+    // Accidental second "?" (…&port=8888?theme=6) must become "&" or port/wsUrl break.
+    s = s.replace(/\?/g, "&");
     s.split("&").forEach(function (part) {
-      var pair = part.split("=");
-      var k = decodeURIComponent(pair[0] || "");
-      var v = decodeURIComponent(pair[1] || "");
+      if (!part) {
+        return;
+      }
+      var eq = part.indexOf("=");
+      var kRaw = eq >= 0 ? part.slice(0, eq) : part;
+      var vRaw = eq >= 0 ? part.slice(eq + 1) : "";
+      var k = "";
+      var v = "";
+      try {
+        k = decodeURIComponent(kRaw || "");
+        v = decodeURIComponent(vRaw || "");
+      } catch (e) {
+        k = kRaw || "";
+        v = vRaw || "";
+      }
       if (k) {
         query[k] = v;
       }
@@ -150,8 +164,17 @@
     return query;
   }
 
+  /** Engine/anim ports are 4-digit; strip junk like "8888?theme=6" → "8888". */
+  function sanitizePort(port, fallback) {
+    var m = String(port == null ? "" : port).match(/^\d{2,5}/);
+    if (m) {
+      return m[0];
+    }
+    return fallback != null ? String(fallback) : "8888";
+  }
+
   function profileForPort(port) {
-    port = String(port);
+    port = sanitizePort(port, "8888");
     if (port === "8889") {
       return {
         port: "8889",
@@ -286,9 +309,7 @@
         ? String(overrides.port)
         : q.port || (host ? readStoredFeedPort() : "") || portFromLocation();
 
-    if (!port) {
-      port = "8888";
-    }
+    port = sanitizePort(port, "8888");
 
     var loc = window.location;
     var pageHost = loc.hostname || "127.0.0.1";
@@ -329,6 +350,7 @@
     LS_FEED_PORT: LS_FEED_PORT,
     portFromLocation: portFromLocation,
     parseQuery: parseQuery,
+    sanitizePort: sanitizePort,
     profileForPort: profileForPort,
     siblingUrl: siblingUrl,
     parseFeedTarget: parseFeedTarget,

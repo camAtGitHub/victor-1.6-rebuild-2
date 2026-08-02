@@ -632,12 +632,15 @@ a:hover {
   color: var(--wv-text-dim);
 }
 
-/* ── Status bar ── */
+/* ── Status bar ──
+   Layout: [left … flex] [right ellipsis] [theme toggle]
+   Toggle is a direct flex child (not inside #statusRight) so long feed labels
+   cannot cover the hit target (Firefox elementFromPoint / click issues). */
 .status {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--wv-space-3);
+  justify-content: flex-start;
+  gap: var(--wv-space-2);
   padding: 0 var(--wv-space-3);
   background: var(--wv-bg-elev);
   border-top: 1px solid var(--wv-line);
@@ -645,6 +648,8 @@ a:hover {
   color: var(--wv-text-faint);
   font-family: var(--wv-mono);
   min-width: 0;
+  position: relative;
+  z-index: var(--wv-z-top);
 }
 .status .left,
 .status .right {
@@ -653,30 +658,29 @@ a:hover {
   white-space: nowrap;
 }
 .status .left {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
 }
-.status .status-end {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
+.status .right {
+  flex: 0 1 auto;
   min-width: 0;
-  max-width: 55%;
-}
-.status .status-end .right {
-  min-width: 0;
+  max-width: min(42vw, 28rem);
 }
 .status .theme-toggle {
-  flex-shrink: 0;
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
   width: 26px;
+  min-width: 26px;
   min-height: 22px;
   height: 22px;
   padding: 0;
   font-size: 14px;
   line-height: 1;
   color: var(--wv-text-dim);
-  border-color: var(--wv-line-soft);
+  border: 1px solid var(--wv-line-soft);
+  border-radius: var(--wv-radius-sm);
   background: var(--wv-bg-panel);
 }
 .status .theme-toggle:hover {

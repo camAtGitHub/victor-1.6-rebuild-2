@@ -353,8 +353,50 @@
     syncToggleUi(resolve(getPreference()));
   }
 
+  /**
+   * Optional URL override: ?theme=light|dark|system
+   * (Ignores junk like ?theme=6 from accidental second "?".)
+   */
+  function applyQueryThemeIfAny() {
+    try {
+      var search = global.location && global.location.search;
+      if (!search) {
+        return;
+      }
+      // Reuse WebVizConfig.parseQuery when available (handles double-?)
+      var q = {};
+      if (global.WebVizConfig && typeof global.WebVizConfig.parseQuery === "function") {
+        q = global.WebVizConfig.parseQuery(search);
+      } else {
+        var s = search.charAt(0) === "?" ? search.slice(1) : search;
+        s = s.replace(/\?/g, "&");
+        s.split("&").forEach(function (part) {
+          var eq = part.indexOf("=");
+          var k = eq >= 0 ? part.slice(0, eq) : part;
+          var v = eq >= 0 ? part.slice(eq + 1) : "";
+          try {
+            k = decodeURIComponent(k);
+            v = decodeURIComponent(v);
+          } catch (e) {
+            /* keep raw */
+          }
+          if (k) {
+            q[k] = v;
+          }
+        });
+      }
+      var t = q.theme;
+      if (t === "light" || t === "dark" || t === "system") {
+        setPreference(t);
+      }
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
   function init() {
     apply();
+    applyQueryThemeIfAny();
     bindMediaListener();
     bindDocClick();
     if (document.readyState === "loading") {
