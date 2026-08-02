@@ -39,6 +39,8 @@
   var hostElem = null;
   var logSeq = 0;
   var shouldFlashLog = false; // flash newest row once after pushTransition
+  // Persist collapsible gate open state: key = owner + "\0" + label (P4)
+  var openGates = Object.create(null);
   var els = null;
   var lastRenderedLogHeadId = null;
   var lastRenderedStackKey = null;
@@ -364,6 +366,50 @@
     return String(v);
   }
 
+  /**
+   * Gate display kind for sort + default collapse (P4).
+   * inactive wins over TRUE/FALSE when both present.
+   * rank: 0 FALSE, 1 unknown, 2 inactive, 3 TRUE — false-first then alpha within.
+   * defaultOpen: unmet/unknown/inactive open; met closed.
+   */
+  function gateKind(fac, isInactive) {
+    var met = fac && fac.areConditionsMet;
+    if (isInactive) {
+      return {
+        rank: 2,
+        statusCls: "fp-gate-inactive",
+        statusTxt: "inactive",
+        defaultOpen: true,
+      };
+    }
+    if (fac && typeof met === "boolean") {
+      if (met) {
+        return {
+          rank: 3,
+          statusCls: "fp-met",
+          statusTxt: "TRUE",
+          defaultOpen: false,
+        };
+      }
+      return {
+        rank: 0,
+        statusCls: "fp-unmet",
+        statusTxt: "FALSE",
+        defaultOpen: true,
+      };
+    }
+    return {
+      rank: 1,
+      statusCls: "fp-gate-unknown",
+      statusTxt: "—",
+      defaultOpen: true,
+    };
+  }
+
+  function openGatesKey(owner, label) {
+    return String(owner) + "\0" + String(label);
+  }
+
   function openStockTab(name) {
     if (window.WebViz && typeof window.WebViz.subscribe === "function") {
       window.WebViz.subscribe(name);
@@ -414,10 +460,15 @@
       "    </section>" +
       "  </div>" +
       '  <section class="fp-panel fp-gates" aria-label="Activation gates">' +
-      '    <div class="fp-panel-title">Gates <span class="fp-meta" data-fp="gatesOwner"></span></div>' +
-      '    <div class="fp-panel-body">' +
-      '      <div class="fp-gates-list" data-fp="gatesList"></div>' +
-      '      <div class="fp-empty" data-fp="gatesEmpty">No condition factors for this behavior yet</div>' +
+      '    <div class="fp-panel-title">Gates <span class="fp-meta" data-fp="gatesCount"></span></div>' +
+      '    <div class="fp-panel-body fp-gates-panel-body">' +
+      '      <div class="fp-gates-toolbar">' +
+      '        <span class="fp-gates-focus" data-fp="gatesOwner"></span>' +
+      "      </div>" +
+      '      <div class="fp-gates-scroll">' +
+      '        <div class="fp-gates-list" data-fp="gatesList"></div>' +
+      '        <div class="fp-empty" data-fp="gatesEmpty">No condition factors for this behavior yet</div>' +
+      "      </div>" +
       "    </div>" +
       "  </section>" +
       "</div>" +
@@ -449,6 +500,7 @@
       logMeta: root.querySelector('[data-fp="logMeta"]'),
       logBody: root.querySelector('[data-fp="logBody"]'),
       logList: root.querySelector('[data-fp="logList"]'),
+      gatesCount: root.querySelector('[data-fp="gatesCount"]'),
       gatesOwner: root.querySelector('[data-fp="gatesOwner"]'),
       gatesList: root.querySelector('[data-fp="gatesList"]'),
       gatesEmpty: root.querySelector('[data-fp="gatesEmpty"]'),
@@ -784,9 +836,15 @@
       return;
     }
     var owner = selectedOwner;
+    // Honesty: factors are latest for owner — not frozen at log-row time
     els.gatesOwner.textContent = owner
-      ? "for " + owner + " (latest factors)"
-      : "";
+      ? "Focus: " +
+        owner +
+        " · latest factors — not time-aligned to log row"
+      : "Focus: — · latest factors — not time-aligned to log row";
+    if (els.gatesCount) {
+      els.gatesCount.textContent = "";
+    }
     els.gatesList.innerHTML = "";
 
     if (!owner) {
@@ -804,10 +862,6 @@
         labels.push(lab);
       }
     });
-    labels.sort();
-    if (labels.length > MAX_GATES_DISPLAY) {
-      labels = labels.slice(0, MAX_GATES_DISPLAY);
-    }
 
     if (!labels.length) {
       els.gatesEmpty.style.display = "block";
@@ -817,64 +871,145 @@
     }
     els.gatesEmpty.style.display = "none";
 
+    // Sort false-first (FALSE, unknown, inactive, TRUE), then alpha within rank
+    labels.sort(function (a, b) {
+      var ka = gateKind(byLabel[a], !!inactive[a]);
+      var kb = gateKind(byLabel[b], !!inactive[b]);
+      if (ka.rank !== kb.rank) {
+        return ka.rank - kb.rank;
+      }
+      if (a < b) {
+        return -1;
+      }
+      if (a > b) {
+        return 1;
+      }
+      return 0;
+    });
+
+    var total = labels.length;
+    var metCount = 0;
+    var ti;
+    for (ti = 0; ti < total; ti++) {
+      var kindT = gateKind(byLabel[labels[ti]], !!inactive[labels[ti]]);
+      if (kindT.statusTxt === "TRUE") {
+        metCount++;
+      }
+    }
+    if (els.gatesCount) {
+      els.gatesCount.textContent = metCount + "/" + total + " met";
+    }
+
+    var truncated = 0;
+    if (labels.length > MAX_GATES_DISPLAY) {
+      truncated = labels.length - MAX_GATES_DISPLAY;
+      labels = labels.slice(0, MAX_GATES_DISPLAY);
+    }
+
     var i;
     for (i = 0; i < labels.length; i++) {
       var lab = labels[i];
       var fac = byLabel[lab];
-      var card = document.createElement("div");
-      card.className = "fp-gate";
-
-      var met = fac && fac.areConditionsMet;
       var isInactive = !!inactive[lab];
-      var statusCls = "fp-gate-unknown";
-      var statusTxt = "—";
-      // Prefer inactive over stale TRUE/FALSE when both exist (Issue 1)
-      if (isInactive) {
-        statusCls = "fp-gate-inactive";
-        statusTxt = "inactive";
-      } else if (fac && typeof met === "boolean") {
-        statusCls = met ? "fp-met" : "fp-unmet";
-        statusTxt = met ? "TRUE" : "FALSE";
-      }
+      var kind = gateKind(fac, isInactive);
+      var ogKey = openGatesKey(owner, lab);
+      var isOpen =
+        openGates[ogKey] !== undefined
+          ? !!openGates[ogKey]
+          : kind.defaultOpen;
 
-      var head = document.createElement("div");
+      var card = document.createElement("div");
+      card.className = "fp-gate" + (isOpen ? " fp-gate-open" : "");
+
+      var head = document.createElement("button");
+      head.type = "button";
       head.className = "fp-gate-head";
+      head.setAttribute("aria-expanded", isOpen ? "true" : "false");
+      head.setAttribute(
+        "title",
+        isOpen ? "Collapse gate factors" : "Expand gate factors"
+      );
       head.innerHTML =
         '<span class="fp-gate-status ' +
-        statusCls +
+        kind.statusCls +
         '">' +
-        statusTxt +
-        '</span><span class="fp-gate-label">' +
+        kind.statusTxt +
+        '</span><span class="fp-gate-label" title="' +
         escapeHtml(lab) +
-        "</span>";
-      card.appendChild(head);
+        '">' +
+        escapeHtml(lab) +
+        '</span><span class="fp-gate-chevron" aria-hidden="true">▶</span>';
+
+      var body = document.createElement("div");
+      body.className = "fp-gate-body";
 
       // Still show last factor details when inactive (optional context)
       if (fac) {
-        var body = document.createElement("div");
-        body.className = "fp-gate-factors";
         var keys = Object.keys(fac);
         var ki;
+        var anyFactor = false;
         for (ki = 0; ki < keys.length; ki++) {
           var k = keys[ki];
           if (factorSkipKey(k)) {
             continue;
           }
+          anyFactor = true;
           var line = document.createElement("div");
           line.className = "fp-factor-line";
+          var valStr = formatFactorVal(fac[k]);
           line.innerHTML =
-            '<span class="fp-factor-key">' +
+            '<span class="fp-factor-key" title="' +
             escapeHtml(k) +
-            '</span><span class="fp-factor-val">' +
-            escapeHtml(formatFactorVal(fac[k])) +
+            '">' +
+            escapeHtml(k) +
+            '</span><span class="fp-factor-val" title="' +
+            escapeHtml(valStr) +
+            '">' +
+            escapeHtml(valStr) +
             "</span>";
           body.appendChild(line);
         }
-        if (body.childNodes.length) {
-          card.appendChild(body);
+        if (!anyFactor) {
+          body.innerHTML =
+            '<div class="fp-factor-line"><span class="fp-factor-key">—</span>' +
+            '<span class="fp-factor-val">no factors</span></div>';
         }
+      } else {
+        body.innerHTML =
+          '<div class="fp-factor-line"><span class="fp-factor-key">—</span>' +
+          '<span class="fp-factor-val">no factors</span></div>';
       }
+
+      head.addEventListener(
+        "click",
+        (function (cardEl, headEl, key) {
+          return function () {
+            var nowOpen = !cardEl.classList.contains("fp-gate-open");
+            if (nowOpen) {
+              cardEl.classList.add("fp-gate-open");
+            } else {
+              cardEl.classList.remove("fp-gate-open");
+            }
+            headEl.setAttribute("aria-expanded", nowOpen ? "true" : "false");
+            headEl.setAttribute(
+              "title",
+              nowOpen ? "Collapse gate factors" : "Expand gate factors"
+            );
+            openGates[key] = nowOpen;
+          };
+        })(card, head, ogKey)
+      );
+
+      card.appendChild(head);
+      card.appendChild(body);
       els.gatesList.appendChild(card);
+    }
+
+    if (truncated > 0) {
+      var more = document.createElement("div");
+      more.className = "fp-gates-more";
+      more.textContent = "+" + truncated + " more (capped at " + MAX_GATES_DISPLAY + ")";
+      els.gatesList.appendChild(more);
     }
   }
 
@@ -978,6 +1113,7 @@
     lastRaw = { behaviors: null, behaviorconds: null };
     logSeq = 0;
     shouldFlashLog = false;
+    openGates = Object.create(null);
     lastRenderedLogHeadId = null;
     lastRenderedStackKey = null;
     lastRenderedOwner = null;
@@ -1371,43 +1507,131 @@
       ".fp-log-tag-deeper { opacity: 1; color: var(--wv-accent); }" +
       ".fp-log-tag-shallower { opacity: 1; color: var(--wv-warn); }" +
       ".fp-log-tag-swap { opacity: 0.85; }" +
+      /* P4 gates: collapsible cards, focus toolbar, false-first sort in JS */
+      ".fp-gates-panel-body {" +
+      "  display: flex;" +
+      "  flex-direction: column;" +
+      "  overflow: hidden;" +
+      "  padding: var(--wv-space-1) var(--wv-space-2);" +
+      "}" +
+      ".fp-gates-toolbar {" +
+      "  flex-shrink: 0;" +
+      "  display: flex;" +
+      "  flex-wrap: nowrap;" +
+      "  align-items: center;" +
+      "  gap: var(--wv-space-2);" +
+      "  min-width: 0;" +
+      "  margin-bottom: var(--wv-space-1);" +
+      "  padding-bottom: var(--wv-space-1);" +
+      "  border-bottom: 1px solid var(--wv-content-line);" +
+      "}" +
+      ".fp-gates-focus {" +
+      "  font-family: var(--wv-mono);" +
+      "  font-size: 11px;" +
+      "  font-weight: 500;" +
+      "  color: var(--wv-content-text);" +
+      "  opacity: 0.75;" +
+      "  min-width: 0;" +
+      "  overflow: hidden;" +
+      "  text-overflow: ellipsis;" +
+      "  white-space: nowrap;" +
+      "}" +
+      ".fp-gates-scroll {" +
+      "  flex: 1 1 auto;" +
+      "  min-height: 0;" +
+      "  overflow: auto;" +
+      "  overscroll-behavior: contain;" +
+      "}" +
       ".fp-gates-list {" +
       "  display: flex;" +
       "  flex-direction: column;" +
-      "  gap: var(--wv-space-2);" +
+      "  gap: 4px;" +
       "}" +
       ".fp-gate {" +
       "  border: 1px solid var(--wv-content-line);" +
       "  border-radius: var(--wv-radius-sm);" +
-      "  padding: var(--wv-space-2);" +
+      "  overflow: hidden;" +
+      "  background: var(--wv-content-bg);" +
       "}" +
       ".fp-gate-head {" +
       "  display: flex;" +
-      "  align-items: baseline;" +
+      "  align-items: center;" +
       "  gap: var(--wv-space-2);" +
-      "  margin-bottom: var(--wv-space-1);" +
+      "  width: 100%;" +
+      "  box-sizing: border-box;" +
+      "  text-align: left;" +
+      "  font: inherit;" +
+      "  padding: 5px 8px;" +
+      "  border: none;" +
+      "  background: transparent;" +
+      "  color: var(--wv-content-text);" +
+      "  cursor: pointer;" +
+      "  user-select: none;" +
+      "  min-width: 0;" +
       "}" +
+      ".fp-gate-head:hover { background: var(--wv-accent-dim); }" +
+      ".fp-gate-head:focus { outline: 2px solid var(--wv-accent); outline-offset: -1px; }" +
       ".fp-gate-status {" +
       "  font-family: var(--wv-mono);" +
-      "  font-size: 11px;" +
+      "  font-size: 10px;" +
       "  font-weight: 700;" +
       "  min-width: 52px;" +
+      "  text-align: center;" +
+      "  padding: 2px 0;" +
+      "  border-radius: 3px;" +
+      "  flex-shrink: 0;" +
       "}" +
       ".fp-met { color: var(--wv-good); }" +
       ".fp-unmet { color: var(--wv-bad); }" +
       ".fp-gate-unknown, .fp-gate-inactive { opacity: 0.55; }" +
-      ".fp-gate-label { font-family: var(--wv-mono); font-size: 12px; font-weight: 600; }" +
-      ".fp-gate-factors { padding-left: var(--wv-space-1); }" +
+      ".fp-gate-label {" +
+      "  font-family: var(--wv-mono);" +
+      "  font-size: 11.5px;" +
+      "  font-weight: 600;" +
+      "  flex: 1 1 auto;" +
+      "  min-width: 0;" +
+      "  overflow: hidden;" +
+      "  text-overflow: ellipsis;" +
+      "  white-space: nowrap;" +
+      "}" +
+      ".fp-gate-chevron {" +
+      "  flex-shrink: 0;" +
+      "  font-size: 10px;" +
+      "  opacity: 0.45;" +
+      "  transition: transform 0.15s ease;" +
+      "}" +
+      ".fp-gate-open .fp-gate-chevron { transform: rotate(90deg); }" +
+      "@media (prefers-reduced-motion: reduce) {" +
+      "  .fp-gate-chevron { transition: none; }" +
+      "}" +
+      ".fp-gate-body {" +
+      "  display: none;" +
+      "  padding: 0 8px 8px 48px;" +
+      "  border-top: 1px solid var(--wv-content-line);" +
+      "}" +
+      ".fp-gate-open .fp-gate-body { display: block; }" +
       ".fp-factor-line {" +
       "  display: grid;" +
-      "  grid-template-columns: minmax(80px, 140px) 1fr;" +
-      "  gap: var(--wv-space-2);" +
+      "  grid-template-columns: minmax(80px, 120px) minmax(0, 1fr);" +
+      "  gap: 6px;" +
       "  font-family: var(--wv-mono);" +
       "  font-size: 11px;" +
-      "  padding: 1px 0;" +
+      "  padding: 3px 0;" +
+      "  border-bottom: 1px solid var(--wv-content-line);" +
       "}" +
+      ".fp-factor-line:last-child { border-bottom: none; }" +
       ".fp-factor-key { opacity: 0.55; overflow: hidden; text-overflow: ellipsis; }" +
-      ".fp-factor-val { word-break: break-all; }" +
+      ".fp-factor-val {" +
+      "  overflow: hidden;" +
+      "  text-overflow: ellipsis;" +
+      "  white-space: nowrap;" +
+      "}" +
+      ".fp-gates-more {" +
+      "  font-size: 11px;" +
+      "  opacity: 0.55;" +
+      "  padding: var(--wv-space-1) 0;" +
+      "  font-family: var(--wv-mono);" +
+      "}" +
       /* Dev tools: collapsed = summary only; open may grow into host scroll */
       ".fp-dev {" +
       "  flex-shrink: 0;" +
