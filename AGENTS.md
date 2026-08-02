@@ -343,6 +343,8 @@ if you ran out of context mid-folder, say so here.
 | 2026-07-29 | Grok | Captured idea: Anki backpack lights via `/data/data/enableankilights` + auto custom lights from `/data/data/customBackpackLights/*` (Wired option) → `docs/mapping/IDEA-backpack-lights-flags.md`. Links existing CCIS/CHANGES. | Feature phase: verify if already coded; else implement flag/folder + Wired. |
 | 2026-08-02 | Grok | Brainstormed no-C++ WebViz modules; designed **FreePlay** (multi-subscribe behaviors+behaviorconds; stock tabs stay; token dual-theme). Spec: `docs/mapping/WEBVIZ-FREEPLAY-DESIGN.md`. | User approved LGTM; rename WEBVIZ-* group; implementation plan next. |
 | 2026-08-02 | Grok | Wrote **implementation plan** `docs/mapping/WEBVIZ-FREEPLAY-PLAN.md` (Phase 0 Allowed APIs + Phases 1–6 shell/CSS/registry/module/verify; success S1–S9). | Execute plan (shell multi-channel → freeplay.js → S1–S9). |
+| 2026-08-02 | Grok | Theme catch-up: FreePlay design+plan drop `module-host--ops`; light `.module-host` + content tokens; shell dark/light via `WebVizTheme`/`#btnThemeToggle` already shipped. | Execute updated plan. |
+| 2026-08-02 | Grok | **FreePlay implemented:** shell multi-channel retain/fan-out (`app.js`), registry (`config.js`), `webVizModules/freeplay.js` (stack/log/gates; content tokens; no C++). Design status → implemented. | Runtime S1–S9 on robot/devData; optional README one-liner. |
 
 ---
 

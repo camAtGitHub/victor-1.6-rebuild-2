@@ -17,7 +17,7 @@
     byKey: Object.create(null),
     displayNames: Object.create(null),
     mounted: Object.create(null), // key → true after init (once)
-    subscribed: Object.create(null), // key → true while WS subscribed
+    subscribed: Object.create(null), // key → true while surface is open/subscribed
     msgCount: Object.create(null),
     moduleErrors: Object.create(null), // key → last error string
     activeKey: "overview",
@@ -27,6 +27,12 @@
     updateTimer: null,
     /** Show Robot feed IP UI after remote params / WebViz feed commands */
     feedUiUnlocked: false,
+    // wire channel → number of interested surfaces (stock and/or multi-channel)
+    channelRefs: Object.create(null), // e.g. { behaviors: 2, behaviorconds: 1 }
+    // surface key → wire channels retained by that surface
+    surfaceChannels: Object.create(null), // e.g. { freeplay: ["behaviors","behaviorconds"] }
+    // stock surfaces: fake dump replayed once per mount (multi-channel resets + replays each sub)
+    fakeReplayed: Object.create(null),
   };
 
   function init() {
@@ -570,6 +576,21 @@
           subscribed: subscribedList(),
           subscribedCount: subscribedCount(),
           mounted: Object.keys(state.mounted).sort(),
+          // Multi-channel debug (S4): wire refcounts + per-surface channel lists
+          channelRefs: (function () {
+            var out = Object.create(null);
+            Object.keys(state.channelRefs).forEach(function (k) {
+              out[k] = state.channelRefs[k];
+            });
+            return out;
+          })(),
+          surfaceChannels: (function () {
+            var out = Object.create(null);
+            Object.keys(state.surfaceChannels).forEach(function (k) {
+              out[k] = (state.surfaceChannels[k] || []).slice();
+            });
+            return out;
+          })(),
           page: window.location.href,
         };
         console.log("[WebViz] status", s);
@@ -706,6 +727,80 @@
     }
   }
 
+  /** Refcount wire-channel subscribe (stock key or multi-channel surface share). */
+  function wireRetain(channel) {
+    channel = String(channel).toLowerCase();
+    var n = state.channelRefs[channel] || 0;
+    state.channelRefs[channel] = n + 1;
+    if (n === 0 && state.socket) {
+      state.socket.subscribe(channel);
+    }
+  }
+
+  function wireRelease(channel) {
+    channel = String(channel).toLowerCase();
+    var n = state.channelRefs[channel] || 0;
+    if (n <= 0) {
+      return;
+    }
+    n -= 1;
+    if (n === 0) {
+      delete state.channelRefs[channel];
+      if (state.socket) {
+        state.socket.unsubscribe(channel);
+      }
+    } else {
+      state.channelRefs[channel] = n;
+    }
+  }
+
+  /** Wire channels a surface wants: methods.channels or [surfaceKey] for stock. */
+  function channelsForSurface(key, methods) {
+    methods = methods || state.byKey[key];
+    if (
+      methods &&
+      Array.isArray(methods.channels) &&
+      methods.channels.length
+    ) {
+      var seen = Object.create(null);
+      var out = [];
+      var i;
+      for (i = 0; i < methods.channels.length; i++) {
+        var c = String(methods.channels[i]).toLowerCase();
+        if (!c || seen[c]) {
+          continue;
+        }
+        seen[c] = true;
+        out.push(c);
+      }
+      return out.length ? out : [String(key).toLowerCase()];
+    }
+    return [String(key).toLowerCase()];
+  }
+
+  /**
+   * Replay devData.json dumps for the given wire channel names.
+   * @param {string[]} channels
+   * @param {string} [onlySurfaceKey] if set, deliver only to that surface (avoid
+   *   re-feeding already-open stock modules when a multi-channel surface subscribes)
+   */
+  function replayFakeForChannels(channels, onlySurfaceKey) {
+    if (!state.fakeData || !channels || !channels.length) {
+      return;
+    }
+    onlySurfaceKey = onlySurfaceKey
+      ? String(onlySurfaceKey).toLowerCase()
+      : null;
+    channels.forEach(function (ch) {
+      ch = String(ch).toLowerCase();
+      if (state.fakeData[ch] && Array.isArray(state.fakeData[ch])) {
+        state.fakeData[ch].forEach(function (entry) {
+          deliverData(ch, entry, onlySurfaceKey);
+        });
+      }
+    });
+  }
+
   /** One-time DOM init + styles for a module panel. */
   function mountModule(key, hostElem) {
     var methods = state.byKey[key];
@@ -729,12 +824,8 @@
     }
 
     state.mounted[key] = true;
-
-    if (state.fakeData && state.fakeData[key]) {
-      state.fakeData[key].forEach(function (entry) {
-        deliverData(key, entry);
-      });
-    }
+    // Fake dumps run only after subscribe (surface is subscribed); not here.
+    delete state.fakeReplayed[key];
   }
 
   function subscribeModule(key) {
@@ -759,16 +850,62 @@
     }
     // Fresh subscription session: reset per-module message tally for tooltips only
     state.msgCount[key] = 0;
-    if (state.socket) {
-      state.socket.subscribe(key);
+
+    var methods = state.byKey[key];
+    var channels = channelsForSurface(key, methods);
+    var isMulti =
+      methods &&
+      Array.isArray(methods.channels) &&
+      methods.channels.length > 0;
+
+    // Multi-channel: clear module session so re-subscribe + fake does not pile dumps
+    if (isMulti && typeof methods.resetSession === "function") {
+      try {
+        methods.resetSession(document.getElementById("tab-" + key));
+      } catch (errReset) {
+        reportModuleError(key, "resetSession", errReset);
+      }
     }
+
+    // Multi-channel: retain each wire name only (do NOT wire-subscribe surface key alone)
+    var i;
+    for (i = 0; i < channels.length; i++) {
+      wireRetain(channels[i]);
+    }
+    state.surfaceChannels[key] = channels;
     state.subscribed[key] = true;
+
     UI.setSubState(key, "subscribed", true);
     UI.markNavLive(key, true, 0);
     refreshConnStatus(state.socket && state.socket.isOpen() ? "live" : "dead");
+
+    // Offline/dev dumps: multi-channel every subscribe (after resetSession);
+    // stock once per mount so re-sub does not re-feed Gantt history.
+    var shouldFake = isMulti || !state.fakeReplayed[key];
+    if (shouldFake) {
+      replayFakeForChannels(channels, key);
+      if (
+        state.fakeData &&
+        state.fakeData[key] &&
+        channels.indexOf(key) < 0 &&
+        Array.isArray(state.fakeData[key])
+      ) {
+        state.fakeData[key].forEach(function (entry) {
+          deliverData(key, entry, key);
+        });
+      }
+      if (!isMulti) {
+        state.fakeReplayed[key] = true;
+      }
+    }
+
     console.info(
       "[WebViz] Subscribed:",
       key,
+      "channels:",
+      channels,
+      "· refs:",
+      JSON.stringify(state.channelRefs),
       "· total modules:",
       subscribedCount(),
       subscribedList()
@@ -783,23 +920,51 @@
       refreshConnStatus(state.socket && state.socket.isOpen() ? "live" : "dead");
       return;
     }
-    if (state.socket) {
-      state.socket.unsubscribe(key);
+    var channels = state.surfaceChannels[key] || [key];
+    var fullyDropped = [];
+    var stillShared = [];
+    var i;
+    for (i = 0; i < channels.length; i++) {
+      var ch = channels[i];
+      var before = state.channelRefs[ch] || 0;
+      wireRelease(ch);
+      if (before > 0 && !state.channelRefs[ch]) {
+        fullyDropped.push(ch);
+      } else if (state.channelRefs[ch]) {
+        stillShared.push(ch);
+      }
     }
+    delete state.surfaceChannels[key];
     delete state.subscribed[key];
     // Stop counting msgs for this module until they sub again
     state.msgCount[key] = 0;
     UI.setSubState(key, "not subscribed", false);
     UI.markNavLive(key, false, 0);
-    UI.toast(
-      state.displayNames[key] || key,
-      "Unsubscribed — robot will stop sending this module’s data",
-      "ok"
-    );
+    var toastMsg;
+    if (stillShared.length === 0) {
+      toastMsg =
+        "Unsubscribed — robot will stop sending this module’s data";
+    } else if (fullyDropped.length === 0) {
+      toastMsg =
+        "Unsubscribed this surface — shared channel(s) still streaming for other modules (" +
+        stillShared.join(", ") +
+        ")";
+    } else {
+      toastMsg =
+        "Unsubscribed — stopped " +
+        fullyDropped.join(", ") +
+        "; still shared: " +
+        stillShared.join(", ");
+    }
+    UI.toast(state.displayNames[key] || key, toastMsg, "ok");
     refreshConnStatus(state.socket && state.socket.isOpen() ? "live" : "dead");
     console.info(
       "[WebViz] Unsubscribed:",
       key,
+      "channels:",
+      channels,
+      "· refs:",
+      JSON.stringify(state.channelRefs),
       "· still subscribed (" + subscribedCount() + "):",
       subscribedList()
     );
@@ -833,36 +998,97 @@
     deliverData(moduleKey, data);
   }
 
-  function deliverData(moduleKey, data) {
-    var methods = state.byKey[moduleKey];
-    if (!methods) {
-      return;
+  /**
+   * Fan-out a wire-channel payload to:
+   *  1) stock module whose key == channel (if subscribed)
+   *  2) multi-channel surfaces that list this channel
+   * @param {string} [onlySurfaceKey] optional: deliver only to this surface
+   *   (used by fake-data replay so FreePlay sub does not re-feed Behaviors)
+   */
+  function deliverData(channel, data, onlySurfaceKey) {
+    channel = String(channel).toLowerCase();
+    onlySurfaceKey = onlySurfaceKey
+      ? String(onlySurfaceKey).toLowerCase()
+      : null;
+    var deliveredAny = false;
+
+    // 1) Stock primary: module key matches wire channel and is subscribed
+    var stockMethods = state.byKey[channel];
+    if (
+      stockMethods &&
+      state.subscribed[channel] &&
+      (!onlySurfaceKey || onlySurfaceKey === channel)
+    ) {
+      var stockElem = document.getElementById("tab-" + channel);
+      if (stockElem) {
+        state.msgCount[channel] = (state.msgCount[channel] || 0) + 1;
+        UI.markNavLive(channel, true, state.msgCount[channel]);
+        try {
+          stockMethods.onData(data, stockElem);
+        } catch (err) {
+          reportModuleError(channel, "onData", err);
+        }
+        if (stockMethods.devShouldDumpData) {
+          dumpDevData(channel, data);
+        }
+        deliveredAny = true;
+      }
     }
 
-    // Drop late packets after unsubscribe (robot may still flush a frame or two)
-    if (!state.subscribed[moduleKey]) {
-      return;
+    // 2) Multi-channel surfaces (e.g. FreePlay) that claim this wire channel
+    var surfaceKeys = Object.keys(state.subscribed);
+    var si;
+    for (si = 0; si < surfaceKeys.length; si++) {
+      var surfaceKey = surfaceKeys[si];
+      // Skip stock primary already handled above (key == channel, no .channels)
+      if (surfaceKey === channel) {
+        continue;
+      }
+      if (onlySurfaceKey && surfaceKey !== onlySurfaceKey) {
+        continue;
+      }
+      var methods = state.byKey[surfaceKey];
+      if (!methods || !Array.isArray(methods.channels) || !methods.channels.length) {
+        continue;
+      }
+      var wants = false;
+      var ci;
+      for (ci = 0; ci < methods.channels.length; ci++) {
+        if (String(methods.channels[ci]).toLowerCase() === channel) {
+          wants = true;
+          break;
+        }
+      }
+      if (!wants) {
+        continue;
+      }
+
+      var elem = document.getElementById("tab-" + surfaceKey);
+      if (!elem) {
+        continue;
+      }
+
+      state.msgCount[surfaceKey] = (state.msgCount[surfaceKey] || 0) + 1;
+      UI.markNavLive(surfaceKey, true, state.msgCount[surfaceKey]);
+
+      try {
+        if (typeof methods.onChannelData === "function") {
+          methods.onChannelData(channel, data, elem);
+        } else {
+          methods.onData(data, elem, channel);
+        }
+      } catch (err2) {
+        reportModuleError(surfaceKey, "onChannelData", err2);
+      }
+
+      if (methods.devShouldDumpData) {
+        dumpDevData(surfaceKey, data);
+      }
+      deliveredAny = true;
     }
 
-    state.msgCount[moduleKey] = (state.msgCount[moduleKey] || 0) + 1;
-    // Tooltip only — badge stays "on", not 2 / 4 / 8…
-    UI.markNavLive(moduleKey, true, state.msgCount[moduleKey]);
-
-    // Host element: prefer #tab-{key} (stock id)
-    var elem = document.getElementById("tab-" + moduleKey);
-    if (!elem) {
-      return;
-    }
-
-    try {
-      methods.onData(data, elem);
-    } catch (err) {
-      reportModuleError(moduleKey, "onData", err);
-    }
-
-    if (methods.devShouldDumpData) {
-      dumpDevData(moduleKey, data);
-    }
+    // Late packets after full unsubscribe: no recipients (expected)
+    return deliveredAny;
   }
 
   function reportModuleError(moduleKey, phase, err) {
@@ -945,6 +1171,24 @@
           "<b>USING FAKE DATA!</b> Remove <code>devData.json</code> when done.";
         overview.insertBefore(call, overview.firstChild.nextSibling);
       }
+      // Late XHR: only fill surfaces that have not received any messages yet
+      // (do not inject dumps over an already-live robot session).
+      Object.keys(state.subscribed).forEach(function (sk) {
+        if ((state.msgCount[sk] || 0) > 0) {
+          return;
+        }
+        var chans = state.surfaceChannels[sk] || [sk];
+        replayFakeForChannels(chans, sk);
+        if (
+          state.fakeData[sk] &&
+          chans.indexOf(sk) < 0 &&
+          Array.isArray(state.fakeData[sk])
+        ) {
+          state.fakeData[sk].forEach(function (entry) {
+            deliverData(sk, entry, sk);
+          });
+        }
+      });
     });
   }
 

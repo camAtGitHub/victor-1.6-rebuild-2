@@ -12,6 +12,7 @@
 
   var MODULES_ENGINE = {
     SoundReactions: "webVizModules/micDataEngine.js",
+    FreePlay: "webVizModules/freeplay.js",
     Behaviors: "webVizModules/behaviors.js",
     Intents: "webVizModules/intents.js",
     CloudIntents: "webVizModules/cloud.js",
@@ -48,7 +49,7 @@
     {
       id: "ai",
       label: "Behavior & AI",
-      keys: ["Behaviors", "BehaviorConds", "Intents", "CloudIntents", "Features", "Sleeping"],
+      keys: ["FreePlay", "Behaviors", "BehaviorConds", "Intents", "CloudIntents", "Features", "Sleeping"],
     },
     {
       id: "sense",
@@ -89,6 +90,7 @@
 
   var DESCRIPTIONS = {
     overview: "Connection status, module index, and how WebViz works",
+    FreePlay: "Live freeplay stack, transition log, and activation gates",
     Behaviors: "Behavior stack / tree timeline (engine freeplay spine)",
     BehaviorConds: "BEI activation conditions & factors",
     Intents: "User intents pending / inject",
