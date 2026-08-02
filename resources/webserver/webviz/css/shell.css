@@ -173,6 +173,35 @@ a:hover {
   gap: 6px;
   flex-shrink: 0;
 }
+.top-actions .theme-sel {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+}
+.top-actions select,
+.top-actions .theme-sel select {
+  height: 30px;
+  min-width: 5.5rem;
+  max-width: 7rem;
+  padding: 0 6px;
+  border-radius: var(--wv-radius-sm);
+  border: 1px solid var(--wv-line);
+  background: var(--wv-bg-input);
+  color: var(--wv-text);
+  font-size: 12px;
+  cursor: pointer;
+}
+.top-actions select:focus,
+.top-actions .theme-sel select:focus {
+  outline: none;
+  border-color: var(--wv-accent);
+  box-shadow: 0 0 0 2px var(--wv-accent-dim);
+}
+.top-actions select:focus-visible,
+.top-actions .theme-sel select:focus-visible {
+  outline: 2px solid var(--wv-accent);
+  outline-offset: 2px;
+}
 
 .btn {
   display: inline-flex;
@@ -353,7 +382,7 @@ a:hover {
 }
 .nav-item.is-active {
   background: var(--wv-accent-dim);
-  border-color: rgba(91, 159, 212, 0.35);
+  border-color: var(--wv-accent-border);
   color: var(--wv-text);
 }
 .nav-item.is-live .status-dot {
@@ -515,12 +544,12 @@ a:hover {
 }
 .surface-head .tools .pill.is-on {
   color: var(--wv-good);
-  border-color: rgba(62, 207, 142, 0.35);
+  border-color: var(--wv-good-border);
   background: var(--wv-good-dim);
 }
 .surface-head .tools .btn.is-on {
   background: var(--wv-bad-dim);
-  border-color: rgba(240, 113, 120, 0.45);
+  border-color: var(--wv-bad-border);
   color: var(--wv-bad);
 }
 .surface-head .tools .btn.is-on:hover {
@@ -528,7 +557,8 @@ a:hover {
   color: var(--wv-text);
 }
 
-/* Module content host — light surface for legacy module CSS/charts */
+/* Module content host — light paper for legacy module CSS/charts.
+   Border keeps the well defined under light chrome (bg #f0f2f6 vs content #fff). */
 .module-host {
   flex: 1;
   min-height: 0;
@@ -537,14 +567,16 @@ a:hover {
   position: relative;
   background: var(--wv-content-bg);
   color: var(--wv-content-text);
+  border: 1px solid var(--wv-content-line);
   /* Match stock tab-content padding so modules lay out as before */
   padding: 15px;
 }
 
-/* Overview stays on dark shell chrome */
+/* Overview uses shell chrome tokens (not content paper) */
 #surface-overview .module-host {
   background: var(--wv-bg);
   color: var(--wv-text);
+  border: none;
   padding: var(--wv-space-5);
 }
 
@@ -683,14 +715,14 @@ a:hover {
   animation: wv-toast-in var(--wv-dur) var(--wv-ease);
 }
 .toast.is-error {
-  border-color: rgba(240, 113, 120, 0.45);
-  background: #1a1418;
+  border-color: var(--wv-bad-border);
+  background: var(--wv-toast-error-bg);
 }
 .toast.is-warn {
-  border-color: rgba(230, 180, 80, 0.4);
+  border-color: var(--wv-warn-border);
 }
 .toast.is-ok {
-  border-color: rgba(62, 207, 142, 0.4);
+  border-color: var(--wv-good-border);
 }
 .toast .t-title {
   font-size: 12px;

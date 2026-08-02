@@ -5,6 +5,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Victor WebViz</title>
 
+  <!-- FOUC: set data-theme before any stylesheet that uses tokens -->
+  <script>
+  (function () {
+    try {
+      var p = localStorage.getItem("webviz.colorScheme") || "system";
+      var dark;
+      if (p === "light") dark = false;
+      else if (p === "dark") dark = true;
+      else {
+        // system
+        if (window.matchMedia) {
+          dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        } else {
+          dark = true; // historic WebViz default
+        }
+      }
+      document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    } catch (e) {
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
+  })();
+  </script>
+
   <!--
     WebViz shell (rebuild).
     - Hosts stock modules in webVizModules/ via the same WS protocol.
@@ -55,6 +78,14 @@
 
       <div class="top-actions">
         <button type="button" class="btn btn-icon" id="btnNavToggle" title="Collapse sidebar" aria-label="Collapse sidebar">☰</button>
+        <label class="theme-sel" title="Color scheme">
+          <span class="visually-hidden" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Color scheme</span>
+          <select id="themeSel" aria-label="Color scheme" title="Color scheme">
+            <option value="system">System</option>
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+          </select>
+        </label>
         <button type="button" class="btn" id="btnReconnect" title="Force reconnect">Reconnect</button>
         <a class="btn btn-link" href="/" title="Web server home">Home</a>
       </div>
@@ -128,6 +159,7 @@
 
   <!-- Shell (order matters) -->
   <script src="webviz/js/config.js"></script>
+  <script src="webviz/js/theme.js"></script>
   <script src="webviz/js/socket.js"></script>
   <script src="webviz/js/loader.js"></script>
   <script src="webviz/js/shell-ui.js"></script>

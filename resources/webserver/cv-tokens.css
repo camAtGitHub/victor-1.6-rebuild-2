@@ -1,9 +1,13 @@
 /* Path A consolevars tokens — same values as webviz/css/tokens.css.
    Self-contained next to consolevarsui.html so scp of consolevars assets
    does not require the webviz/ tree on the robot. Keep in sync with
-   webviz/css/tokens.css when palette changes. */
+   webviz/css/tokens.css when palette changes.
+
+   Theme: dark defaults on :root. Light overrides via html[data-theme="light"]. */
 
 :root {
+  color-scheme: dark;
+
   /* Surfaces */
   --wv-bg: #0c0f14;
   --wv-bg-elev: #12161e;
@@ -36,10 +40,17 @@
   --wv-violet: #c792ea;
   --wv-violet-dim: rgba(199, 146, 234, 0.12);
 
-  /* Module content surface */
+  /* Module content surface (slightly lifted so charts read cleanly) */
   --wv-content-bg: #ededed;
   --wv-content-text: #1a1d24;
   --wv-content-line: #c5cad3;
+
+  /* Semantic chrome helpers (toast / status borders) */
+  --wv-toast-error-bg: #1a1418;
+  --wv-accent-border: rgba(91, 159, 212, 0.35);
+  --wv-good-border: rgba(62, 207, 142, 0.4);
+  --wv-warn-border: rgba(230, 180, 80, 0.4);
+  --wv-bad-border: rgba(240, 113, 120, 0.45);
 
   /* Type */
   --wv-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -71,6 +82,63 @@
   --wv-z-top: 30;
   --wv-z-toast: 100;
   --wv-z-modal: 90;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* Light chrome — same token names, reassigned. Geometry/type/z/motion inherit. */
+html[data-theme="light"] {
+  color-scheme: light;
+
+  /* Surfaces */
+  --wv-bg: #f0f2f6;
+  --wv-bg-elev: #ffffff;
+  --wv-bg-panel: #e8ecf2;
+  --wv-bg-hover: #dde3ec;
+  --wv-bg-active: #d0d8e4;
+  --wv-bg-input: #ffffff;
+
+  /* Lines */
+  --wv-line: #c5ccd8;
+  --wv-line-soft: #d8dee8;
+  --wv-line-strong: #9aa6b8;
+
+  /* Text */
+  --wv-text: #1a1d24;
+  --wv-text-dim: #5c667a;
+  --wv-text-faint: #8b95a8;
+  --wv-text-inv: #ffffff;
+
+  /* Accents / status — base hues kept; *-dim alphas bumped for light wash */
+  --wv-accent: #5b9fd4;
+  --wv-accent-dim: rgba(91, 159, 212, 0.18);
+  --wv-accent-strong: #3d87c4;
+  --wv-good: #3ecf8e;
+  --wv-good-dim: rgba(62, 207, 142, 0.16);
+  --wv-warn: #e6b450;
+  --wv-warn-dim: rgba(230, 180, 80, 0.16);
+  --wv-bad: #f07178;
+  --wv-bad-dim: rgba(240, 113, 120, 0.16);
+  --wv-violet: #c792ea;
+  --wv-violet-dim: rgba(199, 146, 234, 0.16);
+
+  /* Module content paper well (distinct under light chrome) */
+  --wv-content-bg: #ffffff;
+  --wv-content-text: #1a1d24;
+  --wv-content-line: #c5cad3;
+
+  /* Semantic chrome helpers — slightly stronger borders on light surfaces */
+  --wv-toast-error-bg: #fdecee;
+  --wv-accent-border: rgba(91, 159, 212, 0.45);
+  --wv-good-border: rgba(62, 207, 142, 0.5);
+  --wv-warn-border: rgba(230, 180, 80, 0.5);
+  --wv-bad-border: rgba(240, 113, 120, 0.55);
+
+  /* Elevation — softer shadows for light surfaces */
+  --wv-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.08);
+  --wv-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.1);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -46,6 +46,19 @@ Upstream notes: `docs/development/web-server.md`.
 Static asset names must **not** begin with `consolevars` (CivetWeb steals those URLs).  
 New chrome **must use `--wv-*` tokens**. Do not invent a second palette.
 
+### Color scheme
+
+| Concept | Detail |
+|---|---|
+| Preference key | `localStorage` **`webviz.colorScheme`** ∈ `"system"` \| `"dark"` \| `"light"` (default system) |
+| DOM signal | `html[data-theme="dark"]` or `html[data-theme="light"]` only |
+| WebViz | `webviz/js/theme.js` (`WebVizTheme`) + `#themeSel`; FOUC inline script in `webViz.html` / `webViz.beta.html` |
+| Token sync | When palette or light block changes, update **both** `webviz/css/tokens.css` and `cv-tokens.css` |
+| Light content host | WebViz `.module-host` stays light (`--wv-content-*`) under either chrome theme so stock modules keep working |
+| Consolevars (v1) | **Tokens ready** for light: set `document.documentElement.setAttribute("data-theme","light")` and Path A chrome flips via `var(--wv-*)`. **Theme UI optional** — not required in v1; no FOUC / select on `consolevarsui.html` unless explicitly added later. Prefer same storage key when/if UI lands |
+
+Do not invent `--cv-*` light tokens. Do not darken WebViz module hosts for “consistency.”
+
 ### Surfaces
 
 | Token | Hex | Use |
@@ -109,8 +122,8 @@ Use **one frame language** everywhere:
 
 ### WebViz content exception
 
-WebViz **module hosts** may keep a light content surface (`--wv-content-*`) so charts/tables stay readable.  
-**Console vars chrome is full dark** — no light content well unless embedding a chart later.
+WebViz **module hosts** keep a light content surface (`--wv-content-*`) under **both** shell themes so charts/tables stay readable. Overview surface uses shell tokens.  
+**Console vars chrome is full-theme** (no separate light content well) — Path A uses shell tokens end-to-end; light mode recolors the whole page when `data-theme=light`.
 
 ### Density
 
@@ -288,7 +301,8 @@ resources/webserver/.docs/
 
 ## 10. Quick answers
 
-- **Theme source?** `webviz/css/tokens.css`
+- **Theme source?** `webviz/css/tokens.css` (mirror: `cv-tokens.css`)
+- **Color scheme?** `webviz.colorScheme` + `html[data-theme]`; WebViz `#themeSel` / `theme.js`; consolevars tokens only in v1
 - **Font?** Inter (UI) + system mono (ids/values)
 - **Console vars strategy?** Path A: CSS + JS decorate C++ markup; catalog explainers progressive
 - **New endpoints?** No

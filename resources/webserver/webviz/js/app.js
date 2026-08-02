@@ -288,6 +288,14 @@
       });
     }
 
+    var themeSel = document.getElementById("themeSel");
+    if (themeSel && window.WebVizTheme) {
+      themeSel.value = window.WebVizTheme.getPreference();
+      themeSel.addEventListener("change", function () {
+        window.WebVizTheme.setPreference(themeSel.value);
+      });
+    }
+
     var search = document.getElementById("moduleSearch");
     if (search) {
       search.addEventListener("input", function () {
