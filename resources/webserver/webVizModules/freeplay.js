@@ -59,9 +59,143 @@
   var lastTimelineCssW = 0;
   // Click hit bands in CSS pixels after dpr transform: { id, x0, x1 }
   var timelineHits = [];
+  // Layout fractions (session-sticky when possible)
+  var opsTopFrac = 0.46; // stack|log row vs gates row (0.22–0.78)
+  var timelineHeightPx = 200; // secondary timeline body height
+  // behaviorconds ingest stats (why gates may stay empty — see iBEICondition + ANKI_DEV_CHEATS)
+  var condsStats = { total: 0, factors: 0, inactive: 0, ignored: 0 };
+  var TIMELINE_LABEL_MAX = 24; // ~50% more than prior 16-char trunc
+  var LS_OPS_FRAC = "webviz.freeplay.opsTopFrac";
+  var LS_TL_H = "webviz.freeplay.timelineH";
 
   // Multi-channel shell contract (app.js wireRetain / onChannelData)
   myMethods.channels = ["behaviors", "behaviorconds"];
+
+  function loadLayoutPrefs() {
+    try {
+      var f = parseFloat(sessionStorage.getItem(LS_OPS_FRAC));
+      if (isFinite(f) && f >= 0.22 && f <= 0.78) {
+        opsTopFrac = f;
+      }
+      var h = parseInt(sessionStorage.getItem(LS_TL_H), 10);
+      if (isFinite(h) && h >= 100 && h <= 520) {
+        timelineHeightPx = h;
+      }
+    } catch (e) {
+      /* private mode */
+    }
+  }
+
+  function saveLayoutPrefs() {
+    try {
+      sessionStorage.setItem(LS_OPS_FRAC, String(opsTopFrac));
+      sessionStorage.setItem(LS_TL_H, String(timelineHeightPx));
+    } catch (e2) {
+      /* ignore */
+    }
+  }
+
+  function applyOpsSplitCss() {
+    if (!els || !els.root) {
+      return;
+    }
+    var top = opsTopFrac;
+    var bot = Math.max(0.18, 1 - top);
+    els.root.style.setProperty("--fp-ops-top-fr", top + "fr");
+    els.root.style.setProperty("--fp-ops-bot-fr", bot + "fr");
+  }
+
+  function applyTimelineHeightCss() {
+    if (!els || !els.root) {
+      return;
+    }
+    els.root.style.setProperty("--fp-timeline-h", timelineHeightPx + "px");
+  }
+
+  /**
+   * Horizontal row-resize between ops-top (stack|log) and gates.
+   * Pattern from webviz-ux-demo.html split handle.
+   */
+  function wireOpsSplit(handle, workspace) {
+    if (!handle || !workspace) {
+      return;
+    }
+    var dragging = false;
+    handle.addEventListener("pointerdown", function (e) {
+      dragging = true;
+      handle.classList.add("fp-split-active");
+      try {
+        handle.setPointerCapture(e.pointerId);
+      } catch (err) {
+        /* older */
+      }
+      e.preventDefault();
+    });
+    handle.addEventListener("pointermove", function (e) {
+      if (!dragging) {
+        return;
+      }
+      var rect = workspace.getBoundingClientRect();
+      if (!rect.height) {
+        return;
+      }
+      var y = e.clientY - rect.top;
+      opsTopFrac = Math.min(0.78, Math.max(0.22, y / rect.height));
+      applyOpsSplitCss();
+    });
+    function endDrag() {
+      if (!dragging) {
+        return;
+      }
+      dragging = false;
+      handle.classList.remove("fp-split-active");
+      saveLayoutPrefs();
+    }
+    handle.addEventListener("pointerup", endDrag);
+    handle.addEventListener("pointercancel", endDrag);
+  }
+
+  /** Vertical resize of secondary timeline body height. */
+  function wireTimelineSplit(handle) {
+    if (!handle) {
+      return;
+    }
+    var dragging = false;
+    var startY = 0;
+    var startH = 0;
+    handle.addEventListener("pointerdown", function (e) {
+      dragging = true;
+      startY = e.clientY;
+      startH = timelineHeightPx;
+      handle.classList.add("fp-split-active");
+      try {
+        handle.setPointerCapture(e.pointerId);
+      } catch (err) {
+        /* older */
+      }
+      e.preventDefault();
+    });
+    handle.addEventListener("pointermove", function (e) {
+      if (!dragging) {
+        return;
+      }
+      var dy = e.clientY - startY;
+      timelineHeightPx = Math.min(520, Math.max(100, startH + dy));
+      applyTimelineHeightCss();
+      lastTimelineCssW = 0; // force canvas reflow
+      renderTimeline(true);
+    });
+    function endDrag() {
+      if (!dragging) {
+        return;
+      }
+      dragging = false;
+      handle.classList.remove("fp-split-active");
+      saveLayoutPrefs();
+    }
+    handle.addEventListener("pointerup", endDrag);
+    handle.addEventListener("pointercancel", endDrag);
+  }
 
   function stackKeyOf(stack) {
     return stack.join("\0");
@@ -292,6 +426,7 @@
     if (!data || typeof data !== "object") {
       return dirty;
     }
+    condsStats.total++;
 
     // Prefer stack only on behaviors channel — ignore stack blobs here (avoid double log)
     if (data.factors && typeof data.factors === "object" && !Array.isArray(data.factors)) {
@@ -299,10 +434,14 @@
       var owner = factors.ownerDebugLabel;
       var label = factors.conditionLabel;
       if (owner == null || label == null) {
+        condsStats.ignored++;
+        dirty.raw = true;
+        dirty.gates = true; // refresh empty-state diagnostics
         return dirty;
       }
       owner = String(owner);
       label = String(label);
+      condsStats.factors++;
       if (!factorsByOwner[owner]) {
         factorsByOwner[owner] = Object.create(null);
       }
@@ -320,6 +459,7 @@
     if (typeof data.inactive !== "undefined" && typeof data.owner !== "undefined") {
       var iname = String(data.inactive);
       var iowner = String(data.owner);
+      condsStats.inactive++;
       if (!inactiveByOwner[iowner]) {
         inactiveByOwner[iowner] = Object.create(null);
       }
@@ -331,8 +471,54 @@
       return dirty;
     }
 
-    // stack/tree on this channel: ignore (behaviors handles) — no render
+    // stack/tree on this channel: ignore (behaviors handles) — still count for diagnostics
+    condsStats.ignored++;
+    dirty.gates = true; // so empty-state msg can update “last was stack”
+    dirty.raw = true;
     return dirty;
+  }
+
+  function listOwnersWithGateData() {
+    var seen = Object.create(null);
+    var out = [];
+    var o;
+    for (o in factorsByOwner) {
+      if (Object.prototype.hasOwnProperty.call(factorsByOwner, o) && !seen[o]) {
+        seen[o] = true;
+        out.push(o);
+      }
+    }
+    for (o in inactiveByOwner) {
+      if (Object.prototype.hasOwnProperty.call(inactiveByOwner, o) && !seen[o]) {
+        seen[o] = true;
+        out.push(o);
+      }
+    }
+    out.sort();
+    return out;
+  }
+
+  function describeLastCondsShape() {
+    var d = lastRaw.behaviorconds;
+    if (!d || typeof d !== "object") {
+      return "none yet";
+    }
+    if (d.factors && typeof d.factors === "object") {
+      var fo = d.factors.ownerDebugLabel;
+      var fl = d.factors.conditionLabel;
+      return (
+        "factors" +
+        (fo != null ? " owner=" + fo : "") +
+        (fl != null ? " cond=" + fl : "")
+      );
+    }
+    if (typeof d.inactive !== "undefined") {
+      return "inactive " + d.inactive + " owner=" + d.owner;
+    }
+    if ("stack" in d || "tree" in d) {
+      return "stack/tree (ignored here — use Behaviors channel)";
+    }
+    return "unknown shape (see Dev tools raw)";
   }
 
   function displayStack() {
@@ -781,6 +967,7 @@
       "      </div>" +
       "    </section>" +
       "  </div>" +
+      '  <div class="fp-split" data-fp="splitOps" role="separator" aria-orientation="horizontal" aria-label="Resize stack/log versus gates" title="Drag to resize stack/log vs gates"></div>' +
       '  <section class="fp-panel fp-gates" aria-label="Activation gates">' +
       '    <div class="fp-panel-title">Gates <span class="fp-meta" data-fp="gatesCount"></span></div>' +
       '    <div class="fp-panel-body fp-gates-panel-body">' +
@@ -790,18 +977,25 @@
       "      </div>" +
       '      <div class="fp-gates-scroll">' +
       '        <div class="fp-gates-list" data-fp="gatesList"></div>' +
-      '        <div class="fp-empty" data-fp="gatesEmpty">No condition factors for this behavior yet</div>' +
+      '        <div class="fp-empty fp-gates-empty" data-fp="gatesEmpty">No condition factors for this behavior yet</div>' +
       "      </div>" +
       "    </div>" +
       "  </section>" +
       "</div>" +
       /* P6 secondary timeline: collapsed by default; does not replace Ops */
       '<details class="fp-timeline" data-fp="timelineDetails">' +
-      "  <summary>Timeline (secondary)</summary>" +
-      '  <div class="fp-timeline-wrap">' +
+      "  <summary>Timeline (secondary) — each row = a behavior on the stack; X = BS time · click a band to scrub</summary>" +
+      '  <div class="fp-timeline-wrap" data-fp="timelineWrap">' +
+      '    <div class="fp-timeline-legend" aria-hidden="true">' +
+      '      <span class="fp-tl-swatch fp-tl-swatch-leaf"></span><span>leaf (active tip)</span>' +
+      '      <span class="fp-tl-swatch fp-tl-swatch-anc"></span><span>ancestor on stack</span>' +
+      '      <span class="fp-tl-swatch fp-tl-swatch-sel"></span><span>scrub selection</span>' +
+      '      <span class="fp-tl-swatch fp-tl-swatch-now"></span><span>now (BS time)</span>' +
+      "    </div>" +
       '    <canvas class="fp-timeline-canvas" data-fp="timelineCanvas" role="img" aria-label="Transition history timeline — click a band to scrub"></canvas>' +
-      '    <p class="fp-timeline-caption">Secondary history — primary debugging stays on Ops.</p>' +
+      '    <p class="fp-timeline-caption">Left labels = behavior IDs. Green = leaf of that transition; amber = still on stack. Drag handle below to resize.</p>' +
       "  </div>" +
+      '  <div class="fp-split fp-split-timeline" data-fp="splitTimeline" role="separator" aria-orientation="horizontal" aria-label="Resize timeline height" title="Drag to resize timeline height"></div>' +
       "</details>" +
       '<details class="fp-dev" data-fp="devDetails">' +
       "  <summary>Dev tools</summary>" +
@@ -842,13 +1036,23 @@
       gatesEmpty: root.querySelector('[data-fp="gatesEmpty"]'),
       rawBehaviors: root.querySelector('[data-fp="rawBehaviors"]'),
       rawConds: root.querySelector('[data-fp="rawConds"]'),
+      workspace: root.querySelector(".fp-workspace"),
+      splitOps: root.querySelector('[data-fp="splitOps"]'),
+      splitTimeline: root.querySelector('[data-fp="splitTimeline"]'),
       timelineDetails: root.querySelector('[data-fp="timelineDetails"]'),
+      timelineWrap: root.querySelector('[data-fp="timelineWrap"]'),
       timelineCanvas: root.querySelector('[data-fp="timelineCanvas"]'),
       devDetails: root.querySelector('[data-fp="devDetails"]'),
       openBehaviors: root.querySelector('[data-fp="openBehaviors"]'),
       openConds: root.querySelector('[data-fp="openConds"]'),
       copyLog: root.querySelector('[data-fp="copyLog"]'),
     };
+
+    loadLayoutPrefs();
+    applyOpsSplitCss();
+    applyTimelineHeightCss();
+    wireOpsSplit(els.splitOps, els.workspace);
+    wireTimelineSplit(els.splitTimeline);
 
     els.liveBtn.addEventListener("click", function () {
       goLive();
@@ -860,6 +1064,7 @@
         if (els.timelineDetails.open) {
           lastTimelineHeadId = null;
           lastTimelineCssW = 0;
+          applyTimelineHeightCss();
           renderTimeline(true);
         }
       });
@@ -1232,7 +1437,8 @@
 
     if (!owner) {
       els.gatesEmpty.style.display = "block";
-      els.gatesEmpty.textContent = "No behavior selected";
+      els.gatesEmpty.innerHTML = "";
+      els.gatesEmpty.textContent = "No behavior selected — pick a stack frame";
       return;
     }
 
@@ -1248,11 +1454,73 @@
 
     if (!labels.length) {
       els.gatesEmpty.style.display = "block";
-      els.gatesEmpty.textContent =
-        "No condition factors for this behavior yet";
+      els.gatesEmpty.innerHTML = "";
+      // Honest diagnostics: factors only when ANKI_DEV_CHEATS + cond evaluates/changes
+      // (engine/aiComponent/beiConditions/iBEICondition.cpp SendConditionsToWebViz)
+      var p = document.createElement("div");
+      p.className = "fp-gates-help";
+      var condPill = isStale("behaviorconds") ? "stale/silent" : "receiving";
+      var lines = [
+        "No factors for focus “" + owner + "”.",
+        "",
+        "What the engine sends (channel behaviorconds):",
+        "• { factors: { ownerDebugLabel, conditionLabel, areConditionsMet, … } } when a root condition’s met-value or factors change",
+        "• { inactive, owner } when a condition goes inactive",
+        "• Often also stack/tree blobs (FreePlay ignores those here to avoid double-logging)",
+        "",
+        "Important: factors are only produced when ANKI_DEV_CHEATS is enabled in the engine build and a WebViz client is subscribed. No change → no message → gates stay empty.",
+        "",
+        "conds channel: " +
+          condPill +
+          " · msgs=" +
+          condsStats.total +
+          " (factors=" +
+          condsStats.factors +
+          ", inactive=" +
+          condsStats.inactive +
+          ", other/ignored=" +
+          condsStats.ignored +
+          ")",
+        "Last conds payload: " + describeLastCondsShape(),
+      ];
+      var known = listOwnersWithGateData();
+      if (known.length) {
+        lines.push("");
+        lines.push(
+          "Factors/inactive exist for other owners (click to focus):"
+        );
+      } else {
+        lines.push("");
+        lines.push(
+          "No owners have factors yet. Open Dev tools → Last behaviorconds, or stock BehaviorConds tab."
+        );
+      }
+      p.textContent = lines.join("\n");
+      els.gatesEmpty.appendChild(p);
+      if (known.length) {
+        var row = document.createElement("div");
+        row.className = "fp-gates-owner-picks";
+        known.forEach(function (oid) {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "fp-tool-btn";
+          btn.textContent = oid;
+          btn.title = "Focus gates on " + oid;
+          btn.addEventListener("click", function () {
+            selectedOwner = oid;
+            if (liveMode) {
+              ownerPinned = true;
+            }
+            render(true);
+          });
+          row.appendChild(btn);
+        });
+        els.gatesEmpty.appendChild(row);
+      }
       return;
     }
     els.gatesEmpty.style.display = "none";
+    els.gatesEmpty.innerHTML = "";
 
     // Sort false-first (FALSE, unknown, inactive, TRUE), then alpha within rank
     labels.sort(function (a, b) {
@@ -1414,14 +1682,23 @@
     return v || fallback || "";
   }
 
-  /** Colors for P6 canvas — content tokens only (no dark-hex palette). */
+  /**
+   * Timeline canvas colors — high contrast (not blue-on-blue).
+   * Sample semantic tokens from light content host; solid fallbacks if empty.
+   */
   function timelineTheme() {
     return {
       bg: readCssVar("--wv-content-bg", "#ffffff"),
-      text: readCssVar("--wv-content-text", "#222222"),
-      line: readCssVar("--wv-content-line", "#cccccc"),
-      accent: readCssVar("--wv-accent", "#5b9fd4"),
-      warn: readCssVar("--wv-warn", "#c9892d"),
+      text: readCssVar("--wv-content-text", "#1a1d24"),
+      line: readCssVar("--wv-content-line", "#c5cad3"),
+      // leaf = green (active tip of stack for that transition)
+      leaf: readCssVar("--wv-good", "#1a7f4b"),
+      // ancestor = amber (still on stack, not the tip)
+      ancestor: readCssVar("--wv-warn", "#b36b00"),
+      // scrub selection + now line = red/bad for max contrast vs leaf green
+      select: readCssVar("--wv-bad", "#c0392b"),
+      now: readCssVar("--wv-bad", "#c0392b"),
+      rowAlt: "rgba(0,0,0,0.04)",
     };
   }
 
@@ -1504,9 +1781,11 @@
     lastTimelineCssW = cssW;
     timelineHits = [];
 
+    // Reserve space for legend (~22px) + caption (~18px) inside wrap height
+    var chromeH = 44;
     var cssH = wrap
-      ? Math.max(100, (wrap.clientHeight || 140) - 28)
-      : 120;
+      ? Math.max(80, (wrap.clientHeight || timelineHeightPx) - chromeH)
+      : Math.max(80, timelineHeightPx - chromeH);
     var dpr = window.devicePixelRatio || 1;
     canvas.width = Math.floor(cssW * dpr);
     canvas.height = Math.floor(cssH * dpr);
@@ -1526,11 +1805,10 @@
     // Newest-first log → reverse to oldest-left for time axis (matches demo)
     var recent = transitionLog.slice(0, MAX_TIMELINE).reverse();
     if (!recent.length) {
-      ctx.globalAlpha = 0.55;
       ctx.fillStyle = theme.text;
-      ctx.font = "12px " + (readCssVar("--wv-sans", "system-ui") || "system-ui");
-      ctx.fillText("No transitions yet", 12, 28);
-      ctx.globalAlpha = 1;
+      ctx.font =
+        "12px " + (readCssVar("--wv-sans", "system-ui") || "system-ui");
+      ctx.fillText("No transitions yet — bars appear when the stack changes", 12, 28);
       return;
     }
 
@@ -1550,17 +1828,19 @@
       }
     }
 
-    var labelW = Math.min(140, Math.floor(cssW * 0.28));
+    // ~50% more label room vs old 140px / 16 chars
+    var labelW = Math.min(210, Math.max(120, Math.floor(cssW * 0.36)));
     var rowH = Math.min(
-      20,
-      Math.max(12, (cssH - 24) / Math.max(names.length, 1))
+      22,
+      Math.max(14, (cssH - 20) / Math.max(names.length, 1))
     );
-    var t0 = typeof recent[0].t === "number" && isFinite(recent[0].t) ? recent[0].t : 0;
+    var t0 =
+      typeof recent[0].t === "number" && isFinite(recent[0].t)
+        ? recent[0].t
+        : 0;
     var lastT = recent[recent.length - 1].t;
     var t1 =
-      typeof lastT === "number" && isFinite(lastT)
-        ? lastT
-        : t0;
+      typeof lastT === "number" && isFinite(lastT) ? lastT : t0;
     // Prefer live BS time as right edge when newer
     if (typeof bsTime === "number" && isFinite(bsTime) && bsTime > t1) {
       t1 = bsTime;
@@ -1572,33 +1852,46 @@
     var plotW = cssW - labelW - 12;
 
     var mono =
-      "10px " + (readCssVar("--wv-mono", "ui-monospace, monospace") || "monospace");
+      "11px " +
+      (readCssVar("--wv-mono", "ui-monospace, monospace") || "monospace");
     ctx.font = mono;
+    ctx.textBaseline = "middle";
 
-    // Row labels + guide lines
+    // Row labels + alternating row bg + guide lines
     var ni;
     for (ni = 0; ni < names.length; ni++) {
-      var y = 12 + ni * rowH;
-      ctx.globalAlpha = 0.7;
+      var y = 10 + ni * rowH;
+      if (ni % 2 === 1) {
+        ctx.fillStyle = theme.rowAlt;
+        ctx.fillRect(0, y, cssW, rowH);
+      }
       ctx.fillStyle = theme.text;
       var label = names[ni];
-      if (label.length > 16) {
-        label = label.slice(0, 14) + "…";
+      if (label.length > TIMELINE_LABEL_MAX) {
+        label =
+          label.slice(0, Math.max(1, TIMELINE_LABEL_MAX - 1)) + "…";
       }
-      ctx.fillText(label, 6, y + Math.min(12, rowH - 2));
-      ctx.globalAlpha = 1;
+      ctx.fillText(label, 6, y + rowH * 0.5);
       ctx.strokeStyle = theme.line;
       ctx.beginPath();
-      ctx.moveTo(labelW, y + rowH - 2);
-      ctx.lineTo(cssW - 6, y + rowH - 2);
+      ctx.moveTo(labelW, y + rowH);
+      ctx.lineTo(cssW - 4, y + rowH);
       ctx.stroke();
     }
+    // Vertical separator between labels and plot
+    ctx.strokeStyle = theme.line;
+    ctx.beginPath();
+    ctx.moveTo(labelW - 2, 6);
+    ctx.lineTo(labelW - 2, cssH - 4);
+    ctx.stroke();
 
     // Time bands + stack bars; record hit regions for scrub
     for (ri = 0; ri < recent.length; ri++) {
       var r = recent[ri];
       var tStart =
-        typeof r.t === "number" && isFinite(r.t) ? r.t : t0 + (ri / recent.length) * span;
+        typeof r.t === "number" && isFinite(r.t)
+          ? r.t
+          : t0 + (ri / recent.length) * span;
       var tEnd;
       if (ri + 1 < recent.length) {
         var nt = recent[ri + 1].t;
@@ -1606,7 +1899,11 @@
           typeof nt === "number" && isFinite(nt)
             ? nt
             : tStart + span / recent.length;
-      } else if (typeof bsTime === "number" && isFinite(bsTime) && bsTime > tStart) {
+      } else if (
+        typeof bsTime === "number" &&
+        isFinite(bsTime) &&
+        bsTime > tStart
+      ) {
         tEnd = bsTime;
       } else {
         tEnd = t1;
@@ -1616,19 +1913,19 @@
       }
       var x0 = labelW + ((tStart - t0) / span) * plotW;
       var x1 = labelW + ((tEnd - t0) / span) * plotW;
-      var bandW = Math.max(2, x1 - x0 - 1);
+      var bandW = Math.max(3, x1 - x0 - 1);
 
-      timelineHits.push({ id: r.id, x0: x0, x1: Math.max(x0 + 2, x1) });
+      timelineHits.push({ id: r.id, x0: x0, x1: Math.max(x0 + 3, x1) });
 
-      // Selection highlight (full vertical band) — improve on passive demo
+      // Selection highlight — solid red-tint band (not blue)
       if (!liveMode && selectedLogId != null && r.id === selectedLogId) {
-        ctx.globalAlpha = 0.12;
-        ctx.fillStyle = theme.warn;
-        ctx.fillRect(x0, 6, bandW + 1, cssH - 14);
+        ctx.globalAlpha = 0.18;
+        ctx.fillStyle = theme.select;
+        ctx.fillRect(x0, 4, bandW + 1, cssH - 10);
         ctx.globalAlpha = 1;
-        ctx.strokeStyle = theme.warn;
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x0 + 0.5, 6.5, bandW, cssH - 15);
+        ctx.strokeStyle = theme.select;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x0 + 0.5, 4.5, bandW, cssH - 11);
         ctx.lineWidth = 1;
       }
 
@@ -1640,11 +1937,17 @@
         if (rowIdx < 0) {
           continue;
         }
-        var by = 12 + rowIdx * rowH + 3;
+        var by = 10 + rowIdx * rowH + 3;
         var isLeaf = name === leaf;
-        ctx.globalAlpha = isLeaf ? 0.75 : 0.35;
-        ctx.fillStyle = theme.accent;
-        ctx.fillRect(x0, by, bandW, Math.max(4, rowH - 8));
+        var barH = Math.max(6, rowH - 7);
+        // Full opacity solid colors — green leaf vs amber ancestor
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = isLeaf ? theme.leaf : theme.ancestor;
+        ctx.fillRect(x0, by, bandW, barH);
+        // Dark edge for separation when bands abut
+        ctx.strokeStyle = theme.text;
+        ctx.globalAlpha = 0.25;
+        ctx.strokeRect(x0 + 0.5, by + 0.5, Math.max(1, bandW - 1), barH - 1);
         ctx.globalAlpha = 1;
       }
     }
@@ -1652,13 +1955,13 @@
     // "Now" line at bsTime when available
     if (typeof bsTime === "number" && isFinite(bsTime) && bsTime >= t0) {
       var xNow = labelW + ((bsTime - t0) / span) * plotW;
-      ctx.globalAlpha = 0.7;
-      ctx.strokeStyle = theme.warn;
+      ctx.strokeStyle = theme.now;
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(xNow, 6);
-      ctx.lineTo(xNow, cssH - 8);
+      ctx.moveTo(xNow, 4);
+      ctx.lineTo(xNow, cssH - 4);
       ctx.stroke();
-      ctx.globalAlpha = 1;
+      ctx.lineWidth = 1;
     }
   }
 
@@ -1779,6 +2082,8 @@
     lastTimelineSelectedLogId = null;
     lastTimelineCssW = 0;
     timelineHits = [];
+    condsStats = { total: 0, factors: 0, inactive: 0, ignored: 0 };
+    // keep opsTopFrac / timelineHeightPx across re-subscribe (session prefs)
   }
 
   myMethods.init = function (elem) {
@@ -1968,14 +2273,14 @@
       "  white-space: pre-wrap;" +
       "  word-break: break-all;" +
       "}" +
-      /* Ops workspace: ~45% top (stack|log) / ~55% gates; internal scroll only */
+      /* Ops workspace: stack|log / drag split / gates — fr from --fp-ops-*-fr */
       ".fp-workspace {" +
       "  flex: 1 1 auto;" +
       "  min-height: 0;" +
       "  min-width: 0;" +
       "  display: grid;" +
-      "  grid-template-rows: minmax(0, 0.9fr) minmax(0, 1.1fr);" +
-      "  gap: var(--wv-space-2);" +
+      "  grid-template-rows: minmax(72px, var(--fp-ops-top-fr, 0.46fr)) 6px minmax(72px, var(--fp-ops-bot-fr, 0.54fr));" +
+      "  gap: 0;" +
       "  overflow: hidden;" +
       "}" +
       ".fp-ops-top {" +
@@ -1985,6 +2290,30 @@
       "  grid-template-columns: minmax(160px, 220px) minmax(0, 1fr);" +
       "  gap: var(--wv-space-2);" +
       "  overflow: hidden;" +
+      "}" +
+      ".fp-split {" +
+      "  height: 6px;" +
+      "  margin: 0;" +
+      "  padding: 0;" +
+      "  border: none;" +
+      "  border-radius: var(--wv-radius-pill);" +
+      "  background: var(--wv-content-line);" +
+      "  cursor: row-resize;" +
+      "  touch-action: none;" +
+      "  flex-shrink: 0;" +
+      "  align-self: stretch;" +
+      "}" +
+      ".fp-split:hover," +
+      ".fp-split.fp-split-active {" +
+      "  background: var(--wv-accent);" +
+      "}" +
+      ".fp-split:focus {" +
+      "  outline: 2px solid var(--wv-accent);" +
+      "  outline-offset: 1px;" +
+      "}" +
+      ".fp-split-timeline {" +
+      "  margin-top: var(--wv-space-1);" +
+      "  width: 100%;" +
       "}" +
       ".fp-panel {" +
       "  border: 1px solid var(--wv-content-line);" +
@@ -2380,6 +2709,25 @@
       "  padding: var(--wv-space-1) 0;" +
       "  font-family: var(--wv-mono);" +
       "}" +
+      ".fp-gates-empty {" +
+      "  white-space: normal;" +
+      "  max-width: 100%;" +
+      "}" +
+      ".fp-gates-help {" +
+      "  font-family: var(--wv-mono);" +
+      "  font-size: 11px;" +
+      "  line-height: 1.45;" +
+      "  opacity: 0.9;" +
+      "  white-space: pre-wrap;" +
+      "  word-break: break-word;" +
+      "  color: var(--wv-content-text);" +
+      "}" +
+      ".fp-gates-owner-picks {" +
+      "  display: flex;" +
+      "  flex-wrap: wrap;" +
+      "  gap: var(--wv-space-1);" +
+      "  margin-top: var(--wv-space-2);" +
+      "}" +
       /* P6 secondary timeline: collapsed by default under ops workspace */
       ".fp-timeline {" +
       "  flex-shrink: 0;" +
@@ -2393,11 +2741,12 @@
       ".fp-timeline summary {" +
       "  cursor: pointer;" +
       "  font-weight: 600;" +
-      "  font-size: 12px;" +
-      "  text-transform: uppercase;" +
-      "  letter-spacing: 0.03em;" +
+      "  font-size: 11px;" +
+      "  text-transform: none;" +
+      "  letter-spacing: 0;" +
       "  color: var(--wv-content-text);" +
       "  user-select: none;" +
+      "  line-height: 1.35;" +
       "}" +
       ".fp-timeline summary:focus {" +
       "  outline: 2px solid var(--wv-accent);" +
@@ -2407,13 +2756,35 @@
       "  display: flex;" +
       "  flex-direction: column;" +
       "  min-height: 0;" +
-      "  height: 160px;" +
+      "  height: var(--fp-timeline-h, 200px);" +
       "  margin-top: var(--wv-space-2);" +
       "  overflow: hidden;" +
       "}" +
+      ".fp-timeline-legend {" +
+      "  flex-shrink: 0;" +
+      "  display: flex;" +
+      "  flex-wrap: wrap;" +
+      "  align-items: center;" +
+      "  gap: 6px 10px;" +
+      "  font-size: 10px;" +
+      "  color: var(--wv-content-text);" +
+      "  margin-bottom: 4px;" +
+      "}" +
+      ".fp-tl-swatch {" +
+      "  display: inline-block;" +
+      "  width: 12px;" +
+      "  height: 10px;" +
+      "  border-radius: 2px;" +
+      "  border: 1px solid var(--wv-content-line);" +
+      "  vertical-align: middle;" +
+      "}" +
+      ".fp-tl-swatch-leaf { background: var(--wv-good); border-color: var(--wv-good); }" +
+      ".fp-tl-swatch-anc { background: var(--wv-warn); border-color: var(--wv-warn); }" +
+      ".fp-tl-swatch-sel { background: var(--wv-bad); opacity: 0.45; border-color: var(--wv-bad); }" +
+      ".fp-tl-swatch-now { background: transparent; border-left: 3px solid var(--wv-bad); width: 6px; }" +
       ".fp-timeline-canvas {" +
       "  flex: 1 1 auto;" +
-      "  min-height: 100px;" +
+      "  min-height: 60px;" +
       "  width: 100%;" +
       "  max-height: 100%;" +
       "  display: block;" +
@@ -2427,11 +2798,10 @@
       "  flex-shrink: 0;" +
       "  margin: var(--wv-space-1) 0 0 0;" +
       "  font-size: 11px;" +
-      "  opacity: 0.55;" +
+      "  opacity: 0.75;" +
       "  color: var(--wv-content-text);" +
-      "  white-space: nowrap;" +
-      "  overflow: hidden;" +
-      "  text-overflow: ellipsis;" +
+      "  white-space: normal;" +
+      "  line-height: 1.35;" +
       "}" +
       /* Dev tools: collapsed = summary only; open may grow into host scroll */
       ".fp-dev {" +
