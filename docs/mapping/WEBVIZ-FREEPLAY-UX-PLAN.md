@@ -16,7 +16,7 @@
 |---|---|---|
 | P0 discovery | ✅ done | Allowed APIs, gap matrix, anti-patterns |
 | P1 Ops layout grid | ✅ done | `.fp-root` / `.fp-workspace` / `.fp-ops-top` stack\|log + gates; panel-body scroll; no drag-split (fixed fractions) |
-| P2 Stack polish | ✅ done | Depth indent, leaf badge, pin non-leaf / leaf clears pin |
+| P2 Stack polish | ✅ done | Was depth indent; **2026-08-05:** flat depth# + rail (no indent), leaf badge, pin non-leaf / leaf clears pin |
 | P3 Log polish | ✅ done | from→to, client tags (clear/enter/deeper/shallower/swap), flash, pin-to-newest, `n/200` |
 | P4 Gates polish | ✅ done | False-first collapse; focus meta honesty; `openGates` by owner+label |
 | P5 Nice-to-haves | ✅ done | Keyboard (L/Esc, j/k, `/`), log+gates filter, Clear log, silence banner, Copy log JSON, reduced-motion |
@@ -212,7 +212,7 @@ Upgrade stack rendering to demo-quality hierarchy **without** inventing role lab
 
 | Feature | Demo | FreePlay adaptation |
 |---|---|---|
-| Indent by depth | `.stack-indent` + connector L349–421, `renderStack` L1259–1297 | Indent `padding-left: depth * N` with mono names |
+| Nesting without indent | Demo indents + connectors | **Shipped (post-P2):** flat rows; fixed depth index + short depth rail; full-width mono names (indent ate deep IDs in narrow panel) |
 | Leaf treatment | `.stack-item.leaf` + badge | Keep accent leaf; replace `◀` with small “leaf” badge using `--wv-accent` / optional soft tint via `accent-dim` |
 | Selected frame | `.selected` | Keep `fp-stack-selected` + pin semantics (`ownerPinned`) |
 | Role subline | Demo invents roles | **Only if** you can derive something real (e.g. depth index `L0…Ln`, or parent name from previous stack entry). Do **not** invent “HighLevelAI role” fiction |

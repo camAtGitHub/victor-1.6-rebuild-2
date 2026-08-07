@@ -1184,21 +1184,32 @@
       }
       btn.setAttribute("data-owner", name);
       btn.setAttribute("aria-selected", selectedOwner && name === selectedOwner ? "true" : "false");
+      // Full name on hover — panel is narrow; long IDs still ellipsize in the row
+      btn.title =
+        "L" +
+        i +
+        (i === 0 ? " · root" : " · under " + stack[i - 1]) +
+        " · " +
+        name;
 
-      // Depth gutters with tree connectors (content-line color via CSS)
-      var d;
-      for (d = 0; d < i; d++) {
-        var gut = document.createElement("span");
-        gut.className = "fp-stack-indent";
-        gut.setAttribute("aria-hidden", "true");
-        var connV = document.createElement("span");
-        connV.className = "fp-stack-connector";
-        var connH = document.createElement("span");
-        connH.className = "fp-stack-connector-h";
-        gut.appendChild(connV);
-        gut.appendChild(connH);
-        btn.appendChild(gut);
-      }
+      // Flat list + fixed depth badge (no progressive indent — deep stacks stay readable)
+      var depthEl = document.createElement("span");
+      depthEl.className = "fp-stack-depth";
+      depthEl.setAttribute("aria-hidden", "true");
+      depthEl.textContent = String(i);
+      btn.appendChild(depthEl);
+
+      // Fixed-width nesting rail: fills by depth ratio, capped so deep frames cost no text width
+      var rail = document.createElement("span");
+      rail.className = "fp-stack-rail";
+      rail.setAttribute("aria-hidden", "true");
+      var railFill = document.createElement("span");
+      railFill.className = "fp-stack-rail-fill";
+      var maxDepth = Math.max(1, stack.length - 1);
+      // 0 at root → full at leaf; always visible tick at root
+      railFill.style.width = Math.max(12, Math.round((i / maxDepth) * 100)) + "%";
+      rail.appendChild(railFill);
+      btn.appendChild(rail);
 
       var main = document.createElement("span");
       main.className = "fp-stack-main";
@@ -1207,13 +1218,13 @@
       nameEl.textContent = name;
       main.appendChild(nameEl);
 
-      // Honest meta only: depth index; parent name from previous stack entry (not mock roles)
+      // Parent only (depth already in left badge)
       var meta = document.createElement("span");
       meta.className = "fp-stack-meta";
       if (i === 0) {
-        meta.textContent = "L0 · root";
+        meta.textContent = "root";
       } else {
-        meta.textContent = "L" + i + " · " + stack[i - 1];
+        meta.textContent = stack[i - 1];
       }
       main.appendChild(meta);
       btn.appendChild(main);
@@ -2403,7 +2414,7 @@
       "  overscroll-behavior: contain;" +
       "  padding: var(--wv-space-1) var(--wv-space-2);" +
       "}" +
-      /* P2 stack hierarchy: indent gutters, connectors, leaf badge, depth meta */
+      /* Stack hierarchy: flat rows (no progressive indent). Depth = number + fixed rail. */
       ".fp-stack-list {" +
       "  list-style: none;" +
       "  margin: 0;" +
@@ -2427,34 +2438,60 @@
       "  background: transparent;" +
       "  color: var(--wv-content-text);" +
       "  min-width: 0;" +
+      "  gap: 0;" +
       "}" +
       ".fp-stack-item:hover { background: var(--wv-accent-dim); }" +
       ".fp-stack-item:focus { outline: 2px solid var(--wv-accent); outline-offset: 1px; }" +
-      ".fp-stack-indent {" +
-      "  width: 12px;" +
+      /* Fixed-width depth index — same cost at L0 and L20 */
+      ".fp-stack-depth {" +
       "  flex-shrink: 0;" +
-      "  position: relative;" +
+      "  width: 1.75rem;" +
+      "  align-self: center;" +
+      "  text-align: right;" +
+      "  font-family: var(--wv-mono);" +
+      "  font-size: 10px;" +
+      "  font-variant-numeric: tabular-nums;" +
+      "  font-weight: 600;" +
+      "  opacity: 0.45;" +
+      "  line-height: 1;" +
+      "  padding: 0 4px 0 6px;" +
+      "  user-select: none;" +
       "}" +
-      ".fp-stack-connector {" +
-      "  position: absolute;" +
-      "  left: 5px;" +
-      "  top: 0;" +
-      "  bottom: 50%;" +
-      "  width: 1px;" +
-      "  background: var(--wv-content-line);" +
+      ".fp-stack-leaf .fp-stack-depth {" +
+      "  opacity: 1;" +
+      "  color: var(--wv-accent);" +
       "}" +
-      ".fp-stack-connector-h {" +
-      "  position: absolute;" +
-      "  left: 5px;" +
-      "  top: 50%;" +
-      "  width: 7px;" +
-      "  height: 1px;" +
+      /* Nesting cue without eating name width: short track, fill grows with depth */
+      ".fp-stack-rail {" +
+      "  flex-shrink: 0;" +
+      "  width: 14px;" +
+      "  align-self: center;" +
+      "  height: 4px;" +
+      "  border-radius: 2px;" +
       "  background: var(--wv-content-line);" +
+      "  opacity: 0.55;" +
+      "  overflow: hidden;" +
+      "  margin-right: 2px;" +
+      "}" +
+      ".fp-stack-rail-fill {" +
+      "  display: block;" +
+      "  height: 100%;" +
+      "  border-radius: 2px;" +
+      "  background: var(--wv-content-text);" +
+      "  opacity: 0.55;" +
+      "  min-width: 2px;" +
+      "}" +
+      ".fp-stack-leaf .fp-stack-rail {" +
+      "  opacity: 0.9;" +
+      "}" +
+      ".fp-stack-leaf .fp-stack-rail-fill {" +
+      "  background: var(--wv-accent);" +
+      "  opacity: 1;" +
       "}" +
       ".fp-stack-main {" +
       "  flex: 1 1 auto;" +
       "  min-width: 0;" +
-      "  padding: var(--wv-space-1) var(--wv-space-1) var(--wv-space-1) 2px;" +
+      "  padding: var(--wv-space-1) var(--wv-space-1) var(--wv-space-1) 4px;" +
       "  display: flex;" +
       "  flex-direction: column;" +
       "  justify-content: center;" +

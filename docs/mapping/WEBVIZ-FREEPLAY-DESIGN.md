@@ -174,7 +174,7 @@ v1 **Dev tools (collapsed):**
 ├─ (optional silence banner if both channels stale >5s) ────────────┤
 ├─ .fp-workspace (fill host; panel bodies scroll) ──────────────────┤
 │ ┌─ Stack (narrow) ──────┬─ Transition log (wide) ───────────────┐ │
-│ │ indent L0…Ln          │ n/200 · filter · Clear log            │ │
+│ │ flat: # · rail · name │ n/200 · filter · Clear log            │ │
 │ │ leaf [leaf badge]     │ time → to                              │ │
 │ │ click → pin gates     │   from …  · client tags (clear/enter/…)│ │
 │ │                       │ newest first · flash · pin-to-top     │ │
@@ -191,7 +191,7 @@ v1 **Dev tools (collapsed):**
 
 ### 5.1 Behaviors
 
-- **Stack column:** depth-indented breadcrumb root→leaf; leaf badge (`--wv-accent`); click non-leaf pins gates owner while live; leaf (re)click clears pin → follow live leaf.
+- **Stack column:** flat root→leaf list (no progressive indent — deep spines stay readable). Fixed depth index + short fill-rail for nesting cue; parent on meta subline; `title` = full id; leaf badge (`--wv-accent`); click non-leaf pins gates owner while live; leaf (re)click clears pin → follow live leaf.
 - **Transition log:** time + **from → to** leaves; ring **200**; empty-stack events (`clear`); **client-derived tags only** (`enter` / `deeper` / `shallower` / `swap` / `clear`) — **not** engine condition `[T]`/`[F]`. Flash newest; pin scroll to newest while near top.
 - **Gates:** conditions for selected behavior id from **latest** `behaviorconds` factors for that owner. Status sort false-first (FALSE → unknown → inactive → TRUE); inactive wins over stale T/F. Collapsible cards: default open unmet/unknown/inactive, closed met. Toolbar always states honesty string above.
 - **Honesty (do not reword away):**
