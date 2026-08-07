@@ -33,6 +33,7 @@
     BeatDetector: "webVizModules/beatDetector.js",
     IMU: "webVizModules/imu.js",
     Features: "webVizModules/features.js",
+    SocialPresence: "webVizModules/socialPresence.js",
   };
 
   var MODULES_ANIM = {
@@ -59,6 +60,7 @@
         "ObservedObjects",
         "NavMap",
         "Mood",
+        "SocialPresence",
         "SoundReactions",
         "BeatDetector",
       ],
@@ -96,6 +98,7 @@
     Intents: "User intents pending / inject",
     CloudIntents: "Cloud intent stream",
     Mood: "Emotion graph & simple mood controls",
+    SocialPresence: "Social presence telemetry — RSPI & series (graphData wire)",
     NavMap: "Memory map visualization",
     ObservedObjects: "Vision-observed objects",
     VisionScheduleMediator: "Vision schedule",
