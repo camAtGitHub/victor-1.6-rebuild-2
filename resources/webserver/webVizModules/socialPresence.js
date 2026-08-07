@@ -43,6 +43,7 @@
   var eventsInfo = null; // last info.events
   var hoverBound = false;
   var enableAllSnapshot = null; // visibility map before "Enable all"
+  var kpiResizeBound = false;
 
   function $host() {
     if (hostElem) {
@@ -216,6 +217,51 @@
       rebuildPlotSeries();
       redrawChart();
     });
+
+    // KPI columns must be set in JS: WebViz scopes module CSS under #tab-*, so
+    // unscoped @media overrides lose specificity to the base grid rule.
+    if (!kpiResizeBound) {
+      kpiResizeBound = true;
+      window.addEventListener("resize", function () {
+        layoutKpiGrid();
+      });
+    }
+    layoutKpiGrid();
+  }
+
+  /**
+   * ≥2400px: one row (n columns).
+   * &lt;2400px: two rows (ceil(n/2) columns).
+   * ≤640px: two columns (more rows on phone).
+   * Applied as inline style so scoped CSS cannot win over it.
+   */
+  function layoutKpiGrid() {
+    if (!els || !els.kpis) {
+      return;
+    }
+    var n = seriesNames.length;
+    if (!n) {
+      els.kpis.style.display = "grid";
+      els.kpis.style.gridTemplateColumns = "";
+      els.kpis.style.gap = "8px";
+      return;
+    }
+    var w =
+      (typeof window !== "undefined" && window.innerWidth) ||
+      (document.documentElement && document.documentElement.clientWidth) ||
+      0;
+    var cols;
+    if (w > 0 && w < 640) {
+      cols = Math.min(2, n);
+    } else if (w > 0 && w < 2400) {
+      cols = Math.max(1, Math.ceil(n / 2));
+    } else {
+      cols = n;
+    }
+    els.kpis.style.display = "grid";
+    els.kpis.style.gap = "8px";
+    els.kpis.style.gridTemplateColumns =
+      "repeat(" + cols + ", minmax(0, 1fr))";
   }
 
   function allSeriesVisible() {
@@ -340,13 +386,12 @@
     els.toggles.innerHTML = "";
 
     if (!seriesNames.length) {
-      els.kpis.style.removeProperty("--sp-kpi-n");
+      layoutKpiGrid();
       syncEnableAllCheckbox();
       return;
     }
 
-    // Equal columns so common wide layouts stay one full row (no orphan tail)
-    els.kpis.style.setProperty("--sp-kpi-n", String(seriesNames.length));
+    layoutKpiGrid();
 
     var i;
     for (i = 0; i < seriesNames.length; i++) {
@@ -360,19 +405,33 @@
         card.type = "button";
         card.className = "sp-kpi" + (on ? "" : " sp-kpi--off");
         card.setAttribute("aria-pressed", on ? "true" : "false");
-        card.title = (on ? "Hide" : "Show") + " series " + name;
-        card.innerHTML =
-          '<span class="sp-kpi-top">' +
-          '<span class="sp-kpi-swatch" style="background:' +
-          col +
-          '"></span>' +
-          '<span class="sp-kpi-name">' +
-          escapeHtml(name) +
-          "</span>" +
-          "</span>" +
-          '<span class="sp-kpi-val">' +
-          (val == null ? "—" : fmtVal(val)) +
-          "</span>";
+        card.title =
+          name + " — " + (on ? "Hide" : "Show") + " series (click to toggle)";
+
+        var top = document.createElement("span");
+        top.className = "sp-kpi-top";
+        var swatch = document.createElement("span");
+        swatch.className = "sp-kpi-swatch";
+        swatch.style.background = col;
+        var nameEl = document.createElement("span");
+        nameEl.className = "sp-kpi-name";
+        nameEl.textContent = name;
+        // Inline wrap styles: createScopedStyles can drop -webkit-line-clamp via cssText
+        nameEl.style.whiteSpace = "normal";
+        nameEl.style.overflowWrap = "anywhere";
+        nameEl.style.wordBreak = "break-word";
+        nameEl.style.lineHeight = "1.3";
+        nameEl.style.maxHeight = "2.7em";
+        nameEl.style.overflow = "hidden";
+        top.appendChild(swatch);
+        top.appendChild(nameEl);
+
+        var valEl = document.createElement("span");
+        valEl.className = "sp-kpi-val";
+        valEl.textContent = val == null ? "—" : fmtVal(val);
+
+        card.appendChild(top);
+        card.appendChild(valEl);
         card.addEventListener("click", function () {
           toggleSeries(name);
         });
@@ -689,15 +748,18 @@
         btn.className = "sp-event-btn";
         btn.title = "Fire once · sendData(" + label + ")";
         btn.setAttribute("aria-label", "Send event " + label);
+        // Icon + label primary; SEND is optional chrome that yields space (CSS)
         btn.innerHTML =
           '<span class="sp-event-icon" aria-hidden="true">' +
           '<svg width="14" height="14" viewBox="0 0 16 16" fill="none">' +
           '<path d="M2.5 8h9M8.5 4.5L12 8l-3.5 3.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>' +
           "</svg></span>" +
+          '<span class="sp-event-body">' +
           '<span class="sp-event-label">' +
           escapeHtml(label) +
           "</span>" +
-          '<span class="sp-event-hint">send</span>';
+          '<span class="sp-event-hint" aria-hidden="true">send</span>' +
+          "</span>";
         btn.addEventListener("click", function () {
           safeSend(ev);
           btn.classList.remove("sp-event-btn--sent");
@@ -901,16 +963,14 @@
         border-radius: 4px;
       }
 
-      /* One equal-width row at desktop; no orphan tail of 2–3 cards */
+      /*
+       * KPI grid columns are set inline by layoutKpiGrid() — createScopedStyles
+       * prefixes selectors with #tab-*, so unscoped @media overrides lose
+       * specificity and never win. Do not put column counts in @media here.
+       */
       .sp-kpis {
         display: grid;
-        grid-template-columns: repeat(var(--sp-kpi-n, 1), minmax(0, 1fr));
         gap: 8px;
-      }
-      @media (max-width: 640px) {
-        .sp-kpis {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
       }
       .sp-kpi {
         display: flex;
@@ -945,7 +1005,7 @@
       }
       .sp-kpi-top {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         gap: 6px;
         min-width: 0;
         width: 100%;
@@ -955,16 +1015,19 @@
         width: 14px;
         height: 3px;
         border-radius: 2px;
+        margin-top: 5px;
       }
       .sp-kpi-name {
+        flex: 1 1 auto;
         min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
         font-size: 11px;
         font-weight: 600;
         color: #5c667a;
         letter-spacing: 0.02em;
+        line-height: 1.3;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }
       .sp-kpi-val {
         font-family: var(--wv-mono, ui-monospace, monospace);
@@ -1126,7 +1189,8 @@
       }
       .sp-events {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+        /* ~50% wider than prior 148px min so long event names fit */
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
         gap: 8px;
         align-items: stretch;
       }
@@ -1139,11 +1203,13 @@
       .sp-events-empty[hidden] { display: none; }
       .sp-event-btn {
         appearance: none;
+        container-type: inline-size;
+        container-name: sp-event;
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 10px;
         min-height: 44px;
-        padding: 8px 12px;
+        padding: 10px 14px;
         border: 1px solid #b8c0ce;
         border-radius: 9px;
         background:
@@ -1175,20 +1241,44 @@
         background: rgba(37, 99, 235, 0.1);
         color: #2563eb;
       }
+      /* Label owns space; SEND sits after and collapses first */
+      .sp-event-body {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
       .sp-event-label {
         flex: 1 1 auto;
         min-width: 0;
+        line-height: 1.3;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
         overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
       }
       .sp-event-hint {
-        flex: 0 0 auto;
+        flex: 0 1 auto;
+        min-width: 0;
+        max-width: 3.25rem;
+        overflow: hidden;
+        text-overflow: clip;
+        white-space: nowrap;
         font-size: 10px;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.06em;
         color: #8b95a8;
+      }
+      /* When the tile is tight, drop SEND entirely so the label can breathe */
+      @container sp-event (max-width: 200px) {
+        .sp-event-hint {
+          display: none;
+        }
       }
       .sp-event-btn:hover {
         border-color: #2563eb;
@@ -1222,6 +1312,8 @@
       }
       .sp-event-btn--sent .sp-event-hint {
         color: #0f7a4a;
+        max-width: 3.25rem;
+        display: inline;
       }
 
       @media (prefers-reduced-motion: reduce) {
