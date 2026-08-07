@@ -8,6 +8,59 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Console Vars and Functions</title>
 
+    <!-- FOUC: set data-theme + class before any stylesheet that uses tokens -->
+    <script>
+    (function () {
+      var root = document.documentElement;
+      var dark = true;
+      try {
+        var p = localStorage.getItem("webviz.colorScheme") || "system";
+        if (p === "light") dark = false;
+        else if (p === "dark") dark = true;
+        else if (window.matchMedia) {
+          dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        }
+      } catch (e) {
+        dark = true;
+      }
+      var t = dark ? "dark" : "light";
+      root.setAttribute("data-theme", t);
+      root.classList.remove("wv-theme-light", "wv-theme-dark");
+      root.classList.add(dark ? "wv-theme-dark" : "wv-theme-light");
+      /* Inline light vars early so paint is correct even if tokens.css is cached without light block */
+      if (!dark) {
+        var L = {
+          "--wv-bg": "#f0f2f6",
+          "--wv-bg-elev": "#ffffff",
+          "--wv-bg-panel": "#e8ecf2",
+          "--wv-bg-hover": "#dde3ec",
+          "--wv-bg-active": "#d0d8e4",
+          "--wv-bg-input": "#ffffff",
+          "--wv-line": "#c5ccd8",
+          "--wv-line-soft": "#d8dee8",
+          "--wv-line-strong": "#9aa6b8",
+          "--wv-text": "#1a1d24",
+          "--wv-text-dim": "#5c667a",
+          "--wv-text-faint": "#8b95a8",
+          "--wv-text-inv": "#ffffff",
+          "--wv-accent-strong": "#3d87c4",
+          "--wv-content-bg": "#ffffff",
+          "--wv-content-text": "#1a1d24",
+          "--wv-content-line": "#c5cad3",
+          "--wv-toast-error-bg": "#fdecee",
+          "--wv-shadow-sm": "0 1px 2px rgba(0,0,0,0.08)",
+          "--wv-shadow-md": "0 8px 24px rgba(0,0,0,0.1)"
+        };
+        for (var k in L) {
+          if (Object.prototype.hasOwnProperty.call(L, k)) root.style.setProperty(k, L[k]);
+        }
+        try { root.style.setProperty("color-scheme", "light"); } catch (e2) {}
+      } else {
+        try { root.style.setProperty("color-scheme", "dark"); } catch (e3) {}
+      }
+    })();
+    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -30,10 +83,6 @@
     <script src="jquery-ui.js"></script>
 
     <script>
-    $(function() {
-        $("#console").resizable().draggable();
-    });
-
     $(function() {
         $("#main").tabs();
         // $("#main").accordion({
@@ -124,18 +173,66 @@
 <!-- page content -->
 
 <body class="ui-widget-content" style="border:0;">
-    <div id="console" class="ui-widget-content" style="padding: 0.5em;">
-        <h3 class="ui-widget-header" style="text-align: center; margin: 0;">Console Vars and Functions</h3>
-        <p style="text-align:center; margin:0.4em 0 0.6em; font-size:13px;">
-          <a href="/consolevars-explorer">Open Console Vars Explorer</a>
-          <span style="color:var(--wv-text-faint);"> — recipes, search, curated notes (new UI)</span>
-        </p>
-        <div id="main">
+    <div class="app app--consolevars" id="app">
+        <header class="top" role="banner">
+            <div class="brand" title="Console Vars and Functions">
+                <div class="mark" aria-hidden="true">C</div>
+                <span class="title">Console Vars <em id="brandSubtitle">classic</em></span>
+            </div>
+
+            <div class="meta-pills" aria-label="Page meta">
+                <span class="pill" id="pillProcess">—</span>
+                <span class="pill pill-secondary" id="pillPort">—</span>
+            </div>
+
+            <div class="top-actions">
+                <a class="btn btn-link" href="/consolevars-explorer" title="Recipes, search, curated notes">Explorer</a>
+                <a class="btn btn-link" href="/webViz.html" title="WebViz">WebViz</a>
+                <a class="btn btn-link" href="/" title="Web server home">Home</a>
+            </div>
+        </header>
+
+        <main class="cv-stage" id="stage">
+            <div id="console" class="ui-widget-content">
+                <div id="main">
 <!-- generated html -->
-        <div>Output from last console func call:</div><br>
-        <div id='id_consolefunc_result'></div>
-        </div>
+                <div>Output from last console func call:</div><br>
+                <div id='id_consolefunc_result'></div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="status" role="contentinfo">
+            <span class="left" id="cvStatus">Starting…</span>
+            <span class="right" id="statusRight">—</span>
+            <button
+                type="button"
+                class="btn btn-icon theme-toggle"
+                id="btnThemeToggle"
+                title="Switch to light theme"
+                aria-label="Switch to light theme"
+                aria-pressed="false"
+            >
+                <span id="themeToggleIcon" aria-hidden="true">🌓</span>
+            </button>
+        </footer>
     </div>
+
+    <script>
+    (function () {
+      var port = String(window.location.port || "");
+      var process = port === "8889" ? "Anim" : port === "8888" ? "Engine" : "—";
+      var pillP = document.getElementById("pillProcess");
+      var pillPort = document.getElementById("pillPort");
+      var sub = document.getElementById("brandSubtitle");
+      if (pillP) pillP.textContent = process === "—" ? "consolevars" : process;
+      if (pillPort) pillPort.textContent = port ? (":" + port) : window.location.host || "—";
+      if (sub && process !== "—") sub.textContent = process.toLowerCase();
+      var right = document.getElementById("statusRight");
+      if (right) right.textContent = "click theme · double-click system";
+    })();
+    </script>
+    <script src="/webviz/js/theme.js"></script>
     <script src="/cv-app.js"></script>
 </body>
 

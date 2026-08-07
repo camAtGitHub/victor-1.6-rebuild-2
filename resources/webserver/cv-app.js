@@ -777,11 +777,12 @@
     }
   }
 
-  /** Classic page has no #cvStatus — inject a small load line so 404s are visible. */
+  /** Prefer footer/header #cvStatus; else inject a classic status line under #console. */
   function setClassicCatalogStatus(text, isError) {
     var el = $("#cvStatus");
     if (el) {
       el.textContent = text;
+      el.classList.toggle("cv-classic-status-err", !!isError);
       return;
     }
     var host = $("#console") || document.body;
