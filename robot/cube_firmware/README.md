@@ -1,5 +1,8 @@
 # Victor Cube Firmware
 
+**End-to-end build / clone guide:** open [`BUILD.html`](BUILD.html) in a browser
+(hardware BOM, pin map, BLE protocol, DFU, vision markers, Path A stock silicon vs Path B clone).
+
 ## Flashing cube firmware onto cubes
 
 WARNING: This procedure will flash cube firmware onto all nearby advertising cubes, potentially pissing off other developers.

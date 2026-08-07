@@ -249,6 +249,7 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 | `engine/components/cubes/` | L2 cube BLE/coordinator/lights stack |
 | `animProcess/src/cozmoAnim/{animation,faceDisplay,micData,speechRecognizer,audio,…}/` | L2 anim subsystems |
 | `robot/supervisor/`, `robot/hal/`, `robot/clad/` | L2 control path; `robot/syscon/` L1 shallow |
+| `robot/cube_firmware/BUILD.html` | End-to-end **build a Vector cube** guide (HW/FW/BLE/markers); assets in `build-guide-assets/` |
 | `engine/aiComponent/` | L2 README — nested AI entity |
 | `engine/aiComponent/behaviorComponent/` | L2 — stack, factory, intents, BEI (decision core) |
 | `engine/aiComponent/beiConditions/` | L2 — ~60 activation predicates |
@@ -356,6 +357,7 @@ if you ran out of context mid-folder, say so here.
 | 2026-08-02 | Grok | **FreePlay implemented:** shell multi-channel retain/fan-out (`app.js`), registry (`config.js`), `webVizModules/freeplay.js` (stack/log/gates; content tokens; no C++). Design status → implemented. | Runtime S1–S9 on robot/devData; optional README one-liner. |
 | 2026-08-02 | Grok | Reviewed `webviz-ux-demo.html`: **Ops > Timeline** for freeplay debug. Wrote UX uplift plan `docs/mapping/WEBVIZ-FREEPLAY-UX-PLAN.md` (Ops layout, stack/log/gates polish, nice-to-haves beyond demo; timeline optional). | Execute UX plan P1 layout first (`freeplay.js` only). |
 | 2026-08-02 | Grok | **FreePlay UX P1–P6 complete** in `freeplay.js` (Ops grid, stack/log/gates polish, P5 filters/keyboard/silence, P6 secondary timeline). **P7 docs closeout:** UX plan status→implemented; design §5 Ops wireframe + honesty notes; AGENTS landmarks/quick answers; demo HTML pointer comment. | Runtime U1–U11 on robot/devData if desired; no further UX-plan phases. |
+| 2026-08-07 | Grok | Cube hardware deep-dive + **end-to-end build guide** `robot/cube_firmware/BUILD.html` (DA14580/BMA253/BOM/pinout/BLE/DFU/markers; Path A stock silicon + Path B protocol clone; bundled images in `build-guide-assets/`). | Optional: print-ready marker pack; Path B sample firmware. |
 
 ---
 
