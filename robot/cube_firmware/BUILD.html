@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BUILD — Vector Light Cube (End-to-End Guide)</title>
+<style>
+  :root {
+    --bg: #0f1218;
+    --bg2: #171b24;
+    --panel: #1c2230;
+    --border: #2a3344;
+    --text: #e8ecf4;
+    --muted: #9aa6bc;
+    --accent: #5b9dff;
+    --accent2: #7ce3b0;
+    --warn: #ffb454;
+    --danger: #ff6b7a;
+    --code: #0a0d12;
+    --link: #7eb6ff;
+    --radius: 12px;
+    --shadow: 0 12px 40px rgba(0,0,0,.35);
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    background: radial-gradient(1200px 600px at 10% -10%, #1a2740 0%, transparent 50%),
+                radial-gradient(900px 500px at 100% 0%, #1a2f28 0%, transparent 45%),
+                var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+  }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .layout { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+  nav {
+    position: sticky; top: 0; height: 100vh; overflow: auto;
+    background: rgba(15,18,24,.92); border-right: 1px solid var(--border);
+    padding: 1.25rem 1rem 2rem; backdrop-filter: blur(8px);
+  }
+  nav .brand { display: flex; gap: .75rem; align-items: center; margin-bottom: 1rem; }
+  nav .brand img { width: 40px; height: 40px; border-radius: 8px; background: #222; }
+  nav h1 { font-size: .95rem; margin: 0; line-height: 1.25; }
+  nav p { margin: .25rem 0 1rem; color: var(--muted); font-size: .78rem; }
+  nav a {
+    display: block; color: var(--muted); padding: .35rem .55rem; border-radius: 6px;
+    font-size: .84rem; text-decoration: none;
+  }
+  nav a:hover, nav a:focus { background: var(--panel); color: var(--text); text-decoration: none; }
+  nav .sec { margin-top: .9rem; margin-bottom: .3rem; font-size: .7rem; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--accent2); padding-left: .55rem; }
+  main { padding: 2rem clamp(1rem, 3vw, 3rem) 4rem; max-width: 980px; }
+  header.hero {
+    background: linear-gradient(145deg, #1e2a40, #162018 70%);
+    border: 1px solid var(--border); border-radius: calc(var(--radius) + 4px);
+    padding: 1.5rem 1.75rem; box-shadow: var(--shadow); margin-bottom: 2rem;
+  }
+  header.hero h1 { margin: 0 0 .4rem; font-size: clamp(1.6rem, 3vw, 2.2rem); letter-spacing: -.02em; }
+  header.hero .sub { color: var(--muted); margin: 0 0 1rem; max-width: 58ch; }
+  .badges { display: flex; flex-wrap: wrap; gap: .4rem; }
+  .badge {
+    font-size: .72rem; padding: .25rem .55rem; border-radius: 999px;
+    border: 1px solid var(--border); background: rgba(0,0,0,.25); color: var(--muted);
+  }
+  .badge.ok { border-color: #2d6b52; color: var(--accent2); }
+  .badge.warn { border-color: #7a5a20; color: var(--warn); }
+  .badge.danger { border-color: #7a303a; color: var(--danger); }
+  h2 {
+    margin: 2.4rem 0 .8rem; padding-top: .5rem; font-size: 1.45rem;
+    border-bottom: 1px solid var(--border); padding-bottom: .45rem;
+  }
+  h3 { margin: 1.6rem 0 .55rem; font-size: 1.1rem; color: #d5def0; }
+  h4 { margin: 1.1rem 0 .4rem; font-size: .98rem; color: #c5d0e6; }
+  p { margin: .55rem 0 .8rem; }
+  ul, ol { margin: .4rem 0 1rem 1.2rem; padding: 0; }
+  li { margin: .28rem 0; }
+  .muted { color: var(--muted); }
+  .callout {
+    border-left: 3px solid var(--accent); background: var(--panel);
+    padding: .85rem 1rem; border-radius: 0 var(--radius) var(--radius) 0; margin: 1rem 0;
+  }
+  .callout.warn { border-color: var(--warn); }
+  .callout.danger { border-color: var(--danger); }
+  .callout.ok { border-color: var(--accent2); }
+  .callout strong { display: block; margin-bottom: .25rem; }
+  table {
+    width: 100%; border-collapse: collapse; margin: .8rem 0 1.2rem;
+    font-size: .9rem; background: var(--panel); border-radius: var(--radius); overflow: hidden;
+  }
+  th, td { text-align: left; padding: .55rem .7rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: #222a3a; color: #cfe0ff; font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+  tr:last-child td { border-bottom: none; }
+  code, kbd {
+    font-family: var(--mono); font-size: .86em; background: var(--code);
+    padding: .12em .4em; border-radius: 4px; border: 1px solid var(--border);
+  }
+  pre {
+    background: var(--code); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 1rem 1.1rem; overflow: auto; font-family: var(--mono); font-size: .82rem;
+    line-height: 1.45; margin: .8rem 0 1.2rem;
+  }
+  pre code { background: none; border: none; padding: 0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: .85rem; }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    nav { position: relative; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+    .grid2, .grid3 { grid-template-columns: 1fr; }
+  }
+  figure {
+    margin: 1rem 0 1.4rem; background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
+  }
+  figure img, figure svg { display: block; width: 100%; height: auto; background: #0c0f14; }
+  figcaption { padding: .65rem .9rem; color: var(--muted); font-size: .82rem; border-top: 1px solid var(--border); }
+  .markers { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; margin: 1rem 0; }
+  .markers figure { margin: 0; }
+  .markers img { aspect-ratio: 1; object-fit: contain; padding: .5rem; background: #111; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 1rem 1.1rem;
+  }
+  .card h3 { margin-top: 0; }
+  .steps { counter-reset: step; list-style: none; margin-left: 0; }
+  .steps > li {
+    counter-increment: step; position: relative; padding: .85rem 1rem .85rem 3.2rem;
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    margin: .55rem 0;
+  }
+  .steps > li::before {
+    content: counter(step); position: absolute; left: .75rem; top: .85rem;
+    width: 1.7rem; height: 1.7rem; border-radius: 50%; background: var(--accent);
+    color: #061018; font-weight: 700; font-size: .85rem; display: grid; place-items: center;
+  }
+  .toc-mobile { display: none; }
+  footer {
+    margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border);
+    color: var(--muted); font-size: .82rem;
+  }
+  .tag-inferred { color: var(--warn); font-size: .78rem; font-weight: 600; }
+  .tag-confirmed { color: var(--accent2); font-size: .78rem; font-weight: 600; }
+  .diagram { background: #0b0e14; }
+  .path-a { border-top: 3px solid var(--accent2); }
+  .path-b { border-top: 3px solid var(--accent); }
+  .checklist label { display: flex; gap: .55rem; align-items: flex-start; margin: .35rem 0; cursor: pointer; }
+  .checklist input { margin-top: .3rem; }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav>
+  <div class="brand">
+    <img src="build-guide-assets/cube.png" alt="" />
+    <div>
+      <h1>Vector Cube BUILD</h1>
+      <p>End-to-end hardware + firmware</p>
+    </div>
+  </div>
+  <div class="sec">Start</div>
+  <a href="#overview">Overview</a>
+  <a href="#two-paths">Two build paths</a>
+  <a href="#what-vector-needs">What Vector needs</a>
+  <div class="sec">Hardware</div>
+  <a href="#bom">Bill of materials</a>
+  <a href="#soc">SoC &amp; radio</a>
+  <a href="#sensors">Sensors</a>
+  <a href="#lights">Lights &amp; boost</a>
+  <a href="#power">Power &amp; battery</a>
+  <a href="#pinout">Pin map</a>
+  <a href="#schematic">Schematic sketch</a>
+  <a href="#mechanical">Mechanical &amp; markers</a>
+  <div class="sec">Firmware</div>
+  <a href="#architecture">FW architecture</a>
+  <a href="#ble">BLE services</a>
+  <a href="#protocol">App protocol</a>
+  <a href="#dfu">DFU / OTA</a>
+  <a href="#build-fw">Build firmware</a>
+  <a href="#flash">Flash &amp; bletool</a>
+  <div class="sec">Build it</div>
+  <a href="#path-a">Path A — stock silicon</a>
+  <a href="#path-b">Path B — protocol clone</a>
+  <a href="#assembly">Assembly order</a>
+  <a href="#verify">Verification</a>
+  <a href="#troubleshoot">Troubleshooting</a>
+  <div class="sec">Ref</div>
+  <a href="#sources">Sources in this repo</a>
+  <a href="#credits">Credits &amp; legal</a>
+</nav>
+
+<main>
+<header class="hero">
+  <h1>Build a Vector Light Cube</h1>
+  <p class="sub">
+    A start-to-finish guide for rebuilding or cloning Anki Vector’s interactive cube —
+    from Dialog DA14580 hardware through BLE protocol, vision markers, shell, and robot verification.
+    Reverse-engineered from <code>robot/cube_firmware/</code> in this tree (Vector 1.6 rebuild).
+  </p>
+  <div class="badges">
+    <span class="badge ok">MCU: Dialog DA14580</span>
+    <span class="badge ok">Accel: Bosch BMA253</span>
+    <span class="badge ok">44×44×44 mm</span>
+    <span class="badge ok">BLE 4.x peripheral</span>
+    <span class="badge warn">1.5 V N / E90 / LR1 only</span>
+    <span class="badge danger">Not A23 · not Li-ion stock</span>
+  </div>
+</header>
+
+<figure>
+  <img src="build-guide-assets/vector-hero.jpg" alt="Anki Vector robot with cube" />
+  <figcaption>
+    Vector with companion cube. Cube is a visual landmark <em>and</em> a BLE device (lights + accel).
+    Photo: Fictiv teardown coverage of Vector manufacturing.
+  </figcaption>
+</figure>
+
+<!-- ========== OVERVIEW ========== -->
+<h2 id="overview">1. Overview</h2>
+<p>
+  Official Vector ships with <strong>one</strong> light cube (Cozmo shipped three). The cube is:
+</p>
+<ul>
+  <li><strong>Visual:</strong> six unique face markers (~23&nbsp;mm) on a 44&nbsp;mm cube so the camera can localize and dock.</li>
+  <li><strong>Wireless:</strong> BLE peripheral advertising as <code>Vector Cube</code>, streaming accelerometer and battery, receiving light keyframes.</li>
+  <li><strong>Battery powered:</strong> single alkaline N-cell (E90 / LR1), ~20–40 hours of active use.</li>
+</ul>
+<div class="callout">
+  <strong>Where the “firmware file” lives</strong>
+  <code>resources/assets/cubeFirmware/cube.dfu</code> is only the signed <em>application</em> blob (~3.2&nbsp;KB).
+  Real source, board pinout, Dialog SDK, and tools are under <code>robot/cube_firmware/</code>.
+  Engine loads the DFU path via <code>CubeCommsComponent</code> and flashes when versions mismatch.
+</div>
+
+<figure>
+  <img src="build-guide-assets/cube-disassembly-cozmo.jpg" alt="Cozmo cube disassembly stages" />
+  <figcaption>
+    Cozmo-era cube teardown (same product family / battery form factor; mechanical layout is the best public photo series).
+    Stages: open side → LED diffusers → battery spring + antenna → PCB with BLE + accel.
+    Source: Microcontroller Tips / Lee Teschler (2018). Note: that article guessed “Nordic”;
+    <strong>this Vector tree’s firmware is Dialog DA14580</strong> — see §SoC. Cozmo and Vector cubes may differ by generation.
+  </figcaption>
+</figure>
+
+<!-- ========== TWO PATHS ========== -->
+<h2 id="two-paths">2. Two realistic build paths</h2>
+<div class="grid2">
+  <div class="card path-a">
+    <h3>Path A — Hardware-compatible</h3>
+    <p class="muted">Run stock (or rebuilt) Anki images</p>
+    <ul>
+      <li>DA14580 (or carefully qualified 58x) + same pinout</li>
+      <li>BMA253 3-wire SPI</li>
+      <li>12 LED channels + boost enable</li>
+      <li>1.5&nbsp;V cell + Dialog power topology</li>
+      <li>Anki loader + XXTEA DFU + <code>cube.dfu</code></li>
+    </ul>
+    <p><span class="tag-confirmed">Best fidelity</span> Hardest PCB / sourcing.</p>
+  </div>
+  <div class="card path-b">
+    <h3>Path B — Protocol clone</h3>
+    <p class="muted">Any modern BLE MCU</p>
+    <ul>
+      <li>nRF52 / DA14531 / ESP32-C3 / …</li>
+      <li>Implement GATT UUIDs + <code>protocol.h</code></li>
+      <li>Optional: skip stock DFU; ship your app only</li>
+      <li>Still need 4 RGB corners + accel stream</li>
+      <li>Still need correct vision markers + size</li>
+    </ul>
+    <p><span class="tag-inferred">Most practical DIY</span> Engine may still try OTA — handle or ignore.</p>
+  </div>
+</div>
+
+<!-- ========== WHAT VECTOR NEEDS ========== -->
+<h2 id="what-vector-needs">3. What Vector actually needs from a cube</h2>
+<table>
+  <thead><tr><th>Layer</th><th>Requirement</th><th>If missing…</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Vision</td>
+      <td>44&nbsp;mm body, 6 face markers (LIGHTCUBE family), ~23&nbsp;mm marker size</td>
+      <td>Cannot find / dock / roll reliably (dead battery still “visible”)</td>
+    </tr>
+    <tr>
+      <td>BLE discovery</td>
+      <td>Advertise name + custom service UUID; connectable peripheral</td>
+      <td>No lights, no tap games, no preferred-cube radio link</td>
+    </tr>
+    <tr>
+      <td>App protocol</td>
+      <td>Light keyframes, light index map, accel frames, voltage</td>
+      <td>Connects but behaviors misbehave</td>
+    </tr>
+    <tr>
+      <td>Accel orientation</td>
+      <td>Sensible axes relative to faces (tap / upright checks)</td>
+      <td>Pounce / tilt logic wrong</td>
+    </tr>
+    <tr>
+      <td>LED geometry</td>
+      <td>4 corners RGB mapped like production</td>
+      <td>Animations on wrong corners</td>
+    </tr>
+    <tr>
+      <td>Power</td>
+      <td>Stable BLE + boost for LEDs; voltage reports</td>
+      <td>Drops / red-flash low-batt UX</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ========== BOM ========== -->
+<h2 id="bom">4. Bill of materials</h2>
+<h3>Path A (stock-compatible) — electronic</h3>
+<table>
+  <thead><tr><th>Qty</th><th>Part</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><strong>Dialog / Renesas DA14580</strong></td><td>ARM Cortex-M0 + BLE. Packages in OTP docs: WLCSP34, QFN40, QFN48… Cube PCB likely WLCSP/QFN40 <span class="tag-inferred">[INFERRED package]</span></td></tr>
+    <tr><td>1</td><td>16&nbsp;MHz crystal + load caps</td><td>Required. <strong>P1.2 / P1.3 reserved</strong> — do not route LEDs there</td></tr>
+    <tr><td>1</td><td><strong>Bosch BMA253</strong> (or drop-in with chip ID <code>0xFA</code>)</td><td>3-wire SPI; powered via GPIO</td></tr>
+    <tr><td>4</td><td>RGB LED packages (or 12 discrete)</td><td>One per corner; software PWM @ 200&nbsp;Hz</td></tr>
+    <tr><td>1</td><td>LED boost regulator + enable</td><td><code>BOOST_EN</code> on P2.0, 1V-BAT logic domain</td></tr>
+    <tr><td>1</td><td>2.4&nbsp;GHz antenna (printed / chip)</td><td>Follow Dialog RF design notes</td></tr>
+    <tr><td>*</td><td>Decoupling, RF matching, DCDC passives</td><td>Per DA14580 datasheet reference design</td></tr>
+    <tr><td>1</td><td>Battery holder for N / E90 / LR1</td><td>Spring + positive contact; polarity: + toward door</td></tr>
+    <tr><td>opt</td><td>UART pads (P0.4 TX / P0.5 RX)</td><td>Factory “cubeboot” / programming</td></tr>
+    <tr><td>opt</td><td>External SPI flash</td><td><em>Not required</em> for ~3&nbsp;KB RAM-loaded app model</td></tr>
+  </tbody>
+</table>
+
+<h3>Path B (clone) — electronic alternatives</h3>
+<table>
+  <thead><tr><th>Block</th><th>Example</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>MCU+BLE</td><td>nRF52832/40, DA14531, ESP32-C3</td><td>Must run BLE peripheral + your GATT server</td></tr>
+    <tr><td>Accel</td><td>BMA253, LIS2DH12, BMI160…</td><td>Report int16 XYZ; scale near 0x2000 ≈ 1&nbsp;g (see bletool)</td></tr>
+    <tr><td>LEDs</td><td>WS2812 <em>or</em> 12× GPIO PWM</td><td>WS2812 is easier but changes power design</td></tr>
+    <tr><td>Power</td><td>1.5&nbsp;V boost-to-3.3&nbsp;V <em>or</em> LiPo+regulator</td><td>If you change chemistry, redesign UVLO carefully</td></tr>
+  </tbody>
+</table>
+
+<h3>Mechanical / optical (both paths)</h3>
+<table>
+  <thead><tr><th>Item</th><th>Spec</th></tr></thead>
+  <tbody>
+    <tr><td>Outer size</td><td><strong>44 × 44 × 44 mm</strong> (<code>engine/BlockDefinitions.h</code>)</td></tr>
+    <tr><td>Marker size</td><td><strong>23 mm</strong> default block marker size</td></tr>
+    <tr><td>Face set</td><td>LIGHTCUBE1–4 marker families (Vector typically one cube type)</td></tr>
+    <tr><td>Shell</td><td>Rigid cube, soft/rubber corners (stock), translucent LED windows on 4 vertical corners</td></tr>
+    <tr><td>Battery door</td><td>Phillips screw; cover one face</td></tr>
+    <tr><td>Weight / balance</td><td>Keep CG near center for roll/pickup consistency <span class="tag-inferred">[INFERRED]</span></td></tr>
+  </tbody>
+</table>
+
+<!-- ========== SOC ========== -->
+<h2 id="soc">5. SoC &amp; radio</h2>
+<table>
+  <thead><tr><th>Property</th><th>Value</th><th>Evidence</th></tr></thead>
+  <tbody>
+    <tr><td>Device</td><td>Dialog Semiconductor <strong>DA14580</strong> (now Renesas SmartBond)</td><td><code>datasheet.h</code> = <code>DA14580.h</code>; configs <code>da1458x_*</code></td></tr>
+    <tr><td>CPU</td><td>ARM Cortex-M0, 16&nbsp;MHz system clock</td><td><code>Makefile -mcpu=cortex-m0</code>; <code>SYSTEM_CLOCK = 16e6</code></td></tr>
+    <tr><td>Mode</td><td>Integrated processor (<code>CFG_APP</code>)</td><td>Host app is TASK_APP on-chip</td></tr>
+    <tr><td>Sleep</td><td>Extended sleep on</td><td><code>ARCH_EXT_SLEEP_ON</code>, <code>CFG_MEM_MAP_EXT_SLEEP</code></td></tr>
+    <tr><td>Connections</td><td>1 concurrent</td><td><code>CFG_MAX_CONNECTIONS (1)</code></td></tr>
+    <tr><td>BD address</td><td>Public (OTP header)</td><td><code>GAPM_PUBLIC_ADDR</code>; OTP BDADDR offset 0xD4</td></tr>
+    <tr><td>Adv name</td><td><code>Vector Cube</code></td><td><code>user_config.h</code></td></tr>
+    <tr><td>DIS manufacturer</td><td><code>Anki</code> / model <code>Production</code></td><td><code>user_profiles_config.h</code></td></tr>
+  </tbody>
+</table>
+<div class="callout warn">
+  <strong>Dev kits</strong>
+  Renesas still documents DA1458x / successor DA1453x kits. A commercial DA14580 breakout is the fastest Path&nbsp;A prototype
+  (expect to rewire LEDs/accel to match Anki’s pin map before stock app firmware works).
+</div>
+
+<!-- ========== SENSORS ========== -->
+<h2 id="sensors">6. Sensors</h2>
+<h3>Bosch BMA253</h3>
+<ul>
+  <li>Chip ID register <code>0x00</code> must read <strong><code>0xFA</code></strong> or cube emits <code>COMMAND_ACCEL_FAILURE</code>.</li>
+  <li>3-wire SPI bit-banged on Port&nbsp;0 (<code>ACC_nCS</code>, <code>ACC_SCK</code>, <code>ACC_SDA</code>).</li>
+  <li><code>ACC_PWR</code> (P0.2) power-gates the sensor.</li>
+  <li>Configured: ±4&nbsp;g, ~250&nbsp;Hz BW, FIFO XYZ; streams 3 frames/message.</li>
+</ul>
+<pre><code>// robot/cube_firmware/app/accel.c (excerpt)
+spi_write8(BGW_SPI3_WDT, 0x01);   // three-wire SPI
+spi_write8(PMU_RANGE, 0x05);      // +4g
+spi_write8(PMU_BW, 0x0D);         // 250Hz BW
+spi_write8(FIFO_CONFIG_1, 0x40);  // FIFO XYZ
+// chip_id must be 0xFA</code></pre>
+<p class="muted">bletool treats <code>0x2000</code> raw counts ≈ 1&nbsp;g when interpreting upright tests.</p>
+
+<h3>Battery ADC</h3>
+<p>On-chip GP-ADC samples <strong>VBAT1V</strong> about once per second and notifies <code>COMMAND_VOLTAGE_DATA</code>.
+Host scale used in bletool: <code>adc * 3.6 / 1024</code> volts (empirical for that tool).</p>
+
+<!-- ========== LIGHTS ========== -->
+<h2 id="lights">7. Lights &amp; boost</h2>
+<ul>
+  <li><strong>4 corners × RGB = 12 GPIOs</strong> (<code>D0</code>…<code>D11</code>).</li>
+  <li>Software PWM via Timer0 at <strong>200&nbsp;Hz</strong> (<code>lights.c</code>).</li>
+  <li><code>BOOST_EN</code> (P2.0) enables boost for LED power; driven as <strong>1V-BAT</strong> domain GPIO.</li>
+  <li>Engine maps <code>NUM_CUBE_LEDS = 4</code> logical lights.</li>
+</ul>
+<pre><code>// LED enum — corner order (lights.h)
+HAL_LED_D1_RED/GRN/BLU  // channel 0
+HAL_LED_D2_RED/GRN/BLU  // channel 1
+HAL_LED_D3_RED/GRN/BLU  // channel 2
+HAL_LED_D4_RED/GRN/BLU  // channel 3</code></pre>
+
+<!-- ========== POWER ========== -->
+<h2 id="power">8. Power &amp; battery</h2>
+<div class="grid2">
+  <figure>
+    <img src="build-guide-assets/battery-diagram.png" alt="Official Vector cube battery orientation diagram" />
+    <figcaption>Official orientation: positive end toward the battery door. Source: Digital Dream Labs support.</figcaption>
+  </figure>
+  <figure>
+    <img src="build-guide-assets/n-battery-vs-a23.jpg" alt="N cell next to A23 battery" />
+    <figcaption>
+      <strong>Left: N / E90 / LR1 (1.5&nbsp;V) — correct.</strong>
+      Right: A23 (12&nbsp;V) — same-ish size, <em>will destroy the cube</em>.
+      Wikimedia Commons.
+    </figcaption>
+  </figure>
+</div>
+<table>
+  <thead><tr><th>Spec</th><th>Value</th></tr></thead>
+  <tbody>
+    <tr><td>Chemistry / size</td><td>Alkaline <strong>N / E90 / LR1 / MN9100</strong> — 1.5&nbsp;V</td></tr>
+    <tr><td>Dimensions</td><td>≈ 12.0&nbsp;mm Ø × 30.2&nbsp;mm length</td></tr>
+    <tr><td>Runtime</td><td>~20–40&nbsp;h gameplay (official)</td></tr>
+    <tr><td>Forbidden</td><td>A23 (12&nbsp;V); rechargeables (official warning)</td></tr>
+    <tr><td>FW rails</td><td><code>GPIO_POWER_RAIL_1V</code> (boost enable) + <code>_3V</code> (LEDs, SPI, UART)</td></tr>
+    <tr><td>Self-test</td><td>Reset cube (unscrew 10&nbsp;s, reassemble) → flash red→green→blue if OK</td></tr>
+  </tbody>
+</table>
+<div class="callout danger">
+  <strong>Do not put 12&nbsp;V (A23) or raw Li-ion into a stock-topology board.</strong>
+  The DA14580 and boost design assume ~1.5&nbsp;V primary cell behavior. Redesign UVLO/boost if you change chemistry.
+</div>
+
+<!-- ========== PINOUT ========== -->
+<h2 id="pinout">9. Pin map (Anki board)</h2>
+<p>From <code>robot/cube_firmware/app/board.h</code> + drivers. Treat as the canonical Path&nbsp;A netlist.</p>
+<table>
+  <thead><tr><th>Net</th><th>Port.Pin</th><th>Direction / rail</th><th>Function</th></tr></thead>
+  <tbody>
+    <tr><td>ACC_nCS</td><td>P0.0</td><td>Out 3V</td><td>BMA253 chip select</td></tr>
+    <tr><td>—</td><td>P0.1</td><td>—</td><td>(unused in map)</td></tr>
+    <tr><td>ACC_PWR</td><td>P0.2</td><td>Out 3V</td><td>Accel power gate</td></tr>
+    <tr><td>ACC_SCK</td><td>P0.3</td><td>Out 3V</td><td>SPI clock</td></tr>
+    <tr><td>UTX</td><td>P0.4</td><td>UART 3V</td><td>Debug / cubeboot TX</td></tr>
+    <tr><td>URX</td><td>P0.5</td><td>UART 3V</td><td>Debug RX</td></tr>
+    <tr><td>ACC_SDA</td><td>P0.6</td><td>I/O 3V</td><td>3-wire SPI data</td></tr>
+    <tr><td>D1</td><td>P0.7</td><td>Out 3V</td><td>LED</td></tr>
+    <tr><td>D7</td><td>P1.0</td><td>Out 3V</td><td>LED</td></tr>
+    <tr><td>D10</td><td>P1.1</td><td>Out 3V</td><td>LED</td></tr>
+    <tr><td><strong>XTAL</strong></td><td><strong>P1.2 / P1.3</strong></td><td>—</td><td><strong>DO NOT USE — corrupts 16&nbsp;MHz</strong></td></tr>
+    <tr><td>BOOST_EN</td><td>P2.0</td><td>Out 1V</td><td>LED boost enable</td></tr>
+    <tr><td>D0</td><td>P2.1</td><td>Out 3V</td><td>LED</td></tr>
+    <tr><td>D2</td><td>P2.2</td><td>Out 3V</td><td>LED</td></tr>
+    <tr><td>D11</td><td>P2.3</td><td>Out 3V</td><td>LED</td></tr>
+    <tr><td>D9</td><td>P2.4</td><td>Out 3V</td><td>LED</td></tr>
+    <tr><td>D6</td><td>P2.5</td><td>Out 3V</td><td>LED</td></tr>
+    <tr><td>D8</td><td>P2.6</td><td>Out 3V</td><td>LED</td></tr>
+    <tr><td>D3</td><td>P2.7</td><td>Out 3V</td><td>LED</td></tr>
+    <tr><td>D4</td><td>P2.8</td><td>Out 3V</td><td>LED</td></tr>
+    <tr><td>D5</td><td>P2.9</td><td>Out 3V</td><td>LED</td></tr>
+  </tbody>
+</table>
+
+<figure class="diagram">
+<svg viewBox="0 0 900 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Block diagram of cube hardware">
+  <rect width="900" height="420" fill="#0b0e14"/>
+  <text x="24" y="36" fill="#7ce3b0" font-family="Segoe UI,sans-serif" font-size="16" font-weight="700">Cube hardware block diagram (Path A)</text>
+  <!-- Battery -->
+  <rect x="30" y="70" width="120" height="70" rx="10" fill="#1c2230" stroke="#5b9dff" stroke-width="2"/>
+  <text x="90" y="100" text-anchor="middle" fill="#e8ecf4" font-size="13" font-family="sans-serif">N cell 1.5V</text>
+  <text x="90" y="120" text-anchor="middle" fill="#9aa6bc" font-size="11" font-family="sans-serif">E90 / LR1</text>
+  <!-- SoC -->
+  <rect x="220" y="55" width="200" height="160" rx="12" fill="#1c2230" stroke="#7ce3b0" stroke-width="2"/>
+  <text x="320" y="85" text-anchor="middle" fill="#7ce3b0" font-size="14" font-weight="700" font-family="sans-serif">DA14580</text>
+  <text x="320" y="108" text-anchor="middle" fill="#e8ecf4" font-size="12" font-family="sans-serif">Cortex-M0 + BLE</text>
+  <text x="320" y="128" text-anchor="middle" fill="#9aa6bc" font-size="11" font-family="sans-serif">16 MHz · SysRAM app</text>
+  <text x="320" y="148" text-anchor="middle" fill="#9aa6bc" font-size="11" font-family="sans-serif">Loader + GATT host</text>
+  <text x="320" y="175" text-anchor="middle" fill="#9aa6bc" font-size="11" font-family="sans-serif">ADC VBAT · Timer PWM</text>
+  <text x="320" y="195" text-anchor="middle" fill="#9aa6bc" font-size="11" font-family="sans-serif">GPIO · SPI bitbang</text>
+  <!-- Antenna -->
+  <rect x="480" y="70" width="110" height="50" rx="10" fill="#1c2230" stroke="#5b9dff" stroke-width="2"/>
+  <text x="535" y="100" text-anchor="middle" fill="#e8ecf4" font-size="12" font-family="sans-serif">2.4 GHz ant</text>
+  <!-- Accel -->
+  <rect x="480" y="145" width="140" height="60" rx="10" fill="#1c2230" stroke="#ffb454" stroke-width="2"/>
+  <text x="550" y="170" text-anchor="middle" fill="#ffb454" font-size="12" font-weight="700" font-family="sans-serif">BMA253</text>
+  <text x="550" y="188" text-anchor="middle" fill="#9aa6bc" font-size="11" font-family="sans-serif">3-wire SPI · 0xFA</text>
+  <!-- Boost + LEDs -->
+  <rect x="220" y="260" width="120" height="55" rx="10" fill="#1c2230" stroke="#ffb454" stroke-width="2"/>
+  <text x="280" y="292" text-anchor="middle" fill="#e8ecf4" font-size="12" font-family="sans-serif">LED boost</text>
+  <rect x="400" y="250" width="280" height="90" rx="12" fill="#1c2230" stroke="#ff6b7a" stroke-width="2"/>
+  <text x="540" y="280" text-anchor="middle" fill="#ff6b7a" font-size="13" font-weight="700" font-family="sans-serif">4× RGB corners (12 ch)</text>
+  <text x="540" y="302" text-anchor="middle" fill="#9aa6bc" font-size="11" font-family="sans-serif">D0–D11 GPIO soft-PWM @ 200 Hz</text>
+  <text x="540" y="320" text-anchor="middle" fill="#9aa6bc" font-size="11" font-family="sans-serif">BOOST_EN = P2.0</text>
+  <!-- Robot -->
+  <rect x="680" y="70" width="180" height="100" rx="12" fill="#152018" stroke="#7ce3b0" stroke-width="2"/>
+  <text x="770" y="110" text-anchor="middle" fill="#7ce3b0" font-size="13" font-weight="700" font-family="sans-serif">Vector robot</text>
+  <text x="770" y="132" text-anchor="middle" fill="#9aa6bc" font-size="11" font-family="sans-serif">vic-engine CubeComms</text>
+  <text x="770" y="150" text-anchor="middle" fill="#9aa6bc" font-size="11" font-family="sans-serif">BLE + vision markers</text>
+  <!-- arrows -->
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#5b9dff"/></marker>
+  </defs>
+  <line x1="150" y1="105" x2="218" y2="105" stroke="#5b9dff" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="420" y1="95" x2="478" y2="95" stroke="#5b9dff" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="420" y1="170" x2="478" y2="170" stroke="#ffb454" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="320" y1="215" x2="320" y2="258" stroke="#ffb454" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="340" y1="287" x2="398" y2="287" stroke="#ff6b7a" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="620" y1="120" x2="678" y2="120" stroke="#7ce3b0" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="30" y="390" fill="#9aa6bc" font-size="11" font-family="sans-serif">Evidence: robot/cube_firmware/{app,src,sdk} · resources/assets/cubeFirmware/cube.dfu</text>
+</svg>
+  <figcaption>Logical hardware blocks for a stock-compatible cube.</figcaption>
+</figure>
+
+<!-- ========== SCHEMATIC ========== -->
+<h2 id="schematic">10. Schematic sketch (logical)</h2>
+<pre><code>  [N-cell +]----+---- VBAT ----&gt; DA14580 VBAT / DCDC (per Dialog ref)
+                |
+                +---- BOOST_IN --&gt; boost converter --&gt; LED anode rail (~&gt;3V)
+  [N-cell -]---- GND
+
+  DA14580 P2.0 (BOOST_EN, 1V-BAT IO) --&gt; boost ENABLE
+  DA14580 D0..D11 --&gt; LED cathode or anode drivers (active as in lights.c)
+  DA14580 P0.2 ACC_PWR --&gt; BMA253 VDD
+  DA14580 P0.0/3/6 --&gt; BMA253 nCS / SCK / SDI/SDO (3-wire)
+  DA14580 RFIO --&gt; matching --&gt; antenna
+  DA14580 P0.4/P0.5 --&gt; UART test points
+  DA14580 P1.2/P1.3 --&gt; 16 MHz XTAL only</code></pre>
+<p class="muted">There is no full manufacturer schematic in-tree. Path&nbsp;A builders should start from the DA14580 reference design power/RF section and graft Anki’s GPIO map.</p>
+
+<!-- ========== MECHANICAL ========== -->
+<h2 id="mechanical">11. Mechanical shell &amp; vision markers</h2>
+<p>
+  Engine defines light cubes as <strong>44×44×44&nbsp;mm</strong> with <strong>23&nbsp;mm</strong> markers
+  (<code>engine/BlockDefinitions.h</code>). Vector recognizes families LIGHTCUBE1–4 (I/J/K/circle marker sets).
+  Marker textures for simulation (print templates) live in this repo:
+</p>
+<pre><code>simulator/protos/textures/lightCubes/</code></pre>
+
+<div class="markers">
+  <figure><img src="build-guide-assets/lightCubeI_front.png" alt="Front marker"/><figcaption>Front (LIGHTCUBEI)</figcaption></figure>
+  <figure><img src="build-guide-assets/lightCubeI_back.png" alt="Back marker"/><figcaption>Back</figcaption></figure>
+  <figure><img src="build-guide-assets/lightCubeI_left.png" alt="Left marker"/><figcaption>Left</figcaption></figure>
+  <figure><img src="build-guide-assets/lightCubeI_right.png" alt="Right marker"/><figcaption>Right</figcaption></figure>
+  <figure><img src="build-guide-assets/lightCubeI_top.png" alt="Top marker"/><figcaption>Top</figcaption></figure>
+  <figure><img src="build-guide-assets/lightCubeI_bottom.png" alt="Bottom marker"/><figcaption>Bottom</figcaption></figure>
+</div>
+<div class="callout ok">
+  <strong>Printing markers</strong>
+  Print high-contrast, matte, non-glossy. Keep ~23&nbsp;mm mark size centered on each face.
+  Battery door usually occupies one face — align bottom/top markers with door orientation used by stock cubes.
+  A cube with <em>correct markers and dead battery</em> is still a visual landmark; lights/games need BLE+power.
+</div>
+<ul>
+  <li>Four vertical edges: translucent windows over RGB LEDs (diffusers).</li>
+  <li>Rubberized corners improve grip / drop survival (stock manufacturing detail).</li>
+  <li>Center mass PCB with battery along one axis; antenna often opposite or beside spring (teardown).</li>
+</ul>
+
+<!-- ========== ARCHITECTURE ========== -->
+<h2 id="architecture">12. Firmware architecture</h2>
+<p>Two layers share one DA14580:</p>
+<ol>
+  <li><strong>Resident host / loader</strong> (<code>src/user_app/</code> + Dialog SDK) — BLE stack, custom GATT, XXTEA DFU into SysRAM, tick scheduler.</li>
+  <li><strong>Application image</strong> (<code>app/</code> → <code>cube.dfu</code>) — lights, accel, animation, voltage, protocol handlers.</li>
+</ol>
+<table>
+  <thead><tr><th>Item</th><th>Detail</th></tr></thead>
+  <tbody>
+    <tr><td>App load address</td><td><code>0x20005800</code> SysRAM (<code>user_custs1_impl.c</code>, <code>linker.ls</code>)</td></tr>
+    <tr><td>App map</td><td><code>ApplicationMap</code>: version[16], init/deinit/tick, BLE_Recv/Send, nonce[16], app_data…</td></tr>
+    <tr><td>Encryption</td><td>XXTEA; key in <code>tools/key.h</code>; fixed nonce in loader</td></tr>
+    <tr><td>DFU format</td><td>16-byte ASCII timestamp + encrypted body + trailing <code>0xFF</code> (<code>sign.py</code>)</td></tr>
+    <tr><td>Stock image date</td><td><code>2018-08-14T17:40…</code> inside shipping <code>cube.dfu</code></td></tr>
+    <tr><td>SPOTA</td><td><strong>Disabled</strong> (<code>EXCLUDE_DLG_SPOTAR</code>) — Anki custom OTA only</td></tr>
+  </tbody>
+</table>
+<pre><code>// application_api.h
+typedef struct {
+  uint8_t version[0x10];
+  void (*AppInit)();
+  void (*AppDeInit)();
+  void (*AppTick)();
+  void (*BLE_Recv)(uint8_t, const void*);
+  void (*BLE_Send)(uint8_t, const void*);
+  uint8_t nonce[16];
+  uint8_t app_data[0x27CC];
+} ApplicationMap;</code></pre>
+
+<!-- ========== BLE ========== -->
+<h2 id="ble">13. BLE services &amp; UUIDs</h2>
+<p>Advertise Device Information Service + custom 128-bit service. Name: <code>Vector Cube</code>. Adv interval ~1&nbsp;s.</p>
+<table>
+  <thead><tr><th>Role</th><th>UUID (string form as in bletool)</th><th>Props</th></tr></thead>
+  <tbody>
+    <tr><td>Service</td><td><code>c6f6c70f-d219-598b-fb4c-308e1f22f830</code></td><td>primary</td></tr>
+    <tr><td>OTA Write Point</td><td><code>9590ba9c-5140-92b5-1844-5f9d681557a4</code></td><td>write</td></tr>
+    <tr><td>Loaded Program Version</td><td><code>450aa175-8d85-16a6-9148-d50e2eb7b79e</code></td><td>read + notify</td></tr>
+    <tr><td>Application Write</td><td><code>0ea75290-6759-a58d-7948-598c4e02d94a</code></td><td>write (commands in)</td></tr>
+    <tr><td>Application Read</td><td><code>43ef14af-5fb1-7b81-3647-2a9477824cab</code></td><td>read + notify (accel/volt out)</td></tr>
+  </tbody>
+</table>
+<p class="muted">Byte arrays in <code>user_custs_config.h</code> are little-endian UUID storage (Dialog style).</p>
+
+<!-- ========== PROTOCOL ========== -->
+<h2 id="protocol">14. Application protocol (<code>protocol.h</code>)</h2>
+<table>
+  <thead><tr><th>Cmd</th><th>Name</th><th>Direction</th><th>Payload</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>LIGHT_INDEX</td><td>Host → Cube</td><td>flags + 4 initial keyframe indices (channels)</td></tr>
+    <tr><td>1</td><td>LIGHT_KEYFRAMES</td><td>Host → Cube</td><td>flags=start index; up to 3 keyframes (RGB, hold, decay, link)</td></tr>
+    <tr><td>2</td><td>ACCEL_DATA</td><td>Cube → Host</td><td>tap_count + 3×(x,y,z) int16</td></tr>
+    <tr><td>3</td><td>ACCEL_FAILURE</td><td>Cube → Host</td><td>chip id byte</td></tr>
+    <tr><td>4</td><td>VOLTAGE_DATA</td><td>Cube → Host</td><td>uint16 rail_v1 ADC</td></tr>
+  </tbody>
+</table>
+<pre><code>// KeyFrame (6 bytes)
+colors[3], hold, decay, link
+
+// Max 128 keyframes, 4 animation channels, 3 frames per BLE command
+// MTU-ish writes: 20 bytes characteristic length</code></pre>
+<p>Animation state machine: STATIC / HOLD / DECAY with linked frames (<code>animation.c</code>).</p>
+
+<!-- ========== DFU ========== -->
+<h2 id="dfu">15. DFU / OTA flow</h2>
+<ol class="steps">
+  <li>Central connects; reads/notifies <strong>Loaded Program Version</strong> (16-byte ASCII timestamp string).</li>
+  <li>If version ≠ on-disk <code>cube.dfu</code> header, engine / bletool streams DFU body (skip first 0x10) in 20-byte writes to <strong>OTA Write Point</strong>.</li>
+  <li>Loader copies into SysRAM; final short packet triggers XXTEA decrypt + nonce check.</li>
+  <li>On success: version notify updates; <code>AppInit</code> runs; tick every ~10&nbsp;ms timer unit.</li>
+  <li>Runtime commands use <strong>Application Write</strong>; telemetry via <strong>Application Read</strong> notify.</li>
+</ol>
+<div class="callout warn">
+  <strong>Path B note</strong>
+  If you implement a clone on non-DA14580 silicon, either (1) always report a version matching the robot’s on-disk DFU so it never flashes, or (2) accept OTA writes and ignore/no-op them, or (3) change robot resources (advanced). Stock robots will attempt OTA when versions differ.
+</div>
+
+<!-- ========== BUILD FW ========== -->
+<h2 id="build-fw">16. Building firmware (from this repo)</h2>
+<p>Per <code>robot/cube_firmware/README.md</code>:</p>
+<pre><code># Application image (gcc)
+cd robot
+./vmake.sh cube
+# → cube_firmware/build/cube.dfu
+
+# Or in app/:
+cd robot/cube_firmware/app
+make            # needs arm-none-eabi-gcc, python3, xxtea
+# signs with tools/sign.py + tools/key.h
+
+# Host/loader side historically used Keil projects:
+#   cube_firmware.uvprojx / cube_application.uvprojx</code></pre>
+<p class="muted">Full Dialog SDK tree is vendored under <code>robot/cube_firmware/sdk/</code>. Production loader programming uses Dialog OTP / UART boot paths (<code>firstboot.c</code> prints <code>cubeboot</code>).</p>
+
+<!-- ========== FLASH ========== -->
+<h2 id="flash">17. Flashing nearby cubes (bletool)</h2>
+<div class="callout danger">
+  <strong>WARNING (from upstream README):</strong> bletool flashes <em>all nearby advertising cubes</em>.
+  Don’t run this in a room full of other people’s Vectors.
+</div>
+<pre><code>cd robot/cube_firmware/bletool
+npm install
+cd ..
+node bletool ../../resources/assets/cubeFirmware/cube.dfu
+# or: node bletool ./build/cube.dfu</code></pre>
+<p>On match, bletool runs a RGB keyframe test and upright-accel pass/fail lighting.</p>
+<p>Robot auto-flash: <code>engine/components/cubes/cubeCommsComponent.cpp</code> sets path
+<code>assets/cubeFirmware/cube.dfu</code> on the <code>CubeBleClient</code>.</p>
+
+<!-- ========== PATH A ========== -->
+<h2 id="path-a">18. Path A — Build order (stock silicon)</h2>
+<ol class="steps">
+  <li><strong>Prototype on DA14580 dev kit</strong> — bring up BLE advertise as <code>Vector Cube</code>, UART log, current draw in extended sleep.</li>
+  <li><strong>Port Anki pin map</strong> — match <code>board.h</code>; keep P1.2/P1.3 free; wire BMA253 3-wire + power gate.</li>
+  <li><strong>LED + boost</strong> — 12 channels, soft-PWM friendly (no heavy capacitive loading that breaks timing).</li>
+  <li><strong>Power tree</strong> — 1.5&nbsp;V cell → Dialog DCDC; boost for LEDs; verify VBAT ADC range.</li>
+  <li><strong>Program loader</strong> — burn OTP header / boot path per Dialog; public BD_ADDR unique per cube.</li>
+  <li><strong>OTA app</strong> — flash <code>cube.dfu</code> via bletool; confirm version string and RGB self-test.</li>
+  <li><strong>RF validation</strong> — range with robot (~few meters), concurrent with Wi-Fi environment.</li>
+  <li><strong>Mechanical fit</strong> — 44&nbsp;mm shell, markers, door, springs, antenna keep-out.</li>
+  <li><strong>On-robot</strong> — freeplay connect, set lights, roll/pop-a-wheelie, WebViz Cubes tab.</li>
+</ol>
+
+<!-- ========== PATH B ========== -->
+<h2 id="path-b">19. Path B — Protocol clone (practical DIY)</h2>
+<ol class="steps">
+  <li>Pick BLE SoC with good peripheral examples (nRF52 SoftDevice / Zephyr / ArduinoBLE, etc.).</li>
+  <li>Implement GATT service + 4 characteristics (UUIDs above). Advertise name <code>Vector Cube</code>.</li>
+  <li>On connect: notify a 16-byte version string equal to the first 16 bytes of the robot’s <code>cube.dfu</code> (currently starts <code>2018-08-14T17:40</code>…).</li>
+  <li>Parse Application Write packets per <code>protocol.h</code>; drive 4 RGB LEDs with hold/decay (can simplify).</li>
+  <li>Notify accel frames (cmd 2) and voltage (cmd 4) at similar rates to stock.</li>
+  <li>Print / apply vision markers; rigid 44&nbsp;mm body; corner light pipes.</li>
+  <li>Validate with phone nRF Connect first, then Vector connection coordinator / WebViz.</li>
+</ol>
+<div class="callout">
+  <strong>Minimum viable clone</strong>
+  If you only care about “Vector finds cube and docks,” prioritize <em>markers + size</em>.
+  If you care about light games and tap detection, prioritize <em>BLE protocol + accel + LEDs</em>.
+</div>
+
+<!-- ========== ASSEMBLY ========== -->
+<h2 id="assembly">20. Suggested assembly order</h2>
+<ol>
+  <li>PCB SMT: SoC, crystal, RF, accel, boost, passives.</li>
+  <li>Hand-solder springs / battery contacts; verify polarity silk.</li>
+  <li>Mount LEDs toward corner light pipes; black out internal light leaks.</li>
+  <li>Program loader (Path A) or firmware (Path B); functional test on bench with N-cell.</li>
+  <li>Install PCB in mid-frame; route antenna away from battery metal.</li>
+  <li>Apply face markers (correct rotation — top vs bottom docking conventions).</li>
+  <li>Install diffusers / outer shell; torque battery screw gently.</li>
+  <li>Pull-tab simulation: insert battery last before packing.</li>
+</ol>
+
+<!-- ========== VERIFY ========== -->
+<h2 id="verify">21. Verification checklist</h2>
+<div class="card checklist">
+  <label><input type="checkbox" /> Battery self-test: red→green→blue on power cycle</label>
+  <label><input type="checkbox" /> Phone BLE scan sees <code>Vector Cube</code></label>
+  <label><input type="checkbox" /> Custom service UUID present; version characteristic readable</label>
+  <label><input type="checkbox" /> bletool or robot OTA leaves matching version (Path A)</label>
+  <label><input type="checkbox" /> Accel: upright ≈ (0,0,1g); tap increments; no ACCEL_FAILURE</label>
+  <label><input type="checkbox" /> Voltage notify non-zero and decreases as cell drains</label>
+  <label><input type="checkbox" /> Light keyframes: each corner RGB independently</label>
+  <label><input type="checkbox" /> Vision: Vector identifies cube type / pose in WebViz or behaviors</label>
+  <label><input type="checkbox" /> Behaviors: connect, flash lights, roll cube, fetch/pounce as applicable</label>
+  <label><input type="checkbox" /> Overnight: no stuck “LEDs always on” (reset procedure works)</label>
+</div>
+
+<!-- ========== TROUBLESHOOT ========== -->
+<h2 id="troubleshoot">22. Troubleshooting</h2>
+<table>
+  <thead><tr><th>Symptom</th><th>Likely cause</th><th>Fix</th></tr></thead>
+  <tbody>
+    <tr><td>No lights ever</td><td>Dead cell, reverse polarity, boost EN, frozen FW</td><td>Replace N-cell; clean springs; remove batt 60&nbsp;s; Path A reflash</td></tr>
+    <tr><td>Red flash loop</td><td>Low battery (official UX)</td><td>New alkaline N-cell</td></tr>
+    <tr><td>Robot ignores cube</td><td>Sleeping robot; cube in charger space; no BLE; wrong markers</td><td>Wake Vector; move cube; check scan; verify print quality</td></tr>
+    <tr><td>Connects then OTA loops</td><td>Version string / DFU decrypt fail (nonce/key)</td><td>Path A: correct sign.py key; Path B: spoof matching version</td></tr>
+    <tr><td>ACCEL_FAILURE</td><td>Wrong chip / SPI wiring / power gate</td><td>Probe chip ID 0xFA; check 3-wire mode</td></tr>
+    <tr><td>Wrong colors/corners</td><td>LED channel map vs shell orientation</td><td>Remap in lights or rotate assembly</td></tr>
+    <tr><td>RF short range</td><td>Antenna keep-out, ground pour, plastic metal paint</td><td>Follow Dialog RF layout; retune matching</td></tr>
+    <tr><td>Docks poorly</td><td>Size not 44&nbsp;mm; glossy markers; marker rotation</td><td>Re-print matte; check <code>BlockDefinitions</code> faces</td></tr>
+  </tbody>
+</table>
+
+<!-- ========== SOURCES ========== -->
+<h2 id="sources">23. Sources in this repository</h2>
+<table>
+  <thead><tr><th>Path</th><th>Why it matters</th></tr></thead>
+  <tbody>
+    <tr><td><code>robot/cube_firmware/</code></td><td>Full cube FW, SDK, bletool, sign tool</td></tr>
+    <tr><td><code>robot/cube_firmware/app/board.h</code></td><td>Pin map</td></tr>
+    <tr><td><code>robot/cube_firmware/app/protocol.h</code></td><td>Wire protocol</td></tr>
+    <tr><td><code>robot/cube_firmware/app/{lights,accel,animation,adc}.c</code></td><td>Peripherals</td></tr>
+    <tr><td><code>robot/cube_firmware/src/user_app/</code></td><td>Loader, GATT, XXTEA OTA</td></tr>
+    <tr><td><code>resources/assets/cubeFirmware/cube.dfu</code></td><td>Shipped app image</td></tr>
+    <tr><td><code>engine/components/cubes/</code></td><td>Robot-side connection &amp; lights</td></tr>
+    <tr><td><code>engine/BlockDefinitions.h</code></td><td>44&nbsp;mm size, markers</td></tr>
+    <tr><td><code>simulator/protos/textures/lightCubes/</code></td><td>Marker art</td></tr>
+    <tr><td><code>cubeBleClient/</code></td><td>Host BLE client / DFU from robot</td></tr>
+    <tr><td><code>docs/architecture/cubeConnections.md</code></td><td>Connection coordinator semantics</td></tr>
+  </tbody>
+</table>
+
+<!-- ========== CREDITS ========== -->
+<h2 id="credits">24. Credits, confidence, legal</h2>
+<ul>
+  <li><span class="tag-confirmed">CONFIRMED from this tree:</span> DA14580, BMA253 ID, pin map, protocol, DFU, BLE UUIDs, 44&nbsp;mm markers, DFU tooling.</li>
+  <li><span class="tag-inferred">INFERRED / external:</span> exact IC package, boost IC P/N, antenna type, full schematic, Cozmo-vs-Vector PCB deltas (Cozmo teardown author said Nordic — may be mis-ID or different gen).</li>
+  <li>Images: Fictiv (Vector hero), Microcontroller Tips (cube disassembly), Digital Dream Labs support (battery diagram), Wikimedia (N vs A23), in-repo simulator markers.</li>
+  <li>Firmware includes Dialog Semiconductor SDK headers/copyright; Anki / Digital Dream Labs product IP applies to markers, industrial design, and BLE protocol.</li>
+  <li><strong>This guide is for interoperability, repair, and research.</strong> Respect local RF certification law (FCC/CE) before selling transmitters. Do not brick other people’s cubes with mass DFU.</li>
+</ul>
+
+<footer>
+  <p>
+    Generated for the victor-1.6-rebuild tree · Guide path:
+    <code>robot/cube_firmware/BUILD.html</code> · Assets:
+    <code>robot/cube_firmware/build-guide-assets/</code>
+  </p>
+  <p class="muted">
+    Open this file in a browser from the repo (relative images). Last research pass: firmware + public docs + teardown photos.
+  </p>
+</footer>
+</main>
+</div>
+</body>
+</html>
