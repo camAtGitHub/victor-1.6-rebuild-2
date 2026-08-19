@@ -32,8 +32,16 @@ from vizmanager.connect import (
 from vizmanager.session import Session
 from vizmanager.udp import ANKICONN, VIZ_PORT, UdpServer, bind_viz, local_ipv4s
 from vizmanager.view2d import View2D
-from vizmanager.view3d import View3D, _pan_axes
-from vizmanager.world import protocol_rgb
+from vizmanager.view3d import (
+    DRAW_OBJECTS_RATE_SEC,
+    View3D,
+    _MAX_ORBIT_VEL,
+    _MIN_ORBIT_DT,
+    _clamp_orbit_vel,
+    _orbit_dt,
+    _pan_axes,
+)
+from vizmanager.world import MM_TO_M, protocol_rgb
 
 MIN_SIZE = (1280, 720)
 DEFAULT_SIZE = (1600, 900)
@@ -127,6 +135,33 @@ def status_for(handshakes, recent_pps, has_frame, last_pkt_age):
     return STATUS_DEGRADED
 
 
+def map_grid_lines(width, height, origin_x=0.0, origin_y=0.0, step_mm=50):
+    """Axis-aligned grid in MemoryMap space: 1 mm = 1 px, origin at pane center.
+
+    `origin_x` / `origin_y` are pan offsets in the same pixel/mm units as
+    `World.fill_rects` (Y already flipped).
+    """
+    step = float(step_mm)
+    if step <= 0:
+        return ()
+    cx = 0.5 * width + origin_x
+    cy = 0.5 * height + origin_y
+    lines = []
+    x = cx % step
+    if x < 0:
+        x += step
+    while x <= width + 1e-9:
+        lines.append(((int(round(x)), 0), (int(round(x)), int(height))))
+        x += step
+    y = cy % step
+    if y < 0:
+        y += step
+    while y <= height + 1e-9:
+        lines.append(((0, int(round(y))), (int(width), int(round(y)))))
+        y += step
+    return tuple(lines)
+
+
 def connect_error_message(host_ip, viz_port=VIZ_PORT, ui_port=UI_MSG_PORT):
     """Cause + recovery under the IP field (firewall 5103 / 5252 / 5200)."""
     host = host_ip or "YOUR_HOST_LAN_IP"
@@ -180,6 +215,7 @@ class Redirector:
         self.redirected = False
         self.connecting = True
         self.error = None
+        self.error_dismissed = False
         self.t0 = time.time()
         self.last_reg = 0.0
         self.last_ping = 0.0
@@ -204,6 +240,7 @@ class Redirector:
             if data == ANKICONN:
                 self.engine_ui = addr
                 self.connecting = False
+                self.error = None
                 if not self.redirected:
                     pkt = pack_redirect_viz(self.host_ip)
                     try:
@@ -216,6 +253,7 @@ class Redirector:
                 if self.engine_ui is None:
                     self.engine_ui = addr
                     self.connecting = False
+                    self.error = None
                 try:
                     self.ui.sendto(pack_ping(counter, tsent, True), addr)
                 except OSError:
@@ -234,8 +272,13 @@ class Redirector:
 
         if self.connecting and now - self.t0 >= CONNECT_TIMEOUT_S:
             self.connecting = False
-            if self.engine_ui is None:
+            if self.engine_ui is None and not self.error_dismissed:
                 self.error = connect_error_message(self.host_ip)
+
+    def dismiss_error(self):
+        """Esc: drop the banner; do not re-latch a dismissed timeout."""
+        self.error = None
+        self.error_dismissed = True
 
     def close(self):
         for sock in (self.ui, self.reg):
@@ -299,6 +342,13 @@ class VizApp:
         self._fonts = {}
         self._drag = None
         self._cam_bytes = None
+        self._mesh_cache = None
+        self._mesh_cache_t = None
+        self._map_ox = 0.0
+        self._map_oy = 0.0
+        self._az_vel = 0.0
+        self._el_vel = 0.0
+        self._orbit_t = None
 
     def pps(self, now=None):
         now = time.time() if now is None else now
@@ -381,6 +431,13 @@ class VizApp:
             if self.redirector.error:
                 self.connect_error = self.redirector.error
                 self.last_error = self.redirector.error
+            elif self.redirector.engine_ui is not None:
+                self.connect_error = None
+
+    def dismiss_connect_error(self):
+        self.connect_error = None
+        if self.redirector is not None:
+            self.redirector.dismiss_error()
 
     def close(self):
         self.stop_connect()
@@ -477,6 +534,7 @@ class VizApp:
             self._on_mouse_down(event, rects)
         elif event.type == pygame.MOUSEBUTTONUP:
             self._drag = None
+            self._orbit_t = time.monotonic()
         elif event.type == pygame.MOUSEMOTION:
             self._on_mouse_move(event, rects)
         elif event.type == pygame.MOUSEWHEEL:
@@ -495,7 +553,7 @@ class VizApp:
             if self.ip_focused:
                 self.ip_focused = False
             else:
-                self.connect_error = None
+                self.dismiss_connect_error()
             return
         if self.ip_focused:
             if event.key == pygame.K_BACKSPACE:
@@ -514,6 +572,7 @@ class VizApp:
             self.view2d.frame_robot()
             self.view2d.follow_robot = True
             self.view3d.frame_robot()
+            self._frame_map()
         elif event.key == pygame.K_SPACE:
             self.render_paused = not self.render_paused
 
@@ -526,6 +585,8 @@ class VizApp:
         field_w = 168
         field_h = theme.CONTROL_H
         field_y = cy + (ch - field_h) // 2
+        hit_h = max(32, field_h)
+        hit_y = cy + (ch - hit_h) // 2
         btn_w = 108
         btn_h = ch
         btn_x = cx + cw - btn_w
@@ -535,6 +596,7 @@ class VizApp:
             "pip": (pip_x, cy + (ch - _PIP_D) // 2, _PIP_D, _PIP_D),
             "word": (word_x, cy, 110, ch),
             "ip": (field_x, field_y, field_w, field_h),
+            "ip_hit": (field_x, hit_y, field_w, hit_h),
             "pps": (pps_x, cy, 90, ch),
             "disconnect": (btn_x - disc_w, cy, disc_w, ch),
             "connect": (btn_x, cy, btn_w, btn_h),
@@ -543,7 +605,7 @@ class VizApp:
     def _on_mouse_down(self, event, rects):
         widgets = self._chrome_widgets(rects)
         pos = event.pos
-        self.ip_focused = _hit(widgets["ip"], pos)
+        self.ip_focused = _hit(widgets["ip_hit"], pos)
         if event.button == 1 and _hit(widgets["connect"], pos):
             if not self.connecting():
                 self.start_connect()
@@ -565,6 +627,10 @@ class VizApp:
             mods = pygame.key.get_mods()
             pan = event.button in (2, 3) or bool(mods & pygame.KMOD_SHIFT)
             self._drag = (pos, pan)
+            self._orbit_t = time.monotonic()
+            if self.tab == TAB_3D:
+                self._az_vel = 0.0
+                self._el_vel = 0.0
 
     def _on_mouse_move(self, event, rects):
         drag = self._drag
@@ -577,6 +643,10 @@ class VizApp:
         x, y = event.pos
         dx, dy = x - lx, y - ly
         self._drag = ((x, y), pan)
+        now = time.monotonic()
+        raw_dt = now - self._orbit_t if self._orbit_t is not None else _MIN_ORBIT_DT
+        self._orbit_t = now
+        dt = _orbit_dt(raw_dt)
         if self.tab == TAB_3D:
             if pan:
                 s = 0.002 * self.view3d.distance
@@ -587,15 +657,24 @@ class VizApp:
                     cy - s * dx * right[1] + s * dy * cam_up[1],
                     cz - s * dx * right[2] + s * dy * cam_up[2],
                 )
+                self._az_vel = 0.0
+                self._el_vel = 0.0
             else:
-                self.view3d.azimuth = (self.view3d.azimuth - dx * 0.4) % 360.0
+                daz = -dx * 0.4
+                delv = dy * 0.4
+                self.view3d.azimuth = (self.view3d.azimuth + daz) % 360.0
                 self.view3d.elevation = max(
-                    -89.0, min(89.0, self.view3d.elevation + dy * 0.4)
+                    -89.0, min(89.0, self.view3d.elevation + delv)
                 )
+                self._az_vel = _clamp_orbit_vel(daz / dt)
+                self._el_vel = _clamp_orbit_vel(delv / dt)
         elif self.tab == TAB_2D:
             self.view2d.follow_robot = False
             self.view2d.center_x -= dx / max(self.view2d.ppm, 1.0)
             self.view2d.center_y += dy / max(self.view2d.ppm, 1.0)
+        elif self.tab == TAB_MAP:
+            self._map_ox += dx
+            self._map_oy += dy
 
     def _on_wheel(self, event, rects):
         import pygame
@@ -618,10 +697,15 @@ class VizApp:
             names, size = (theme.FONT_UI, "DejaVu Sans", "Segoe UI"), theme.FONT_CHROME_PX
         elif kind == "label":
             names, size = (theme.FONT_UI, "DejaVu Sans"), theme.FONT_LABEL_PX
+        elif kind == "log":
+            names, size = (
+                (theme.FONT_MONO, "DejaVu Sans Mono", "Consolas"),
+                theme.FONT_LABEL_PX,
+            )
         else:
             names, size = (
                 (theme.FONT_MONO, "DejaVu Sans Mono", "Consolas"),
-                theme.FONT_HUD_PX if kind == "mono" else 11,
+                theme.FONT_HUD_PX,
             )
         font = None
         for name in names:
@@ -638,6 +722,7 @@ class VizApp:
         import pygame
 
         rects = layout_rects(*screen.get_size())
+        self._coast_orbit()
         screen.fill(theme.BG_VOID)
         self._draw_chrome(screen, rects)
         self._draw_camera(screen, rects)
@@ -722,7 +807,9 @@ class VizApp:
         y = theme.CHROME_H + 2
         pad = theme.SPACE[0]
         h = pad * 2 + len(lines) * (font.get_height() + 2)
-        box = pygame.Rect(ip.x, y, min(max_w, rects["chrome"][2] - ip.x - 8), h)
+        box = pygame.Rect(
+            ip.x, y, min(max_w, rects["chrome"][2] - ip.x - theme.SPACE[1]), h
+        )
         pygame.draw.rect(screen, theme.BG_ELEVATED, box)
         pygame.draw.rect(screen, theme.DANGER, box, 1)
         ty = box.y + pad
@@ -802,9 +889,7 @@ class VizApp:
         disconnected = self.status() == STATUS_DISCONNECTED
         has_robot = self.session.world.robot is not None
         has_tiles = bool(self.session.world.nav_tiles)
-        if self.tab == TAB_MAP and not has_tiles:
-            self._centered(surf, surf.get_rect(), "No MemoryMap tiles", theme.TEXT_MUTED)
-        elif disconnected and not has_robot:
+        if disconnected and not has_robot:
             self._centered(
                 surf,
                 surf.get_rect(),
@@ -818,10 +903,62 @@ class VizApp:
                 "No Viz stream — waiting for packets (ANKI_DEV_CHEATS).",
                 theme.TEXT_MUTED,
             )
+        elif self.tab == TAB_MAP and not has_tiles:
+            self._centered(surf, surf.get_rect(), "No MemoryMap tiles", theme.TEXT_MUTED)
 
     def _paint_2d(self, surf):
         self.view2d.width, self.view2d.height = surf.get_size()
         self.view2d.draw(surf)
+
+    def _world_meshes(self):
+        now = time.monotonic()
+        if (
+            self._mesh_cache is None
+            or self._mesh_cache_t is None
+            or (now - self._mesh_cache_t) >= DRAW_OBJECTS_RATE_SEC
+        ):
+            self._mesh_cache = self.view3d.meshes()
+            self._mesh_cache_t = now
+        return self._mesh_cache
+
+    def _coast_orbit(self):
+        if self._drag or self.tab != TAB_3D:
+            return
+        if abs(self._az_vel) < 0.5 and abs(self._el_vel) < 0.5:
+            self._az_vel = 0.0
+            self._el_vel = 0.0
+            return
+        now = time.monotonic()
+        raw_dt = now - self._orbit_t if self._orbit_t is not None else _MIN_ORBIT_DT
+        self._orbit_t = now
+        dt = max(float(raw_dt), 1e-3)
+        decay = math.exp(-dt * 1000.0 / max(theme.MOTION_MS, 1))
+        self._az_vel *= decay
+        self._el_vel *= decay
+        if abs(self._az_vel) > _MAX_ORBIT_VEL:
+            self._az_vel = _clamp_orbit_vel(self._az_vel)
+        if abs(self._el_vel) > _MAX_ORBIT_VEL:
+            self._el_vel = _clamp_orbit_vel(self._el_vel)
+        if abs(self._az_vel) < 0.5 and abs(self._el_vel) < 0.5:
+            self._az_vel = 0.0
+            self._el_vel = 0.0
+            return
+        self.view3d.azimuth = (self.view3d.azimuth + self._az_vel * dt) % 360.0
+        self.view3d.elevation = max(
+            -89.0, min(89.0, self.view3d.elevation + self._el_vel * dt)
+        )
+
+    def _frame_map(self):
+        robot = self.session.world.robot
+        if robot is None:
+            self._map_ox = 0.0
+            self._map_oy = 0.0
+            return
+        x, y, _z = self.session.world.apply_origin(
+            robot.x_trans_m, robot.y_trans_m, robot.z_trans_m
+        )
+        self._map_ox = -x / MM_TO_M
+        self._map_oy = y / MM_TO_M
 
     def _paint_3d(self, surf):
         import pygame
@@ -834,7 +971,7 @@ class VizApp:
             self._stroke_mesh(pg, surf, mesh, w, h)
         for mesh in self.view3d.axes_lines():
             self._stroke_mesh(pg, surf, mesh, w, h)
-        for mesh in self.view3d.meshes():
+        for mesh in self._world_meshes():
             self._stroke_mesh(pg, surf, mesh, w, h)
 
     def _stroke_mesh(self, pg, surf, mesh, w, h):
@@ -861,18 +998,11 @@ class VizApp:
 
         w, h = surf.get_size()
         surf.fill(theme.BG_VOID)
-        self.view2d.width, self.view2d.height = w, h
-        grid = theme.GRID
-        for (x0, y0), (x1, y1) in self.view2d.grid_lines():
-            pygame.draw.line(
-                surf,
-                grid,
-                self.view2d.world_to_screen(x0, y0),
-                self.view2d.world_to_screen(x1, y1),
-                1,
-            )
+        ox, oy = self._map_ox, self._map_oy
+        for (x0, y0), (x1, y1) in map_grid_lines(w, h, ox, oy):
+            pygame.draw.line(surf, theme.GRID, (x0, y0), (x1, y1), 1)
         for x, y, rw, rh, color in self.session.world.fill_rects(w, h):
-            pygame.draw.rect(surf, protocol_rgb(color), (x, y, rw, rh))
+            pygame.draw.rect(surf, protocol_rgb(color), (x + ox, y + oy, rw, rh))
 
     def _draw_stack_state(self, screen, rects):
         import pygame
