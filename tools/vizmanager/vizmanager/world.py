@@ -8,9 +8,12 @@ translation (mm → m, vizManager.cpp:159–170 / MM_TO_M).
 from __future__ import annotations
 
 import math
+from collections import namedtuple
 from dataclasses import dataclass, field
 
 from vizmanager import theme
+
+NavTile = namedtuple("NavTile", "color_rgba center_x_mm center_y_mm edge_len_mm")
 
 # vizTypes.clad VizConstants
 ALL_PATH_IDs = 0xFFFFFFFF
@@ -31,6 +34,19 @@ VIZ_OBJECT_TEXT = 5
 ARC_RES_RAD = 0.2
 
 MM_TO_M = 0.001
+
+
+def protocol_rgba(color_rgba):
+    """Split CLAD 0xRRGGBBAA into (r, g, b, a) in 0–255."""
+    return anki_rgba(color_rgba)
+
+
+def protocol_rgb(color_rgba):
+    """RGB of a protocol color; fall back to PATH if fully transparent."""
+    r, g, b, a = anki_rgba(color_rgba)
+    if a == 0 and r == 0 and g == 0 and b == 0:
+        return theme.PATH
+    return (r, g, b)
 
 
 def anki_rgba(packed):
@@ -282,6 +298,11 @@ class World:
         self.robot = None
         self.origin = Pose3()
         self.show_objects = True
+        self.nav_nodes = []
+        self.nav_tiles = ()
+        self.nav_origin_id = 0
+        self.nav_generation = 0
+        self.nav_info = None
 
     def apply_origin(self, x, y, z):
         """PreComposeWith origin (already metres)."""
@@ -443,3 +464,63 @@ class World:
             ay=float(payload.rot_axis_y),
             az=float(payload.rot_axis_z),
         )
+
+    def memory_map_begin(self, origin_id, info=None):
+        # Begin clears the accumulator; info is unused in stock.
+        self.nav_origin_id = origin_id
+        self.nav_info = info
+        self.nav_nodes = []
+
+    def memory_map_chunk(self, origin_id, quad_infos):
+        self.nav_origin_id = origin_id
+        nodes = self.nav_nodes
+        for quad in quad_infos:
+            nodes.append(
+                NavTile(
+                    quad.colorRGBA,
+                    quad.centerX_mm,
+                    quad.centerY_mm,
+                    quad.edgeLen_mm,
+                )
+            )
+
+    def memory_map_end(self, origin_id):
+        self.nav_origin_id = origin_id
+        self.nav_tiles = tuple(self.nav_nodes)
+        self.nav_generation += 1
+
+    def fill_rects(self, display_width, display_height, origin_x=0.0, origin_y=0.0):
+        """Pixel fill rects: origin at display center, Y flipped, 1 px gap.
+
+        `origin_x` / `origin_y` are pan offsets in the same 1 mm = 1 px space.
+        Clip is applied in screen space after the offset (visible pane), so a
+        left/top tile dropped at pan 0 can re-enter when panned into view.
+        Off-display quads are clipped on the top/left only, matching stock.
+        """
+        center_x = 0.5 * display_width
+        center_y = 0.5 * display_height
+        rects = []
+        for node in self.nav_tiles:
+            top_left_x = node.center_x_mm - node.edge_len_mm / 2.0
+            top_left_y = node.center_y_mm + node.edge_len_mm / 2.0
+            image_x = top_left_x + center_x + origin_x
+            image_y = -top_left_y + center_y + origin_y
+            width = node.edge_len_mm - 1.0
+            height = node.edge_len_mm - 1.0
+            if image_x < 0:
+                width -= abs(image_x)
+                image_x = 0.0
+            if image_y < 0:
+                height -= abs(image_y)
+                image_y = 0.0
+            if height > 0 and width > 0:
+                rects.append(
+                    (
+                        int(image_x),
+                        int(image_y),
+                        int(width),
+                        int(height),
+                        node.color_rgba,
+                    )
+                )
+        return rects

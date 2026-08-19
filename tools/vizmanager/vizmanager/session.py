@@ -24,8 +24,8 @@ class Session:
         self.errors = 0
         self.last_addr = None
         self.last_handshake_addr = None
-        self.overlay = Overlay2D()
         self.world = World()
+        self.overlay = Overlay2D()
         # HANDLERS — later PRs only ADD handlers[tag] = ... in this block. Do not refactor.
         self.handlers = {}
         # PR4:
@@ -37,6 +37,7 @@ class Session:
         self.handlers[_Tag.CurrentAnimation if _Tag else 23] = self.hud.handle_current_animation
         _mv = codec.MessageViz
         if _mv is not None:
+            # PR5:
             self.handlers[_mv.Tag.ImageChunk] = self._on_image_chunk
             self.handlers[_mv.Tag.CameraQuad] = self._on_camera_quad
             self.handlers[_mv.Tag.CameraRect] = self._on_camera_rect
@@ -44,6 +45,7 @@ class Session:
             self.handlers[_mv.Tag.CameraOval] = self._on_camera_oval
             self.handlers[_mv.Tag.CameraText] = self._on_camera_text
             self.handlers[_mv.Tag.CameraParams] = self._on_camera_params
+            # PR6:
             self.handlers[_mv.Tag.SetVizOrigin] = self._on_set_viz_origin
             self.handlers[_mv.Tag.Object] = self._on_object
             self.handlers[_mv.Tag.LineSegment] = self._on_line_segment
@@ -57,9 +59,24 @@ class Session:
             self.handlers[_mv.Tag.SetPathColor] = self._on_set_path_color
             self.handlers[_mv.Tag.ErasePath] = self._on_erase_path
             self.handlers[_mv.Tag.ShowObjects] = self._on_show_objects
+            # PR8:
+            self.handlers[_mv.Tag.MemoryMapMessageVizBegin] = self._on_memory_map_begin
+            self.handlers[_mv.Tag.MemoryMapMessageViz] = self._on_memory_map
+            self.handlers[_mv.Tag.MemoryMapMessageVizEnd] = self._on_memory_map_end
+            self.handlers[_mv.Tag.EnabledVisionModes] = self._on_enabled_vision_modes
+            self.handlers[_mv.Tag.DockingErrorSignal] = self._on_docking
+            self.handlers[_mv.Tag.VisionMarker] = self._noop
+            self.handlers[_mv.Tag.TrackerQuad] = self._noop
+            self.handlers[_mv.Tag.FaceDetection] = self._noop
+            self.handlers[_mv.Tag.VisionModeDebug] = self._on_vision_mode_debug
+            self.handlers[_mv.Tag.SaveImages] = self._on_save_images
+            self.handlers[_mv.Tag.SaveState] = self._on_save_state
 
     def _drop(self, msg):
         self.drops += 1
+
+    def _noop(self, msg):
+        """FaceDetection unused; VisionMarker/TrackerQuad have no live sender."""
 
     def process_datagram(self, data, addr=None):
         """Recv-side dispatch. Do not pass ANKICONN to codec.unpack."""
@@ -138,3 +155,35 @@ class Session:
 
     def _on_show_objects(self, msg):
         self.world.set_show_objects(msg.data.show)
+
+    def _on_memory_map_begin(self, msg):
+        payload = msg.data
+        self.world.memory_map_begin(payload.originId, info=payload.info)
+
+    def _on_memory_map(self, msg):
+        payload = msg.data
+        self.world.memory_map_chunk(payload.originId, payload.quadInfos)
+
+    def _on_memory_map_end(self, msg):
+        payload = msg.data
+        self.world.memory_map_end(payload.originId)
+
+    def _on_enabled_vision_modes(self, msg):
+        self.hud.set_enabled_vision_modes(msg.data.modes)
+
+    def _on_docking(self, msg):
+        payload = msg.data
+        self.hud.set_docking(
+            payload.x_dist, payload.y_dist, payload.z_dist, payload.angle
+        )
+
+    def _on_vision_mode_debug(self, msg):
+        self.hud.set_vision_mode_debug(msg.data.debugStrings)
+
+    def _on_save_images(self, msg):
+        payload = msg.data
+        self.hud.apply_save_images(payload.mode, payload.path)
+
+    def _on_save_state(self, msg):
+        payload = msg.data
+        self.hud.apply_save_state(payload.enabled, payload.path)

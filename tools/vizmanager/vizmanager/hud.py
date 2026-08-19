@@ -13,6 +13,8 @@ Do not reverse. Theme tokens only; no raw color hex.
 from __future__ import annotations
 
 import math
+import os
+from collections import namedtuple
 
 from vizmanager import theme
 
@@ -70,6 +72,58 @@ _LINE_H = theme.SPACE[3]  # 16px; Webots used 10px Lucida — too small
 _EMPTY_STACK = "No BehaviorStackDebug yet"
 _EMPTY_STATE = "No RobotStateMessage yet"
 
+# ImageSendMode (clad/types/imageTypes.clad) — Off/Stream/SingleShot.
+IMAGE_SEND_OFF = 0
+IMAGE_SEND_STREAM = 1
+IMAGE_SEND_SINGLE = 2
+
+_DEFAULT_IMAGES_FOLDER = "saved_images"
+_DEFAULT_STATE_FOLDER = "saved_state"
+_STATE_FILENAME = "RobotState.txt"
+
+# Docking inset geometry from vizControllerImpl.cpp:401–452 (STATE, not a pane).
+DOCK_MM_PER_PIXEL = 2.0
+DOCK_RECT_W = 180
+DOCK_RECT_H = 180
+DOCK_HALF_FACE = 20
+
+_VISION_TEXT_WIDTH = 15
+_VISION_MODES_PER_LINE = 4
+_VISION_MOD_MAX_LEN = 8
+
+DockingError = namedtuple("DockingError", "x_dist y_dist z_dist angle")
+
+
+def _vision_mode_names():
+    """Map VisionMode int → enum name. Empty if generated CLAD is missing."""
+    try:
+        from clad.types.visionModes import Anki
+    except ImportError:
+        return {}
+    vision_mode = Anki.Vector.VisionMode
+    names = {}
+    for attr in dir(vision_mode):
+        if attr.startswith("_") or attr == "Count":
+            continue
+        value = getattr(vision_mode, attr)
+        if isinstance(value, int):
+            names[value] = attr
+    return names
+
+
+def _vision_mode_count(names):
+    try:
+        from clad.types.visionModes import Anki
+        return int(Anki.Vector.VisionMode.Count)
+    except (ImportError, AttributeError):
+        if not names:
+            return 0
+        return max(names) + 1
+
+
+def _mode_color(active):
+    return theme.TEXT if active else theme.TEXT_MUTED
+
 
 def _deg(rad):
     return rad * (180.0 / math.pi)
@@ -120,6 +174,14 @@ class HUD:
         self.anim_name = ""
         self.anim_tag = 0
         self._font = None
+        self.docking = None
+        self.enabled_modes = ()
+        self.vision_debug = ()
+        self.image_mode = IMAGE_SEND_OFF
+        self.images_folder = ""
+        self.state_enabled = False
+        self.state_folder = ""
+        self._mode_names = None
 
     def handle_behavior_stack(self, msg):
         # Engine order: index 0 = stack bottom (stackVizMonitor push order).
@@ -288,3 +350,160 @@ class HUD:
         if self.robot_state is None and not self.labels:
             return self._blit_lines(surface, [_EMPTY_STATE], theme.TEXT_MUTED)
         return self._blit_lines(surface, lines, theme.TEXT)
+
+    def set_docking(self, x_dist, y_dist, z_dist, angle):
+        self.docking = DockingError(x_dist, y_dist, z_dist, angle)
+
+    def docking_state_line(self):
+        """One STATE line. None until a DockingErrorSignal arrives."""
+        dock = self.docking
+        if dock is None:
+            return None
+        return "ErrSig x:{:.1f} y:{:.1f} z:{:.1f} a:{:.2f}".format(
+            dock.x_dist, dock.y_dist, dock.z_dist, dock.angle
+        )
+
+    def docking_plot(self):
+        """Optional STATE inset geometry. None if missing or off the 180 px box."""
+        dock = self.docking
+        if dock is None:
+            return None
+        face_x = 0.5 * DOCK_RECT_W - dock.y_dist / DOCK_MM_PER_PIXEL
+        face_y = DOCK_RECT_H - dock.x_dist / DOCK_MM_PER_PIXEL
+        if (
+            face_x < DOCK_HALF_FACE
+            or face_x > DOCK_RECT_W - DOCK_HALF_FACE
+            or face_y < DOCK_HALF_FACE
+            or face_y > DOCK_RECT_H - DOCK_HALF_FACE
+        ):
+            return None
+        dx = DOCK_HALF_FACE * math.cos(dock.angle)
+        dy = -DOCK_HALF_FACE * math.sin(dock.angle)
+        return {
+            "size": (DOCK_RECT_W, DOCK_RECT_H),
+            "robot": (0.5 * DOCK_RECT_W, float(DOCK_RECT_H)),
+            "face": (face_x, face_y),
+            "face_line": (
+                (face_x + dx, face_y + dy),
+                (face_x - dx, face_y - dy),
+            ),
+        }
+
+    def set_enabled_vision_modes(self, modes):
+        self.enabled_modes = tuple(int(m) for m in modes)
+
+    def set_vision_mode_debug(self, debug_strings):
+        self.vision_debug = tuple(debug_strings)
+
+    def vision_schedule_lines(self):
+        """VisionModeDebug rows: skip modifier names that contain '_'."""
+        return [s for s in self.vision_debug if "_" not in s]
+
+    def _names(self):
+        if self._mode_names is None:
+            self._mode_names = _vision_mode_names()
+        return self._mode_names
+
+    def _mode_groups(self):
+        """Base modes → modifier list, enum order. Matches kModesMap build."""
+        names = self._names()
+        if not names:
+            return []
+        inverse = {name: value for value, name in names.items()}
+        count = _vision_mode_count(names)
+        groups = []
+        index = {}
+        for mode in range(count):
+            name = names.get(mode)
+            if not name:
+                continue
+            underscore = name.find("_")
+            if underscore == -1:
+                index[mode] = len(groups)
+                groups.append((mode, name, []))
+                continue
+            base_name = name[:underscore]
+            base = inverse.get(base_name)
+            if base is None:
+                continue
+            if base not in index:
+                index[base] = len(groups)
+                groups.append((base, base_name, []))
+            mod = name[underscore + 1 : underscore + 1 + _VISION_MOD_MAX_LEN]
+            groups[index[base]][2].append((mode, mod))
+        return groups
+
+    def vision_mode_plain(self):
+        """Modes without modifiers: (name, active, color_token) in enum order."""
+        enabled = set(self.enabled_modes)
+        rows = []
+        for mode, name, modifiers in self._mode_groups():
+            if modifiers:
+                continue
+            active = mode in enabled
+            rows.append((name[:_VISION_TEXT_WIDTH], active, _mode_color(active)))
+        return rows
+
+    def vision_mode_with_modifiers(self):
+        """Modes that have modifiers: (name, active, color, [(mod, active, color)])."""
+        enabled = set(self.enabled_modes)
+        rows = []
+        for mode, name, modifiers in self._mode_groups():
+            if not modifiers:
+                continue
+            active = mode in enabled
+            mods = []
+            for mod_id, mod_name in modifiers:
+                mod_active = mod_id in enabled
+                mods.append((mod_name, mod_active, _mode_color(mod_active)))
+            rows.append((name, active, _mode_color(active), tuple(mods)))
+        return rows
+
+    def vision_modes_per_line(self):
+        return _VISION_MODES_PER_LINE
+
+    def apply_save_images(self, mode, path):
+        self.image_mode = int(mode)
+        if self.image_mode == IMAGE_SEND_OFF:
+            return
+        folder = path if path else _DEFAULT_IMAGES_FOLDER
+        self.images_folder = folder
+        if folder:
+            os.makedirs(folder, exist_ok=True)
+
+    def apply_save_state(self, enabled, path):
+        self.state_enabled = bool(enabled)
+        if not self.state_enabled:
+            return
+        folder = path if path else _DEFAULT_STATE_FOLDER
+        self.state_folder = folder
+        if folder:
+            os.makedirs(folder, exist_ok=True)
+
+    def save_image(self, filename, data):
+        """Write image bytes if SaveImages is on. SingleShot then turns Off."""
+        if self.image_mode == IMAGE_SEND_OFF:
+            return None
+        folder = self.images_folder or _DEFAULT_IMAGES_FOLDER
+        os.makedirs(folder, exist_ok=True)
+        dest = os.path.join(folder, filename)
+        with open(dest, "wb") as handle:
+            handle.write(data)
+        if self.image_mode == IMAGE_SEND_SINGLE:
+            self.image_mode = IMAGE_SEND_OFF
+        return dest
+
+    def save_state_payload(self, packed_bytes):
+        """Append a hex line to RobotState.txt in the save-state folder."""
+        if not self.state_enabled:
+            return None
+        folder = self.state_folder or _DEFAULT_STATE_FOLDER
+        os.makedirs(folder, exist_ok=True)
+        dest = os.path.join(folder, _STATE_FILENAME)
+        with open(dest, "a") as handle:
+            handle.write(packed_bytes.hex())
+            handle.write("\n")
+        return dest
+
+
+Hud = HUD
