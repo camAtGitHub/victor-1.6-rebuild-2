@@ -1,0 +1,44 @@
+"""MessageViz session: ANKICONN handshake, then tag dispatch.
+
+Loop idea from webotsCtrlViz.cpp:47–73 (recv) and vizControllerImpl.cpp:261–266
+(ProcessMessage → handlers.get(tag, drop)). Handshake is not MessageViz.
+"""
+
+from __future__ import annotations
+
+from vizmanager import codec
+from vizmanager.udp import ANKICONN
+
+
+class Session:
+    """Dispatch one datagram at a time. Tests call process_datagram without a socket."""
+
+    def __init__(self):
+        self.packets = 0
+        self.handshakes = 0
+        self.tag_counts = {}
+        self.drops = 0
+        self.errors = 0
+        self.last_addr = None
+        self.last_handshake_addr = None
+        # HANDLERS — later PRs only ADD handlers[tag] = ... in this block. Do not refactor.
+        self.handlers = {}
+
+    def _drop(self, msg):
+        self.drops += 1
+
+    def process_datagram(self, data, addr=None):
+        """Recv-side dispatch. Do not pass ANKICONN to codec.unpack."""
+        self.packets += 1
+        self.last_addr = addr
+        if data == ANKICONN:
+            self.handshakes += 1
+            self.last_handshake_addr = addr
+            return
+        try:
+            msg, tag = codec.unpack(data)
+        except Exception:
+            self.errors += 1
+            return
+        self.tag_counts[tag] = self.tag_counts.get(tag, 0) + 1
+        self.handlers.get(tag, self._drop)(msg)
