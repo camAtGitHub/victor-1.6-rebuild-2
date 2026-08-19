@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import sys
 from types import SimpleNamespace
@@ -13,8 +14,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from vizmanager import theme  # noqa: E402
 from vizmanager.view3d import (  # noqa: E402
     AXIS_LEN_M,
+    CANVAS_KEYS,
     DRAW_OBJECTS_RATE_SEC,
     View3D,
+    _MAX_ORBIT_VEL,
+    _MIN_ORBIT_DT,
+    _clamp_orbit_vel,
+    _orbit_dt,
+    _pan_axes,
     vispy_available,
 )
 from vizmanager.world import (  # noqa: E402
@@ -286,7 +293,87 @@ def test_grid_uses_theme_grid_token():
     view = View3D(World())
     lines = view.grid_lines()
     assert lines
-    assert theme.GRID == (0x1E, 0x25, 0x30)
+    assert all(m.kind == "grid" for m in lines)
+    assert all(m.color == theme.GRID for m in lines)
+
+
+def test_canvas_keys_do_not_bind_escape():
+    assert CANVAS_KEYS is None
+
+
+def test_orbit_dt_and_vel_clamped():
+    assert _orbit_dt(1e-4) == pytest.approx(_MIN_ORBIT_DT)
+    assert _orbit_dt(0.0) == pytest.approx(_MIN_ORBIT_DT)
+    assert _orbit_dt(0.05) == pytest.approx(0.05)
+    flung = (10.0 * 0.4) / 1e-4
+    assert flung > _MAX_ORBIT_VEL
+    assert _clamp_orbit_vel(flung) == pytest.approx(_MAX_ORBIT_VEL)
+    assert _clamp_orbit_vel(-flung) == pytest.approx(-_MAX_ORBIT_VEL)
+
+
+class _FakeTimer:
+    def __init__(self):
+        self.started = 0
+        self.stopped = 0
+
+    def start(self):
+        self.started += 1
+
+    def stop(self):
+        self.stopped += 1
+
+
+def test_coast_timer_restarts_after_stop():
+    view = View3D(World())
+    view.canvas = object()
+    view._az_vel = 80.0
+    fake = _FakeTimer()
+    view._timer = fake
+    view._arm_coast_timer()
+    assert fake.started == 1
+    fake.stop()
+    view._arm_coast_timer()
+    assert fake.started == 2
+
+
+def test_close_stops_timers():
+    view = View3D(World())
+    t1, t2 = _FakeTimer(), _FakeTimer()
+    view._timer = t1
+    view._draw_timer = t2
+    view.close()
+    assert t1.stopped == 1
+    assert t2.stopped == 1
+    assert view._timer is None
+    assert view._draw_timer is None
+
+
+def test_pan_uses_camera_right_and_up():
+    view = View3D(World())
+    view.azimuth = 0.0
+    view.elevation = 0.0
+    right, cam_up = _pan_axes(0.0, 0.0)
+    assert right[0] == pytest.approx(1.0)
+    assert right[1] == pytest.approx(0.0)
+    assert cam_up[2] == pytest.approx(1.0)
+    before = view.center
+    view._pan(10.0, 0.0)
+    assert view.center[0] < before[0]
+    view.center = before
+    view.elevation = 25.0
+    _r, up25 = _pan_axes(0.0, 25.0)
+    assert up25[1] == pytest.approx(math.sin(math.radians(25.0)))
+    assert abs(up25[2]) < 1.0
+    view._pan(0.0, 10.0)
+    assert view.center[1] != pytest.approx(before[1])
+    assert view.center[2] != pytest.approx(before[2])
+
+
+def test_tick_force_skips_interval_gate():
+    view = View3D(World())
+    assert view.tick(now=0.0) is True
+    assert view.tick(now=0.1) is False
+    assert view.tick(now=0.1, force=True) is True
 
 
 def test_rebuild_throttled_to_4hz():

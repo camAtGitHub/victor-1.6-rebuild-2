@@ -44,6 +44,11 @@ _ROBOT_LIFT = (0.03, 0.05, 0.01)
 _HEAD_DEFAULT = 0.08
 GRID_STEP_M = 0.1
 GRID_HALF_M = 2.0
+# Orbit coast: ignore sub-frame dt spikes; cap deg/s so release cannot fling.
+_MIN_ORBIT_DT = 0.016
+_MAX_ORBIT_VEL = 720.0
+# Esc must not destroy the WORLD canvas (MASTER: Esc dismisses connect error).
+CANVAS_KEYS = None
 
 _BOX_EDGES = (
     (0, 1),
@@ -121,6 +126,32 @@ def _pitch_y(x, y, z, angle):
     return (x * c - z * s, y, x * s + z * c)
 
 
+def _orbit_dt(dt):
+    if dt is None or dt <= 0:
+        return _MIN_ORBIT_DT
+    return max(float(dt), _MIN_ORBIT_DT)
+
+
+def _clamp_orbit_vel(vel):
+    return max(-_MAX_ORBIT_VEL, min(_MAX_ORBIT_VEL, float(vel)))
+
+
+def _pan_axes(azimuth, elevation):
+    """Camera right and screen-up for a Z-up turntable (az=0 looks +Y)."""
+    az = math.radians(azimuth)
+    el = math.radians(elevation)
+    saz, caz = math.sin(az), math.cos(az)
+    sel, cel = math.sin(el), math.cos(el)
+    forward = (-cel * saz, cel * caz, -sel)
+    right = (caz, saz, 0.0)
+    cam_up = (
+        right[1] * forward[2] - right[2] * forward[1],
+        right[2] * forward[0] - right[0] * forward[2],
+        right[0] * forward[1] - right[1] * forward[0],
+    )
+    return right, cam_up
+
+
 def _expand_segments(points, connect):
     if not points:
         return ()
@@ -184,9 +215,36 @@ class View3D:
                 self.canvas.size = self.size
             except Exception:
                 pass
+        self._update_aspect()
 
     def set_paused(self, paused):
         self.paused = bool(paused)
+
+    def close(self):
+        """Stop timers and close the canvas so discarded views do not leak."""
+        self._stop_timer("_timer")
+        self._stop_timer("_draw_timer")
+        if self.canvas is not None:
+            try:
+                self.canvas.close()
+            except Exception:
+                pass
+        self.canvas = None
+        self._view = None
+        self._camera = None
+        self._world_line = None
+        self._grid_line = None
+        self._axes_line = None
+
+    def _stop_timer(self, name):
+        timer = getattr(self, name, None)
+        if timer is None:
+            return
+        try:
+            timer.stop()
+        except Exception:
+            pass
+        setattr(self, name, None)
 
     def axes_lines(self):
         """100 mm RGB triad at the scene origin (composed viz frame)."""
@@ -209,14 +267,15 @@ class View3D:
         def snap(v):
             return math.floor(v / GRID_STEP_M) * GRID_STEP_M
 
+        color = theme.GRID
         lines = []
         x = snap(x0)
         while x <= x1 + 1e-9:
-            lines.append(((x, y0, 0.0), (x, y1, 0.0)))
+            lines.append(Mesh3("grid", ((x, y0, 0.0), (x, y1, 0.0)), color, "segments"))
             x += GRID_STEP_M
         y = snap(y0)
         while y <= y1 + 1e-9:
-            lines.append(((x0, y, 0.0), (x1, y, 0.0)))
+            lines.append(Mesh3("grid", ((x0, y, 0.0), (x1, y, 0.0)), color, "segments"))
             y += GRID_STEP_M
         return tuple(lines)
 
@@ -358,33 +417,41 @@ class View3D:
         )
         return (body, head, lift)
 
-    def tick(self, now=None):
-        """Rebuild meshes at ≤4 Hz. Returns True if a rebuild ran."""
+    def tick(self, now=None, force=False):
+        """Rebuild protocol meshes at ≤4 Hz. Grid/axes update with the camera.
+
+        The vispy draw timer already fires at DRAW_OBJECTS_RATE_SEC; pass
+        force=True from that timer so jitter does not skip a cycle.
+        """
         if self.paused:
             return False
         if now is None:
             now = time.monotonic()
         if (
-            self._last_rebuild is not None
+            not force
+            and self._last_rebuild is not None
             and (now - self._last_rebuild) < DRAW_OBJECTS_RATE_SEC
         ):
             return False
         self._last_rebuild = now
-        self.rebuild()
+        self._push_world()
         return True
 
     def rebuild(self):
         """Snapshot World into mesh lists and vispy Line visuals (if any)."""
-        self._push_visuals()
+        self._push_grid_axes()
+        self._push_world()
 
     def create_canvas(self, parent=None, show=False):
         """Build a vispy SceneCanvas. Returns None if vispy/GL is unavailable."""
+        if self.canvas is not None:
+            self.close()
         scene = _scene_mod()
         if scene is None:
             return None
         try:
             canvas = scene.SceneCanvas(
-                keys="interactive",
+                keys=CANVAS_KEYS,
                 size=self.size,
                 bgcolor=_rgb01(theme.BG_VOID),
                 show=show,
@@ -461,14 +528,30 @@ class View3D:
 
             self._draw_timer = app.Timer(
                 interval=DRAW_OBJECTS_RATE_SEC,
-                connect=lambda _e: self.tick(),
+                connect=lambda _e: self.tick(force=True),
                 start=True,
                 iterations=-1,
             )
         except Exception:
             self._draw_timer = None
+        self._update_aspect()
         self.rebuild()
         return canvas
+
+    def _update_aspect(self):
+        cam = self._camera
+        if cam is None:
+            return
+        w, h = self.size
+        aspect = float(w) / max(float(h), 1.0)
+        try:
+            cam.aspect = aspect
+        except Exception:
+            pass
+        try:
+            cam.view_changed()
+        except Exception:
+            pass
 
     def _on_resize(self, event):
         try:
@@ -476,6 +559,7 @@ class View3D:
             self.size = (int(size[0]), int(size[1]))
         except Exception:
             pass
+        self._update_aspect()
 
     def _on_key(self, event):
         name = getattr(event.key, "name", None) or str(event.key)
@@ -509,20 +593,15 @@ class View3D:
         dy = float(event.pos[1] - self._last_mouse[1])
         self._last_mouse = event.pos
         now = time.monotonic()
-        dt = now - self._last_cam_t if self._last_cam_t is not None else 0.016
+        raw_dt = now - self._last_cam_t if self._last_cam_t is not None else _MIN_ORBIT_DT
         self._last_cam_t = now
-        if dt <= 0:
-            dt = 0.016
+        dt = _orbit_dt(raw_dt)
         # LMB: orbit. MMB or Shift+LMB: pan (MASTER.md).
         modifiers = getattr(event, "modifiers", ()) or ()
         names = {getattr(m, "name", str(m)) for m in modifiers}
         shift = "Shift" in names or "shift" in names
         if self._pan_button or shift:
-            # Pan in the look-at plane; scale with distance.
-            s = 0.002 * self.distance
-            cx, cy, cz = self.center
-            az = math.radians(self.azimuth)
-            self.center = (cx - dx * s * math.cos(az), cy + dx * s * math.sin(az), cz + dy * s)
+            self._pan(dx, dy)
             self._az_vel = 0.0
             self._el_vel = 0.0
         else:
@@ -530,9 +609,20 @@ class View3D:
             delv = dy * 0.4
             self.azimuth = (self.azimuth + daz) % 360.0
             self.elevation = max(-89.0, min(89.0, self.elevation + delv))
-            self._az_vel = daz / dt
-            self._el_vel = delv / dt
+            self._az_vel = _clamp_orbit_vel(daz / dt)
+            self._el_vel = _clamp_orbit_vel(delv / dt)
         self._push_camera()
+
+    def _pan(self, dx, dy):
+        """Grab-the-world pan in the camera right / camera-up plane."""
+        s = 0.002 * self.distance
+        right, cam_up = _pan_axes(self.azimuth, self.elevation)
+        cx, cy, cz = self.center
+        self.center = (
+            cx - s * dx * right[0] + s * dy * cam_up[0],
+            cy - s * dx * right[1] + s * dy * cam_up[1],
+            cz - s * dx * right[2] + s * dy * cam_up[2],
+        )
 
     def _on_mouse_wheel(self, event):
         delta = getattr(event, "delta", (0.0, 0.0))
@@ -556,25 +646,39 @@ class View3D:
             return
         if self.canvas is None:
             return
+        if self._timer is not None:
+            try:
+                self._timer.start()
+            except Exception:
+                self._timer = None
+            else:
+                return
         try:
             from vispy import app
         except Exception:
             return
-        if self._timer is None:
-            try:
-                self._timer = app.Timer(
-                    interval=0.016,
-                    connect=self._on_coast,
-                    start=True,
-                    iterations=-1,
-                )
-            except Exception:
-                self._timer = None
+        try:
+            self._timer = app.Timer(
+                interval=0.016,
+                connect=self._on_coast,
+                start=True,
+                iterations=-1,
+            )
+        except Exception:
+            self._timer = None
 
     def _on_coast(self, event):
         if self._dragging or not self.damp_orbit:
             return
-        dt = 0.016
+        now = time.monotonic()
+        ev_dt = getattr(event, "dt", None)
+        if ev_dt is None or ev_dt <= 0:
+            if self._last_cam_t is not None:
+                ev_dt = now - self._last_cam_t
+            else:
+                ev_dt = _MIN_ORBIT_DT
+        self._last_cam_t = now
+        dt = max(float(ev_dt), 1e-3)
         # ~150 ms time constant (theme.MOTION_MS); no auto-spin — vel → 0.
         decay = math.exp(-dt * 1000.0 / max(theme.MOTION_MS, 1))
         self._az_vel *= decay
@@ -594,35 +698,32 @@ class View3D:
 
     def _push_camera(self):
         cam = self._camera
-        if cam is None:
-            return
-        try:
-            cam.azimuth = self.azimuth
-            cam.elevation = self.elevation
-            cam.distance = self.distance
-            cam.center = self.center
-        except Exception:
-            pass
+        if cam is not None:
+            try:
+                cam.azimuth = self.azimuth
+                cam.elevation = self.elevation
+                cam.distance = self.distance
+                cam.center = self.center
+            except Exception:
+                pass
+        self._push_grid_axes()
 
-    def _push_visuals(self):
-        if self._world_line is None:
+    def _push_grid_axes(self):
+        if self._grid_line is None:
             return
-        self._set_line(
-            self._grid_line,
-            self._pairs_to_pos(self.grid_lines()),
-            _rgba01(theme.GRID),
-        )
+        gpos = []
+        for mesh in self.grid_lines():
+            for p in _expand_segments(mesh.points, mesh.connect):
+                gpos.append(p)
+        self._set_line(self._grid_line, gpos, _rgba01(theme.GRID))
         axes_pos, axes_col = self._axes_arrays()
         self._set_line(self._axes_line, axes_pos, axes_col)
+
+    def _push_world(self):
+        if self._world_line is None:
+            return
         wpos, wcol = self._world_arrays()
         self._set_line(self._world_line, wpos, wcol)
-
-    def _pairs_to_pos(self, pairs):
-        pts = []
-        for a, b in pairs:
-            pts.append(a)
-            pts.append(b)
-        return pts
 
     def _axes_arrays(self):
         pos = []
