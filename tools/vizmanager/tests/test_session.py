@@ -59,9 +59,10 @@ def _pack(tag_name, **fields):
 @needs_generated
 def test_unknown_tag_drops_silently():
     sess = Session()
-    packed = _pack("FaceDetection")  # unused tag; Object/Quad/SetRobot now have world handlers
+    # Include-pollution tags 0–18 are not in Webots Subscribe; FaceDetection is an explicit ignore.
+    packed = _pack("ReportCloudConnectivity")
     sess.process_datagram(packed)
-    tag = codec.MessageViz.Tag.FaceDetection
+    tag = codec.MessageViz.Tag.ReportCloudConnectivity
     assert sess.tag_counts[tag] == 1
     assert sess.drops == 1
     assert sess.errors == 0
