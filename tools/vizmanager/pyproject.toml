@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vizmanager"
+version = "0.1.0"
+description = "Host VizManager client for Vector UDP Viz (port 5252)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pygame",
+    "vispy",
+    "opencv-python",
+    "numpy",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+test = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["vizmanager*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
