@@ -7,6 +7,7 @@ Loop idea from webotsCtrlViz.cpp:47–73 (recv) and vizControllerImpl.cpp:261–
 from __future__ import annotations
 
 from vizmanager import codec
+from vizmanager.hud import HUD
 from vizmanager.udp import ANKICONN
 
 
@@ -23,6 +24,13 @@ class Session:
         self.last_handshake_addr = None
         # HANDLERS — later PRs only ADD handlers[tag] = ... in this block. Do not refactor.
         self.handlers = {}
+        # PR4:
+        self.hud = HUD()
+        _Tag = codec.MessageViz.Tag if codec.generated_available() else None
+        self.handlers[_Tag.BehaviorStackDebug if _Tag else 51] = self.hud.handle_behavior_stack
+        self.handlers[_Tag.RobotStateMessage if _Tag else 22] = self.hud.handle_robot_state
+        self.handlers[_Tag.SetLabel if _Tag else 44] = self.hud.handle_set_label
+        self.handlers[_Tag.CurrentAnimation if _Tag else 23] = self.hud.handle_current_animation
 
     def _drop(self, msg):
         self.drops += 1
