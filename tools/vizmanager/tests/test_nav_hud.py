@@ -69,6 +69,18 @@ def test_fill_rects_clips_negative_origin_and_skips_empty():
     assert h > 0
 
 
+def test_fill_rects_clips_after_pan_so_offpane_tiles_return():
+    world = World()
+    # image_x = -80 - 5 + 50 = -35, w=9 → dropped at pan 0.
+    world.nav_tiles = (NavTile(1, -80.0, 0.0, 10.0),)
+    assert world.fill_rects(100, 100) == []
+    rects = world.fill_rects(100, 100, origin_x=40.0)
+    assert len(rects) == 1
+    x, y, w, h, color = rects[0]
+    assert (x, w, color) == (5, 9, 1)
+    assert h > 0
+
+
 def test_memory_map_begin_clears_info_unused():
     world = World()
     world.nav_nodes = [NavTile(1, 0.0, 0.0, 8.0)]

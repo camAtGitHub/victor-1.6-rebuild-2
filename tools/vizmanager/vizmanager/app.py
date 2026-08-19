@@ -1001,8 +1001,8 @@ class VizApp:
         ox, oy = self._map_ox, self._map_oy
         for (x0, y0), (x1, y1) in map_grid_lines(w, h, ox, oy):
             pygame.draw.line(surf, theme.GRID, (x0, y0), (x1, y1), 1)
-        for x, y, rw, rh, color in self.session.world.fill_rects(w, h):
-            pygame.draw.rect(surf, protocol_rgb(color), (x + ox, y + oy, rw, rh))
+        for x, y, rw, rh, color in self.session.world.fill_rects(w, h, ox, oy):
+            pygame.draw.rect(surf, protocol_rgb(color), (x, y, rw, rh))
 
     def _draw_stack_state(self, screen, rects):
         import pygame
