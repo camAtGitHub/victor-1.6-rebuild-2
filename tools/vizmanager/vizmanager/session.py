@@ -10,6 +10,7 @@ from vizmanager import codec
 from vizmanager.hud import HUD
 from vizmanager.overlay2d import Overlay2D
 from vizmanager.udp import ANKICONN
+from vizmanager.world import World
 
 
 class Session:
@@ -24,6 +25,7 @@ class Session:
         self.last_addr = None
         self.last_handshake_addr = None
         self.overlay = Overlay2D()
+        self.world = World()
         # HANDLERS — later PRs only ADD handlers[tag] = ... in this block. Do not refactor.
         self.handlers = {}
         # PR4:
@@ -42,6 +44,19 @@ class Session:
             self.handlers[_mv.Tag.CameraOval] = self._on_camera_oval
             self.handlers[_mv.Tag.CameraText] = self._on_camera_text
             self.handlers[_mv.Tag.CameraParams] = self._on_camera_params
+            self.handlers[_mv.Tag.SetVizOrigin] = self._on_set_viz_origin
+            self.handlers[_mv.Tag.Object] = self._on_object
+            self.handlers[_mv.Tag.LineSegment] = self._on_line_segment
+            self.handlers[_mv.Tag.Quad] = self._on_quad
+            self.handlers[_mv.Tag.EraseObject] = self._on_erase_object
+            self.handlers[_mv.Tag.EraseLineSegments] = self._on_erase_line_segments
+            self.handlers[_mv.Tag.EraseQuad] = self._on_erase_quad
+            self.handlers[_mv.Tag.SetRobot] = self._on_set_robot
+            self.handlers[_mv.Tag.AppendPathSegmentLine] = self._on_append_path_line
+            self.handlers[_mv.Tag.AppendPathSegmentArc] = self._on_append_path_arc
+            self.handlers[_mv.Tag.SetPathColor] = self._on_set_path_color
+            self.handlers[_mv.Tag.ErasePath] = self._on_erase_path
+            self.handlers[_mv.Tag.ShowObjects] = self._on_show_objects
 
     def _drop(self, msg):
         self.drops += 1
@@ -82,3 +97,44 @@ class Session:
 
     def _on_camera_params(self, msg):
         self.overlay.handle_camera_params(msg.data)
+
+    def _on_set_viz_origin(self, msg):
+        self.world.set_viz_origin(msg.data)
+
+    def _on_object(self, msg):
+        self.world.set_object(msg.data)
+
+    def _on_line_segment(self, msg):
+        self.world.add_line_segment(msg.data)
+
+    def _on_quad(self, msg):
+        self.world.set_quad(msg.data)
+
+    def _on_erase_object(self, msg):
+        p = msg.data
+        self.world.erase_object(p.objectID, p.lower_bound_id, p.upper_bound_id)
+
+    def _on_erase_line_segments(self, msg):
+        self.world.erase_line_segments(msg.data.identifier)
+
+    def _on_erase_quad(self, msg):
+        p = msg.data
+        self.world.erase_quad(p.quadType, p.quadID)
+
+    def _on_set_robot(self, msg):
+        self.world.set_robot(msg.data)
+
+    def _on_append_path_line(self, msg):
+        self.world.append_path_line(msg.data)
+
+    def _on_append_path_arc(self, msg):
+        self.world.append_path_arc(msg.data)
+
+    def _on_set_path_color(self, msg):
+        self.world.set_path_color(msg.data)
+
+    def _on_erase_path(self, msg):
+        self.world.erase_path(msg.data.pathID)
+
+    def _on_show_objects(self, msg):
+        self.world.set_show_objects(msg.data.show)
