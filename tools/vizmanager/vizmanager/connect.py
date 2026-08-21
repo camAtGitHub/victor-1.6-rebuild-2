@@ -39,25 +39,10 @@ HOST_DEVICE_ID = 1  # CozmoEngine constructs UiMessageHandler(1) → auto-connec
 
 
 def local_ipv4s() -> list[str]:
-    ips: list[str] = []
-    try:
-        hostname_ip = socket.gethostbyname(socket.gethostname())
-        if hostname_ip and not hostname_ip.startswith("127."):
-            ips.append(hostname_ip)
-    except OSError:
-        pass
-    # Route-trick: pick the address the kernel would use to leave the LAN.
-    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        probe.connect(("8.8.8.8", 80))
-        route_ip = probe.getsockname()[0]
-        if route_ip not in ips:
-            ips.append(route_ip)
-    except OSError:
-        pass
-    finally:
-        probe.close()
-    return ips
+    """Same NIC filter as udp.local_ipv4s (skip 127/169.254)."""
+    from vizmanager.udp import local_ipv4s as _udp_local_ipv4s
+
+    return _udp_local_ipv4s()
 
 
 def hexdump(data: bytes, limit: int = 24) -> str:

@@ -29,6 +29,19 @@ Paths this tree actually uses (do not invent a second output dir):
 
 `<repo>` is the folder that contains `tools/vizmanager/` and `victor-clad/`.
 
+### Standalone Windows exe (no repo on the target PC)
+
+Build **on Windows** (not in this Linux checkout). Recipients unzip one folder; they do not need Python or this git tree.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\vizmanager\scripts\setup_windows.ps1
+powershell -ExecutionPolicy Bypass -File tools\vizmanager\scripts\build_windows.ps1
+```
+
+Output: `tools/vizmanager/dist/VizManager/` (`VizManager.exe` + `_internal/`). Zip **that whole directory**. Details: `tools/vizmanager/SHIPPING.md`.
+
+Do not ship the `.exe` alone. CLAD and DLLs live in `_internal/` (`codec._repo_root()` uses PyInstaller `_MEIPASS`).
+
 ### 1. One-shot setup (PowerShell)
 
 From the **repo root** (or any cwd; the script finds the repo from its own path):
@@ -83,15 +96,14 @@ That is RedirectViz working. CAMERA can still be empty — that is the next step
 
 ### 4. Camera (`VisionMode::Viz`)
 
-RedirectViz turns on engine `_sendImages`. It does **not** turn on `VisionMode::Viz`.
-Until Viz is on, CAMERA shows `No ImageChunk (enable VisionMode::Viz)` even with a live WORLD.
+After RedirectViz handshake the app GETs `http://ROBOT:8888/consolevarset?key=Viz&value=true`. Disconnect or quit GETs `value=false`. Engine `:8888` must already be reachable.
 
-Cheats robot, engine console `:8888`:
+If HTTP fails, CAMERA stays on `No ImageChunk (enable VisionMode::Viz)` while WORLD can still be live. Fallback:
 
 - Browser: `http://ROBOT_IP:8888/consolevars` → **Vision.General.VisionModes** → tick **Viz**
 - Or: `curl "http://ROBOT_IP:8888/consolevarset?key=Viz&value=true"`
 
-Does not survive `vic-engine` restart. Need opencv (`pip` already installed it).
+Does not survive `vic-engine` restart.
 
 ### If Connect times out
 
@@ -157,6 +169,7 @@ sudo iptables -I INPUT -p udp --dport 5200 -s ROBOT_LAN_IP -j ACCEPT
 | Space | Pause render only (UI pings keep going) |
 | Esc | Dismiss connect error / blur IP field |
 | Drag CAMERA\|WORLD edge | Resize the camera pane (default 640px, double-click to reset) |
+| H | Cycle host IPv4 candidates when the host field is shown |
 
 Connect: button disables and shows **Connecting…** until UI handshake or 8 s. Errors under the IP field include the 5103 / 5252 / 5200 fix.
 

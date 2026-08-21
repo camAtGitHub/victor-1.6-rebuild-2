@@ -16,6 +16,8 @@ from vizmanager.udp import (  # noqa: E402
     UdpServer,
     bind_viz,
     hexdump,
+    host_ip_needs_picker,
+    is_usable_ipv4,
     local_ipv4s,
 )
 
@@ -41,8 +43,24 @@ def test_local_ipv4s_and_hexdump():
     ips = local_ipv4s()
     assert isinstance(ips, list)
     assert all(isinstance(ip, str) for ip in ips)
+    assert all(is_usable_ipv4(ip) for ip in ips)
     dumped = hexdump(b"\x00FAKE-VIZ-PACKET")
     assert "00" in dumped
+
+
+def test_usable_ipv4_skips_loopback_and_link_local():
+    assert is_usable_ipv4("192.168.50.10")
+    assert not is_usable_ipv4("127.0.0.1")
+    assert not is_usable_ipv4("169.254.1.1")
+    assert not is_usable_ipv4("")
+    assert not is_usable_ipv4("not-an-ip")
+
+
+def test_host_ip_needs_picker():
+    assert host_ip_needs_picker([]) is True
+    assert host_ip_needs_picker(["10.0.0.1"]) is False
+    assert host_ip_needs_picker(["10.0.0.1", "192.168.1.2"]) is True
+    assert host_ip_needs_picker(["10.0.0.1"], explicit_host_ip="10.0.0.1") is True
 
 
 def test_bind_recv_handshake_not_mixed_with_payload():

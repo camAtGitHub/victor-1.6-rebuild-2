@@ -16,11 +16,33 @@ ANKICONN = b"ANKICONN"
 MAX_MSG = 2848
 
 
+def is_usable_ipv4(ip):
+    """LAN IPv4 the robot might ping: not loopback, not link-local."""
+    if not ip or not isinstance(ip, str):
+        return False
+    if ip.startswith("127.") or ip.startswith("169.254."):
+        return False
+    parts = ip.split(".")
+    if len(parts) != 4:
+        return False
+    try:
+        return all(0 <= int(p) <= 255 for p in parts)
+    except ValueError:
+        return False
+
+
+def host_ip_needs_picker(ips, explicit_host_ip=None):
+    """Show the chrome host field when NIC list is empty, ambiguous, or forced."""
+    if explicit_host_ip:
+        return True
+    return len(ips) != 1
+
+
 def local_ipv4s() -> list[str]:
     ips: list[str] = []
     try:
         hostname_ip = socket.gethostbyname(socket.gethostname())
-        if hostname_ip and not hostname_ip.startswith("127."):
+        if is_usable_ipv4(hostname_ip) and hostname_ip not in ips:
             ips.append(hostname_ip)
     except OSError:
         pass
@@ -29,7 +51,7 @@ def local_ipv4s() -> list[str]:
     try:
         probe.connect(("8.8.8.8", 80))
         route_ip = probe.getsockname()[0]
-        if route_ip not in ips:
+        if is_usable_ipv4(route_ip) and route_ip not in ips:
             ips.append(route_ip)
     except OSError:
         pass

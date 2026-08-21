@@ -14,6 +14,16 @@ import sys
 
 
 def _repo_root():
+    """Repo root, or PyInstaller _MEIPASS when frozen (no checkout required).
+
+    Frozen onedir ships generated/cladPython and msgbuffers under _MEIPASS
+    so a zip of dist/VizManager/ runs on a PC that never saw this tree.
+    """
+    if getattr(sys, "frozen", False):
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            return os.path.abspath(meipass)
+        return os.path.abspath(os.path.dirname(sys.executable))
     # tools/vizmanager/vizmanager/codec.py → repo root
     return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 

@@ -246,6 +246,57 @@ def test_world_meshes_cached_for_draw_objects_rate():
         app.close()
 
 
+def test_host_field_shown_when_host_ip_forced():
+    parser = build_parser()
+    args = parser.parse_args(["--listen-only", "--host-ip", "10.1.2.3"])
+    app = VizApp(args)
+    try:
+        assert app.show_host_field is True
+        assert app.host_text == "10.1.2.3"
+        widgets = app._chrome_widgets(layout_rects(*DEFAULT_SIZE))
+        assert widgets["host"][2] > 0
+        assert widgets["ip"][3] == theme.CONTROL_H
+        assert widgets["host_hit"][3] >= 32
+    finally:
+        app.close()
+
+
+def test_handshake_enables_viz_http_and_close_disables():
+    import vizmanager.app as appmod
+
+    calls = []
+
+    def fake_set(robot, enable, timeout=None, urlopen=None):
+        calls.append((robot, bool(enable)))
+        return None
+
+    orig = appmod.set_viz_mode
+    appmod.set_viz_mode = fake_set
+    parser = build_parser()
+    args = parser.parse_args(["--listen-only", "--bind", "127.0.0.1", "--viz-port", "0"])
+    app = VizApp(args)
+    redir = Redirector("192.168.50.155", "127.0.0.1", "127.0.0.1", 0)
+    sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        app.robot_ip = "192.168.50.155"
+        app.redirector = redir
+        port = redir.ui.getsockname()[1]
+        sender.sendto(ANKICONN, ("127.0.0.1", port))
+        app.drain(0.5)
+        assert redir.redirected is True
+        assert calls == [("192.168.50.155", True)]
+        assert app._viz_http_enabled is True
+        app.close()
+        assert calls == [("192.168.50.155", True), ("192.168.50.155", False)]
+        assert app._viz_http_enabled is False
+    finally:
+        appmod.set_viz_mode = orig
+        sender.close()
+        app.redirector = None
+        redir.close()
+        app.close()
+
+
 def test_listen_only_bind_handshake_counts():
     parser = build_parser()
     args = parser.parse_args(["--listen-only", "--bind", "127.0.0.1", "--viz-port", "0"])

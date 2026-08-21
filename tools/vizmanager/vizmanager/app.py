@@ -30,7 +30,15 @@ from vizmanager.connect import (
     send_ankiconn_and,
 )
 from vizmanager.session import Session
-from vizmanager.udp import ANKICONN, VIZ_PORT, UdpServer, bind_viz, local_ipv4s
+from vizmanager.udp import (
+    ANKICONN,
+    VIZ_PORT,
+    UdpServer,
+    bind_viz,
+    host_ip_needs_picker,
+    local_ipv4s,
+)
+from vizmanager.vision_http import set_viz_mode
 from vizmanager.view2d import View2D
 from vizmanager.view3d import (
     DRAW_OBJECTS_RATE_SEC,
@@ -365,7 +373,14 @@ class VizApp:
         self.args = args
         self.listen_only = bool(args.listen_only)
         self.robot_ip = args.robot or ""
-        self.host_ip = args.host_ip or (local_ipv4s()[0] if local_ipv4s() else "")
+        self._lan_ips = local_ipv4s()
+        self.host_ip = args.host_ip or (self._lan_ips[0] if self._lan_ips else "")
+        self.host_text = self.host_ip
+        self.host_focused = False
+        self.show_host_field = host_ip_needs_picker(self._lan_ips, args.host_ip)
+        self._viz_http_enabled = False
+        self._viz_http_tried = False
+        self._viz_http_error = None
         self.bind_addr = args.bind or "0.0.0.0"
         self.viz_port = int(args.viz_port)
         self.ui_port = int(args.ui_port)
@@ -379,6 +394,10 @@ class VizApp:
         self.ip_focused = False
         self.connect_error = None
         self.last_error = ""
+        if self.show_host_field and self._lan_ips:
+            self.last_error = "host IPv4 candidates: {0}".format(
+                ", ".join(self._lan_ips)
+            )
         self.viz = None
         self.redirector = None
         self._pkt_times = []
@@ -426,11 +445,22 @@ class VizApp:
             self.connect_error = "Enter a robot IPv4"
             self.last_error = self.connect_error
             return
+        if self.show_host_field:
+            host = self.host_text.strip()
+            if not _valid_ipv4(host):
+                self.connect_error = (
+                    "Enter a host IPv4 the robot can ping (not VPN/Hyper-V/WSL)"
+                )
+                self.last_error = self.connect_error
+                return
+            self.host_ip = host
         if not self.host_ip:
             self.connect_error = "need --host-ip (no LAN IPv4 found)"
             self.last_error = self.connect_error
             return
         self.stop_connect()
+        self._viz_http_tried = False
+        self._viz_http_error = None
         self.robot_ip = robot
         self.ip_text = robot
         try:
@@ -445,9 +475,37 @@ class VizApp:
         self.connect_error = None
 
     def stop_connect(self):
+        self._disable_viz_http()
         if self.redirector is not None:
             self.redirector.close()
             self.redirector = None
+
+    def _disable_viz_http(self):
+        if not self._viz_http_enabled:
+            return
+        robot = self.robot_ip
+        self._viz_http_enabled = False
+        if robot:
+            set_viz_mode(robot, False)
+
+    def _maybe_enable_viz_http(self):
+        if self._viz_http_tried or self.redirector is None:
+            return
+        if not self.redirector.redirected:
+            return
+        self._viz_http_tried = True
+        err = set_viz_mode(self.robot_ip, True)
+        if err:
+            self._viz_http_error = err
+            self.connect_error = (
+                "VisionMode::Viz HTTP failed on :8888 — CAMERA stays empty. {0}".format(
+                    err
+                )
+            )
+            self.last_error = self.connect_error
+            return
+        self._viz_http_enabled = True
+        self._viz_http_error = None
 
     def connecting(self):
         return self.redirector is not None and self.redirector.connecting
@@ -488,8 +546,9 @@ class VizApp:
             if self.redirector.error:
                 self.connect_error = self.redirector.error
                 self.last_error = self.redirector.error
-            elif self.redirector.engine_ui is not None:
+            elif self.redirector.engine_ui is not None and not self._viz_http_error:
                 self.connect_error = None
+            self._maybe_enable_viz_http()
 
     def dismiss_connect_error(self):
         self.connect_error = None
@@ -597,10 +656,16 @@ class VizApp:
             self._on_mouse_move(event, rects)
         elif event.type == pygame.MOUSEWHEEL:
             self._on_wheel(event, rects)
-        elif event.type == pygame.TEXTINPUT and self.ip_focused:
+        elif event.type == pygame.TEXTINPUT and (self.ip_focused or self.host_focused):
+            target = "host" if self.host_focused else "robot"
+            text = self.host_text if target == "host" else self.ip_text
             for ch in event.text:
-                if ch in "0123456789." and len(self.ip_text) < 15:
-                    self.ip_text += ch
+                if ch in "0123456789." and len(text) < 15:
+                    text += ch
+            if target == "host":
+                self.host_text = text
+            else:
+                self.ip_text = text
         elif event.type == pygame.KEYDOWN:
             self._on_key(event)
 
@@ -608,17 +673,31 @@ class VizApp:
         import pygame
 
         if event.key == pygame.K_ESCAPE:
-            if self.ip_focused:
+            if self.ip_focused or self.host_focused:
                 self.ip_focused = False
+                self.host_focused = False
             else:
                 self.dismiss_connect_error()
             return
-        if self.ip_focused:
+        if self.ip_focused or self.host_focused:
             if event.key == pygame.K_BACKSPACE:
-                self.ip_text = self.ip_text[:-1]
+                if self.host_focused:
+                    self.host_text = self.host_text[:-1]
+                else:
+                    self.ip_text = self.ip_text[:-1]
             elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
                 self.ip_focused = False
+                self.host_focused = False
                 self.start_connect()
+            return
+        if event.key == pygame.K_h and self.show_host_field and self._lan_ips:
+            cur = self.host_text.strip()
+            try:
+                idx = self._lan_ips.index(cur)
+            except ValueError:
+                idx = -1
+            self.host_text = self._lan_ips[(idx + 1) % len(self._lan_ips)]
+            self.host_ip = self.host_text
             return
         if event.key in (pygame.K_1, pygame.K_KP1):
             self.tab = TAB_3D
@@ -640,7 +719,7 @@ class VizApp:
         pip_x = cx + pad
         word_x = pip_x + _PIP_D + pad
         field_x = word_x + 110
-        field_w = 168
+        field_w = 140 if self.show_host_field else 168
         field_h = theme.CONTROL_H
         field_y = cy + (ch - field_h) // 2
         hit_h = max(32, field_h)
@@ -649,13 +728,18 @@ class VizApp:
         btn_h = ch
         btn_x = cx + cw - btn_w
         disc_w = 84
-        pps_x = field_x + field_w + pad
+        host_x = field_x + field_w + pad
+        host_w = field_w if self.show_host_field else 0
+        pps_x = host_x + host_w + pad if self.show_host_field else field_x + field_w + pad
+        pps_w = 70 if self.show_host_field else 90
         return {
             "pip": (pip_x, cy + (ch - _PIP_D) // 2, _PIP_D, _PIP_D),
             "word": (word_x, cy, 110, ch),
             "ip": (field_x, field_y, field_w, field_h),
             "ip_hit": (field_x, hit_y, field_w, hit_h),
-            "pps": (pps_x, cy, 90, ch),
+            "host": (host_x, field_y, host_w, field_h),
+            "host_hit": (host_x, hit_y, host_w, hit_h),
+            "pps": (pps_x, cy, pps_w, ch),
             "disconnect": (btn_x - disc_w, cy, disc_w, ch),
             "connect": (btn_x, cy, btn_w, btn_h),
         }
@@ -664,6 +748,11 @@ class VizApp:
         widgets = self._chrome_widgets(rects)
         pos = event.pos
         self.ip_focused = _hit(widgets["ip_hit"], pos)
+        self.host_focused = bool(
+            self.show_host_field and widgets["host_hit"][2] > 0 and _hit(widgets["host_hit"], pos)
+        )
+        if self.host_focused:
+            self.ip_focused = False
         if event.button == 1 and _hit(rects["splitter"], pos):
             if getattr(event, "clicks", 1) >= 2:
                 self.reset_cam_w()
@@ -851,6 +940,20 @@ class VizApp:
         ip_col = theme.TEXT if self.ip_text else theme.TEXT_MUTED
         ip_img = ui.render(shown[:15], True, ip_col)
         screen.blit(ip_img, (ip_rect.x + 6, ip_rect.y + (ip_rect.h - ip_img.get_height()) // 2))
+
+        if self.show_host_field:
+            host_rect = pygame.Rect(widgets["host"])
+            pg.draw.rect(screen, theme.BG_ELEVATED, host_rect)
+            pg.draw.rect(screen, theme.BORDER, host_rect, 1)
+            if self.host_focused:
+                pg.draw.rect(screen, theme.ACCENT, host_rect.inflate(4, 4), 2)
+            host_shown = self.host_text or "host IPv4"
+            host_col = theme.TEXT if self.host_text else theme.TEXT_MUTED
+            host_img = ui.render(host_shown[:15], True, host_col)
+            screen.blit(
+                host_img,
+                (host_rect.x + 6, host_rect.y + (host_rect.h - host_img.get_height()) // 2),
+            )
 
         pps_txt = "{0:.0f} pps".format(self.pps())
         if self.render_paused:

@@ -18,6 +18,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest"]
 test = ["pytest"]
+exe = ["pyinstaller>=6.0"]
 
 [tool.setuptools.packages.find]
 where = ["."]
