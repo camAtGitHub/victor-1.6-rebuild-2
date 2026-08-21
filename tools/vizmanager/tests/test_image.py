@@ -21,7 +21,7 @@ from vizmanager.image import (  # noqa: E402
     EncodedImage,
     opencv_available,
 )
-from vizmanager.overlay2d import Overlay2D  # noqa: E402
+from vizmanager.overlay2d import Overlay2D, OverlayText  # noqa: E402
 from vizmanager.session import Session  # noqa: E402
 
 _generated_ok = os.path.isfile(_GENERATED) and codec.generated_available()
@@ -31,6 +31,27 @@ needs_image_stack = pytest.mark.skipif(
     not _generated_ok or not _cv2_ok,
     reason="generated CLAD Python or opencv missing",
 )
+
+
+def test_overlay_text_is_recorded_in_image_pixels():
+    ov = Overlay2D()
+    ov.frame = True
+    payload = type(
+        "T",
+        (),
+        {"color": 0x11223344, "x": 8, "y": 12, "text": "marker"},
+    )()
+    ov.handle_camera_text(payload)
+    assert ov.texts == [OverlayText(8, 12, "marker", (0x11, 0x22, 0x33))]
+    ov.timestamp = 42
+    ov._draw_camera_info()
+    assert ov.info_timestamp == 42
+    assert ov.info_exp.startswith("Exp:")
+    ov.texts.append(OverlayText(0, 0, "old", (0, 0, 0)))
+    # A new camera paste (same path as handle_image_chunk) must wipe labels.
+    ov.texts = []
+    ov._draw_camera_info()
+    assert ov.texts == []
 
 if _cv2_ok:
     import cv2  # noqa: E402
@@ -211,6 +232,40 @@ def test_session_complete_jpeg_pastes_then_overlays_wipe():
     assert r2 > g2
     assert sess.drops == 0
     assert sess.errors == 0
+
+
+@needs_image_stack
+def test_session_camera_text_is_stored_not_baked():
+    """CameraText stays in overlay.texts so the pane can draw 12px HUD type.
+
+    Baking Hershey 0.4 into a Half-res JPEG then letterboxing made labels
+    unreadable. Next ImageChunk still wipes the list (same as geometry).
+    """
+    MessageViz = codec.MessageViz
+    width, height = 32, 32
+    jpeg = _jpeg(width, height, rgb=(0, 0, 180))
+    sess = Session()
+    sess.process_datagram(
+        _pack("ImageChunk", _chunk(jpeg, image_id=1, width=width, height=height, ts=10))
+    )
+    text_cls = MessageViz.typeByTag(MessageViz.Tag.CameraText)
+    msg = text_cls(color=0xFFFFFFFF, x=8, y=12, text="marker")
+    sess.process_datagram(_pack("CameraText", msg))
+    assert len(sess.overlay.texts) == 1
+    item = sess.overlay.texts[0]
+    assert item.text == "marker"
+    assert item.x == 8
+    assert item.y == 12
+    assert item.rgb == (255, 255, 255)
+    # Not burned into the JPEG paste (geometry overlays still are).
+    assert int(sess.overlay.frame[12, 8, 0]) < 40
+    assert sess.overlay.info_timestamp == 10
+
+    sess.process_datagram(
+        _pack("ImageChunk", _chunk(jpeg, image_id=2, width=width, height=height, ts=20))
+    )
+    assert sess.overlay.texts == []
+    assert sess.overlay.info_timestamp == 20
 
 
 @needs_image_stack

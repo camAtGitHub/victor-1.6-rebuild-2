@@ -20,9 +20,16 @@ from vizmanager.app import (
     STATUS_LIVE,
     Redirector,
     VizApp,
+    _CAM_DEFAULT_W,
+    _CAM_MIN_W,
+    _SPLITTER_W,
+    _WORLD_MIN_W,
     build_parser,
+    clamp_cam_w,
     connect_error_message,
+    image_to_pane,
     layout_rects,
+    letterbox_dest,
     map_grid_lines,
     status_for,
 )
@@ -53,17 +60,71 @@ def test_parser_rejects_both_modes():
 def test_layout_world_largest_default_and_min():
     for size in (DEFAULT_SIZE, MIN_SIZE):
         rects = layout_rects(*size)
-        world = rects["world"][2] * rects["world"][3]
-        camera = rects["camera"][2] * rects["camera"][3]
         stack = rects["stack"][2] * rects["stack"][3]
         state = rects["state"][2] * rects["state"][3]
-        assert world > camera
+        world = rects["world"][2] * rects["world"][3]
         assert world > stack
         assert world > state
         assert rects["chrome"][3] == theme.CHROME_H
         assert rects["log"][3] == theme.LOG_H_COLLAPSED
         assert rects["window"][2] >= MIN_SIZE[0]
         assert rects["window"][3] >= MIN_SIZE[1]
+        assert rects["camera"][2] >= _CAM_MIN_W
+        assert rects["world"][2] >= _WORLD_MIN_W
+    default = layout_rects(*DEFAULT_SIZE)
+    assert default["camera"][2] == _CAM_DEFAULT_W
+    assert _CAM_DEFAULT_W == 2 * 320
+    assert default["world"][2] >= default["camera"][2]
+
+
+def test_layout_cam_w_is_clamped_and_splitter_sits_on_the_seam():
+    wide = layout_rects(*DEFAULT_SIZE, cam_w=400)
+    assert wide["camera"][2] == 400
+    assert wide["world"][0] == 400
+    too_big = layout_rects(*DEFAULT_SIZE, cam_w=10000)
+    assert too_big["camera"][2] == clamp_cam_w(DEFAULT_SIZE[0], 10000)
+    assert too_big["world"][2] >= _WORLD_MIN_W
+    too_small = layout_rects(*DEFAULT_SIZE, cam_w=1)
+    assert too_small["camera"][2] == _CAM_MIN_W
+    rects = layout_rects(*DEFAULT_SIZE, cam_w=500)
+    split = rects["splitter"]
+    assert split[2] == _SPLITTER_W
+    cam = rects["camera"]
+    world = rects["world"]
+    seam = cam[0] + cam[2]
+    assert split[0] <= seam <= split[0] + split[2]
+    assert world[0] == seam
+
+
+def test_letterbox_maps_image_pixels_onto_the_pane():
+    pane = (0, 36, 640, 360)
+    dest, scale = letterbox_dest(320, 180, pane)
+    assert scale == 2.0
+    assert dest == (0, 36, 640, 360)
+    x, y = image_to_pane(10, 20, dest, scale)
+    assert (x, y) == (20.0, 76.0)
+    # Pillarbox: frame narrower than pane aspect.
+    dest2, scale2 = letterbox_dest(100, 100, (0, 0, 400, 200))
+    assert scale2 == 2.0
+    assert dest2[2] == 200
+    assert dest2[3] == 200
+    assert dest2[0] == 100
+
+
+def test_app_splitter_drag_changes_cam_w():
+    parser = build_parser()
+    args = parser.parse_args(["--listen-only"])
+    app = VizApp(args)
+    try:
+        assert app.cam_w == _CAM_DEFAULT_W
+        app.apply_splitter_x(400, DEFAULT_SIZE[0])
+        assert app.cam_w == 400
+        app.apply_splitter_x(0, DEFAULT_SIZE[0])
+        assert app.cam_w == _CAM_MIN_W
+        app.reset_cam_w()
+        assert app.cam_w == _CAM_DEFAULT_W
+    finally:
+        app.close()
 
 
 def test_status_words_not_color_only():

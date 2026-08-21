@@ -60,6 +60,9 @@ STATUS_DISCONNECTED = "DISCONNECTED"
 EMPTY_CAMERA = "No ImageChunk (enable VisionMode::Viz)"
 _RIGHT_W = 300
 _CAM_MIN_W = 320
+_CAM_DEFAULT_W = 640  # 100% bigger than the original 320px satellite
+_WORLD_MIN_W = 320
+_SPLITTER_W = 8
 _TAB_H = 24
 _PIP_D = 8
 
@@ -90,8 +93,42 @@ def build_parser():
     return parser
 
 
-def layout_rects(width, height):
-    """MASTER.md layout. WORLD is the largest pane. Returns (x, y, w, h) tuples."""
+def clamp_cam_w(width, cam_w, right_w=_RIGHT_W):
+    """Keep CAMERA >= 320px and WORLD >= 320px at the current window width."""
+    w = max(int(width), MIN_SIZE[0])
+    max_cam = w - int(right_w) - _WORLD_MIN_W
+    max_cam = max(_CAM_MIN_W, max_cam)
+    return max(_CAM_MIN_W, min(int(cam_w), max_cam))
+
+
+def letterbox_dest(frame_w, frame_h, pane):
+    """Fit (frame_w, frame_h) inside pane (x, y, w, h). Returns (dest, scale).
+
+    dest is (x, y, w, h) of the letterboxed image. Overlay image-pixels map
+    through image_to_pane using this dest + scale.
+    """
+    px, py, pw, ph = pane
+    if frame_w < 1 or frame_h < 1 or pw < 1 or ph < 1:
+        return (px, py, max(1, pw), max(1, ph)), 1.0
+    scale = min(pw / float(frame_w), ph / float(frame_h))
+    nw = max(1, int(round(frame_w * scale)))
+    nh = max(1, int(round(frame_h * scale)))
+    dx = px + (pw - nw) // 2
+    dy = py + (ph - nh) // 2
+    return (dx, dy, nw, nh), scale
+
+
+def image_to_pane(x, y, dest, scale):
+    """Map JPEG-pixel (x, y) onto the letterboxed dest rect."""
+    return dest[0] + x * scale, dest[1] + y * scale
+
+
+def layout_rects(width, height, cam_w=None):
+    """MASTER.md layout. Default CAMERA is 640px; drag the splitter to change.
+
+    WORLD stays at least _WORLD_MIN_W. At DEFAULT_SIZE, WORLD is still the
+    widest pane. Returns (x, y, w, h) tuples.
+    """
     w = max(int(width), MIN_SIZE[0])
     h = max(int(height), MIN_SIZE[1])
     chrome_h = theme.CHROME_H
@@ -99,10 +136,9 @@ def layout_rects(width, height):
     body_top = chrome_h
     body_h = h - chrome_h - log_h
     right_w = _RIGHT_W
-    cam_w = _CAM_MIN_W
-    world_w = w - cam_w - right_w
-    if world_w < cam_w or world_w < right_w:
-        world_w = max(w // 2, cam_w + 1, right_w + 1)
+    wanted = _CAM_DEFAULT_W if cam_w is None else cam_w
+    if w - right_w < _CAM_MIN_W + _WORLD_MIN_W:
+        world_w = max(w // 2, _CAM_MIN_W + 1, right_w + 1)
         leftover = w - world_w
         right_w = min(_RIGHT_W, leftover // 2)
         if right_w < 220:
@@ -111,13 +147,18 @@ def layout_rects(width, height):
         if cam_w < 1:
             cam_w = 1
             world_w = w - cam_w - right_w
+    else:
+        cam_w = clamp_cam_w(w, wanted, right_w)
+        world_w = w - cam_w - right_w
     tab_h = _TAB_H
     stack_h = body_h * 2 // 5
     state_h = body_h - stack_h
+    split_x = cam_w - _SPLITTER_W // 2
     return {
         "window": (0, 0, w, h),
         "chrome": (0, 0, w, chrome_h),
         "camera": (0, body_top, cam_w, body_h),
+        "splitter": (split_x, body_top, _SPLITTER_W, body_h),
         "world": (cam_w, body_top, world_w, body_h),
         "world_tabs": (cam_w, body_top, world_w, tab_h),
         "world_view": (cam_w, body_top + tab_h, world_w, body_h - tab_h),
@@ -332,6 +373,7 @@ class VizApp:
         self.view2d = View2D(self.session.world)
         self.view3d = View3D(self.session.world)
         self.tab = TAB_3D
+        self.cam_w = _CAM_DEFAULT_W
         self.render_paused = False
         self.ip_text = self.robot_ip
         self.ip_focused = False
@@ -344,6 +386,8 @@ class VizApp:
         self._last_draw = {"camera": None, "world": None, "camera_frame": None}
         self._fonts = {}
         self._drag = None
+        self._split_drag = False
+        self._splitter_hover = False
         self._cam_bytes = None
         self._mesh_cache = None
         self._mesh_cache_t = None
@@ -407,6 +451,16 @@ class VizApp:
 
     def connecting(self):
         return self.redirector is not None and self.redirector.connecting
+
+    def apply_splitter_x(self, x, window_w):
+        """Set CAMERA width from the splitter's window-x (drag)."""
+        self.cam_w = clamp_cam_w(window_w, int(x))
+
+    def reset_cam_w(self):
+        self.cam_w = _CAM_DEFAULT_W
+
+    def _layout(self, size):
+        return layout_rects(size[0], size[1], cam_w=self.cam_w)
 
     def drain(self, timeout=0.0):
         socks = []
@@ -532,11 +586,12 @@ class VizApp:
     def _handle_event(self, event, size):
         import pygame
 
-        rects = layout_rects(*size)
+        rects = self._layout(size)
         if event.type == pygame.MOUSEBUTTONDOWN:
             self._on_mouse_down(event, rects)
         elif event.type == pygame.MOUSEBUTTONUP:
             self._drag = None
+            self._split_drag = False
             self._orbit_t = time.monotonic()
         elif event.type == pygame.MOUSEMOTION:
             self._on_mouse_move(event, rects)
@@ -609,6 +664,14 @@ class VizApp:
         widgets = self._chrome_widgets(rects)
         pos = event.pos
         self.ip_focused = _hit(widgets["ip_hit"], pos)
+        if event.button == 1 and _hit(rects["splitter"], pos):
+            if getattr(event, "clicks", 1) >= 2:
+                self.reset_cam_w()
+                self._split_drag = False
+                return
+            self._split_drag = True
+            self.apply_splitter_x(pos[0], rects["window"][2])
+            return
         if event.button == 1 and _hit(widgets["connect"], pos):
             if not self.connecting():
                 self.start_connect()
@@ -636,6 +699,20 @@ class VizApp:
                 self._el_vel = 0.0
 
     def _on_mouse_move(self, event, rects):
+        import pygame
+
+        hover = _hit(rects["splitter"], event.pos)
+        self._splitter_hover = hover or self._split_drag
+        try:
+            if self._splitter_hover:
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_SIZEWE)
+            else:
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+        except Exception:
+            pass
+        if self._split_drag:
+            self.apply_splitter_x(event.pos[0], rects["window"][2])
+            return
         drag = self._drag
         if not drag:
             return
@@ -705,6 +782,11 @@ class VizApp:
                 (theme.FONT_MONO, "DejaVu Sans Mono", "Consolas"),
                 theme.FONT_LABEL_PX,
             )
+        elif kind == "overlay":
+            names, size = (
+                (theme.FONT_MONO, "DejaVu Sans Mono", "Consolas"),
+                theme.FONT_HUD_PX,
+            )
         else:
             names, size = (
                 (theme.FONT_MONO, "DejaVu Sans Mono", "Consolas"),
@@ -724,7 +806,7 @@ class VizApp:
     def _draw(self, screen):
         import pygame
 
-        rects = layout_rects(*screen.get_size())
+        rects = self._layout(screen.get_size())
         self._coast_orbit()
         screen.fill(theme.BG_VOID)
         self._draw_chrome(screen, rects)
@@ -827,31 +909,98 @@ class VizApp:
         r = pygame.Rect(rects["camera"])
         pygame.draw.rect(screen, theme.BG_VOID, r)
         pygame.draw.rect(screen, theme.BORDER, r, 1)
+        overlay = self.session.overlay
         if self.render_paused:
             frame = self._last_draw.get("camera_frame")
+            texts = self._last_draw.get("camera_texts") or ()
+            info = self._last_draw.get("camera_info") or (0, "", "")
         else:
-            frame = self.session.overlay.frame
+            frame = overlay.frame
+            texts = list(overlay.texts)
+            info = (overlay.info_timestamp, overlay.info_exp, overlay.info_awb)
             self._last_draw["camera_frame"] = frame
+            self._last_draw["camera_texts"] = texts
+            self._last_draw["camera_info"] = info
+        dest = None
+        scale = 1.0
         if frame is None:
             self._centered(screen, r, EMPTY_CAMERA, theme.TEXT_MUTED)
+        else:
+            try:
+                import numpy as np
+            except ImportError:
+                self._centered(screen, r, EMPTY_CAMERA, theme.TEXT_MUTED)
+                np = None
+            if np is not None:
+                arr = np.ascontiguousarray(frame)
+                h, w = arr.shape[0], arr.shape[1]
+                if h < 1 or w < 1:
+                    self._centered(screen, r, EMPTY_CAMERA, theme.TEXT_MUTED)
+                else:
+                    self._cam_bytes = arr.tobytes()
+                    src = pygame.image.frombuffer(self._cam_bytes, (w, h), "RGB")
+                    dest, scale = letterbox_dest(w, h, (r.x, r.y, r.w, r.h))
+                    scaled = pygame.transform.smoothscale(src, (dest[2], dest[3]))
+                    screen.blit(scaled, dest[:2])
+                    self._draw_camera_overlays(screen, dest, scale, texts, info)
+        self._draw_splitter(screen, rects)
+
+    def _draw_splitter(self, screen, rects):
+        import pygame
+
+        seam = rects["camera"][2]
+        y = rects["camera"][1]
+        h = rects["camera"][3]
+        color = theme.ACCENT if self._splitter_hover else theme.BORDER
+        pygame.draw.line(screen, color, (seam, y), (seam, y + h), 1)
+
+    def _blit_overlay_text(self, screen, font, text, pos, color):
+        """12px HUD type with a 1px drop shadow (Webots drawText). pos is top-left."""
+        if not text:
             return
-        try:
-            import numpy as np
-        except ImportError:
-            self._centered(screen, r, EMPTY_CAMERA, theme.TEXT_MUTED)
-            return
-        arr = np.ascontiguousarray(frame)
-        h, w = arr.shape[0], arr.shape[1]
-        if h < 1 or w < 1:
-            self._centered(screen, r, EMPTY_CAMERA, theme.TEXT_MUTED)
-            return
-        self._cam_bytes = arr.tobytes()
-        src = pygame.image.frombuffer(self._cam_bytes, (w, h), "RGB")
-        scale = min(r.w / float(w), r.h / float(h))
-        nw, nh = max(1, int(w * scale)), max(1, int(h * scale))
-        scaled = pygame.transform.smoothscale(src, (nw, nh))
-        dest = scaled.get_rect(center=r.center)
-        screen.blit(scaled, dest)
+        x, y = int(round(pos[0])), int(round(pos[1]))
+        shadow = font.render(text, True, theme.BG_VOID)
+        glyph = font.render(text, True, color)
+        screen.blit(shadow, (x + 1, y + 1))
+        screen.blit(glyph, (x, y))
+
+    def _draw_camera_overlays(self, screen, dest, scale, texts, info):
+        import pygame
+
+        font = self._font(pygame, "overlay")
+        for item in texts:
+            px, py = image_to_pane(item.x, item.y, dest, scale)
+            self._blit_overlay_text(screen, font, item.text, (px, py), item.rgb)
+        ts, exp_text, awb_text = info
+        pad = theme.SPACE[0]
+        line_h = font.get_height()
+        dx, dy, dw, dh = dest
+        if ts or exp_text or awb_text:
+            self._blit_overlay_text(
+                screen,
+                font,
+                str(ts),
+                (dx + pad, dy + dh - pad - line_h),
+                theme.DANGER,
+            )
+            if exp_text:
+                img_w = font.size(exp_text)[0]
+                self._blit_overlay_text(
+                    screen,
+                    font,
+                    exp_text,
+                    (dx + dw - pad - img_w, dy + dh - pad - line_h),
+                    theme.DANGER,
+                )
+            if awb_text:
+                img_w = font.size(awb_text)[0]
+                self._blit_overlay_text(
+                    screen,
+                    font,
+                    awb_text,
+                    (dx + dw - pad - img_w, dy + dh - pad - 2 * line_h),
+                    theme.DANGER,
+                )
 
     def _draw_world(self, screen, rects):
         import pygame

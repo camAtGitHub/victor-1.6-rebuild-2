@@ -156,6 +156,7 @@ sudo iptables -I INPUT -p udp --dport 5200 -s ROBOT_LAN_IP -j ACCEPT
 | F | Frame robot |
 | Space | Pause render only (UI pings keep going) |
 | Esc | Dismiss connect error / blur IP field |
+| Drag CAMERA\|WORLD edge | Resize the camera pane (default 640px, double-click to reset) |
 
 Connect: button disables and shows **Connecting…** until UI handshake or 8 s. Errors under the IP field include the 5103 / 5252 / 5200 fix.
 
