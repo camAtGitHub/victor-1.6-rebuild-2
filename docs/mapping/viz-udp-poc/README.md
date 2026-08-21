@@ -53,7 +53,7 @@ Optional later: deploy this tree and use `RedirectVizTo` via `:8888` instead of 
 Allow UDP **5252** and **5200** inbound in Windows Defender Firewall:
 
 ```powershell
-New-NetFirewallRule -Protocol UDP -LocalPort 5252,5200
+New-NetFirewallRule -DisplayName 'Vector Viz' -Direction Inbound -Protocol UDP -LocalPort 5252,5200 -Action Allow
 ```
 
 ### Linux (this host)

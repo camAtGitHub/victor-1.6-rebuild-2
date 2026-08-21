@@ -537,9 +537,10 @@ def write_python_file(output_directory, output_file, output_callback,
 
     with get_output(output_directory, output_file) as output:
         if comment_lines:
-            output.write('"""\n')
-            output.write('\n'.join('{0}'.format(line) for line in comment_lines))
-            output.write('\n"""\n\n')
+            # Hash comments, not a """ docstring: Windows paths like lib\util
+            # are a truncated \uXXXX escape inside a string literal.
+            output.write('\n'.join('# {0}'.format(line) for line in comment_lines))
+            output.write('\n\n')
 
         if future_features:
             for feature in future_features:
@@ -646,6 +647,9 @@ def _convert_abspaths_to_relpaths(args):
     # find longest_common_path (lcp)
     # commonprefix might return a partial path, so use dirname on the results
     lcp = os.path.dirname(os.path.commonprefix(paths))
-    rel_args = [os.path.relpath(a, lcp) if os.path.isabs(a) else a for a in args]
+    rel_args = [
+        make_path_portable(os.path.relpath(a, lcp)) if os.path.isabs(a) else a
+        for a in args
+    ]
     return rel_args
 

@@ -50,7 +50,10 @@ TAB_NAMES = ("3D", "2D", "Map")
 CONNECT_TIMEOUT_S = 8.0
 STALE_S = 2.0
 PPS_WINDOW_S = 1.0
-FIREWALL_WIN = "New-NetFirewallRule -Protocol UDP -LocalPort 5252,5200"
+FIREWALL_WIN = (
+    "New-NetFirewallRule -DisplayName 'Vector Viz' -Direction Inbound "
+    "-Protocol UDP -LocalPort 5252,5200 -Action Allow"
+)
 STATUS_LIVE = "LIVE"
 STATUS_DEGRADED = "DEGRADED"
 STATUS_DISCONNECTED = "DISCONNECTED"

@@ -55,7 +55,8 @@ def unpack(data):
     """
     if MessageViz is None:
         raise ImportError(
-            "generated MessageViz not found; run tools/vizmanager/scripts/generate_clad.sh"
+            "generated MessageViz not found; run python tools/vizmanager/scripts/generate_clad.py "
+            "(Windows: tools/vizmanager/scripts/setup_windows.ps1)"
         )
     msg = MessageViz.unpack(data)
     return msg, int(msg.tag)
