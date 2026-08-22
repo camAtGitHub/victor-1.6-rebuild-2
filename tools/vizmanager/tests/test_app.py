@@ -39,6 +39,7 @@ from vizmanager.app import (
     layout_rects,
     letterbox_dest,
     map_grid_lines,
+    map_path_highlight_pts,
     map_robot_pts,
     status_for,
     _RIGHT_W,
@@ -47,7 +48,7 @@ from vizmanager import overlay_panel
 from vizmanager.sensors import OverlaySettings
 from vizmanager.udp import ANKICONN
 from vizmanager.view3d import DRAW_OBJECTS_RATE_SEC
-from vizmanager.world import World
+from vizmanager.world import MM_TO_M, World
 
 try:
     import pygame
@@ -246,6 +247,83 @@ def test_map_robot_pts_tip_at_origin_and_pans():
     assert pts[2] == (-30, 75)
     panned = map_robot_pts(world, 100, 100, origin_x=10.0, origin_y=-4.0)
     assert panned[0] == (60, 46)
+
+
+def _path_line(path_id=1, **kw):
+    fields = dict(
+        pathID=path_id,
+        x_start_m=0.0,
+        y_start_m=0.0,
+        z_start_m=0.0,
+        x_end_m=0.5,
+        y_end_m=0.0,
+        z_end_m=0.0,
+    )
+    fields.update(kw)
+    return SimpleNamespace(**fields)
+
+
+def _path_arc(path_id=1, **kw):
+    fields = dict(
+        pathID=path_id,
+        x_center_m=0.0,
+        y_center_m=0.0,
+        radius_m=1.0,
+        start_rad=0.0,
+        sweep_rad=0.4,
+    )
+    fields.update(kw)
+    return SimpleNamespace(**fields)
+
+
+def _robot_state(curr=0):
+    return SimpleNamespace(state=SimpleNamespace(currPathSegment=curr))
+
+
+def test_map_path_highlight_only_active_segment():
+    world = World()
+    world.append_path_line(_path_line())
+    world.append_path_arc(_path_arc())
+    settings = OverlaySettings()
+    assert map_path_highlight_pts(world, 100, 100) == ()
+    strips = map_path_highlight_pts(
+        world, 100, 100, settings=settings, robot_state=_robot_state(0)
+    )
+    assert len(strips) == 1
+    # Line (0,0)->(0.5,0) m: 1 mm = 1 px, Y flip, origin at pane center.
+    assert strips[0] == ((50, 50), (550, 50))
+    panned = map_path_highlight_pts(
+        world,
+        100,
+        100,
+        origin_x=10.0,
+        origin_y=-4.0,
+        settings=settings,
+        robot_state=_robot_state(0),
+    )
+    assert panned[0][0] == (60, 46)
+    arc = map_path_highlight_pts(
+        world, 100, 100, settings=settings, robot_state=_robot_state(1)
+    )
+    assert len(arc) == 1
+    expected_arc = world.paths[1].segment_polyline_m(1)
+    assert len(arc[0]) == len(expected_arc)
+    x_m, y_m, _z = expected_arc[0]
+    assert arc[0][0] == (
+        int(round(x_m / MM_TO_M + 50.0)),
+        int(round(-y_m / MM_TO_M + 50.0)),
+    )
+    assert map_path_highlight_pts(
+        world, 100, 100, settings=settings, robot_state=_robot_state(5)
+    ) == ()
+    assert map_path_highlight_pts(
+        world, 100, 100, settings=settings, robot_state=_robot_state(-1)
+    ) == ()
+    off = OverlaySettings()
+    off.path_highlight = False
+    assert map_path_highlight_pts(
+        world, 100, 100, settings=off, robot_state=_robot_state(0)
+    ) == ()
 
 
 def test_map_grid_is_1mm_px_not_view2d_metres():

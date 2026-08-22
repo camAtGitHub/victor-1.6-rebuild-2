@@ -10,6 +10,7 @@ import os
 from dataclasses import dataclass
 
 from vizmanager import theme
+from vizmanager.sensors import OverlaySettings
 from vizmanager.world import (
     VIZ_OBJECT_CHARGER,
     VIZ_OBJECT_CUBOID,
@@ -122,8 +123,10 @@ class View2D:
             y += GRID_STEP_M
         return tuple(lines)
 
-    def meshes(self):
+    def meshes(self, settings=None, robot_state=None):
         """Protocol meshes in world metres (origin already applied). Empty if hidden."""
+        if settings is None:
+            settings = OverlaySettings()
         out = []
         world = self.world
         if world.robot is not None:
@@ -151,6 +154,18 @@ class View2D:
                 pts = tuple(world.apply_origin(*p)[:2] for p in strip)
                 if len(pts) >= 2:
                     out.append(Mesh("polyline", pts, color, False))
+        if (
+            settings.path_highlight
+            and robot_state is not None
+            and robot_state.state.currPathSegment >= 0
+        ):
+            curr = robot_state.state.currPathSegment
+            for path in world.paths.values():
+                strip = path.segment_polyline_m(curr)
+                if strip:
+                    pts = tuple(world.apply_origin(*p)[:2] for p in strip)
+                    if len(pts) >= 2:
+                        out.append(Mesh("polyline", pts, theme.ACCENT, False))
         return tuple(out)
 
     def _object_mesh(self, obj):
@@ -176,7 +191,7 @@ class View2D:
         hx, hy = 0.5 * max(obj.x_size_m, 0.01), 0.5 * max(obj.y_size_m, 0.01)
         return Mesh("polyline", _rect_xy(fn, (-hx, hx), (-hy, hy)), color, True)
 
-    def draw(self, surface=None):
+    def draw(self, surface=None, settings=None, robot_state=None):
         """Blit onto a pygame surface. Creates a software surface if none given.
 
         Returns the surface, or None if pygame is unavailable and no surface was
@@ -203,7 +218,7 @@ class View2D:
                 self.world_to_screen(x1, y1),
                 1,
             )
-        for mesh in self.meshes():
+        for mesh in self.meshes(settings=settings, robot_state=robot_state):
             pts = [self.world_to_screen(x, y) for x, y in mesh.points]
             if len(pts) < 2:
                 continue

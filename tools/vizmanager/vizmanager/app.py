@@ -209,6 +209,37 @@ def map_robot_pts(world, width, height, origin_x=0.0, origin_y=0.0):
     return tuple(out)
 
 
+def map_path_highlight_pts(
+    world, width, height, origin_x=0.0, origin_y=0.0, settings=None, robot_state=None
+):
+    """Screen pixels of the active path segment (1 mm = 1 px). Empty if none."""
+    if settings is None:
+        settings = OverlaySettings()
+    if not settings.path_highlight or robot_state is None:
+        return ()
+    curr = robot_state.state.currPathSegment
+    if curr < 0:
+        return ()
+    cx = 0.5 * width
+    cy = 0.5 * height
+    out = []
+    for path in world.paths.values():
+        strip = path.segment_polyline_m(curr)
+        if not strip:
+            continue
+        pts = []
+        for p in strip:
+            x_m, y_m, _z = world.apply_origin(*p)
+            x_mm = x_m / MM_TO_M
+            y_mm = y_m / MM_TO_M
+            sx = int(round(x_mm + cx + origin_x))
+            sy = int(round(-y_mm + cy + origin_y))
+            pts.append((sx, sy))
+        if len(pts) >= 2:
+            out.append(tuple(pts))
+    return tuple(out)
+
+
 def map_grid_lines(width, height, origin_x=0.0, origin_y=0.0, step_mm=50):
     """Axis-aligned grid in MemoryMap space: 1 mm = 1 px, origin at pane center.
 
@@ -1257,7 +1288,11 @@ class VizApp:
 
     def _paint_2d(self, surf):
         self.view2d.width, self.view2d.height = surf.get_size()
-        self.view2d.draw(surf)
+        self.view2d.draw(
+            surf,
+            settings=self.overlays,
+            robot_state=self.session.hud.robot_state,
+        )
 
     def _world_meshes(self):
         now = time.monotonic()
@@ -1266,7 +1301,10 @@ class VizApp:
             or self._mesh_cache_t is None
             or (now - self._mesh_cache_t) >= DRAW_OBJECTS_RATE_SEC
         ):
-            self._mesh_cache = self.view3d.meshes()
+            self._mesh_cache = self.view3d.meshes(
+                settings=self.overlays,
+                robot_state=self.session.hud.robot_state,
+            )
             self._mesh_cache_t = now
         return self._mesh_cache
 
@@ -1355,6 +1393,17 @@ class VizApp:
         pts = map_robot_pts(self.session.world, w, h, ox, oy)
         if len(pts) >= 3:
             pygame.draw.polygon(surf, theme.ACCENT, pts, 1)
+        for strip in map_path_highlight_pts(
+            self.session.world,
+            w,
+            h,
+            ox,
+            oy,
+            settings=self.overlays,
+            robot_state=self.session.hud.robot_state,
+        ):
+            if len(strip) >= 2:
+                pygame.draw.lines(surf, theme.ACCENT, False, strip, 1)
 
     def _draw_stack_state(self, screen, rects):
         import pygame

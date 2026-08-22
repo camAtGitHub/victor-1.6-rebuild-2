@@ -14,6 +14,7 @@ import time
 from dataclasses import dataclass
 
 from vizmanager import theme
+from vizmanager.sensors import OverlaySettings
 from vizmanager.world import (
     VIZ_OBJECT_CHARGER,
     VIZ_OBJECT_CUBOID,
@@ -279,8 +280,10 @@ class View3D:
             y += GRID_STEP_M
         return tuple(lines)
 
-    def meshes(self):
+    def meshes(self, settings=None, robot_state=None):
         """Protocol + robot meshes in world metres (origin already applied)."""
+        if settings is None:
+            settings = OverlaySettings()
         out = []
         world = self.world
         if world.robot is not None:
@@ -305,6 +308,18 @@ class View3D:
                 pts = tuple(world.apply_origin(*p) for p in strip)
                 if len(pts) >= 2:
                     out.append(Mesh3("polyline", pts, color, "strip"))
+        if (
+            settings.path_highlight
+            and robot_state is not None
+            and robot_state.state.currPathSegment >= 0
+        ):
+            curr = robot_state.state.currPathSegment
+            for path in world.paths.values():
+                strip = path.segment_polyline_m(curr)
+                if strip:
+                    pts = tuple(world.apply_origin(*p) for p in strip)
+                    if len(pts) >= 2:
+                        out.append(Mesh3("polyline", pts, theme.ACCENT, "strip"))
         return tuple(out)
 
     def _object_meshes(self, obj):
