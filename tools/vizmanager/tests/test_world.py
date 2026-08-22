@@ -109,6 +109,19 @@ def _path_line(path_id=3, **kw):
     return SimpleNamespace(**fields)
 
 
+def _path_arc(path_id=3, **kw):
+    fields = dict(
+        pathID=path_id,
+        x_center_m=0.0,
+        y_center_m=0.0,
+        radius_m=1.0,
+        start_rad=0.0,
+        sweep_rad=0.4,
+    )
+    fields.update(kw)
+    return SimpleNamespace(**fields)
+
+
 def test_erase_object_clears_right_key():
     w = World()
     w.set_object(_obj(objectID=10))
@@ -137,6 +150,34 @@ def test_erase_path_clears_right_key():
     assert 8 in w.paths
     w.erase_path(ALL_PATH_IDs)
     assert w.paths == {}
+
+
+def test_path_order_and_segment_polyline_m():
+    w = World()
+    w.append_path_line(_path_line(path_id=1))
+    w.append_path_arc(_path_arc(path_id=1))
+    path = w.paths[1]
+    assert path.order == [("line", 0), ("arc", 0)]
+    assert path.segment_polyline_m(0) == ((0.0, 0.0, 0.0), (0.5, 0.0, 0.0))
+    assert path.segment_polyline_m(1) == tuple(path.arcs[0].points_m())
+    assert path.segment_polyline_m(-1) is None
+    assert path.segment_polyline_m(2) is None
+
+
+def test_polylines_m_stays_lines_then_arcs():
+    w = World()
+    w.append_path_line(_path_line(path_id=1, x_end_m=0.5))
+    w.append_path_arc(_path_arc(path_id=1))
+    w.append_path_line(_path_line(path_id=1, x_start_m=1.0, x_end_m=1.5))
+    path = w.paths[1]
+    assert path.order == [("line", 0), ("arc", 0), ("line", 1)]
+    strips = path.polylines_m()
+    assert strips[0] == ((0.0, 0.0, 0.0), (0.5, 0.0, 0.0))
+    assert strips[1] == ((1.0, 0.0, 0.0), (1.5, 0.0, 0.0))
+    assert strips[2] == tuple(path.arcs[0].points_m())
+    assert path.segment_polyline_m(0) == strips[0]
+    assert path.segment_polyline_m(1) == strips[2]
+    assert path.segment_polyline_m(2) == strips[1]
 
 
 def test_erase_quad_physviz_all():
