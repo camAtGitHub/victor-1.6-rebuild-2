@@ -12,6 +12,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from vizmanager import theme  # noqa: E402
+from vizmanager.sensors import OverlaySettings  # noqa: E402
 from vizmanager.view3d import (  # noqa: E402
     AXIS_LEN_M,
     CANVAS_KEYS,
@@ -106,6 +107,23 @@ def _path_line(path_id=3, **kw):
     return SimpleNamespace(**fields)
 
 
+def _path_arc(path_id=3, **kw):
+    fields = dict(
+        pathID=path_id,
+        x_center_m=0.0,
+        y_center_m=0.0,
+        radius_m=1.0,
+        start_rad=0.0,
+        sweep_rad=0.4,
+    )
+    fields.update(kw)
+    return SimpleNamespace(**fields)
+
+
+def _robot_state(curr=0):
+    return SimpleNamespace(state=SimpleNamespace(currPathSegment=curr))
+
+
 def _robot(**kw):
     fields = dict(
         x_trans_m=0.25,
@@ -195,6 +213,82 @@ def test_path_color_falls_back_to_theme_path():
     paths = [m for m in view.meshes() if m.kind == "polyline"]
     assert paths
     assert paths[0].color == theme.PATH
+
+
+def _line_then_arc_world():
+    w = World()
+    w.append_path_line(_path_line(path_id=1))
+    w.append_path_arc(_path_arc(path_id=1))
+    return w
+
+
+def _accent_paths(meshes):
+    return [m for m in meshes if m.kind == "polyline" and m.color == theme.ACCENT]
+
+
+def _protocol_paths(meshes):
+    return [m for m in meshes if m.kind == "polyline" and m.color != theme.ACCENT]
+
+
+def test_path_highlight_line_then_arc_segment_0():
+    w = _line_then_arc_world()
+    path = w.paths[1]
+    color_before = path.color
+    view = View3D(w)
+    meshes = view.meshes(settings=OverlaySettings(), robot_state=_robot_state(0))
+    protocol = _protocol_paths(meshes)
+    accent = _accent_paths(meshes)
+    assert len(protocol) == 2
+    assert all(m.color == theme.PATH for m in protocol)
+    assert len(accent) == 1
+    expected = tuple(w.apply_origin(*p) for p in path.segment_polyline_m(0))
+    assert accent[0].points == expected
+    assert expected == ((0.0, 0.0, 0.0), (0.5, 0.0, 0.0))
+    assert accent[0].connect == "strip"
+    assert path.color is color_before
+    assert not _accent_paths(view.meshes())
+
+
+def test_path_highlight_line_then_arc_segment_1():
+    w = _line_then_arc_world()
+    path = w.paths[1]
+    view = View3D(w)
+    meshes = view.meshes(settings=OverlaySettings(), robot_state=_robot_state(1))
+    accent = _accent_paths(meshes)
+    protocol = _protocol_paths(meshes)
+    assert len(protocol) == 2
+    assert all(m.color == theme.PATH for m in protocol)
+    assert len(accent) == 1
+    expected = tuple(w.apply_origin(*p) for p in path.segment_polyline_m(1))
+    assert accent[0].points == expected
+    assert expected == tuple(path.arcs[0].points_m())
+
+
+def test_path_highlight_out_of_range_and_disabled():
+    w = _line_then_arc_world()
+    view = View3D(w)
+    off = OverlaySettings()
+    off.path_highlight = False
+    assert not _accent_paths(view.meshes(settings=off, robot_state=_robot_state(0)))
+    assert not _accent_paths(
+        view.meshes(settings=OverlaySettings(), robot_state=_robot_state(5))
+    )
+    assert not _accent_paths(
+        view.meshes(settings=OverlaySettings(), robot_state=_robot_state(-1))
+    )
+    protocol = _protocol_paths(
+        view.meshes(settings=OverlaySettings(), robot_state=_robot_state(5))
+    )
+    assert len(protocol) == 2
+    assert all(m.color == theme.PATH for m in protocol)
+
+
+def test_path_highlight_hidden_when_show_objects_false():
+    w = _line_then_arc_world()
+    view = View3D(w)
+    w.set_show_objects(0)
+    meshes = view.meshes(settings=OverlaySettings(), robot_state=_robot_state(0))
+    assert not any(m.kind == "polyline" for m in meshes)
 
 
 def test_text_is_skipped():
