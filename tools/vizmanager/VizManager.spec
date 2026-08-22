@@ -32,6 +32,22 @@ hiddenimports = [
     "pygame",
     "cv2",
     "numpy",
+    # `from vizmanager import overlay_panel` is not traced as a submodule.
+    "vizmanager.overlay_panel",
+    "vizmanager.sensors",
+    "vizmanager.theme",
+    "vizmanager.app",
+    "vizmanager.session",
+    "vizmanager.hud",
+    "vizmanager.world",
+    "vizmanager.view2d",
+    "vizmanager.view3d",
+    "vizmanager.overlay2d",
+    "vizmanager.image",
+    "vizmanager.codec",
+    "vizmanager.connect",
+    "vizmanager.udp",
+    "vizmanager.vision_http",
 ]
 
 
@@ -49,6 +65,13 @@ for _pkg in ("pygame", "cv2", "numpy", "vispy"):
     datas += _d
     binaries += _b
     hiddenimports += _h
+
+try:
+    from PyInstaller.utils.hooks import collect_submodules
+
+    hiddenimports += collect_submodules("vizmanager")
+except Exception:
+    pass
 
 a = Analysis(
     [os.path.join(SPEC_DIR, "vizmanager", "__main__.py")],

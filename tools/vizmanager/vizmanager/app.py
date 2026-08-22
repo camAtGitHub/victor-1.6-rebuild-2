@@ -18,7 +18,8 @@ import struct
 import sys
 import time
 
-from vizmanager import overlay_panel, theme
+from vizmanager import theme
+import vizmanager.overlay_panel as overlay_panel
 from vizmanager.connect import (
     E2G_PING,
     MAX_MSG,

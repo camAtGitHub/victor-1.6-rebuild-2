@@ -25,6 +25,13 @@ def test_unfrozen_repo_root_is_checkout():
     assert os.path.isdir(os.path.join(root, "tools", "vizmanager"))
 
 
+def test_spec_hiddenimports_include_overlay_modules():
+    spec = os.path.join(os.path.dirname(__file__), "..", "VizManager.spec")
+    text = open(spec, encoding="utf-8").read()
+    assert '"vizmanager.overlay_panel"' in text
+    assert '"vizmanager.sensors"' in text
+
+
 def test_freeze_datas_match_codec_search_paths():
     root = repo_root()
     datas = freeze_datas(root)
