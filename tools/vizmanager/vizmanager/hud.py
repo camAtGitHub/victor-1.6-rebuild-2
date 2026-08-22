@@ -2,7 +2,8 @@
 
 Stack draw: vizControllerImpl.cpp:918–933 (clear, then debugStrings[i] at line i).
 Robot state: vizControllerImpl.cpp:756–882 (pose/head/lift/pitch/roll/accel/gyro
-plus cliffs/battery/anim in the same handler). CurrentAnimation: 910–915.
+plus cliffs/battery/anim in the same handler). White/PathSeg at 18/19.
+Cliff/OffTreads GREEN/RED -> LIVE/DANGER. CurrentAnimation: 910–915.
 SetLabel: 394–398 (NUM_TEXT_LABELS + labelID).
 Producer: stackVizMonitor.cpp:64–81 (GetDebugLabel, bottom-to-top as sent).
 
@@ -17,9 +18,11 @@ import os
 from collections import namedtuple
 
 from vizmanager import theme
+from vizmanager.sensors import OverlaySettings
 
 # VizTextLabelType in vizControllerImpl.h:88–107 (line numbers on the state panel).
-NUM_TEXT_LABELS = 19
+# White at 18, PathSeg at 19; SetLabel at NUM_TEXT_LABELS + labelID.
+NUM_TEXT_LABELS = 21
 
 # cozmoConfig.h ConvertLiftAngleToLiftHeightMM
 _LIFT_ARM_LENGTH = 66.0
@@ -203,18 +206,37 @@ class HUD:
         """debugStrings as sent: index 0 at top. Do not reverse."""
         return list(self.stack)
 
-    def state_lines(self):
-        """Webots robot-state lines, then SetLabel at NUM_TEXT_LABELS + labelID."""
-        lines = [""] * NUM_TEXT_LABELS
+    def state_rows(self, settings=None):
+        """Webots robot-state rows as (text, color_token). Empty string when gated off."""
+        if settings is None:
+            settings = OverlaySettings()
+        rows = [("", theme.TEXT)] * NUM_TEXT_LABELS
         if self.robot_state is not None:
             formatted = self._format_robot_state()
-            lines[: len(formatted)] = formatted
+            colors = self._robot_state_colors()
+            for i, text in enumerate(formatted):
+                if i >= NUM_TEXT_LABELS:
+                    break
+                color = colors[i] if i < len(colors) else theme.TEXT
+                rows[i] = (text, color)
+            if not settings.cliff_hud:
+                rows[6] = ("", theme.TEXT)
+            if not settings.tof_hud:
+                rows[7] = ("", theme.TEXT)
+            if not settings.white_hud:
+                rows[18] = ("", theme.TEXT)
+            if not settings.path_seg_hud:
+                rows[19] = ("", theme.TEXT)
         if self.labels:
             extra = max(self.labels) + 1
-            lines.extend([""] * extra)
+            rows.extend([("", theme.TEXT)] * extra)
             for label_id, text in self.labels.items():
-                lines[NUM_TEXT_LABELS + label_id] = text
-        return lines
+                rows[NUM_TEXT_LABELS + label_id] = (text, theme.TEXT)
+        return rows
+
+    def state_lines(self, settings=None):
+        """Webots robot-state lines, then SetLabel at NUM_TEXT_LABELS + labelID."""
+        return [text for text, _color in self.state_rows(settings)]
 
     def _format_robot_state(self):
         payload = self.robot_state
@@ -235,6 +257,8 @@ class HUD:
         in_use = payload.animTracksInUse
         hot = "H" if status & _IS_BATTERY_OVERHEATED else " "
         disc = "D" if status & _IS_BATTERY_DISCONNECTED else " "
+        white = int(state.whiteDetectedFlags)
+        seg = int(state.currPathSegment)
         return [
             "Pose: %6.1f, %6.1f, ang: %4.1f  [fid: %d, oid: %d]"
             % (pose.x, pose.y, _deg(pose.angle), state.pose_frame_id, state.pose_origin_id),
@@ -247,7 +271,7 @@ class HUD:
             % (accel.x, accel.y, accel.z, payload.imuTemperature_degC),
             "Gyro: %6.1f %6.1f %6.1f deg/s"
             % (_deg(gyro.x), _deg(gyro.y), _deg(gyro.z)),
-            "Cliff: {%4d, %4d, %4d, %4d} thresh: {%4d, %4d, %4d, %4d}"
+            "Cliff: FL:%4d FR:%4d BL:%4d BR:%4d  thr FL:%4d FR:%4d BL:%4d BR:%4d"
             % (
                 cliffs[0],
                 cliffs[1],
@@ -305,7 +329,21 @@ class HUD:
                 "" if status & _HEAD_IN_POS else "HEADING",
                 _flag(status, _IS_MOVING, "MOVING"),
             ),
+            "White: FL:%d FR:%d BL:%d BR:%d"
+            % ((white >> 0) & 1, (white >> 1) & 1, (white >> 2) & 1, (white >> 3) & 1),
+            "PathSeg: -" if seg < 0 else "PathSeg: %d" % seg,
         ]
+
+    def _robot_state_colors(self):
+        """Per-line colors. Webots GREEN/RED -> LIVE/DANGER."""
+        payload = self.robot_state
+        state = payload.state
+        colors = [theme.TEXT] * NUM_TEXT_LABELS
+        colors[6] = theme.DANGER if state.cliffDetectedFlags else theme.LIVE
+        colors[7] = theme.LIVE if int(state.proxData.rangeStatus) == 0 else theme.WARN
+        colors[9] = theme.LIVE if int(payload.offTreadsState) == 0 else theme.DANGER
+        colors[18] = theme.TEXT if state.whiteDetectedFlags else theme.TEXT_MUTED
+        return colors
 
     def _ensure_font(self):
         pg = _pygame()
@@ -338,18 +376,30 @@ class HUD:
             surface.blit(img, (pad, pad + i * _LINE_H))
         return surface
 
+    def _blit_rows(self, surface, rows):
+        surface.fill(theme.BG_PANEL)
+        font = self._ensure_font()
+        if font is None:
+            return surface
+        pad = theme.PANEL_PAD
+        for i, (text, color) in enumerate(rows):
+            if not text:
+                continue
+            img = font.render(str(text), True, color)
+            surface.blit(img, (pad, pad + i * _LINE_H))
+        return surface
+
     def draw_stack(self, surface):
         """Paint stack onto a pygame surface (dummy display / offscreen ok)."""
         if self.stack:
             return self._blit_lines(surface, self.stack, theme.TEXT)
         return self._blit_lines(surface, [_EMPTY_STACK], theme.TEXT_MUTED)
 
-    def draw_state(self, surface):
+    def draw_state(self, surface, settings=None):
         """Paint robot-state + labels onto a pygame surface (offscreen ok)."""
-        lines = self.state_lines()
         if self.robot_state is None and not self.labels:
             return self._blit_lines(surface, [_EMPTY_STATE], theme.TEXT_MUTED)
-        return self._blit_lines(surface, lines, theme.TEXT)
+        return self._blit_rows(surface, self.state_rows(settings))
 
     def set_docking(self, x_dist, y_dist, z_dist, angle):
         self.docking = DockingError(x_dist, y_dist, z_dist, angle)

@@ -39,6 +39,7 @@ if os.path.isfile(_GENERATED) and not codec.generated_available():
     importlib.reload(codec)
 
 from vizmanager.hud import HUD, lift_height_mm  # noqa: E402
+from vizmanager.sensors import OverlaySettings  # noqa: E402
 from vizmanager.session import Session  # noqa: E402
 
 _generated_ok = os.path.isfile(_GENERATED) and codec.generated_available()
@@ -60,6 +61,16 @@ def _pack(tag_name, **fields):
     payload_cls = MessageViz.typeByTag(getattr(MessageViz.Tag, tag_name))
     payload = payload_cls(**fields)
     return MessageViz(**{tag_name: payload}).pack()
+
+
+def _robot_state_payload():
+    MessageViz = codec.MessageViz
+    payload_cls = MessageViz.typeByTag(MessageViz.Tag.RobotStateMessage)
+    return payload_cls()
+
+
+def _pack_robot_state(payload):
+    return codec.MessageViz(RobotStateMessage=payload).pack()
 
 
 def test_stack_order_not_reversed():
@@ -99,7 +110,7 @@ def test_current_animation_and_set_label():
     assert sess.hud.anim_tag == 7
     assert sess.hud.labels[0] == "hello"
     lines = sess.hud.state_lines()
-    assert lines[19] == "hello"
+    assert lines[21] == "hello"
 
 
 @needs_generated
@@ -144,6 +155,106 @@ def test_robot_state_pose_head_lift_and_anim():
     assert "[4]" in lines[12]
 
 
+@needs_generated
+def test_cliff_row_danger_when_detected():
+    payload = _robot_state_payload()
+    payload.state.cliffDetectedFlags = 0x01
+    sess = Session()
+    sess.process_datagram(_pack_robot_state(payload))
+    text, color = sess.hud.state_rows()[6]
+    assert color == theme.DANGER
+    assert "FL:" in text
+
+
+@needs_generated
+def test_cliff_row_live_when_clear():
+    payload = _robot_state_payload()
+    payload.state.cliffDetectedFlags = 0
+    sess = Session()
+    sess.process_datagram(_pack_robot_state(payload))
+    text, color = sess.hud.state_rows()[6]
+    assert color == theme.LIVE
+    assert "FL:" in text
+
+
+@needs_generated
+def test_off_treads_color():
+    sess = Session()
+    payload = _robot_state_payload()
+    payload.offTreadsState = 1
+    sess.process_datagram(_pack_robot_state(payload))
+    assert sess.hud.state_rows()[9][1] == theme.DANGER
+    payload = _robot_state_payload()
+    payload.offTreadsState = 0
+    sess.process_datagram(_pack_robot_state(payload))
+    assert sess.hud.state_rows()[9][1] == theme.LIVE
+
+
+@needs_generated
+def test_dist_row_live_and_warn():
+    sess = Session()
+    payload = _robot_state_payload()
+    payload.state.proxData.rangeStatus = 0
+    sess.process_datagram(_pack_robot_state(payload))
+    assert sess.hud.state_rows()[7][1] == theme.LIVE
+    payload = _robot_state_payload()
+    payload.state.proxData.rangeStatus = 1
+    sess.process_datagram(_pack_robot_state(payload))
+    assert sess.hud.state_rows()[7][1] == theme.WARN
+    payload = _robot_state_payload()
+    payload.state.proxData.rangeStatus = 255
+    sess.process_datagram(_pack_robot_state(payload))
+    assert sess.hud.state_rows()[7][1] == theme.WARN
+
+
+@needs_generated
+def test_white_line_br_flag():
+    payload = _robot_state_payload()
+    payload.state.whiteDetectedFlags = 0x08
+    sess = Session()
+    sess.process_datagram(_pack_robot_state(payload))
+    text, color = sess.hud.state_rows()[18]
+    assert "BR:1" in text
+    assert color == theme.TEXT
+
+
+@needs_generated
+def test_white_muted_when_clear():
+    payload = _robot_state_payload()
+    payload.state.whiteDetectedFlags = 0
+    sess = Session()
+    sess.process_datagram(_pack_robot_state(payload))
+    text, color = sess.hud.state_rows()[18]
+    assert "White:" in text
+    assert color == theme.TEXT_MUTED
+
+
+@needs_generated
+def test_path_seg_line():
+    sess = Session()
+    payload = _robot_state_payload()
+    payload.state.currPathSegment = -1
+    sess.process_datagram(_pack_robot_state(payload))
+    assert sess.hud.state_lines()[19] == "PathSeg: -"
+    payload = _robot_state_payload()
+    payload.state.currPathSegment = 2
+    sess.process_datagram(_pack_robot_state(payload))
+    assert sess.hud.state_lines()[19] == "PathSeg: 2"
+
+
+@needs_generated
+def test_cliff_hud_off_leaves_empty_slot():
+    payload = _robot_state_payload()
+    sess = Session()
+    sess.process_datagram(_pack_robot_state(payload))
+    settings = OverlaySettings(cliff_hud=False)
+    assert sess.hud.state_lines(settings)[6] == ""
+    assert "Pose:" in sess.hud.state_lines(settings)[0]
+    assert sess.hud.state_lines(OverlaySettings(tof_hud=False))[7] == ""
+    assert sess.hud.state_lines(OverlaySettings(white_hud=False))[18] == ""
+    assert sess.hud.state_lines(OverlaySettings(path_seg_hud=False))[19] == ""
+
+
 def test_session_registers_hud_handlers():
     sess = Session()
     assert isinstance(sess.hud, HUD)
@@ -168,6 +279,9 @@ def test_hud_uses_theme_tokens_not_hex():
     assert "theme.BG_PANEL" in src
     assert "theme.TEXT" in src
     assert "theme.TEXT_MUTED" in src
+    assert "theme.DANGER" in src
+    assert "theme.LIVE" in src
+    assert "theme.WARN" in src
     assert "theme.FONT_MONO" in src
     assert "theme.FONT_HUD_PX" in src
     for banned in ("#00FF00", "#00FFFF", "#0B0D10", "#161B22", "#E8EDF2"):
