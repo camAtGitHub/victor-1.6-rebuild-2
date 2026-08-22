@@ -39,13 +39,14 @@ from vizmanager.app import (
     layout_rects,
     letterbox_dest,
     map_grid_lines,
+    map_m_to_px,
     map_path_highlight_pts,
     map_robot_pts,
     status_for,
     _RIGHT_W,
 )
 from vizmanager import overlay_panel
-from vizmanager.sensors import OverlaySettings
+from vizmanager.sensors import OverlaySettings, cliff_dots_world, tof_ray_world
 from vizmanager.udp import ANKICONN
 from vizmanager.view3d import DRAW_OBJECTS_RATE_SEC
 from vizmanager.world import MM_TO_M, World
@@ -636,9 +637,65 @@ def test_connect_is_only_accent_dim_fill():
 
 
 def test_no_raw_hex_in_overlay_panel_or_sensors():
-    for name in ("overlay_panel.py", "sensors.py"):
+    for name in ("overlay_panel.py", "sensors.py", "view2d.py", "view3d.py"):
         text = open(os.path.join(_VIZ, name), encoding="utf-8").read()
         assert _HEX.search(text) is None, name
+
+
+def _sensor_state(cliff_flags=0, range_status=0, distance_mm=100):
+    return SimpleNamespace(
+        state=SimpleNamespace(
+            cliffDetectedFlags=cliff_flags,
+            proxData=SimpleNamespace(
+                rangeStatus=range_status,
+                distance_mm=distance_mm,
+            ),
+        )
+    )
+
+
+def test_map_cliff_and_tof_use_same_mm_px_as_robot():
+    world = World()
+    world.set_robot(_map_robot())
+    state = _sensor_state()
+    w, h = 100, 100
+    fl_pts, _color = cliff_dots_world(world, state)[0]
+    mapped = tuple(map_m_to_px(p[0], p[1], w, h) for p in fl_pts)
+    expected = []
+    for x_m, y_m, _z in fl_pts:
+        x_mm = x_m / MM_TO_M
+        y_mm = y_m / MM_TO_M
+        expected.append((int(round(x_mm + 50.0)), int(round(-y_mm + 50.0))))
+    assert mapped == tuple(expected)
+    cx = sum(p[0] for p in fl_pts) / 4.0
+    cy = sum(p[1] for p in fl_pts) / 4.0
+    assert map_m_to_px(cx, cy, w, h) == (52, 36)
+    ray_pts, _ray_color = tof_ray_world(world, state)
+    origin_px = map_m_to_px(ray_pts[0][0], ray_pts[0][1], w, h)
+    assert origin_px == map_m_to_px(0.010, 0.0, w, h)
+    app_src = open(os.path.join(_VIZ, "app.py"), encoding="utf-8").read()
+    assert "cliff_dots_world" in app_src
+    assert "tof_ray_world" in app_src
+    assert "map_m_to_px" in app_src
+
+
+def test_camera_overlays_off_skips_camera_text():
+    parser = build_parser()
+    args = parser.parse_args(["--listen-only"])
+    app = VizApp(args)
+    try:
+        app.overlays.camera_overlays = False
+        blits = []
+        app._blit_overlay_text = lambda *a, **k: blits.append(True)
+        texts = [SimpleNamespace(x=8, y=12, text="marker", rgb=(255, 255, 255))]
+        app._draw_camera_overlays(
+            object(), (0, 0, 64, 64), 1.0, texts, (10, "Exp:1", "AWB")
+        )
+        assert blits == []
+        app_src = open(os.path.join(_VIZ, "app.py"), encoding="utf-8").read()
+        assert "if not self.overlays.camera_overlays:" in app_src
+    finally:
+        app.close()
 
 
 def test_key_o_toggles_panel_open():

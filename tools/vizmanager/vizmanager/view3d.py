@@ -14,7 +14,7 @@ import time
 from dataclasses import dataclass
 
 from vizmanager import theme
-from vizmanager.sensors import OverlaySettings
+from vizmanager.sensors import OverlaySettings, cliff_dots_world, tof_ray_world
 from vizmanager.world import (
     VIZ_OBJECT_CHARGER,
     VIZ_OBJECT_CUBOID,
@@ -288,6 +288,14 @@ class View3D:
         world = self.world
         if world.robot is not None:
             out.extend(self._robot_meshes())
+            if settings.cliff_dots:
+                for pts, color in cliff_dots_world(world, robot_state):
+                    out.append(Mesh3("polyline", pts, color, "loop"))
+            if settings.tof_ray:
+                ray = tof_ray_world(world, robot_state)
+                if ray is not None:
+                    pts, color = ray
+                    out.append(Mesh3("polyline", pts, color, "strip"))
         if not world.show_objects:
             return tuple(out)
         for obj in world.objects.values():
@@ -308,12 +316,8 @@ class View3D:
                 pts = tuple(world.apply_origin(*p) for p in strip)
                 if len(pts) >= 2:
                     out.append(Mesh3("polyline", pts, color, "strip"))
-        if (
-            settings.path_highlight
-            and robot_state is not None
-            and robot_state.state.currPathSegment >= 0
-        ):
-            curr = robot_state.state.currPathSegment
+        curr = getattr(getattr(robot_state, "state", None), "currPathSegment", -1)
+        if settings.path_highlight and curr is not None and curr >= 0:
             for path in world.paths.values():
                 strip = path.segment_polyline_m(curr)
                 if strip:

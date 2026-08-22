@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from vizmanager import theme  # noqa: E402
 from vizmanager.sensors import OverlaySettings  # noqa: E402
+from vizmanager.view2d import View2D  # noqa: E402
 from vizmanager.view3d import (  # noqa: E402
     AXIS_LEN_M,
     CANVAS_KEYS,
@@ -519,3 +520,97 @@ def test_create_canvas_headless_does_not_require_gpu():
     canvas = view.create_canvas(show=False)
     assert canvas is None or hasattr(canvas, "central_widget")
     assert vispy_available() is True or canvas is None
+
+
+def _sensor_state(cliff_flags=0, range_status=0, distance_mm=100):
+    return SimpleNamespace(
+        state=SimpleNamespace(
+            cliffDetectedFlags=cliff_flags,
+            proxData=SimpleNamespace(
+                rangeStatus=range_status,
+                distance_mm=distance_mm,
+            ),
+        )
+    )
+
+
+def _closed_2d(meshes):
+    return [m for m in meshes if m.kind == "polyline" and m.closed]
+
+
+def _open_2d(meshes):
+    return [m for m in meshes if m.kind == "polyline" and not m.closed]
+
+
+def _closed_3d(meshes):
+    return [m for m in meshes if m.kind == "polyline" and m.connect == "loop"]
+
+
+def _strip_3d(meshes):
+    return [m for m in meshes if m.kind == "polyline" and m.connect == "strip"]
+
+
+def test_sensor_meshes_grow_by_four_dots_and_ray():
+    w = World()
+    w.set_robot(_robot())
+    state = _sensor_state()
+    settings = OverlaySettings()
+    view2 = View2D(w)
+    base2 = view2.meshes()
+    full2 = view2.meshes(settings=settings, robot_state=state)
+    assert len(full2) == len(base2) + 5
+    squares = _closed_2d(full2)
+    assert len(squares) == 4
+    assert all(len(m.points) == 4 for m in squares)
+    rays2 = _open_2d(full2)
+    assert len(rays2) == 1
+    assert len(rays2[0].points) == 2
+
+    view3 = View3D(w)
+    base3 = view3.meshes()
+    full3 = view3.meshes(settings=settings, robot_state=state)
+    assert len(full3) == len(base3) + 5
+    loops = _closed_3d(full3)
+    assert len(loops) == 4
+    assert all(len(m.points) == 4 for m in loops)
+    strips = _strip_3d(full3)
+    assert len(strips) == 1
+    assert len(strips[0].points) == 2
+
+
+def test_cliff_dots_off_omits_closed_squares():
+    w = World()
+    w.set_robot(_robot())
+    state = _sensor_state()
+    off = OverlaySettings(cliff_dots=False)
+    view2 = View2D(w)
+    meshes2 = view2.meshes(settings=off, robot_state=state)
+    assert _closed_2d(meshes2) == []
+    assert len(view2.meshes(settings=off, robot_state=state)) == len(view2.meshes()) + 1
+    view3 = View3D(w)
+    meshes3 = view3.meshes(settings=off, robot_state=state)
+    assert _closed_3d(meshes3) == []
+    assert len(meshes3) == len(view3.meshes()) + 1
+
+
+def test_show_objects_false_keeps_robot_cliff_tof():
+    w = World()
+    w.set_object(_obj())
+    w.set_quad(_quad())
+    w.append_path_line(_path_line(path_id=1))
+    w.set_robot(_robot())
+    w.set_show_objects(0)
+    state = _sensor_state()
+    settings = OverlaySettings()
+
+    meshes2 = View2D(w).meshes(settings=settings, robot_state=state)
+    assert any(m.kind == "triangle" for m in meshes2)
+    assert len(_closed_2d(meshes2)) == 4
+    assert len(_open_2d(meshes2)) == 1
+    assert all(m.kind in ("triangle", "polyline") for m in meshes2)
+
+    meshes3 = View3D(w).meshes(settings=settings, robot_state=state)
+    assert all(m.kind in ("robot", "polyline") for m in meshes3)
+    assert len([m for m in meshes3 if m.kind == "robot"]) == 3
+    assert len(_closed_3d(meshes3)) == 4
+    assert len(_strip_3d(meshes3)) == 1

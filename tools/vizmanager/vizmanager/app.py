@@ -29,7 +29,7 @@ from vizmanager.connect import (
     pack_redirect_viz,
     send_ankiconn_and,
 )
-from vizmanager.sensors import OverlaySettings
+from vizmanager.sensors import OverlaySettings, cliff_dots_world, tof_ray_world
 from vizmanager.session import Session
 from vizmanager.udp import (
     ANKICONN,
@@ -192,21 +192,23 @@ def status_for(handshakes, recent_pps, has_frame, last_pkt_age):
     return STATUS_DEGRADED
 
 
+def map_m_to_px(x_m, y_m, width, height, origin_x=0.0, origin_y=0.0):
+    """World metres -> MemoryMap screen (1 mm = 1 px)."""
+    x_mm = x_m / MM_TO_M
+    y_mm = y_m / MM_TO_M
+    sx = int(round(x_mm + 0.5 * width + origin_x))
+    sy = int(round(-y_mm + 0.5 * height + origin_y))
+    return (sx, sy)
+
+
 def map_robot_pts(world, width, height, origin_x=0.0, origin_y=0.0):
     """Screen pixels of the SetRobot triangle in MemoryMap space (1 mm = 1 px)."""
     pts_m = robot_marker_points_m(world)
     if not pts_m:
         return ()
-    cx = 0.5 * width
-    cy = 0.5 * height
-    out = []
-    for x_m, y_m in pts_m:
-        x_mm = x_m / MM_TO_M
-        y_mm = y_m / MM_TO_M
-        sx = int(round(x_mm + cx + origin_x))
-        sy = int(round(-y_mm + cy + origin_y))
-        out.append((sx, sy))
-    return tuple(out)
+    return tuple(
+        map_m_to_px(x_m, y_m, width, height, origin_x, origin_y) for x_m, y_m in pts_m
+    )
 
 
 def map_path_highlight_pts(
@@ -217,8 +219,8 @@ def map_path_highlight_pts(
         settings = OverlaySettings()
     if not settings.path_highlight or robot_state is None:
         return ()
-    curr = robot_state.state.currPathSegment
-    if curr < 0:
+    curr = getattr(getattr(robot_state, "state", None), "currPathSegment", -1)
+    if curr is None or curr < 0:
         return ()
     cx = 0.5 * width
     cy = 0.5 * height
@@ -1188,6 +1190,8 @@ class VizApp:
         screen.blit(glyph, (x, y))
 
     def _draw_camera_overlays(self, screen, dest, scale, texts, info):
+        if not self.overlays.camera_overlays:
+            return
         import pygame
 
         font = self._font(pygame, "overlay")
@@ -1393,14 +1397,33 @@ class VizApp:
         pts = map_robot_pts(self.session.world, w, h, ox, oy)
         if len(pts) >= 3:
             pygame.draw.polygon(surf, theme.ACCENT, pts, 1)
+        settings = self.overlays
+        robot_state = self.session.hud.robot_state
+        world = self.session.world
+        if settings.cliff_dots:
+            for pts_xyz, color in cliff_dots_world(world, robot_state):
+                screen_pts = tuple(
+                    map_m_to_px(p[0], p[1], w, h, ox, oy) for p in pts_xyz
+                )
+                if len(screen_pts) >= 2:
+                    pygame.draw.polygon(surf, color, screen_pts, 1)
+        if settings.tof_ray:
+            ray = tof_ray_world(world, robot_state)
+            if ray is not None:
+                pts_xyz, color = ray
+                screen_pts = tuple(
+                    map_m_to_px(p[0], p[1], w, h, ox, oy) for p in pts_xyz
+                )
+                if len(screen_pts) >= 2:
+                    pygame.draw.lines(surf, color, False, screen_pts, 1)
         for strip in map_path_highlight_pts(
-            self.session.world,
+            world,
             w,
             h,
             ox,
             oy,
-            settings=self.overlays,
-            robot_state=self.session.hud.robot_state,
+            settings=settings,
+            robot_state=robot_state,
         ):
             if len(strip) >= 2:
                 pygame.draw.lines(surf, theme.ACCENT, False, strip, 1)
