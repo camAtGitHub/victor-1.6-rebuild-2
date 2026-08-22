@@ -13,7 +13,6 @@
 
 #include "cozmoAnim/backpackLights/animBackpackLightComponent.h"
 
-#include "clad/types/backpackAnimationTriggers.h"
 #include "coretech/common/engine/utils/data/dataPlatform.h"
 #include "coretech/common/engine/utils/timer.h"
 #include "cozmoAnim/animTimeStamp.h"
@@ -21,14 +20,12 @@
 #include "cozmoAnim/micData/micDataSystem.h"
 #include "cozmoAnim/robotDataLoader.h"
 #include "clad/robotInterface/messageEngineToRobot.h"
-#include "clad/types/robotStatusAndActions.h"
+#include "engine/components/lightsConfig.h"
 #include "util/console/consoleInterface.h"
 #include "util/fileUtils/fileUtils.h"
 #include "util/internetUtils/internetUtils.h"
 
 #include "osState/osState.h"
-
-#define DEBUG_LIGHTS 0
 
 namespace Anki {
 namespace Vector {
@@ -127,18 +124,11 @@ void BackpackLightComponent::UpdateCriticalBackpackLightConfig(bool isCloudStrea
 
     trigger = BackpackAnimationTrigger::LowBattery;
   }
-  else if( _isBatteryLow && _isOnChargerContacts && _isBatteryCharging && _isBatteryDisconnected )
-  {
-    trigger = BackpackAnimationTrigger::ChargingLowBatteryOverheated;
-  }
-  else if ( !_isBatteryFull && _isOnChargerContacts && _isBatteryCharging && _isBatteryDisconnected )
-  {
-    trigger = BackpackAnimationTrigger::ChargingOverheated;
-  }
-  else if ( !_isOnChargerContacts && _isBatteryDisconnected )
-  {
-    trigger = BackpackAnimationTrigger::Overheated;
-  }
+  // else if( _isBatteryLow && _isOnChargerContacts )
+  // {
+  //   trigger = BackpackAnimationTrigger::Charging;
+  // }
+  // If we have been offline for long enough
   else if(_offlineAtTime_ms > 0 &&
           ((TimeStamp_t)curTime_ms - _offlineAtTime_ms > kOfflineTimeBeforeLights_ms))
   {
@@ -528,13 +518,14 @@ void BackpackLightComponent::UpdateSystemLightState(bool isCloudStreamOpen)
 
     // If user space is unsecure then mix white in
     // to the system light as the off color (normally green)
-    if(!OSState::getInstance()->IsUserSpaceSecure())
+    if(!OSState::getInstance()->IsUserSpaceSecure() && _systemLightState == SystemLightState::Off)
     {
-      light.offColor = 0xFFFFFF00;
+      light.onColor = 0x00FF0000;
+      light.offColor = 0x00FFFF00;
       light.onPeriod_ms = 960;
-      light.offPeriod_ms = 960;
-      light.transitionOnPeriod_ms = 0;
-      light.transitionOffPeriod_ms = 0;
+      light.offPeriod_ms = _blinkDotLight() ? 960 : 0;
+      light.transitionOnPeriod_ms = _fadeDotLight() ? 3000 : 0;
+      light.transitionOffPeriod_ms = _fadeDotLight() ? 3000 : 0;
       light.offset_ms = 0;
     }
 

@@ -18,8 +18,15 @@ Anki's built in semi-auto self-test option. The self-test is very prone to error
 ### CHANGE SLOT
 Vector has 2 system slots, slot a and slot b. This option runs the `sysswitch` command which switches whatever the inactive slot is to the active one, and reboot the robot into the other system slot.
 
-### WIREOS LIGHTS / ANKI LIGHTS
-Toggles the WireOS backpack lights instead of the stock Anki or vice-versa ones if those are preferred. If custom backpack lights are in use this option will display `CUSTOM LIGHTS ON` instead and won't do anything.
+### BACKPACK SETTINGS
+- WIREOS LIGHTS / ANKI LIGHTS
+    - Toggles the WireOS backpack lights instead of the stock Anki or vice-versa ones if those are preferred. If custom backpack lights are in use this option will display `CUSTOM LIGHTS ON` instead and won't do anything.
+- DOT LIGHT SETTINGS
+    - Settings related to the dot light.
+    - TOGGLE FADING
+        - If the dot light is set to blink this will make it so that it fades green/blue instead of abruptly shifting.
+    - TOGGLE BLNKING
+        - Allow the dot light to blink green/blue.
 
 ## CONFIGURATION PAGE 2
 ### ENTER RECOVERY
@@ -32,8 +39,13 @@ Vector has 3 performance profiles provided by Wired. `REGULAR`, `BALANCED`, and 
 ### TOGGLE 30 FPS / TOGGLE 60 FPS
 1.6-rebuild has Vector's refresh rate for the screen set to 60fps instead of the normal 30fps and with some of the workarounds I've done it works amazingly. But some people don't like 60fps or their bot is old enough that 60fps strains the battery too much causing shutdowns. This is a nice little toggle for those who want to go back to the classic Vector 30fps. When in 30fps mode the option switches to `TOGGLE 60 FPS` so that you know which mode Vector is currently running in.
 
-### DISABLE UPDATING / ENABLE UPDATING
-Disables all auto updates. If you're doing dev work for instance and your bot updates it would be pretty annoying, or if you'd rather delay the updates for some other time it'd be worth enabling this option. If auto updates are off this option will become `ENABLE UPDATING`.
+## UPDATE SETTTINGS
+Contains a few options related to updating Vector
+
+- DISABLE UPDATING / ENABLE UPDATING
+    - Disables all auto updates. If you're doing dev work for instance and your bot updates it would be pretty annoying, or if you'd rather delay the updates for some other time it'd be worth enabling this option. If auto updates are off this option will become `ENABLE UPDATING`.
+- CHECK FOR UPDATES
+    - It be what it's called
 
 ## CONFIGURATION PAGE 4
 ### SLEEP SETTINGS
@@ -51,3 +63,11 @@ On every beat Vector will randomly change his eye color to one of the eye color 
 
 ### USE BETA ALEXA / USE MODERN ALEXA
 Old beta Alexa actually had it's voice run through the stock Vector voice filter instead of having it's own unfiltered channel. This restores that behavior.
+
+## CONFIGURATION PAGE 5
+
+### USE BETA ALEXA / USE MODERN ALEXA
+Old beta Alexa actually had it's voice run through the stock Vector voice filter instead of having it's own unfiltered channel. This restores that behavior.
+
+### USE VIC-CLOUDLESS / USE NORMAL CLOUD
+vic-cloudless is a modified version of vic-cloud developed by [Wire](https://github.com/kercre123/vic-cloudless). It allows Vector to process voice commands locally on himself without needing a seperate Voice Command server. The version in rebuild uses my [fork](https://github.com/Victor-Rebuild/vic-cloudswitch/tree/1.6-rebuild) which allows it to work in cloud and cloudless mode.

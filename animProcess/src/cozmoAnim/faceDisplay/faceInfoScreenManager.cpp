@@ -56,6 +56,7 @@
 #include "util/logging/logging.h"
 #include "webServerProcess/src/webService.h"
 
+#include <anki/cozmo/shared/cozmoConfig.h>
 #include <chrono>
 #include <cstddef>
 #include <fstream>
@@ -119,6 +120,7 @@ bool checkAutoUpdatesOn() {
 }
 
 bool needsUpdate() {
+  (void)system("/usr/sbin/update-engine-rebuild -c");
   if (Util::FileUtils::FileExists("/run/rebuild/needs-update")) {
     return true;
   } else if (Util::FileUtils::FileExists("/run/rebuild/dont-need-update")) {
@@ -126,7 +128,6 @@ bool needsUpdate() {
   } else if (!Util::FileUtils::FileExists("/run/rebuild/needs-update") &&
              !Util::FileUtils::FileExists("/run/rebuild/dont-need-update"))
   {
-    (void)system("/usr/sbin/update-engine-rebuild -c");
     return needsUpdate();
   } else {
     return false;
@@ -213,9 +214,13 @@ void FaceInfoScreenManager::Init(Anim::AnimContext* context, Anim::AnimationStre
   _context = context;
   _animationStreamer = animStreamer;
   
+  // osstate is useful
+  auto osstate = OSState::getInstance();
+
   // allow us to send debug info out to the web server
   _webService = context->GetWebService();
 
+  // screen/menu item definitons
   #define ADD_SCREEN(name, gotoScreen) \
     _screenMap.emplace(std::piecewise_construct, \
                        std::forward_as_tuple(ScreenName::name), \
@@ -247,6 +252,23 @@ void FaceInfoScreenManager::Init(Anim::AnimContext* context, Anim::AnimationStre
   #define SET_EXIT_ACTION(screen, lambda) \
     GetScreen(ScreenName::screen)->SetExitScreenAction(lambda);
 
+  if (!Util::Data::DataPlatform::readAsJson(kTogglesPath, _toggles)) {
+    _toggles["classicAlexa"]        = Util::FileUtils::FileExists("/data/data/rebuild/old-alexa");
+    _toggles["disablePersonCheck"]  = Util::FileUtils::FileExists("/data/data/rebuild/dont-look-for-people-at-night");
+    _toggles["disableReactToSound"] = Util::FileUtils::FileExists("/data/data/rebuild/dont-react-to-sound-at-night");
+    _toggles["dttbRandomEyes"]      = Util::FileUtils::FileExists("/data/data/rebuild/dttb-eye-randomizer");
+    _toggles["snoringDisabled"]     = Util::FileUtils::FileExists("/data/data/rebuild/dont-snore-at-night");
+    _toggles["wireOSLights"]        = Util::FileUtils::FileExists("/data/data/wirelights");
+    _context->GetDataPlatform()->writeAsJson(kTogglesPath, _toggles);
+
+    Util::FileUtils::DeleteFile("/data/data/rebuild/old-alexa");
+    Util::FileUtils::DeleteFile("/data/data/rebuild/dont-snore-at-night");
+    Util::FileUtils::DeleteFile("/data/data/rebuild/dont-look-for-people-at-night");
+    Util::FileUtils::DeleteFile("/data/data/rebuild/dont-react-to-sound-at-night");
+    Util::FileUtils::DeleteFile("/data/data/rebuild/dttb-eye-randomizer");
+    Util::FileUtils::DeleteFile("/data/data/wirelights");
+  }
+
   // =============== Screens ==================
   // Screens we don't want users to have access to
   // * Microphone visualization
@@ -263,11 +285,17 @@ void FaceInfoScreenManager::Init(Anim::AnimContext* context, Anim::AnimationStre
   // Start rebuild custom screens
   ADD_SCREEN_WITH_TEXT(AutoUpdates, AutoUpdates, {"UPDATE SETTINGS"});
   ADD_SCREEN_WITH_TEXT(BackpackLights, BackpackLights, {_wireoslights() ? "USE ANKI LIGHTS?" : "USE WIREOS LIGHTS?"});
+  ADD_SCREEN_WITH_TEXT(BackpackLightsMenu, BackpackLightsMenu, {"BACKPACK SETTINGS"});
+  ADD_SCREEN_WITH_TEXT(BackpackLightsDot, BackpackLightsDot, {"DOT LIGHT SETTINGS"});
+  ADD_SCREEN_WITH_TEXT(BackpackLightsDotBlink, BackpackLightsDotBlink, {"BLINK DOT LIGHT?"});
+  ADD_SCREEN_WITH_TEXT(BackpackLightsDotFade, BackpackLightsDotFade, {"FADE DOT LIGHT?"});
   ADD_SCREEN_WITH_TEXT(BootRecovery, BootRecovery, {"RECOVERY MODE?"});
+  ADD_SCREEN_WITH_TEXT(Cloudless, Cloudless, {_cloudlessEnabled ? "USE NORMAL CLOUD?" : "USE VIC-CLOUDLESS?"});
   ADD_SCREEN_WITH_TEXT(ConfigurationSubmenu, ConfigurationSubmenu, {"CONFIGURATION PAGE 1"});
   ADD_SCREEN_WITH_TEXT(ConfigurationSubmenu2, ConfigurationSubmenu2, {"CONFIGURATION PAGE 2"});
   ADD_SCREEN_WITH_TEXT(ConfigurationSubmenu3, ConfigurationSubmenu3, {"CONFIGURATION PAGE 3"});
   ADD_SCREEN_WITH_TEXT(ConfigurationSubmenu4, ConfigurationSubmenu4, {"CONFIGURATION PAGE 4"});
+  ADD_SCREEN_WITH_TEXT(ConfigurationSubmenu5, ConfigurationSubmenu5, {"CONFIGURATION PAGE 5"});
   ADD_SCREEN_WITH_TEXT(DisableAutoUpdates, DisableAutoUpdates, {checkAutoUpdatesOn() ? "DISABLE UPDATES?" : "ENABLE UPDATES?"});
   ADD_SCREEN_WITH_TEXT(SleepSettings, SleepSettings, {"SLEEP SETTINGS"});
   ADD_SCREEN_WITH_TEXT(DTTBRandomEyes, DTTBRandomEyes, {"TOGGLE DTTB EYES?"});
@@ -389,72 +417,6 @@ void FaceInfoScreenManager::Init(Anim::AnimContext* context, Anim::AnimationStre
   ADD_MENU_ITEM(Main, IsXray() ? "DATA" : "DATA OPTIONS", UserDataSubmenu);
   ADD_MENU_ITEM(Main, IsXray() ? "CONF" : "CONFIGURATION", ConfigurationSubmenu);
 
-  // === Configuration Submenu ===
-  FaceInfoScreen::MenuItemAction incSlotUp = [] {
-      confPageNumber += 1;
-      switch(confPageNumber) {
-          case 4:  return ScreenName::ConfigurationSubmenu4;
-          case 3:  return ScreenName::ConfigurationSubmenu3;
-          case 2:  return ScreenName::ConfigurationSubmenu2;
-          default: confPageNumber = 1; return ScreenName::ConfigurationSubmenu;
-      }
-  };
-
-  FaceInfoScreen::MenuItemAction incSlotDown = [] {
-      confPageNumber -= 1;
-      switch(confPageNumber) {
-          case 1:  return ScreenName::ConfigurationSubmenu;
-          case 2:  return ScreenName::ConfigurationSubmenu2;
-          case 3:  return ScreenName::ConfigurationSubmenu3;
-          default: confPageNumber = 4; return ScreenName::ConfigurationSubmenu4;
-      }
-  };
-
-  // === Screen 1 ===
-  ADD_MENU_ITEM(ConfigurationSubmenu, "EXIT", Main);
-  ADD_MENU_ITEM_WITH_ACTION(ConfigurationSubmenu, "NEXT PAGE", incSlotUp);
-  ADD_MENU_ITEM(ConfigurationSubmenu, "SELF TEST", SelfTest);
-  if (_wireoslights()) {
-    ADD_MENU_ITEM(ConfigurationSubmenu, "ANKI LIGHTS", BackpackLights);
-    ADD_MENU_ITEM(ConfigurationSubmenu, "CHANGE SLOT", SwitchSlot);
-  } else if (_userlights()) {
-    ADD_MENU_ITEM(ConfigurationSubmenu, "CHANGE SLOT", SwitchSlot);
-    ADD_MENU_ITEM(ConfigurationSubmenu, "CUSTOM LIGHTS ON", ConfigurationSubmenu);
-  } else {
-    ADD_MENU_ITEM(ConfigurationSubmenu, "CHANGE SLOT", SwitchSlot);
-    ADD_MENU_ITEM(ConfigurationSubmenu, "WIREOS LIGHTS", BackpackLights);
-  }
-
-  // === Screen 2 ===
-  ADD_MENU_ITEM(ConfigurationSubmenu2, "EXIT", Main);
-  ADD_MENU_ITEM_WITH_ACTION(ConfigurationSubmenu2, "NEXT PAGE", incSlotUp);
-  ADD_MENU_ITEM_WITH_ACTION(ConfigurationSubmenu2, "PREV PAGE", incSlotDown);
-  ADD_MENU_ITEM(ConfigurationSubmenu2, "ENTER RECOVERY", BootRecovery);
-  ADD_MENU_ITEM(ConfigurationSubmenu2, "CHANGE PERF PROFILE", SetFrequency);
-  DISABLE_TIMEOUT(ConfigurationSubmenu)
-
-  // === Screen 3 ===
-  ADD_MENU_ITEM(ConfigurationSubmenu3, "EXIT", Main);
-  ADD_MENU_ITEM_WITH_ACTION(ConfigurationSubmenu3, "NEXT PAGE", incSlotUp);
-  ADD_MENU_ITEM_WITH_ACTION(ConfigurationSubmenu3, "PREV PAGE", incSlotDown);
-  ADD_MENU_ITEM(ConfigurationSubmenu3, _using30fps() ? "TOGGLE 60 FPS" : "TOGGLE 30 FPS", Toggle30fps);
-  ADD_MENU_ITEM(ConfigurationSubmenu3, "UPDATE SETTINGS", AutoUpdates);
-  DISABLE_TIMEOUT(ConfigurationSubmenu)
-
-  // === Screen 4 ===
-  ADD_MENU_ITEM(ConfigurationSubmenu4, "EXIT", Main);
-  ADD_MENU_ITEM_WITH_ACTION(ConfigurationSubmenu4, "PREV PAGE", incSlotDown);
-  ADD_MENU_ITEM(ConfigurationSubmenu4, "SLEEP SETTINGS", SleepSettings);
-  ADD_MENU_ITEM(ConfigurationSubmenu4, "DTTB RANDOM EYES", DTTBRandomEyes);
-  ADD_MENU_ITEM(ConfigurationSubmenu4, _classicAlexa ? "USE MODERN ALEXA" : "USE BETA ALEXA", OldNewAlexa);
-  DISABLE_TIMEOUT(ConfigurationSubmenu)
-
-  // Sleep settings
-  ADD_MENU_ITEM(SleepSettings, "BACK", ConfigurationSubmenu4);
-  ADD_MENU_ITEM(SleepSettings, _disablePersonCheck ? "ENABLE RTP" : "DISABLE RTP", RTP);
-  ADD_MENU_ITEM(SleepSettings, _disableReactToSound ? "ENABLE RTS" : "DISABLE RTS", RTS);
-  ADD_MENU_ITEM(SleepSettings, _snoringDisabled ? "ENABLE SNORING" : "DISABLE SNORING", Snoring);
-
   // === User Data Menu ===
   ADD_MENU_ITEM(UserDataSubmenu, "EXIT", Main);
   ADD_MENU_ITEM(UserDataSubmenu, "REONBOARD", Reonboard);
@@ -472,7 +434,7 @@ void FaceInfoScreenManager::Init(Anim::AnimContext* context, Anim::AnimationStre
   };
   ADD_MENU_ITEM_WITH_ACTION(SelfTest, "CONFIRM", confirmSelfTest);
   DISABLE_TIMEOUT(SelfTestRunning);
-  
+
   // Clear User Data menu
   FaceInfoScreen::MenuItemAction confirmClearUserData = [this]() {
     // Write this file to indicate that the data partition should be wiped on reboot
@@ -513,6 +475,137 @@ void FaceInfoScreenManager::Init(Anim::AnimContext* context, Anim::AnimationStre
   ADD_MENU_ITEM(Reonboard, "BACK", UserDataSubmenu);
   ADD_MENU_ITEM_WITH_ACTION(Reonboard, "CONFIRM", confirmReonboard);
   DISABLE_TIMEOUT(Reonboard);
+
+  // === Configuration Submenu ===
+  FaceInfoScreen::MenuItemAction incSlotUp = [] {
+      confPageNumber += 1;
+      switch(confPageNumber) {
+          case 5:  return ScreenName::ConfigurationSubmenu5;
+          case 4:  return ScreenName::ConfigurationSubmenu4;
+          case 3:  return ScreenName::ConfigurationSubmenu3;
+          case 2:  return ScreenName::ConfigurationSubmenu2;
+          default: confPageNumber = 1; return ScreenName::ConfigurationSubmenu;
+      }
+  };
+
+  FaceInfoScreen::MenuItemAction incSlotDown = [] {
+      confPageNumber -= 1;
+      switch(confPageNumber) {
+          case 1:  return ScreenName::ConfigurationSubmenu;
+          case 2:  return ScreenName::ConfigurationSubmenu2;
+          case 3:  return ScreenName::ConfigurationSubmenu3;
+          case 4:  return ScreenName::ConfigurationSubmenu4;
+          default: confPageNumber = 5; return ScreenName::ConfigurationSubmenu5;
+      }
+  };
+
+  // === Screen 1 ===
+  ADD_MENU_ITEM(ConfigurationSubmenu, "EXIT", Main);
+  ADD_MENU_ITEM_WITH_ACTION(ConfigurationSubmenu, "NEXT PAGE", incSlotUp);
+  ADD_MENU_ITEM(ConfigurationSubmenu, "SELF TEST", SelfTest);
+  ADD_MENU_ITEM(ConfigurationSubmenu, "CHANGE SLOT", SwitchSlot);
+  ADD_MENU_ITEM(ConfigurationSubmenu, "BACKPACK SETTINGS", BackpackLightsMenu);
+  DISABLE_TIMEOUT(ConfigurationSubmenu)
+
+  // === Screen 2 ===
+  ADD_MENU_ITEM(ConfigurationSubmenu2, "EXIT", Main);
+  ADD_MENU_ITEM_WITH_ACTION(ConfigurationSubmenu2, "NEXT PAGE", incSlotUp);
+  ADD_MENU_ITEM_WITH_ACTION(ConfigurationSubmenu2, "PREV PAGE", incSlotDown);
+  ADD_MENU_ITEM(ConfigurationSubmenu2, "ENTER RECOVERY", BootRecovery);
+  ADD_MENU_ITEM(ConfigurationSubmenu2, "CHANGE PERF PROFILE", SetFrequency);
+  DISABLE_TIMEOUT(ConfigurationSubmenu2)
+
+  // === Screen 3 ===
+  ADD_MENU_ITEM(ConfigurationSubmenu3, "EXIT", Main);
+  ADD_MENU_ITEM_WITH_ACTION(ConfigurationSubmenu3, "NEXT PAGE", incSlotUp);
+  ADD_MENU_ITEM_WITH_ACTION(ConfigurationSubmenu3, "PREV PAGE", incSlotDown);
+  ADD_MENU_ITEM(ConfigurationSubmenu3, _using30fps() ? "TOGGLE 60 FPS" : "TOGGLE 30 FPS", Toggle30fps);
+  ADD_MENU_ITEM(ConfigurationSubmenu3, "UPDATE SETTINGS", AutoUpdates);
+  DISABLE_TIMEOUT(ConfigurationSubmenu3)
+
+  // === Screen 4 ===
+  ADD_MENU_ITEM(ConfigurationSubmenu4, "EXIT", Main);
+  ADD_MENU_ITEM_WITH_ACTION(ConfigurationSubmenu4, "NEXT PAGE", incSlotUp);
+  ADD_MENU_ITEM_WITH_ACTION(ConfigurationSubmenu4, "PREV PAGE", incSlotDown);
+  ADD_MENU_ITEM(ConfigurationSubmenu4, "SLEEP SETTINGS", SleepSettings);
+  ADD_MENU_ITEM(ConfigurationSubmenu4, "DTTB RANDOM EYES", DTTBRandomEyes);
+  DISABLE_TIMEOUT(ConfigurationSubmenu4)
+
+  // === Screen 5 ===
+  ADD_MENU_ITEM(ConfigurationSubmenu5, "EXIT", Main);
+  ADD_MENU_ITEM_WITH_ACTION(ConfigurationSubmenu5, "PREV PAGE", incSlotDown);
+  ADD_MENU_ITEM(ConfigurationSubmenu5, _classicAlexa ? "USE MODERN ALEXA" : "USE BETA ALEXA", OldNewAlexa);
+  ADD_MENU_ITEM(ConfigurationSubmenu5, _cloudlessEnabled ? "USE NORMAL CLOUD" : "USE VIC-CLOUDLESS", Cloudless);
+  DISABLE_TIMEOUT(ConfigurationSubmenu5)
+
+  // === SwitchSlot screen ===
+  FaceInfoScreen::MenuItemAction confirmSlotSwitch = [this] {
+    LOG_INFO("FaceInfoScreenManager.SwitchSlot.Confirmed", "");
+    (void)system("/bin/sysswitch");
+    this->Reboot();
+    return ScreenName::SwitchSlotReboot;
+  };
+  ADD_MENU_ITEM(SwitchSlot, "BACK", ConfigurationSubmenu);
+  ADD_MENU_ITEM_WITH_ACTION(SwitchSlot, "CONFIRM", confirmSlotSwitch);
+
+  ADD_MENU_ITEM(BackpackLightsMenu, "BACK", ConfigurationSubmenu);
+  if (_userlights()) {
+    ADD_MENU_ITEM(BackpackLightsMenu, "CUSTOM LIGHTS ON", ConfigurationSubmenu);
+  } else if (_wireoslights()) {
+    ADD_MENU_ITEM(BackpackLightsMenu, "ANKI LIGHTS", BackpackLights);
+  } else {
+    ADD_MENU_ITEM(BackpackLightsMenu, "WIREOS LIGHTS", BackpackLights);
+  }
+  ADD_MENU_ITEM(BackpackLightsMenu, "DOT LIGHT SETTINGS", BackpackLightsDot);
+
+  // === Swap backpack lights screen ===
+  FaceInfoScreen::MenuItemAction confirmToggleWireOSAnkiLights = [this] {
+    LOG_INFO("FaceInfoScreenManager.Swaplights.Confirmed", "");
+    RebuildToggles::SetBool(_context->GetDataPlatform(), "wireOSLights", !RebuildToggles::GetBool("wireOSLights"));
+
+    _isRestartRequired = true;
+
+    return ScreenName::ConfigurationSubmenu;
+  };
+  ADD_MENU_ITEM(BackpackLights, "BACK", BackpackLightsMenu);
+  ADD_MENU_ITEM_WITH_ACTION(BackpackLights, "CONFIRM", confirmToggleWireOSAnkiLights);
+
+  ADD_MENU_ITEM(BackpackLightsDot, "BACK", BackpackLightsMenu);
+  ADD_MENU_ITEM(BackpackLightsDot, "TOGGLE FADING", BackpackLightsDotFade);
+  ADD_MENU_ITEM(BackpackLightsDot, "TOGGLE BLINKING", BackpackLightsDotBlink);
+
+  // === Fade dot light screen ===
+  FaceInfoScreen::MenuItemAction confirmToggleDotLightFade = [this] {
+    LOG_INFO("FaceInfoScreenManager.BlinkDotLight.Confirmed", "");
+    RebuildToggles::SetBool(_context->GetDataPlatform(), "fadeDotLight", !RebuildToggles::GetBool("fadeDotLight"));
+
+    _isRestartRequired = true;
+
+    return ScreenName::ConfigurationSubmenu;
+  };
+  ADD_MENU_ITEM(BackpackLightsDotFade, "BACK", BackpackLightsDot);
+  ADD_MENU_ITEM_WITH_ACTION(BackpackLightsDotFade, "CONFIRM", confirmToggleDotLightFade);
+
+  // === Blink dot light screen ===
+  FaceInfoScreen::MenuItemAction confirmToggleDotLightBlink = [this] {
+    LOG_INFO("FaceInfoScreenManager.BlinkDotLight.Confirmed", "");
+    RebuildToggles::SetBool(_context->GetDataPlatform(), "blinkDotLight", !RebuildToggles::GetBool("blinkDotLight"));
+
+    _isRestartRequired = true;
+
+    return ScreenName::ConfigurationSubmenu;
+  };
+  ADD_MENU_ITEM(BackpackLightsDotBlink, "BACK", BackpackLightsDot);
+  ADD_MENU_ITEM_WITH_ACTION(BackpackLightsDotBlink, "CONFIRM", confirmToggleDotLightBlink);
+
+  // === Recovery screen ===
+  FaceInfoScreen::MenuItemAction confirmBootRecovery = [] {
+    LOG_INFO("FaceInfoScreenManager.Recovery.Confirmed", "");
+    (void)system("/usr/sbin/reboot recovery");
+    return ScreenName::Rebooting;
+  };
+  ADD_MENU_ITEM(BootRecovery, "BACK", ConfigurationSubmenu2);
+  ADD_MENU_ITEM_WITH_ACTION(BootRecovery, "CONFIRM", confirmBootRecovery);
 
   // === Change CPU/RAM speed ===
   FaceInfoScreen::MenuItemAction confirmSetSpeedReg = [] {
@@ -582,72 +675,22 @@ void FaceInfoScreenManager::Init(Anim::AnimContext* context, Anim::AnimationStre
   auto updateRebuild = [this]() {
     DrawUpdate();
   };
-  if (needsUpdate()) {
+  if (osstate->IsWallTimeSynced() && needsUpdate()) {
     ADD_MENU_ITEM(UpdateRebuild, "UPDATE", Updating);
   }
   SET_ENTER_ACTION(Updating, updateRebuild);
   DISABLE_TIMEOUT(Updating);
 
-  // === Swap backpack lights screen ===
-  FaceInfoScreen::MenuItemAction confirmToggleLights = [this] {
-    LOG_INFO("FaceInfoScreenManager.Swaplights.Confirmed", "");
-    if (!_wireoslights()) {
-      Util::FileUtils::WriteFile("/data/data/rebuild/wirelights", "");
-    } else {
-      Util::FileUtils::DeleteFile("/data/data/rebuild/wirelights");
-    }
-
-    _isRestartRequired = true;
-
-    return ScreenName::ConfigurationSubmenu;
-  };
-  ADD_MENU_ITEM(BackpackLights, "BACK", ConfigurationSubmenu);
-  ADD_MENU_ITEM_WITH_ACTION(BackpackLights, "CONFIRM", confirmToggleLights);
-
-  // === SwitchSlot screen ===
-  FaceInfoScreen::MenuItemAction confirmSlotSwitch = [this] {
-    LOG_INFO("FaceInfoScreenManager.SwitchSlot.Confirmed", "");
-    (void)system("/bin/sysswitch");
-    this->Reboot();
-    return ScreenName::SwitchSlotReboot;
-  };
-  ADD_MENU_ITEM(SwitchSlot, "BACK", ConfigurationSubmenu);
-  ADD_MENU_ITEM_WITH_ACTION(SwitchSlot, "CONFIRM", confirmSlotSwitch);
-    
-  // === Recovery screen ===
-  FaceInfoScreen::MenuItemAction confirmBootRecovery = [] {
-    LOG_INFO("FaceInfoScreenManager.Recovery.Confirmed", "");
-    (void)system("/usr/sbin/reboot recovery");
-    return ScreenName::Rebooting;
-  };
-  ADD_MENU_ITEM(BootRecovery, "BACK", ConfigurationSubmenu2);
-  ADD_MENU_ITEM_WITH_ACTION(BootRecovery, "CONFIRM", confirmBootRecovery);
-
-  // === Old/New alexa screen ===
-  FaceInfoScreen::MenuItemAction confirmOldNewAlexa = [this] {
-    LOG_INFO("FaceInfoScreenManager.OldNewAlexa.Confirmed", "");
-    if (Util::FileUtils::FileDoesNotExist("/data/data/rebuild/old-alexa")) {
-      Util::FileUtils::WriteFile("/data/data/rebuild/old-alexa", "");
-    } else {
-      Util::FileUtils::DeleteFile("/data/data/rebuild/old-alexa");
-    }
-
-    _isRestartRequired = true;
-
-    return ScreenName::ConfigurationSubmenu4;
-  };
-  ADD_MENU_ITEM(OldNewAlexa, "BACK", ConfigurationSubmenu4);
-  ADD_MENU_ITEM_WITH_ACTION(OldNewAlexa, "CONFIRM", confirmOldNewAlexa);
+  // Sleep settings
+  ADD_MENU_ITEM(SleepSettings, "BACK", ConfigurationSubmenu4);
+  ADD_MENU_ITEM(SleepSettings, _disablePersonCheck ? "ENABLE RTP" : "DISABLE RTP", RTP);
+  ADD_MENU_ITEM(SleepSettings, _disableReactToSound ? "ENABLE RTS" : "DISABLE RTS", RTS);
+  ADD_MENU_ITEM(SleepSettings, _snoringDisabled ? "ENABLE SNORING" : "DISABLE SNORING", Snoring);
 
   // === Toggle Snoring ===
   FaceInfoScreen::MenuItemAction confirmToggleSnoring = [this] {
     LOG_INFO("FaceInfoScreenManager.Snoring.Confirmed", "");
-    if (Util::FileUtils::FileDoesNotExist("/data/data/rebuild/dont-snore-at-night")) {
-      Util::FileUtils::WriteFile("/data/data/rebuild/dont-snore-at-night", "");
-    } else {
-      Util::FileUtils::DeleteFile("/data/data/rebuild/dont-snore-at-night");
-    }
-
+    RebuildToggles::SetBool(_context->GetDataPlatform(), "snoringDisabled", !_snoringDisabled);
     _isRestartRequired = true;
 
     return ScreenName::SleepSettings;
@@ -655,30 +698,10 @@ void FaceInfoScreenManager::Init(Anim::AnimContext* context, Anim::AnimationStre
   ADD_MENU_ITEM(Snoring, "BACK", SleepSettings);
   ADD_MENU_ITEM_WITH_ACTION(Snoring, "CONFIRM", confirmToggleSnoring);
 
-  // === Toggle React to Sound ===
-  FaceInfoScreen::MenuItemAction confirmToggleRTS = [this] {
-    LOG_INFO("FaceInfoScreenManager.ReacttoSound.Confirmed", "");
-    if (Util::FileUtils::FileDoesNotExist("/data/data/rebuild/dont-react-to-sound-at-night")) {
-      Util::FileUtils::WriteFile("/data/data/rebuild/dont-react-to-sound-at-night", "");
-    } else {
-      Util::FileUtils::DeleteFile("/data/data/rebuild/dont-react-to-sound-at-night");
-    }
-
-    _isRestartRequired = true;
-
-    return ScreenName::SleepSettings;
-  };
-  ADD_MENU_ITEM(RTS, "BACK", SleepSettings);
-  ADD_MENU_ITEM_WITH_ACTION(RTS, "CONFIRM", confirmToggleRTS);
-
   // === Toggle React to Person ===
   FaceInfoScreen::MenuItemAction confirmToggleRTP = [this] {
     LOG_INFO("FaceInfoScreenManager.ReacttoPerson.Confirmed", "");
-    if (Util::FileUtils::FileDoesNotExist("/data/data/rebuild/dont-look-for-people-at-night")) {
-      Util::FileUtils::WriteFile("/data/data/rebuild/dont-look-for-people-at-night", "");
-    } else {
-      Util::FileUtils::DeleteFile("/data/data/rebuild/dont-look-for-people-at-night");
-    }
+    RebuildToggles::SetBool(_context->GetDataPlatform(), "disablePersonCheck", !_disablePersonCheck);
 
     _isRestartRequired = true;
 
@@ -687,14 +710,22 @@ void FaceInfoScreenManager::Init(Anim::AnimContext* context, Anim::AnimationStre
   ADD_MENU_ITEM(RTP, "BACK", SleepSettings);
   ADD_MENU_ITEM_WITH_ACTION(RTP, "CONFIRM", confirmToggleRTP);
 
+  // === Toggle React to Sound ===
+  FaceInfoScreen::MenuItemAction confirmToggleRTS = [this] {
+    LOG_INFO("FaceInfoScreenManager.ReacttoSound.Confirmed", "");
+    RebuildToggles::SetBool(_context->GetDataPlatform(), "disableReactToSound", !_disableReactToSound);
+
+    _isRestartRequired = true;
+
+    return ScreenName::SleepSettings;
+  };
+  ADD_MENU_ITEM(RTS, "BACK", SleepSettings);
+  ADD_MENU_ITEM_WITH_ACTION(RTS, "CONFIRM", confirmToggleRTS);
+
   // === DTTB random eye colors screen ===
   FaceInfoScreen::MenuItemAction confirmToggleDTTBEyes = [this] {
     LOG_INFO("FaceInfoScreenManager.SwapDTTBEyes.Confirmed", "");
-    if (Util::FileUtils::FileDoesNotExist("/data/data/rebuild/dttb-eye-randomizer")) {
-      Util::FileUtils::WriteFile("/data/data/rebuild/dttb-eye-randomizer", "");
-    } else {
-      Util::FileUtils::DeleteFile("/data/data/rebuild/dttb-eye-randomizer");
-    }
+    RebuildToggles::SetBool(_context->GetDataPlatform(), "dttbRandomEyes", !RebuildToggles::GetBool("dttbRandomEyes"));
 
     _isRestartRequired = true;
 
@@ -702,6 +733,33 @@ void FaceInfoScreenManager::Init(Anim::AnimContext* context, Anim::AnimationStre
   };
   ADD_MENU_ITEM(DTTBRandomEyes, "BACK", ConfigurationSubmenu4);
   ADD_MENU_ITEM_WITH_ACTION(DTTBRandomEyes, "CONFIRM", confirmToggleDTTBEyes);
+
+  // === Old/New alexa screen ===
+  FaceInfoScreen::MenuItemAction confirmOldNewAlexa = [this] {
+    LOG_INFO("FaceInfoScreenManager.OldNewAlexa.Confirmed", "");
+    RebuildToggles::SetBool(_context->GetDataPlatform(), "classicAlexa", !_classicAlexa);
+    _isRestartRequired = true;
+
+    return ScreenName::ConfigurationSubmenu5;
+  };
+  ADD_MENU_ITEM(OldNewAlexa, "BACK", ConfigurationSubmenu5);
+  ADD_MENU_ITEM_WITH_ACTION(OldNewAlexa, "CONFIRM", confirmOldNewAlexa);
+
+  // === Cloudless screen ===
+  FaceInfoScreen::MenuItemAction confirmToggleCloudless = [this] {
+    LOG_INFO("FaceInfoScreenManager.Cloudless.Confirmed", "");
+    if (!_cloudlessEnabled) {
+      Util::FileUtils::WriteFile("/data/data/forceCloudless", "");
+    } else {
+      Util::FileUtils::DeleteFile("/data/data/forceCloudless");
+    }
+
+    _isRestartRequired = true;
+
+    return ScreenName::ConfigurationSubmenu5;
+  };
+  ADD_MENU_ITEM(Cloudless, "BACK", ConfigurationSubmenu5);
+  ADD_MENU_ITEM_WITH_ACTION(Cloudless, "CONFIRM", confirmToggleCloudless);
 
   // === Camera screen ===
   FaceInfoScreen::ScreenAction cameraEnterAction = [this]() {
@@ -751,7 +809,8 @@ void FaceInfoScreenManager::Init(Anim::AnimContext* context, Anim::AnimationStre
   };
   SET_ENTER_ACTION(ToggleMute, toggleMuteEnterAction);
   // TODO (VIC-11606): don't use timeout and instead wait for mute anim to end
-  SET_TIMEOUT(ToggleMute, 8, None);
+  const bool muted = _context->GetMicDataSystem()->IsMicMuted();
+  SET_TIMEOUT(ToggleMute, muted ? 8 : 6.5, None);
   
   // === AlexaNotification ===
   auto alexaNotification = [this]() {
@@ -2090,13 +2149,11 @@ void FaceInfoScreenManager::DrawUpdatePrompt()
 {
   auto osstate = OSState::getInstance();
 
-  if (osstate->IsValidIPAddress(osstate->GetIPAddress()) && !needsUpdate()) {
+  if (osstate->IsWallTimeSynced()) {
     (void)system("/usr/sbin/update-engine-rebuild -c");
   }
 
-  if (needsUpdate()) {
-    auto *osstate = OSState::getInstance();
-
+  if (osstate->IsWallTimeSynced() && needsUpdate()) {
     const std::string okToUpdate = "UPDATE REBUILD?";
 
     const std::string currOSVer = IsXray() ? "CURR: " + osstate->GetOSBuildVersion() : "CURRENT: " + osstate->GetOSBuildVersion();
@@ -2422,10 +2479,14 @@ void FaceInfoScreenManager::DrawScratch()
 {
 
   if (_currScreen == GetScreen(ScreenName::AutoUpdates) ||
+      _currScreen == GetScreen(ScreenName::BackpackLightsMenu) ||
+      _currScreen == GetScreen(ScreenName::BackpackLightsDot) ||
+      _currScreen == GetScreen(ScreenName::Camera) ||
       _currScreen == GetScreen(ScreenName::ConfigurationSubmenu) ||
       _currScreen == GetScreen(ScreenName::ConfigurationSubmenu2) ||
       _currScreen == GetScreen(ScreenName::ConfigurationSubmenu3) ||
       _currScreen == GetScreen(ScreenName::ConfigurationSubmenu4) ||
+      _currScreen == GetScreen(ScreenName::ConfigurationSubmenu5) ||
       _currScreen == GetScreen(ScreenName::DisableAutoUpdates) ||
       _currScreen == GetScreen(ScreenName::SleepSettings) ||
       _currScreen == GetScreen(ScreenName::SetFrequency) ||

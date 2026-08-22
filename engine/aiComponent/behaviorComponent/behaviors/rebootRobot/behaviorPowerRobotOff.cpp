@@ -21,9 +21,7 @@
 #include "engine/aiComponent/behaviorComponent/behaviorExternalInterface/beiRobotInfo.h"
 #include "engine/aiComponent/behaviorComponent/userIntentComponent.h"
 #include "engine/aiComponent/behaviorComponent/userIntents.h"
-#include "engine/aiComponent/beiConditions/conditions/conditionTimePowerButtonPressed.h"
 #include "engine/components/dataAccessorComponent.h"
-#include "engine/externalInterface/externalInterface.h"
 #include "robot.h"
 
 namespace Anki {
@@ -31,7 +29,6 @@ namespace Vector {
 
 namespace{
 const char* kPowerOffAnimName         = "powerOffAnimName";
-const char* const kWaitForAnimMsgKey  = "waitForAnimMsg";
 const char* kFindChargerBehaviorKey   = "goToChargerBehavior";
 }
 
@@ -40,8 +37,6 @@ BehaviorPowerRobotOff::InstanceConfig::InstanceConfig(const Json::Value& config)
 {
   const std::string debugName = "BehaviorPowerRobotOff.InstanceConfig.MissingKey. ";
   powerOffAnimName   = JsonTools::ParseString(config, kPowerOffAnimName, debugName + kPowerOffAnimName);
-
-  waitForAnimMsg = config.get( kWaitForAnimMsgKey, false ).asBool();
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -113,13 +108,6 @@ void BehaviorPowerRobotOff::GetBehaviorJsonKeys(std::set<const char*>& expectedK
   expectedKeys.insert( std::begin(list), std::end(list) );
 }
 
-
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-void BehaviorPowerRobotOff::OnBehaviorEnteredActivatableScope()
-{
-}
-
-
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 void BehaviorPowerRobotOff::OnBehaviorActivated()
 {
@@ -129,14 +117,7 @@ void BehaviorPowerRobotOff::OnBehaviorActivated()
   UserIntentPtr intentDataShutdownSatisfied = uic.GetUserIntentIfActive(USER_INTENT(victor_shutdown_satisfied));
 
   // reset dynamic variables
-  const bool prevShouldStartPowerOffAnimaiton = _dVars.shouldStartPowerOffAnimaiton;
   _dVars = DynamicVariables();
-
-  // make shouldStartPowerOffAnimaiton persist if _iConfig.waitForAnimMsg, since this behavior WantToBeActivated
-  // iff shouldStartPowerOffAnimaiton, whenever _iConfig.waitForAnimMsg
-  if( _iConfig.waitForAnimMsg ) {
-    _dVars.shouldStartPowerOffAnimaiton = prevShouldStartPowerOffAnimaiton;
-  }
 
   if (intentDataShutdown || intentDataShutdownSatisfied) {
     _dVars.isShutdown = true;
@@ -150,19 +131,6 @@ void BehaviorPowerRobotOff::OnBehaviorActivated()
     TransitionToPoweringOff();
   }
 }
-
-
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-void BehaviorPowerRobotOff::BehaviorUpdate()
-{
-}
-
-
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-void BehaviorPowerRobotOff::OnBehaviorLeftActivatableScope()
-{
-}
-
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 void BehaviorPowerRobotOff::AlwaysHandleInScope(const RobotToEngineEvent& event)  {
