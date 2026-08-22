@@ -244,6 +244,7 @@ class VizPath:
     color: int | None = None
     lines: list = field(default_factory=list)
     arcs: list = field(default_factory=list)
+    order: list = field(default_factory=list)
 
     def polylines_m(self):
         """Line segments then tessellated arcs (VizControllerImpl DrawPaths order)."""
@@ -260,6 +261,19 @@ class VizPath:
             if pts:
                 strips.append(tuple(pts))
         return strips
+
+    def segment_polyline_m(self, index):
+        if index < 0 or index >= len(self.order):
+            return None
+        kind, i = self.order[index]
+        if kind == "line":
+            line = self.lines[i]
+            return (
+                (line.x_start_m, line.y_start_m, line.z_start_m),
+                (line.x_end_m, line.y_end_m, line.z_end_m),
+            )
+        pts = self.arcs[i].points_m()
+        return tuple(pts) if pts else None
 
 
 @dataclass
@@ -407,7 +421,8 @@ class World:
         return path
 
     def append_path_line(self, payload):
-        self._path(payload.pathID).lines.append(
+        path = self._path(payload.pathID)
+        path.lines.append(
             PathLine(
                 x_start_m=float(payload.x_start_m),
                 y_start_m=float(payload.y_start_m),
@@ -417,9 +432,11 @@ class World:
                 z_end_m=float(payload.z_end_m),
             )
         )
+        path.order.append(("line", len(path.lines) - 1))
 
     def append_path_arc(self, payload):
-        self._path(payload.pathID).arcs.append(
+        path = self._path(payload.pathID)
+        path.arcs.append(
             PathArc(
                 x_center_m=float(payload.x_center_m),
                 y_center_m=float(payload.y_center_m),
@@ -428,6 +445,7 @@ class World:
                 sweep_rad=float(payload.sweep_rad),
             )
         )
+        path.order.append(("arc", len(path.arcs) - 1))
 
     def set_path_color(self, payload):
         path = self.paths.get(int(payload.pathID))
