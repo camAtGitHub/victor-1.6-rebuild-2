@@ -169,11 +169,18 @@ sudo iptables -I INPUT -p udp --dport 5200 -s ROBOT_LAN_IP -j ACCEPT
 | 1 / 2 / 3 | WORLD 3D / 2D / Map |
 | F | Frame robot |
 | Space | Pause render only (UI pings keep going) |
-| Esc | Dismiss connect error / blur IP field |
+| O | Toggle overlay panel |
+| Esc | If overlay panel open, close it; else dismiss connect error / blur IP field |
 | Drag CAMERA\|WORLD edge | Resize the camera pane (default 640px, double-click to reset) |
 | H | Cycle host IPv4 candidates when the host field is shown |
 
 Connect: button disables and shows **Connecting…** until UI handshake or 8 s. Errors under the IP field include the 5103 / 5252 / 5200 fix.
+
+Muted chrome **Overlays** (left of Disconnect) opens the same panel; it is not a second Connect.
+
+Overlay panel toggles STATE cliffs/white/ToF/pathseg and WORLD cliff dots / ToF ray / active path / camera overlays. Defaults ON. Session-only (not saved).
+
+Firmware point-turns are not sent on Viz, so `currPathSegment` can skew vs drawn path segments.
 
 ## Generate CLAD Python
 

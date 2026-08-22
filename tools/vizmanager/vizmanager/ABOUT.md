@@ -12,4 +12,5 @@ What it shows
 • STACK — behavior stack (BehaviorStackDebug)
 • STATE — pose, head/lift, battery, cliffs, animation
 • Chrome — LIVE / DEGRADED / DISCONNECTED, robot IP, pkt/s, Connect
+• Overlay panel (O): per-sensor HUD/WORLD/CAMERA toggles; cliffs, ToF ray, active path
 
