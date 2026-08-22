@@ -18,7 +18,7 @@ import struct
 import sys
 import time
 
-from vizmanager import theme
+from vizmanager import overlay_panel, theme
 from vizmanager.connect import (
     E2G_PING,
     MAX_MSG,
@@ -29,6 +29,7 @@ from vizmanager.connect import (
     pack_redirect_viz,
     send_ankiconn_and,
 )
+from vizmanager.sensors import OverlaySettings
 from vizmanager.session import Session
 from vizmanager.udp import (
     ANKICONN,
@@ -436,6 +437,8 @@ class VizApp:
         self._az_vel = 0.0
         self._el_vel = 0.0
         self._orbit_t = None
+        self.overlays = OverlaySettings()
+        self._overlay_focus = 0
 
     def pps(self, now=None):
         now = time.time() if now is None else now
@@ -694,6 +697,8 @@ class VizApp:
         import pygame
 
         if event.key == pygame.K_ESCAPE:
+            if overlay_panel.close_if_open(self.overlays):
+                return
             if self.ip_focused or self.host_focused:
                 self.ip_focused = False
                 self.host_focused = False
@@ -711,6 +716,21 @@ class VizApp:
                 self.host_focused = False
                 self.start_connect()
             return
+        if event.key == pygame.K_o:
+            overlay_panel.toggle_open(self.overlays)
+            if self.overlays.panel_open:
+                self._overlay_focus = 0
+            return
+        if self.overlays.panel_open:
+            if event.key == pygame.K_UP:
+                self._overlay_focus = overlay_panel.move_focus(self._overlay_focus, -1)
+                return
+            if event.key == pygame.K_DOWN:
+                self._overlay_focus = overlay_panel.move_focus(self._overlay_focus, 1)
+                return
+            if event.key in (pygame.K_SPACE, pygame.K_RETURN, pygame.K_KP_ENTER):
+                overlay_panel.toggle_index(self.overlays, self._overlay_focus)
+                return
         if event.key == pygame.K_h and self.show_host_field and self._lan_ips:
             cur = self.host_text.strip()
             try:
@@ -751,8 +771,14 @@ class VizApp:
         disc_w = 84
         host_x = field_x + field_w + pad
         host_w = field_w if self.show_host_field else 0
+        ov_w = 84
+        disc_x = btn_x - disc_w
+        ov_x = disc_x - ov_w
         pps_x = host_x + host_w + pad if self.show_host_field else field_x + field_w + pad
         pps_w = 70 if self.show_host_field else 90
+        max_pps_w = ov_x - pps_x - pad
+        if pps_w > max_pps_w:
+            pps_w = max(0, max_pps_w)
         return {
             "pip": (pip_x, cy + (ch - _PIP_D) // 2, _PIP_D, _PIP_D),
             "word": (word_x, cy, 110, ch),
@@ -761,7 +787,8 @@ class VizApp:
             "host": (host_x, field_y, host_w, field_h),
             "host_hit": (host_x, hit_y, host_w, hit_h),
             "pps": (pps_x, cy, pps_w, ch),
-            "disconnect": (btn_x - disc_w, cy, disc_w, ch),
+            "overlays": (ov_x, cy, ov_w, ch),
+            "disconnect": (disc_x, cy, disc_w, ch),
             "connect": (btn_x, cy, btn_w, btn_h),
         }
 
@@ -790,6 +817,22 @@ class VizApp:
             if self.redirector is not None and not self.connecting():
                 self.stop_connect()
             return
+        if event.button == 1 and _hit(widgets["overlays"], pos):
+            overlay_panel.toggle_open(self.overlays)
+            if self.overlays.panel_open:
+                self._overlay_focus = 0
+            return
+        if self.overlays.panel_open:
+            view = rects["world_view"]
+            if overlay_panel.hit_panel(pos, view):
+                if event.button == 1:
+                    field = overlay_panel.hit_checkbox(pos, view)
+                    if field:
+                        overlay_panel.toggle_field(self.overlays, field)
+                        self._overlay_focus = overlay_panel.CHECKBOX_FIELDS.index(field)
+                return
+            if event.button == 1 and _hit(rects["world"], pos):
+                self.overlays.panel_open = False
         tabs = rects["world_tabs"]
         if event.button == 1 and _hit(tabs, pos):
             tw = tabs[2] // 3
@@ -811,6 +854,10 @@ class VizApp:
     def _on_mouse_move(self, event, rects):
         import pygame
 
+        if self.overlays.panel_open and not self._drag and not self._split_drag:
+            idx = overlay_panel.row_index_at(event.pos, rects["world_view"])
+            if idx is not None:
+                self._overlay_focus = idx
         hover = _hit(rects["splitter"], event.pos)
         self._splitter_hover = hover or self._split_drag
         try:
@@ -926,6 +973,15 @@ class VizApp:
         self._draw_log(screen, rects)
         if self.connect_error:
             self._draw_connect_error(screen, rects)
+        if self.overlays.panel_open:
+            overlay_panel.draw(
+                screen,
+                self._font(pygame, "ui"),
+                self._font(pygame, "label"),
+                self.overlays,
+                rects["world_view"],
+                self._overlay_focus,
+            )
 
     def _draw_chrome(self, screen, rects):
         import pygame
@@ -983,6 +1039,12 @@ class VizApp:
         screen.blit(
             pps_img,
             (widgets["pps"][0], chrome.y + (chrome.h - pps_img.get_height()) // 2),
+        )
+
+        ov_lab = ui.render("Overlays", True, theme.TEXT_MUTED)
+        ov_r = pygame.Rect(widgets["overlays"])
+        screen.blit(
+            ov_lab, (ov_r.x + 8, ov_r.y + (ov_r.h - ov_lab.get_height()) // 2)
         )
 
         if self.redirector is not None and not self.connecting():
