@@ -131,7 +131,7 @@ Minimum window **1280×720**. Default **1600×900**. Not mobile-first (override 
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│ CHROME  36px  [pip+STATE]  robot IP field   pps   [Connect]      │
+│ CHROME  36px  [pip+STATE] IP pps Overlays Disconnect [Connect]   │
 ├────────────────┬────────────────────────────────┬────────────────┤
 │ CAMERA         │ WORLD                          │ STACK          │
 │ 640 default    │ 3D default · tab: 2D · tab: Map│ Fira Code list │

@@ -833,6 +833,7 @@ class VizApp:
                 return
             if event.button == 1 and _hit(rects["world"], pos):
                 self.overlays.panel_open = False
+                return
         tabs = rects["world_tabs"]
         if event.button == 1 and _hit(tabs, pos):
             tw = tabs[2] // 3
@@ -914,9 +915,14 @@ class VizApp:
             self._map_oy += dy
 
     def _on_wheel(self, event, rects):
-        import pygame
+        pos = getattr(event, "pos", None)
+        if pos is None:
+            import pygame
 
-        if not _hit(rects["world_view"], pygame.mouse.get_pos()):
+            pos = pygame.mouse.get_pos()
+        if not _hit(rects["world_view"], pos):
+            return
+        if self.overlays.panel_open and overlay_panel.hit_panel(pos, rects["world_view"]):
             return
         dy = getattr(event, "y", 0)
         if self.tab == TAB_3D:

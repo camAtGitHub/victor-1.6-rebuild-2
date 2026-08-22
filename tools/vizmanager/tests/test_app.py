@@ -26,6 +26,7 @@ from vizmanager.app import (
     STATUS_DISCONNECTED,
     STATUS_LIVE,
     Redirector,
+    TAB_2D,
     VizApp,
     _CAM_DEFAULT_W,
     _CAM_MIN_W,
@@ -481,10 +482,41 @@ def test_click_outside_panel_on_world_closes():
     args = parser.parse_args(["--listen-only"])
     app = VizApp(args)
     try:
+        app.tab = TAB_2D
         app.overlays.panel_open = True
         tabs = layout_rects(*DEFAULT_SIZE)["world_tabs"]
         _click(app, (tabs[0] + 8, tabs[1] + 8))
         assert app.overlays.panel_open is False
+        assert app.tab == TAB_2D
+        assert app._drag is None
+
+        app.overlays.panel_open = True
+        world_view = layout_rects(*DEFAULT_SIZE)["world_view"]
+        pos = (world_view[0] + 8, world_view[1] + 8)
+        assert overlay_panel.hit_panel(pos, world_view) is False
+        _click(app, pos)
+        assert app.overlays.panel_open is False
+        assert app._drag is None
+    finally:
+        app.close()
+
+
+def test_wheel_over_panel_does_not_zoom():
+    parser = build_parser()
+    args = parser.parse_args(["--listen-only"])
+    app = VizApp(args)
+    try:
+        app.overlays.panel_open = True
+        rects = layout_rects(*DEFAULT_SIZE)
+        panel = overlay_panel.panel_rect(rects["world_view"])
+        dist = app.view3d.distance
+        ppm = app.view2d.ppm
+        app._on_wheel(SimpleNamespace(pos=_center(panel), y=1), rects)
+        assert app.view3d.distance == dist
+        assert app.view2d.ppm == ppm
+        app.overlays.panel_open = False
+        app._on_wheel(SimpleNamespace(pos=_center(panel), y=1), rects)
+        assert app.view3d.distance != dist
     finally:
         app.close()
 
