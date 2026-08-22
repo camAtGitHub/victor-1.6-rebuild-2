@@ -1364,7 +1364,7 @@ class VizApp:
         stack_s = pygame.Surface(stack_r.size)
         state_s = pygame.Surface(state_r.size)
         self.session.hud.draw_stack(stack_s)
-        self.session.hud.draw_state(state_s)
+        self.session.hud.draw_state(state_s, self.overlays)
         dock = self.session.hud.docking_state_line()
         if dock:
             font = self._font(pygame, "mono")

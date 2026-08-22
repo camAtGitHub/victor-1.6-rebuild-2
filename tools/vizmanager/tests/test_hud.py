@@ -191,6 +191,23 @@ def test_off_treads_color():
 
 
 @needs_generated
+def test_dist_row_live_and_warn():
+    sess = Session()
+    payload = _robot_state_payload()
+    payload.state.proxData.rangeStatus = 0
+    sess.process_datagram(_pack_robot_state(payload))
+    assert sess.hud.state_rows()[7][1] == theme.LIVE
+    payload = _robot_state_payload()
+    payload.state.proxData.rangeStatus = 1
+    sess.process_datagram(_pack_robot_state(payload))
+    assert sess.hud.state_rows()[7][1] == theme.WARN
+    payload = _robot_state_payload()
+    payload.state.proxData.rangeStatus = 255
+    sess.process_datagram(_pack_robot_state(payload))
+    assert sess.hud.state_rows()[7][1] == theme.WARN
+
+
+@needs_generated
 def test_white_line_br_flag():
     payload = _robot_state_payload()
     payload.state.whiteDetectedFlags = 0x08
@@ -199,6 +216,17 @@ def test_white_line_br_flag():
     text, color = sess.hud.state_rows()[18]
     assert "BR:1" in text
     assert color == theme.TEXT
+
+
+@needs_generated
+def test_white_muted_when_clear():
+    payload = _robot_state_payload()
+    payload.state.whiteDetectedFlags = 0
+    sess = Session()
+    sess.process_datagram(_pack_robot_state(payload))
+    text, color = sess.hud.state_rows()[18]
+    assert "White:" in text
+    assert color == theme.TEXT_MUTED
 
 
 @needs_generated

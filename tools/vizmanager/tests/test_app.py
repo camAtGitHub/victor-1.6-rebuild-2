@@ -416,6 +416,30 @@ def test_overlay_settings_on_app_default_closed():
         app.close()
 
 
+def test_draw_state_passes_app_overlays():
+    app_src = open(os.path.join(_VIZ, "app.py"), encoding="utf-8").read()
+    assert "self.session.hud.draw_state(state_s, self.overlays)" in app_src
+    parser = build_parser()
+    args = parser.parse_args(["--listen-only"])
+    app = VizApp(args)
+    try:
+        from vizmanager import codec
+
+        app.overlays.cliff_hud = False
+        if not codec.generated_available():
+            assert app.session.hud.state_lines(app.overlays)[6] == ""
+            return
+        MessageViz = codec.MessageViz
+        payload_cls = MessageViz.typeByTag(MessageViz.Tag.RobotStateMessage)
+        payload = payload_cls()
+        app.session.process_datagram(MessageViz(RobotStateMessage=payload).pack())
+        assert app.session.hud.state_lines(app.overlays)[6] == ""
+        app.overlays.cliff_hud = True
+        assert "Cliff:" in app.session.hud.state_lines(app.overlays)[6]
+    finally:
+        app.close()
+
+
 def test_layout_rects_key_set_unchanged():
     rects = layout_rects(*DEFAULT_SIZE)
     assert set(rects) == _LAYOUT_KEYS
