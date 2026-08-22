@@ -58,6 +58,15 @@ def _triangle(pose_origin_fn, length, width):
     return tuple(pose_origin_fn(p)[:2] for p in locals_xy)
 
 
+def robot_marker_points_m(world):
+    """SetRobot triangle in world metres (origin applied). Empty if no robot."""
+    robot = world.robot
+    if robot is None:
+        return ()
+    fn = lambda p, pose=robot.pose: world.apply_pose_origin(p, pose)
+    return _triangle(fn, _ROBOT_L, _ROBOT_W)
+
+
 def _rect_xy(pose_origin_fn, xs, ys):
     locals_xy = (
         (xs[0], ys[0], 0.0),

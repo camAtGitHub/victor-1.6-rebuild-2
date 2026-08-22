@@ -132,7 +132,19 @@ try {
     if (-not $SkipPip) {
         Write-Host ""
         Write-Host "=== pip install -e .[test] (pygame, vispy, opencv-python, numpy) ==="
-        Invoke-Py $Py @("-m", "pip", "install", "-e", ".[test]")
+        Write-Host "Windows may lock Scripts\*.exe (pip .deleteme / Defender); retrying on failure."
+        $pipOk = $false
+        for ($i = 1; $i -le 8; $i++) {
+            Write-Host "pip attempt $i/8"
+            $all = @($Py.Prefix) + @("-m", "pip", "install", "-e", ".[test]", "--upgrade-strategy", "only-if-needed")
+            & $Py.Exe @all
+            if ($LASTEXITCODE -eq 0) { $pipOk = $true; break }
+            Write-Warning ("pip exit {0}. Retry in {1}s (close other Python; Defender often locks the new .exe)." -f $LASTEXITCODE, (2 * $i))
+            Start-Sleep -Seconds (2 * $i)
+        }
+        if (-not $pipOk) {
+            throw "pip install failed after 8 tries (WinError 2 / .deleteme). Re-run; or exclude C:\Python311\Scripts from Defender."
+        }
     }
 
     $needGen = -not (Test-Path -LiteralPath $MessageViz)

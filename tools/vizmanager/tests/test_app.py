@@ -13,6 +13,9 @@ from vizmanager import theme
 from vizmanager.app import (
     CONNECT_TIMEOUT_S,
     DEFAULT_SIZE,
+    EMPTY_MAP,
+    EMPTY_MAP_FRAME,
+    EMPTY_MAP_HINT,
     FIREWALL_WIN,
     MIN_SIZE,
     STATUS_DEGRADED,
@@ -31,10 +34,13 @@ from vizmanager.app import (
     layout_rects,
     letterbox_dest,
     map_grid_lines,
+    map_robot_pts,
     status_for,
+    _RIGHT_W,
 )
 from vizmanager.udp import ANKICONN
 from vizmanager.view3d import DRAW_OBJECTS_RATE_SEC
+from vizmanager.world import World
 
 
 def test_parser_robot_and_listen_only():
@@ -75,6 +81,9 @@ def test_layout_world_largest_default_and_min():
     assert default["camera"][2] == _CAM_DEFAULT_W
     assert _CAM_DEFAULT_W == 2 * 320
     assert default["world"][2] >= default["camera"][2]
+    assert default["stack"][2] == _RIGHT_W
+    assert default["state"][2] == _RIGHT_W
+    assert _RIGHT_W == 380
 
 
 def test_layout_cam_w_is_clamped_and_splitter_sits_on_the_seam():
@@ -159,6 +168,44 @@ def test_ip_hit_target_at_least_32px():
     assert visual[3] == theme.CONTROL_H
     assert hit[3] >= 32
     assert hit[2] == visual[2]
+
+
+def test_map_empty_overlay_tells_how_to_activate():
+    assert EMPTY_MAP == "No MemoryMap tiles"
+    assert EMPTY_MAP_HINT == "Open WebViz NavMap to activate."
+    assert EMPTY_MAP_FRAME == "Once tiles activate press 'F' to centre on robot"
+
+
+def _map_robot(**kw):
+    from types import SimpleNamespace
+
+    fields = dict(
+        x_trans_m=0.0,
+        y_trans_m=0.0,
+        z_trans_m=0.0,
+        rot_rad=0.0,
+        rot_axis_x=0.0,
+        rot_axis_y=0.0,
+        rot_axis_z=1.0,
+        head_angle=0.0,
+        lift_angle=0.0,
+    )
+    fields.update(kw)
+    return SimpleNamespace(**fields)
+
+
+def test_map_robot_pts_tip_at_origin_and_pans():
+    world = World()
+    assert map_robot_pts(world, 100, 100) == ()
+    world.set_robot(_map_robot())
+    pts = map_robot_pts(world, 100, 100)
+    assert len(pts) == 3
+    assert pts[0] == (50, 50)
+    # Base 80 mm behind (+X heading), 25 mm half-width, Y flipped.
+    assert pts[1] == (-30, 25)
+    assert pts[2] == (-30, 75)
+    panned = map_robot_pts(world, 100, 100, origin_x=10.0, origin_y=-4.0)
+    assert panned[0] == (60, 46)
 
 
 def test_map_grid_is_1mm_px_not_view2d_metres():

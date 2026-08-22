@@ -40,6 +40,8 @@ powershell -ExecutionPolicy Bypass -File tools\vizmanager\scripts\build_windows.
 
 Output: `tools/vizmanager/dist/VizManager/` (`VizManager.exe` + `_internal/`). Zip **that whole directory**. Details: `tools/vizmanager/SHIPPING.md`.
 
+`pip` on Windows often fails once with `WinError 2` renaming `Scripts\pyi-*.exe` to `.deleteme` (Defender file lock). The build script retries; if PyInstaller already imports it skips pip (`-SkipPip` / `-ForcePip`).
+
 Do not ship the `.exe` alone. CLAD and DLLs live in `_internal/` (`codec._repo_root()` uses PyInstaller `_MEIPASS`).
 
 ### 1. One-shot setup (PowerShell)
@@ -86,7 +88,7 @@ cd tools\vizmanager
 python -m vizmanager --robot 192.168.50.155 --host-ip YOUR_LAN_IP
 ```
 
-Window: 1600×900 chrome. Type the robot IP if needed, **Connect**.
+Window: 1680×900 chrome. Type the robot IP if needed, **Connect**.
 Allow **python.exe** if Defender pops a dialog.
 
 Success looks like: status **LIVE** (or **DEGRADED**), pkt/s > 0, STACK / STATE / WORLD filling in.

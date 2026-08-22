@@ -1,12 +1,12 @@
-# VizManager — ship this folder, not the repo
+# VizManager - ship this folder, not the repo
 
 The Windows freeze is **onedir**. Recipients need the **entire** `VizManager` directory (`VizManager.exe` **and** `_internal/`). They do **not** need Python, this git tree, or `generated/cladPython` on disk.
 
 ```
 VizManager/
   VizManager.exe
-  _internal/          ← CLAD, pygame, OpenCV, vispy, DLLs. Keep beside the exe.
-  README.txt          ← this file, copied by build_windows.ps1
+  _internal/          <- CLAD, pygame, OpenCV, vispy, DLLs. Keep beside the exe.
+  README.txt          <- this file, copied by build_windows.ps1
 ```
 
 Zip that folder and send the zip. Do not send only the `.exe`.
@@ -42,3 +42,5 @@ powershell -ExecutionPolicy Bypass -File tools\vizmanager\scripts\build_windows.
 ```
 
 Output: `tools/vizmanager/dist/VizManager/`. Zip that directory.
+
+If pip dies with `WinError 2` / `.deleteme` on `C:\Python311\Scripts\pyi-archive_viewer.exe`, that is Windows locking the new console-script exe (Defender is the usual culprit). `build_windows.ps1` retries and skips pip when `import PyInstaller` already works. Re-run is enough; `-SkipPip` if PyInstaller is installed; `-ForcePip` to reinstall. Optional: exclude `C:\Python311\Scripts` from real-time scanning.

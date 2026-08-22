@@ -39,7 +39,7 @@ from vizmanager.udp import (
     local_ipv4s,
 )
 from vizmanager.vision_http import set_viz_mode
-from vizmanager.view2d import View2D
+from vizmanager.view2d import View2D, robot_marker_points_m
 from vizmanager.view3d import (
     DRAW_OBJECTS_RATE_SEC,
     View3D,
@@ -52,7 +52,7 @@ from vizmanager.view3d import (
 from vizmanager.world import MM_TO_M, protocol_rgb
 
 MIN_SIZE = (1280, 720)
-DEFAULT_SIZE = (1600, 900)
+DEFAULT_SIZE = (1680, 900)
 TAB_3D, TAB_2D, TAB_MAP = 0, 1, 2
 TAB_NAMES = ("3D", "2D", "Map")
 CONNECT_TIMEOUT_S = 8.0
@@ -66,7 +66,11 @@ STATUS_LIVE = "LIVE"
 STATUS_DEGRADED = "DEGRADED"
 STATUS_DISCONNECTED = "DISCONNECTED"
 EMPTY_CAMERA = "No ImageChunk (enable VisionMode::Viz)"
-_RIGHT_W = 300
+EMPTY_MAP = "No MemoryMap tiles"
+EMPTY_MAP_HINT = "Open WebViz NavMap to activate."
+EMPTY_MAP_FRAME = "Once tiles activate press 'F' to centre on robot"
+# STACK+STATE. HUD is 12px mono (~8 px/char). Splitter only resizes CAMERA|WORLD.
+_RIGHT_W = 300 + 10 * 8
 _CAM_MIN_W = 320
 _CAM_DEFAULT_W = 640  # 100% bigger than the original 320px satellite
 _WORLD_MIN_W = 320
@@ -185,6 +189,23 @@ def status_for(handshakes, recent_pps, has_frame, last_pkt_age):
     if has_frame and not stale and recent_pps > 0:
         return STATUS_LIVE
     return STATUS_DEGRADED
+
+
+def map_robot_pts(world, width, height, origin_x=0.0, origin_y=0.0):
+    """Screen pixels of the SetRobot triangle in MemoryMap space (1 mm = 1 px)."""
+    pts_m = robot_marker_points_m(world)
+    if not pts_m:
+        return ()
+    cx = 0.5 * width
+    cy = 0.5 * height
+    out = []
+    for x_m, y_m in pts_m:
+        x_mm = x_m / MM_TO_M
+        y_mm = y_m / MM_TO_M
+        sx = int(round(x_mm + cx + origin_x))
+        sy = int(round(-y_mm + cy + origin_y))
+        out.append((sx, sy))
+    return tuple(out)
 
 
 def map_grid_lines(width, height, origin_x=0.0, origin_y=0.0, step_mm=50):
@@ -1159,7 +1180,12 @@ class VizApp:
                 theme.TEXT_MUTED,
             )
         elif self.tab == TAB_MAP and not has_tiles:
-            self._centered(surf, surf.get_rect(), "No MemoryMap tiles", theme.TEXT_MUTED)
+            self._centered(
+                surf,
+                surf.get_rect(),
+                EMPTY_MAP + "\n" + EMPTY_MAP_HINT + "\n" + EMPTY_MAP_FRAME,
+                theme.TEXT_MUTED,
+            )
 
     def _paint_2d(self, surf):
         self.view2d.width, self.view2d.height = surf.get_size()
@@ -1258,6 +1284,9 @@ class VizApp:
             pygame.draw.line(surf, theme.GRID, (x0, y0), (x1, y1), 1)
         for x, y, rw, rh, color in self.session.world.fill_rects(w, h, ox, oy):
             pygame.draw.rect(surf, protocol_rgb(color), (x, y, rw, rh))
+        pts = map_robot_pts(self.session.world, w, h, ox, oy)
+        if len(pts) >= 3:
+            pygame.draw.polygon(surf, theme.ACCENT, pts, 1)
 
     def _draw_stack_state(self, screen, rects):
         import pygame
@@ -1309,8 +1338,13 @@ class VizApp:
         if not isinstance(rect, pygame.Rect):
             rect = pygame.Rect(rect)
         font = self._font(pygame, "ui")
-        img = font.render(text, True, color)
-        dest.blit(img, img.get_rect(center=rect.center))
+        imgs = [font.render(line, True, color) for line in text.split("\n")]
+        gap = 2
+        total_h = sum(img.get_height() for img in imgs) + gap * (len(imgs) - 1)
+        y = rect.centery - total_h // 2
+        for img in imgs:
+            dest.blit(img, img.get_rect(midtop=(rect.centerx, y)))
+            y += img.get_height() + gap
 
 
 def _hit(rect, pos):
