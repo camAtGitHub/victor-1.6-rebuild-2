@@ -168,7 +168,7 @@ sudo iptables -I INPUT -p udp --dport 5200 -s ROBOT_LAN_IP -j ACCEPT
 |---|---|
 | 1 / 2 / 3 | WORLD 3D / 2D / Map |
 | F | Frame robot |
-| Space | Pause render only (UI pings keep going) |
+| Space | If overlay panel open, flip focused checkbox; else pause render only (UI pings keep going) |
 | O | Toggle overlay panel |
 | Esc | If overlay panel open, close it; else dismiss connect error / blur IP field |
 | Drag CAMERA\|WORLD edge | Resize the camera pane (default 640px, double-click to reset) |
@@ -178,7 +178,7 @@ Connect: button disables and shows **Connecting…** until UI handshake or 8 s. 
 
 Muted chrome **Overlays** (left of Disconnect) opens the same panel; it is not a second Connect.
 
-Overlay panel toggles STATE cliffs/white/ToF/pathseg and WORLD cliff dots / ToF ray / active path / camera overlays. Defaults ON. Session-only (not saved).
+Overlay panel toggles STATE cliffs/white/ToF/pathseg, WORLD cliff dots / ToF ray / active path, and CAMERA protocol overlays. Defaults ON. Session-only (not saved).
 
 Firmware point-turns are not sent on Viz, so `currPathSegment` can skew vs drawn path segments.
 
