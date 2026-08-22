@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import os
+import re
 import socket
 import sys
 import time
+from types import SimpleNamespace
+
+import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -22,6 +26,7 @@ from vizmanager.app import (
     STATUS_DISCONNECTED,
     STATUS_LIVE,
     Redirector,
+    TAB_2D,
     VizApp,
     _CAM_DEFAULT_W,
     _CAM_MIN_W,
@@ -38,9 +43,44 @@ from vizmanager.app import (
     status_for,
     _RIGHT_W,
 )
+from vizmanager import overlay_panel
+from vizmanager.sensors import OverlaySettings
 from vizmanager.udp import ANKICONN
 from vizmanager.view3d import DRAW_OBJECTS_RATE_SEC
 from vizmanager.world import World
+
+try:
+    import pygame
+except ImportError:
+    pygame = None
+
+_LAYOUT_KEYS = {
+    "window",
+    "chrome",
+    "camera",
+    "splitter",
+    "world",
+    "world_tabs",
+    "world_view",
+    "stack",
+    "state",
+    "log",
+}
+_VIZ = os.path.join(os.path.dirname(__file__), "..", "vizmanager")
+_HEX = re.compile(r"#[0-9A-Fa-f]{3,8}\b")
+
+
+def _click(app, pos, button=1, clicks=1):
+    rects = app._layout(DEFAULT_SIZE)
+    app._on_mouse_down(
+        SimpleNamespace(pos=pos, button=button, clicks=clicks),
+        rects,
+    )
+    return rects
+
+
+def _center(rect):
+    return (rect[0] + rect[2] // 2, rect[1] + rect[3] // 2)
 
 
 def test_parser_robot_and_listen_only():
@@ -362,3 +402,195 @@ def test_listen_only_bind_handshake_counts():
         assert app.status() in (STATUS_LIVE, STATUS_DEGRADED)
     finally:
         app.close()
+
+
+def test_overlay_settings_on_app_default_closed():
+    parser = build_parser()
+    args = parser.parse_args(["--listen-only"])
+    app = VizApp(args)
+    try:
+        assert isinstance(app.overlays, OverlaySettings)
+        assert app.overlays.panel_open is False
+        assert app.overlays.cliff_dots is True
+    finally:
+        app.close()
+
+
+def test_layout_rects_key_set_unchanged():
+    rects = layout_rects(*DEFAULT_SIZE)
+    assert set(rects) == _LAYOUT_KEYS
+    assert rects["chrome"][3] == theme.CHROME_H
+
+
+def test_overlays_chrome_left_of_disconnect_muted_width():
+    parser = build_parser()
+    args = parser.parse_args(["--listen-only"])
+    app = VizApp(args)
+    try:
+        widgets = app._chrome_widgets(layout_rects(*DEFAULT_SIZE))
+        ov = widgets["overlays"]
+        disc = widgets["disconnect"]
+        conn = widgets["connect"]
+        assert ov[2] == 84
+        assert ov[3] == theme.CHROME_H
+        assert ov[3] >= 32
+        assert ov[0] + ov[2] == disc[0]
+        assert disc[0] + disc[2] == conn[0]
+    finally:
+        app.close()
+
+
+def test_click_overlays_toggles_panel_open():
+    parser = build_parser()
+    args = parser.parse_args(["--listen-only"])
+    app = VizApp(args)
+    try:
+        widgets = app._chrome_widgets(layout_rects(*DEFAULT_SIZE))
+        pos = _center(widgets["overlays"])
+        assert app.overlays.panel_open is False
+        _click(app, pos)
+        assert app.overlays.panel_open is True
+        _click(app, pos)
+        assert app.overlays.panel_open is False
+    finally:
+        app.close()
+
+
+def test_checkbox_hit_flips_cliff_dots():
+    parser = build_parser()
+    args = parser.parse_args(["--listen-only"])
+    app = VizApp(args)
+    try:
+        app.overlays.panel_open = True
+        assert app.overlays.cliff_dots is True
+        world_view = layout_rects(*DEFAULT_SIZE)["world_view"]
+        row = None
+        for field, _label, rect, _index in overlay_panel.iter_rows(world_view):
+            if field == "cliff_dots":
+                row = rect
+                break
+        assert row is not None
+        _click(app, _center(row))
+        assert app.overlays.cliff_dots is False
+        assert app.overlays.panel_open is True
+    finally:
+        app.close()
+
+
+def test_click_outside_panel_on_world_closes():
+    parser = build_parser()
+    args = parser.parse_args(["--listen-only"])
+    app = VizApp(args)
+    try:
+        app.tab = TAB_2D
+        app.overlays.panel_open = True
+        tabs = layout_rects(*DEFAULT_SIZE)["world_tabs"]
+        _click(app, (tabs[0] + 8, tabs[1] + 8))
+        assert app.overlays.panel_open is False
+        assert app.tab == TAB_2D
+        assert app._drag is None
+
+        app.overlays.panel_open = True
+        world_view = layout_rects(*DEFAULT_SIZE)["world_view"]
+        pos = (world_view[0] + 8, world_view[1] + 8)
+        assert overlay_panel.hit_panel(pos, world_view) is False
+        _click(app, pos)
+        assert app.overlays.panel_open is False
+        assert app._drag is None
+    finally:
+        app.close()
+
+
+def test_wheel_over_panel_does_not_zoom():
+    parser = build_parser()
+    args = parser.parse_args(["--listen-only"])
+    app = VizApp(args)
+    try:
+        app.overlays.panel_open = True
+        rects = layout_rects(*DEFAULT_SIZE)
+        panel = overlay_panel.panel_rect(rects["world_view"])
+        dist = app.view3d.distance
+        ppm = app.view2d.ppm
+        app._on_wheel(SimpleNamespace(pos=_center(panel), y=1), rects)
+        assert app.view3d.distance == dist
+        assert app.view2d.ppm == ppm
+        app.overlays.panel_open = False
+        app._on_wheel(SimpleNamespace(pos=_center(panel), y=1), rects)
+        assert app.view3d.distance != dist
+    finally:
+        app.close()
+
+
+def test_connect_is_only_accent_dim_fill():
+    panel = open(os.path.join(_VIZ, "overlay_panel.py"), encoding="utf-8").read()
+    sensors = open(os.path.join(_VIZ, "sensors.py"), encoding="utf-8").read()
+    app_src = open(os.path.join(_VIZ, "app.py"), encoding="utf-8").read()
+    assert "ACCENT_DIM" not in panel
+    assert "ACCENT_DIM" not in sensors
+    fills = [line.strip() for line in app_src.splitlines() if "ACCENT_DIM" in line]
+    assert len(fills) == 1
+    assert "draw.rect" in fills[0]
+    assert "ACCENT_DIM" in fills[0]
+
+
+def test_no_raw_hex_in_overlay_panel_or_sensors():
+    for name in ("overlay_panel.py", "sensors.py"):
+        text = open(os.path.join(_VIZ, name), encoding="utf-8").read()
+        assert _HEX.search(text) is None, name
+
+
+def test_key_o_toggles_panel_open():
+    if pygame is None:
+        pytest.skip("pygame not installed")
+    parser = build_parser()
+    args = parser.parse_args(["--listen-only"])
+    app = VizApp(args)
+    try:
+        assert app.overlays.panel_open is False
+        app._on_key(SimpleNamespace(key=pygame.K_o))
+        assert app.overlays.panel_open is True
+        app._on_key(SimpleNamespace(key=pygame.K_o))
+        assert app.overlays.panel_open is False
+    finally:
+        app.close()
+
+
+def test_esc_closes_overlay_panel_before_connect_error():
+    if pygame is None:
+        pytest.skip("pygame not installed")
+    parser = build_parser()
+    args = parser.parse_args(["--listen-only"])
+    app = VizApp(args)
+    try:
+        app.overlays.panel_open = True
+        app.connect_error = "firewall"
+        app._on_key(SimpleNamespace(key=pygame.K_ESCAPE))
+        assert app.overlays.panel_open is False
+        assert app.connect_error == "firewall"
+        app._on_key(SimpleNamespace(key=pygame.K_ESCAPE))
+        assert app.connect_error is None
+    finally:
+        app.close()
+
+
+def test_overlay_panel_space_flips_focus_not_pause():
+    if pygame is None:
+        pytest.skip("pygame not installed")
+    parser = build_parser()
+    args = parser.parse_args(["--listen-only"])
+    app = VizApp(args)
+    try:
+        app.overlays.panel_open = True
+        app._overlay_focus = overlay_panel.CHECKBOX_FIELDS.index("cliff_dots")
+        assert app.overlays.cliff_dots is True
+        assert app.render_paused is False
+        app._on_key(SimpleNamespace(key=pygame.K_SPACE))
+        assert app.overlays.cliff_dots is False
+        assert app.render_paused is False
+        app._on_key(SimpleNamespace(key=pygame.K_UP))
+        assert app._overlay_focus == overlay_panel.CHECKBOX_FIELDS.index("path_seg_hud")
+        app._on_key(SimpleNamespace(key=pygame.K_RETURN))
+        assert app.overlays.path_seg_hud is False
+    finally:
+        app.close()
+

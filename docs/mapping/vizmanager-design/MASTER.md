@@ -131,7 +131,7 @@ Minimum window **1280×720**. Default **1600×900**. Not mobile-first (override 
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│ CHROME  36px  [pip+STATE]  robot IP field   pps   [Connect]      │
+│ CHROME  36px  [pip+STATE] IP pps Overlays Disconnect [Connect]   │
 ├────────────────┬────────────────────────────────┬────────────────┤
 │ CAMERA         │ WORLD                          │ STACK          │
 │ 640 default    │ 3D default · tab: 2D · tab: Map│ Fira Code list │
@@ -152,7 +152,8 @@ Minimum window **1280×720**. Default **1600×900**. Not mobile-first (override 
 - **WORLD is the primary pane** (widest at the 1600 default). Camera starts at **640px**; drag the CAMERA|WORLD seam to resize. HUD is a satellite. Overlay labels are 12px HUD type on the letterboxed view, not baked into the JPEG.
 - Stack order is **engine order** (bottom of list = bottom of stack / first in `debugStrings`). Do not reverse.
 - 3D / 2D / Map are **tabs on WORLD**, not three always-on 3D contexts.
-- One primary CTA: **Connect**. Disconnect is secondary (text button).
+- One primary CTA: **Connect**. Disconnect is secondary (text button). Overlays is the same muted text treatment — not a second filled CTA.
+- Overlay panel is a WORLD satellite, not a fourth primary pane (not a `layout_rects` key).
 - No hamburger. No marketing hero.
 
 **Empty WORLD:** muted grid + “No Viz stream” + why (not connected / no packets / cheats off) + Connect if disconnected.
@@ -172,14 +173,17 @@ Minimum window **1280×720**. Default **1600×900**. Not mobile-first (override 
 | **2** | WORLD tab 2D |
 | **3** | WORLD tab Map |
 | **F** | Frame robot in 3D/2D |
-| **Space** | Pause *rendering* (stream still received; badge PAUSED). Does not drop UI ping |
-| **Esc** | Close connect error / unfocus field |
+| **O** | Toggle overlay panel |
+| **Space** | Pause *rendering* (stream still received; badge PAUSED). Does not drop UI ping. While overlay panel open: flip focused checkbox |
+| **Esc** | If overlay panel open → close it; else existing blur / dismiss error |
 | Orbit | LMB drag 3D (OrbitControls equivalent) |
 | Pan | MMB or Shift+LMB |
 | Zoom | Wheel; update camera aspect on resize |
 | **Drag CAMERA\|WORLD** | Resize camera pane (default **640px**, min 320). Double-click seam to reset |
 
-Focus rings: 2px `accent` on IP field and Connect. Never `outline: none` without a replacement.
+Overlay panel is a WORLD satellite, not a fourth primary pane; not a second filled CTA. Drawn last, clipped to WORLD view. Open with **O** or muted chrome **Overlays** (left of Disconnect). While open: Up/Down move checkbox focus, Space/Enter flips the focused row (2px `accent` ring). Click outside the panel on WORLD closes it.
+
+Focus rings: 2px `accent` on IP field, Connect, and the overlay-panel focused/hovered row. Never `outline: none` without a replacement.
 
 Connect while in-flight: button disabled (loading). Error text **under** the IP field, cause + fix (“Robot did not register UI — allow UDP 5103 on the robot”).
 
