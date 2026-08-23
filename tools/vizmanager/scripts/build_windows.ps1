@@ -117,6 +117,7 @@ $Pkg = Join-Path $Root "tools\vizmanager"
 $Spec = Join-Path $Pkg "VizManager.spec"
 $MessageViz = Join-Path $Root "generated\cladPython\clad\vizInterface\messageViz.py"
 $Shipping = Join-Path $Pkg "SHIPPING.md"
+$Manual = Join-Path $Pkg "OWNERS-MANUAL.md"
 $DistDir = Join-Path $Pkg "dist\VizManager"
 
 Write-Host "Repo     $Root"
@@ -158,9 +159,14 @@ if (-not (Test-Path -LiteralPath $exe)) {
 if (Test-Path -LiteralPath $Shipping) {
     Copy-Item -LiteralPath $Shipping -Destination (Join-Path $DistDir "README.txt") -Force
 }
+if (-not (Test-Path -LiteralPath $Manual)) {
+    throw "missing $Manual"
+}
+Copy-Item -LiteralPath $Manual -Destination (Join-Path $DistDir "OWNERS-MANUAL.md") -Force
 
 Write-Host ""
 Write-Host "Built $exe"
+Write-Host "Copied OWNERS-MANUAL.md beside the exe."
 Write-Host "Ship the WHOLE folder (exe + _internal), not the exe alone:"
 Write-Host "  $DistDir"
 Write-Host ""

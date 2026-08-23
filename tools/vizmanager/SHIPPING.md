@@ -7,6 +7,7 @@ VizManager/
   VizManager.exe
   _internal/          <- CLAD, pygame, OpenCV, vispy, DLLs. Keep beside the exe.
   README.txt          <- this file, copied by build_windows.ps1
+  OWNERS-MANUAL.md    <- how to use the window (copied by build_windows.ps1)
 ```
 
 Zip that folder and send the zip. Do not send only the `.exe`.
