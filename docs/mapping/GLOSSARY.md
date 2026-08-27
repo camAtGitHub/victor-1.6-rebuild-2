@@ -168,6 +168,12 @@ Terms observed in upstream docs, mapping notes (`docs/mapping/`), and folder REA
 | **Picovoice** | Rebuild wake-word option (customizable); listed in `CHANGES.md`. | `CHANGES.md`, `HIGH-LEVEL.md` |
 | **Wwise** | Audio middleware used for playback. | `arch_overview.md`, `lib/audio/` |
 | **ToF / whiskeyToF** | Time-of-flight range sensors (VL53L1); `ToFSensor` / `whiskeyToF` platform lib; Whiskey/Vector product split in sensors. | `platform/README.md`, `components/README.md` |
+| **Whiskey** | Vector 2019 head rev: EMR `HW_VER` 7–`0x19`; `IsWhiskey()`. ToF/lights/touch differ from 1.0; **same camera sizes** as 1.0 (not the “cheaper camera”). | `emrHelper_vicos.h`, `hwid.h`, `CAMERA-HW-V1-V2.md` |
+| **Xray** | Vector 2.0 (DDL) head rev: `HW_VER` ≥ `0x20`; `IsXray()`. Different camera (1600×1200 → 800×600, 2MP formats), LCD, eyes. CCIS may print `HW: 8`. | `cozmoConfig.h`, `CAMERA-HW-V1-V2.md`, `CHANGES.md` |
+| **EMR / HW_VER** | Factory EEPROM/record on the head; `Factory::GetEMR()->fields.HW_VER` drives `IsWhiskey` / `IsXray`. | `emrHelper_vicos.h`, `robot/fixture/stm/hwid.h` |
+| **AWB / gray-world** | Auto white balance: green gain fixed at 1.0; R/B scaled so channel means match green. Clamped to analog-gain range **0.25–3.8** (no separate AWB max). | `cameraParamsController.cpp`, `CAMERA-HW-V1-V2.md` |
+| **Debayer / RAW10** | Convert Bayer MIPI BGGR10 frames to RGB/Y; NEON path drops bottom 3 bits then applies gamma LUT. | `coretech/vision/engine/debayer/` |
+| **DebayerGamma** | Console gamma for RAW10→RGB (default 1.7; **2.1 on Xray**). Needs **`ResetGamma`** to apply. Gamma > 1 flattens darks. | `visionComponent.cpp`, `CAMERA-HW-V1-V2.md` |
 | **Cube / light cube** | BLE interactive cube; FW under `robot/cube_firmware/`; host client `cubeBleClient/` + engine cube components. | `cubeConnections.md`, `robot/README.mapping.md` |
 | **Breakpad** | Google Breakpad crash dumps via `platform/victorCrashReports` / `lib/crash-reporting-vicos`. | `crash-reports.md`, `platform/README.md` |
 

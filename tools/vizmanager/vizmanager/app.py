@@ -30,6 +30,11 @@ from vizmanager.connect import (
     pack_redirect_viz,
     send_ankiconn_and,
 )
+from vizmanager.recents import (
+    load_recent_robots,
+    remember_recent_robot,
+    save_recent_robots,
+)
 from vizmanager.sensors import OverlaySettings, cliff_dots_world, tof_ray_world
 from vizmanager.session import Session
 from vizmanager.udp import (
@@ -72,13 +77,17 @@ EMPTY_MAP = "No MemoryMap tiles"
 EMPTY_MAP_HINT = "Open WebViz NavMap to activate."
 EMPTY_MAP_FRAME = "Once tiles activate press 'F' to centre on robot"
 # STACK+STATE. HUD is 12px mono (~8 px/char). Splitter only resizes CAMERA|WORLD.
-_RIGHT_W = 300 + 10 * 8
+# Extra 15 chars come from WORLD, not CAMERA.
+_RIGHT_W = 300 + 25 * 8
 _CAM_MIN_W = 320
 _CAM_DEFAULT_W = 640  # 100% bigger than the original 320px satellite
 _WORLD_MIN_W = 320
 _SPLITTER_W = 8
 _TAB_H = 24
 _PIP_D = 8
+_CARET_PERIOD_S = 0.53
+_CHEV_W = 14
+_DROP_ROW_H = 24
 
 
 def pygame_available():
@@ -140,8 +149,8 @@ def image_to_pane(x, y, dest, scale):
 def layout_rects(width, height, cam_w=None):
     """MASTER.md layout. Default CAMERA is 640px; drag the splitter to change.
 
-    WORLD stays at least _WORLD_MIN_W. At DEFAULT_SIZE, WORLD is still the
-    widest pane. Returns (x, y, w, h) tuples.
+    WORLD stays at least _WORLD_MIN_W. STACK+STATE extra width is taken from
+    WORLD (CAMERA default stays 640). Returns (x, y, w, h) tuples.
     """
     w = max(int(width), MIN_SIZE[0])
     h = max(int(height), MIN_SIZE[1])
@@ -290,6 +299,19 @@ def _valid_ipv4(text):
         return all(0 <= int(p) <= 255 for p in parts)
     except ValueError:
         return False
+
+
+def caret_visible(now, origin, period=_CARET_PERIOD_S):
+    """Blink the text caret: on for `period`, off for `period`."""
+    if period <= 0:
+        return True
+    elapsed_ms = int(round((now - origin) * 1000.0))
+    period_ms = int(round(period * 1000.0))
+    if period_ms <= 0:
+        return True
+    if elapsed_ms < 0:
+        elapsed_ms = 0
+    return (elapsed_ms // period_ms) % 2 == 0
 
 
 def _recvfrom(sock):
@@ -448,6 +470,11 @@ class VizApp:
         self.render_paused = False
         self.ip_text = self.robot_ip
         self.ip_focused = False
+        self._recent_robots = load_recent_robots()
+        if not self.ip_text and self._recent_robots:
+            self.ip_text = self._recent_robots[0]
+        self._ip_recent_hi = None
+        self._caret_t = time.time()
         self.connect_error = None
         self.last_error = ""
         if self.show_host_field and self._lan_ips:
@@ -521,6 +548,8 @@ class VizApp:
         self._viz_http_error = None
         self.robot_ip = robot
         self.ip_text = robot
+        self._recent_robots = remember_recent_robot(robot, self._recent_robots)
+        save_recent_robots(self._recent_robots)
         try:
             self.redirector = Redirector(
                 robot, self.host_ip, self.bind_addr, self.ui_port
@@ -724,6 +753,8 @@ class VizApp:
                 self.host_text = text
             else:
                 self.ip_text = text
+                self._ip_recent_hi = None
+            self._caret_t = time.time()
         elif event.type == pygame.KEYDOWN:
             self._on_key(event)
 
@@ -736,6 +767,7 @@ class VizApp:
             if self.ip_focused or self.host_focused:
                 self.ip_focused = False
                 self.host_focused = False
+                self._ip_recent_hi = None
             else:
                 self.dismiss_connect_error()
             return
@@ -745,10 +777,28 @@ class VizApp:
                     self.host_text = self.host_text[:-1]
                 else:
                     self.ip_text = self.ip_text[:-1]
+                    self._ip_recent_hi = None
+                self._caret_t = time.time()
             elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                if self.ip_focused:
+                    recents = self._visible_recents()
+                    hi = self._ip_recent_hi
+                    if hi is not None and 0 <= hi < len(recents):
+                        self.ip_text = recents[hi]
                 self.ip_focused = False
                 self.host_focused = False
+                self._ip_recent_hi = None
                 self.start_connect()
+            elif self.ip_focused and event.key == pygame.K_DOWN:
+                recents = self._visible_recents()
+                if recents:
+                    hi = -1 if self._ip_recent_hi is None else self._ip_recent_hi
+                    self._ip_recent_hi = (hi + 1) % len(recents)
+            elif self.ip_focused and event.key == pygame.K_UP:
+                recents = self._visible_recents()
+                if recents:
+                    hi = 0 if self._ip_recent_hi is None else self._ip_recent_hi
+                    self._ip_recent_hi = (hi - 1) % len(recents)
             return
         if event.key == pygame.K_o:
             overlay_panel.toggle_open(self.overlays)
@@ -826,15 +876,54 @@ class VizApp:
             "connect": (btn_x, cy, btn_w, btn_h),
         }
 
+    def _visible_recents(self):
+        recents = list(self._recent_robots)
+        q = self.ip_text.strip()
+        if not q:
+            return recents
+        matched = [ip for ip in recents if ip.startswith(q)]
+        return matched if matched else recents
+
+    def _ip_dropdown_rows(self, widgets):
+        if not self.ip_focused:
+            return []
+        recents = self._visible_recents()
+        if not recents:
+            return []
+        ip = widgets["ip"]
+        rows = []
+        y = ip[1] + ip[3]
+        for addr in recents:
+            rows.append((addr, (ip[0], y, ip[2], _DROP_ROW_H)))
+            y += _DROP_ROW_H
+        return rows
+
     def _on_mouse_down(self, event, rects):
         widgets = self._chrome_widgets(rects)
         pos = event.pos
+        if event.button == 1:
+            for i, (addr, row) in enumerate(self._ip_dropdown_rows(widgets)):
+                if _hit(row, pos):
+                    self.ip_text = addr
+                    self.ip_focused = False
+                    self.host_focused = False
+                    self._ip_recent_hi = None
+                    return
+        was_ip = self.ip_focused
+        was_host = self.host_focused
         self.ip_focused = _hit(widgets["ip_hit"], pos)
         self.host_focused = bool(
             self.show_host_field and widgets["host_hit"][2] > 0 and _hit(widgets["host_hit"], pos)
         )
         if self.host_focused:
             self.ip_focused = False
+        if self.ip_focused and not was_ip:
+            self._caret_t = time.time()
+            self._ip_recent_hi = None
+        if self.host_focused and not was_host:
+            self._caret_t = time.time()
+        if not self.ip_focused:
+            self._ip_recent_hi = None
         if event.button == 1 and _hit(rects["splitter"], pos):
             if getattr(event, "clicks", 1) >= 2:
                 self.reset_cam_w()
@@ -895,9 +984,23 @@ class VizApp:
                 self._overlay_focus = idx
         hover = _hit(rects["splitter"], event.pos)
         self._splitter_hover = hover or self._split_drag
+        widgets = self._chrome_widgets(rects)
+        if self.ip_focused:
+            for i, (_addr, row) in enumerate(self._ip_dropdown_rows(widgets)):
+                if _hit(row, event.pos):
+                    self._ip_recent_hi = i
+                    break
+        over_ip = _hit(widgets["ip_hit"], event.pos)
+        over_host = bool(
+            self.show_host_field
+            and widgets["host_hit"][2] > 0
+            and _hit(widgets["host_hit"], event.pos)
+        )
         try:
             if self._splitter_hover:
                 pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_SIZEWE)
+            elif over_ip or over_host:
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_IBEAM)
             else:
                 pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
         except Exception:
@@ -1013,6 +1116,7 @@ class VizApp:
         self._draw_log(screen, rects)
         if self.connect_error:
             self._draw_connect_error(screen, rects)
+        self._draw_ip_dropdown(screen, rects)
         if self.overlays.panel_open:
             overlay_panel.draw(
                 screen,
@@ -1056,7 +1160,21 @@ class VizApp:
         shown = self.ip_text or "robot IPv4"
         ip_col = theme.TEXT if self.ip_text else theme.TEXT_MUTED
         ip_img = ui.render(shown[:15], True, ip_col)
+        chev = bool(self._recent_robots)
+        text_max_w = ip_rect.w - 12 - (_CHEV_W if chev else 0)
+        prev_clip = screen.get_clip()
+        screen.set_clip(pygame.Rect(ip_rect.x + 6, ip_rect.y, max(1, text_max_w), ip_rect.h))
         screen.blit(ip_img, (ip_rect.x + 6, ip_rect.y + (ip_rect.h - ip_img.get_height()) // 2))
+        screen.set_clip(prev_clip)
+        if chev:
+            cx = ip_rect.right - 8
+            cy = ip_rect.centery
+            pg.draw.polygon(
+                screen,
+                theme.TEXT_MUTED,
+                [(cx - 4, cy - 2), (cx + 4, cy - 2), (cx, cy + 3)],
+            )
+        self._draw_field_caret(screen, pg, ui, ip_rect, self.ip_text, self.ip_focused, chev)
 
         if self.show_host_field:
             host_rect = pygame.Rect(widgets["host"])
@@ -1070,6 +1188,9 @@ class VizApp:
             screen.blit(
                 host_img,
                 (host_rect.x + 6, host_rect.y + (host_rect.h - host_img.get_height()) // 2),
+            )
+            self._draw_field_caret(
+                screen, pg, ui, host_rect, self.host_text, self.host_focused, False
             )
 
         pps_txt = "{0:.0f} pps".format(self.pps())
@@ -1104,6 +1225,39 @@ class VizApp:
         screen.blit(lab, lab.get_rect(center=btn.center))
         if not disabled:
             pg.draw.rect(screen, theme.ACCENT, btn, 2)
+
+    def _draw_field_caret(self, screen, pg, font, rect, text, focused, chevron):
+        if not focused:
+            return
+        if not caret_visible(time.time(), self._caret_t):
+            return
+        text_w = font.size(text)[0] if text else 0
+        caret_x = rect.x + 6 + text_w
+        right = rect.right - 4 - (_CHEV_W if chevron else 0)
+        if caret_x > right:
+            caret_x = right
+        if caret_x < rect.x + 6:
+            caret_x = rect.x + 6
+        top = rect.y + 4
+        bottom = rect.y + rect.h - 4
+        pg.draw.line(screen, theme.TEXT, (caret_x, top), (caret_x, bottom), 1)
+
+    def _draw_ip_dropdown(self, screen, rects):
+        import pygame
+
+        rows = self._ip_dropdown_rows(self._chrome_widgets(rects))
+        if not rows:
+            return
+        ui = self._font(pygame, "ui")
+        for i, (addr, row) in enumerate(rows):
+            box = pygame.Rect(row)
+            fill = theme.ACCENT_DIM if i == self._ip_recent_hi else theme.BG_ELEVATED
+            pygame.draw.rect(screen, fill, box)
+            pygame.draw.rect(screen, theme.BORDER, box, 1)
+            img = ui.render(addr, True, theme.TEXT)
+            screen.blit(
+                img, (box.x + 6, box.y + (box.h - img.get_height()) // 2)
+            )
 
     def _draw_connect_error(self, screen, rects):
         import pygame

@@ -14,7 +14,7 @@
 |---|---|---|
 | `README.md` | Index of architecture topics | — (toc only) |
 | `arch_overview.md` | Three processes (Engine/Anim/Robot), CLAD IPC, components, coretech | `engine/`, `animProcess/`, `robot/`, `coretech/`, `clad/` |
-| `whats_in_victor.md` | Hardware: SoC, motors, displays, sensors, comms, peripherals | `robot/hal/`, `robot/syscon/`, `platform/` [INFERRED] |
+| `whats_in_victor.md` | Hardware: SoC, motors, displays, sensors, comms, peripherals. Camera listed as 1280×720 / 90°×50° — **stock 1.0 only**; Vector 2.0 (Xray) is 1600×1200 → 800×600. See `docs/mapping/CAMERA-HW-V1-V2.md`. | `robot/hal/`, `robot/syscon/`, `platform/` [INFERRED] |
 | `actions.md` | Action system: IActionRunner, queues, compound actions, tags | `engine/actions/` |
 | `animations.md` | Animation tracks/layers/playback, content pipeline, Webots, console | `animProcess/`, `cannedAnimLib/`, `resources/assets/` |
 | `behaviors.md` | Behavior stack, active features, config JSON pointer | `engine/aiComponent/behaviorComponent/`, `resources/config/engine/behaviorComponent/` |

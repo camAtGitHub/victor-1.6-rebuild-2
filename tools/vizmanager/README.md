@@ -8,7 +8,7 @@ This host is the UDP **server** on port **5252**. The engine is the client.
 Bind is **`0.0.0.0`**. pygame = chrome + 2D + camera; vispy 3D is optional
 (WORLD 3D falls back to projected wires). Missing pygame still prints **pkt/s**.
 
-Layout: WORLD is the largest pane. One CTA: **Connect**.
+Layout: CAMERA | WORLD | STACK+STATE (STACK/STATE fixed width). One CTA: **Connect**.
 
 ---
 

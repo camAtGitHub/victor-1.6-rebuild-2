@@ -154,7 +154,7 @@ Stock docs describe Anki 1.6. This tree differs — **always check `CHANGES.md`*
 | Eyes / lights | Rainbow, Rebuild eyes, WireOS lights toggle | anim + CCIS `CONFIG_MENU.md` |
 | Wake word | Picovoice option | CHANGES; mic stack |
 | OpenCV | 4.14 mainlined | vision / coretech |
-| Vector 2.0 | Hardware support | syscon / platform / anim |
+| Vector 2.0 | Hardware support | syscon / platform / anim; **camera = Xray** — see `CAMERA-HW-V1-V2.md` |
 
 ---
 
@@ -168,6 +168,7 @@ Stock docs describe Anki 1.6. This tree differs — **always check `CHANGES.md`*
 | “Make it move once” | `engine/actions/README.md` |
 | Component inventory | `engine/components/README.md` + `robotComponents_fwd.h` |
 | Vision | `engine/vision/README.md` + `VisionComponent` |
+| Camera 1.0 vs 2.0 / low light | **`docs/mapping/CAMERA-HW-V1-V2.md`** (Xray ≠ Whiskey; AWB rails) |
 | Worlds / map / mood | `engine/blockWorld/`, `navMap/`, `moodSystem/` READMEs |
 | External I/O | `engine/cozmoAPI/README.md`, `cloud/README.mapping.md` |
 | Build / deploy | `setenv.sh` → `vbuild` |

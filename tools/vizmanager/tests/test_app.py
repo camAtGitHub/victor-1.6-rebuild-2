@@ -30,9 +30,11 @@ from vizmanager.app import (
     VizApp,
     _CAM_DEFAULT_W,
     _CAM_MIN_W,
+    _CARET_PERIOD_S,
     _SPLITTER_W,
     _WORLD_MIN_W,
     build_parser,
+    caret_visible,
     clamp_cam_w,
     connect_error_message,
     image_to_pane,
@@ -45,6 +47,7 @@ from vizmanager.app import (
     status_for,
     _RIGHT_W,
 )
+from vizmanager.recents import load_recent_robots
 from vizmanager import overlay_panel
 from vizmanager.sensors import OverlaySettings, cliff_dots_world, tof_ray_world
 from vizmanager.udp import ANKICONN
@@ -70,6 +73,11 @@ _LAYOUT_KEYS = {
 }
 _VIZ = os.path.join(os.path.dirname(__file__), "..", "vizmanager")
 _HEX = re.compile(r"#[0-9A-Fa-f]{3,8}\b")
+
+
+@pytest.fixture(autouse=True)
+def _isolate_recents(tmp_path, monkeypatch):
+    monkeypatch.setenv("VIZMANAGER_RECENTS", str(tmp_path / "recent_robots.json"))
 
 
 def _click(app, pos, button=1, clicks=1):
@@ -122,10 +130,10 @@ def test_layout_world_largest_default_and_min():
     default = layout_rects(*DEFAULT_SIZE)
     assert default["camera"][2] == _CAM_DEFAULT_W
     assert _CAM_DEFAULT_W == 2 * 320
-    assert default["world"][2] >= default["camera"][2]
+    assert default["world"][2] == DEFAULT_SIZE[0] - _CAM_DEFAULT_W - _RIGHT_W
     assert default["stack"][2] == _RIGHT_W
     assert default["state"][2] == _RIGHT_W
-    assert _RIGHT_W == 380
+    assert _RIGHT_W == 300 + 25 * 8
 
 
 def test_layout_cam_w_is_clamped_and_splitter_sits_on_the_seam():
@@ -631,9 +639,10 @@ def test_connect_is_only_accent_dim_fill():
     assert "ACCENT_DIM" not in panel
     assert "ACCENT_DIM" not in sensors
     fills = [line.strip() for line in app_src.splitlines() if "ACCENT_DIM" in line]
-    assert len(fills) == 1
-    assert "draw.rect" in fills[0]
-    assert "ACCENT_DIM" in fills[0]
+    assert len(fills) == 2
+    assert all("ACCENT_DIM" in line for line in fills)
+    assert any("draw.rect" in line and "disabled" in line for line in fills)
+    assert any("ip_recent_hi" in line for line in fills)
 
 
 def test_no_raw_hex_in_overlay_panel_or_sensors():
@@ -750,6 +759,119 @@ def test_overlay_panel_space_flips_focus_not_pause():
         assert app._overlay_focus == overlay_panel.CHECKBOX_FIELDS.index("path_seg_hud")
         app._on_key(SimpleNamespace(key=pygame.K_RETURN))
         assert app.overlays.path_seg_hud is False
+    finally:
+        app.close()
+
+
+def test_caret_blinks_on_the_period():
+    origin = 10.0
+    assert caret_visible(origin, origin, _CARET_PERIOD_S) is True
+    assert caret_visible(origin + _CARET_PERIOD_S * 0.5, origin, _CARET_PERIOD_S) is True
+    assert caret_visible(origin + _CARET_PERIOD_S, origin, _CARET_PERIOD_S) is False
+    assert caret_visible(origin + _CARET_PERIOD_S * 1.5, origin, _CARET_PERIOD_S) is False
+    assert caret_visible(origin + _CARET_PERIOD_S * 2.0, origin, _CARET_PERIOD_S) is True
+
+
+def test_app_prefills_last_robot_ip(tmp_path):
+    path = tmp_path / "recent_robots.json"
+    path.write_text('{"robots": ["10.0.0.9", "10.0.0.8"]}', encoding="utf-8")
+    parser = build_parser()
+    args = parser.parse_args(["--listen-only"])
+    app = VizApp(args)
+    try:
+        assert app.ip_text == "10.0.0.9"
+        assert app._recent_robots == ["10.0.0.9", "10.0.0.8"]
+    finally:
+        app.close()
+
+
+def test_cli_robot_ip_wins_over_recents(tmp_path):
+    path = tmp_path / "recent_robots.json"
+    path.write_text('{"robots": ["10.0.0.9"]}', encoding="utf-8")
+    parser = build_parser()
+    args = parser.parse_args(["--robot", "192.168.1.50"])
+    app = VizApp(args)
+    try:
+        assert app.ip_text == "192.168.1.50"
+    finally:
+        app.close()
+
+
+def test_click_recent_fills_robot_ip():
+    parser = build_parser()
+    args = parser.parse_args(["--listen-only"])
+    app = VizApp(args)
+    try:
+        app._recent_robots = ["192.168.50.155", "10.0.0.2"]
+        app.ip_text = ""
+        app.ip_focused = True
+        rects = layout_rects(*DEFAULT_SIZE)
+        rows = app._ip_dropdown_rows(app._chrome_widgets(rects))
+        assert [addr for addr, _row in rows] == ["192.168.50.155", "10.0.0.2"]
+        _click(app, _center(rows[1][1]))
+        assert app.ip_text == "10.0.0.2"
+        assert app.ip_focused is False
+        assert app._ip_dropdown_rows(app._chrome_widgets(rects)) == []
+    finally:
+        app.close()
+
+
+def test_ip_dropdown_hidden_until_robot_field_is_focused():
+    parser = build_parser()
+    args = parser.parse_args(["--listen-only"])
+    app = VizApp(args)
+    try:
+        app._recent_robots = ["192.168.50.155"]
+        widgets = app._chrome_widgets(layout_rects(*DEFAULT_SIZE))
+        assert app._ip_dropdown_rows(widgets) == []
+        app.ip_focused = True
+        rows = app._ip_dropdown_rows(widgets)
+        assert len(rows) == 1
+        assert rows[0][0] == "192.168.50.155"
+        assert rows[0][1][1] == widgets["ip"][1] + widgets["ip"][3]
+        assert rows[0][1][2] == widgets["ip"][2]
+    finally:
+        app.close()
+
+
+def test_start_connect_remembers_robot_ip(tmp_path):
+    parser = build_parser()
+    args = parser.parse_args(["--listen-only", "--ui-port", "0"])
+    app = VizApp(args)
+    try:
+        app.ip_text = "192.168.50.155"
+        app.host_ip = "127.0.0.1"
+        app.show_host_field = False
+        app.start_connect()
+        assert app._recent_robots[0] == "192.168.50.155"
+        assert load_recent_robots() == ["192.168.50.155"]
+        app.ip_text = "10.1.2.3"
+        app.start_connect()
+        assert app._recent_robots[:2] == ["10.1.2.3", "192.168.50.155"]
+    finally:
+        app.close()
+
+
+def test_arrow_keys_highlight_recent_then_enter_uses_it():
+    if pygame is None:
+        pytest.skip("pygame not installed")
+    parser = build_parser()
+    args = parser.parse_args(["--listen-only", "--ui-port", "0"])
+    app = VizApp(args)
+    try:
+        app._recent_robots = ["192.168.50.155", "10.0.0.2"]
+        app.ip_text = ""
+        app.ip_focused = True
+        app.host_ip = "127.0.0.1"
+        app.show_host_field = False
+        app._on_key(SimpleNamespace(key=pygame.K_DOWN))
+        assert app._ip_recent_hi == 0
+        app._on_key(SimpleNamespace(key=pygame.K_DOWN))
+        assert app._ip_recent_hi == 1
+        app._on_key(SimpleNamespace(key=pygame.K_RETURN))
+        assert app.ip_text == "10.0.0.2"
+        assert app.ip_focused is False
+        assert app._recent_robots[0] == "10.0.0.2"
     finally:
         app.close()
 

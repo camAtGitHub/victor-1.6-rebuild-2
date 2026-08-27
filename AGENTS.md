@@ -245,6 +245,7 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 | `resources/webserver/webVizModules/freeplay.js` | Production FreePlay: Ops stack\|log + gates; client log tags; latest-factor gates; secondary timeline |
 | `webviz-ux-demo.html` | Standalone Ops vs Timeline mock (reference only; not robot-deployed) |
 | `docs/mapping/GLOSSARY.md` | ~130 repo terms |
+| `docs/mapping/CAMERA-HW-V1-V2.md` | Camera 1.0 vs Whiskey vs Xray/2.0; AE/AWB rails; low-light green-gray |
 | `docs/mapping/IDEA-backpack-lights-flags.md` | Idea: Anki lights flag + customBackpackLights folder + Wired option |
 | `engine/components/cubes/` | L2 cube BLE/coordinator/lights stack |
 | `animProcess/src/cozmoAnim/{animation,faceDisplay,micData,speechRecognizer,audio,…}/` | L2 anim subsystems |
@@ -331,6 +332,7 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 - **Which parts are rebuild-specific vs. stock Anki 1.6?** — `CHANGES.md`. Observed: wirepod
   cloud, anim 16 ms, platform OTA/diagnostics notes. Upstream `docs/` = stock 1.6.
 - **Version pins** — `VERSION` = `1.6.1`; `VICTOR_COMPAT_VERSION` = `210`.
+- **Camera 1.0 vs 2.0 / low light?** — **Xray (Vector 2.0, `HW_VER` ≥ `0x20`)** is the cheaper/different camera (1600×1200 → 800×600 vs 1280×720 → 640×360). **Whiskey (2019) is not a camera change.** Same AE ceiling 66 ms / gain 3.8 — **v2 is still a lot darker** (smaller pixels + gamma 2.1 + black-level −6) **and** greener (**AWB 3.8 / 1.0 / 3.8** vs v1 ~1.5 / 1.8). Map: `docs/mapping/CAMERA-HW-V1-V2.md`.
 - **Glossary / indexes** — `docs/mapping/GLOSSARY.md`, `UPSTREAM-DOCS-INDEX.md`, `HIGH-LEVEL.md`.
 
 ---
@@ -358,6 +360,8 @@ if you ran out of context mid-folder, say so here.
 | 2026-08-02 | Grok | Reviewed `webviz-ux-demo.html`: **Ops > Timeline** for freeplay debug. Wrote UX uplift plan `docs/mapping/WEBVIZ-FREEPLAY-UX-PLAN.md` (Ops layout, stack/log/gates polish, nice-to-haves beyond demo; timeline optional). | Execute UX plan P1 layout first (`freeplay.js` only). |
 | 2026-08-02 | Grok | **FreePlay UX P1–P6 complete** in `freeplay.js` (Ops grid, stack/log/gates polish, P5 filters/keyboard/silence, P6 secondary timeline). **P7 docs closeout:** UX plan status→implemented; design §5 Ops wireframe + honesty notes; AGENTS landmarks/quick answers; demo HTML pointer comment. | Runtime U1–U11 on robot/devData if desired; no further UX-plan phases. |
 | 2026-08-07 | Grok | Cube hardware deep-dive + **end-to-end build guide** `robot/cube_firmware/BUILD.html` (DA14580/BMA253/BOM/pinout/BLE/DFU/markers; Path A stock silicon + Path B protocol clone; bundled images in `build-guide-assets/`). | Optional: print-ready marker pack; Path B sample firmware. |
+| 2026-08-23 | Grok | Camera 1.0 vs 2.0 (Xray ≠ Whiskey): AE/AWB, `DebayerGamma`, black-level stretch, dead temporal denoise, observed AWB 3.8/1/3.8 vs ~1.5/1.8. Wrote `docs/mapping/CAMERA-HW-V1-V2.md`; glossary + HIGH-LEVEL + Quick answers. | Feature phase if wanted: stop AWB at TooDark, Xray-only AE/gamma, wire TemporalDenoiseGreen. |
+| 2026-08-23 | Grok | User: v2 is **a lot darker**, not just greener, at same 66/3.8. Updated `CAMERA-HW-V1-V2.md` §3/§5/§8: tone curve (gamma 2.1, black −6) + smaller pixels; AE has no headroom. | Night gamma/black-level skip first if implementing. |
 
 ---
 

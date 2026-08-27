@@ -5,6 +5,7 @@
 **Upstream docs:**
 - [`docs/architecture/visionSystem.md`](../../docs/architecture/visionSystem.md)
 - [`docs/architecture/neuralNets.md`](../../docs/architecture/neuralNets.md)
+- **HW 1.0 vs 2.0 camera / AWB / low light:** [`docs/mapping/CAMERA-HW-V1-V2.md`](../../docs/mapping/CAMERA-HW-V1-V2.md)
 
 ## What this is
 
