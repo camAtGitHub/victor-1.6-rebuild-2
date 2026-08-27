@@ -247,6 +247,7 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 | `docs/mapping/GLOSSARY.md` | ~130 repo terms |
 | `docs/mapping/CAMERA-HW-V1-V2.md` | Camera 1.0 vs Whiskey vs Xray/2.0; AE/AWB rails; low-light green-gray |
 | `docs/mapping/IDEA-backpack-lights-flags.md` | Idea: Anki lights flag + customBackpackLights folder + Wired option |
+| `docs/mapping/TODO-overheat-backpack-lights.md` | Easy win: WireOS thermal JSON exists; restore clad/map/`if`s so they play (41 °C charger cooldown) |
 | `engine/components/cubes/` | L2 cube BLE/coordinator/lights stack |
 | `animProcess/src/cozmoAnim/{animation,faceDisplay,micData,speechRecognizer,audio,…}/` | L2 anim subsystems |
 | `robot/supervisor/`, `robot/hal/`, `robot/clad/` | L2 control path; `robot/syscon/` L1 shallow |
@@ -362,6 +363,7 @@ if you ran out of context mid-folder, say so here.
 | 2026-08-07 | Grok | Cube hardware deep-dive + **end-to-end build guide** `robot/cube_firmware/BUILD.html` (DA14580/BMA253/BOM/pinout/BLE/DFU/markers; Path A stock silicon + Path B protocol clone; bundled images in `build-guide-assets/`). | Optional: print-ready marker pack; Path B sample firmware. |
 | 2026-08-23 | Grok | Camera 1.0 vs 2.0 (Xray ≠ Whiskey): AE/AWB, `DebayerGamma`, black-level stretch, dead temporal denoise, observed AWB 3.8/1/3.8 vs ~1.5/1.8. Wrote `docs/mapping/CAMERA-HW-V1-V2.md`; glossary + HIGH-LEVEL + Quick answers. | Feature phase if wanted: stop AWB at TooDark, Xray-only AE/gamma, wire TemporalDenoiseGreen. |
 | 2026-08-23 | Grok | User: v2 is **a lot darker**, not just greener, at same 66/3.8. Updated `CAMERA-HW-V1-V2.md` §3/§5/§8: tone curve (gamma 2.1, black −6) + smaller pixels; AE has no headroom. | Night gamma/black-level skip first if implementing. |
+| 2026-08-27 | Grok | Overheat backpack lights: JSON in WireOS pack is never selected (clad/map/`if`s reverted). Captured easy-win TODO `docs/mapping/TODO-overheat-backpack-lights.md` (41 °C charger cooldown; do not implement until asked). | Feature phase: restore four thermal triggers + anim selection. |
 
 ---
 
