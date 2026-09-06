@@ -13,31 +13,31 @@
     },
     "ManualWB_R": {
       "process": "engine",
-      "blurb": "Commanded red AWB gain for ApplyManualWhiteBalance (default 1.0, range 0.25–3.8). Slider alone does not hit VicOS — run ApplyManualWhiteBalance.",
-      "detail": "Session B VicOS honour test. Pair with ManualWB_G/B. Apply builds CameraParams from current exp/gain + these three gains and calls SetAndDisableCameraControl.",
+      "blurb": "Commanded red software-WB gain for ApplyManualWhiteBalance (default 1.0, range 0.25–3.8). Slider alone does not change pixels — run Apply. Sensor AWB is intentionally pinned to 1,1,1.",
+      "detail": "Software WB path (not VicOS). Pair with ManualWB_G/B. Apply enables in-engine saturating R/G/B multiply after debayer; overlay shows these gains.",
       "requires": ["ApplyManualWhiteBalance"],
       "related": ["ManualWB_G", "ManualWB_B", "ApplyManualWhiteBalance", "WhiteBalance"],
       "category": "Vision.PreProcessing",
       "status": "live",
-      "tags": ["vision", "whitebalance", "session-b"]
+      "tags": ["vision", "whitebalance", "session-b", "software-wb"]
     },
     "ManualWB_G": {
       "process": "engine",
-      "blurb": "Commanded green AWB gain for ApplyManualWhiteBalance (default 1.0, range 0.25–3.8). Slider alone does not hit VicOS.",
+      "blurb": "Commanded green software-WB gain for ApplyManualWhiteBalance (default 1.0, range 0.25–3.8). Slider alone does not change pixels. Sensor AWB is intentionally pinned to 1,1,1.",
       "requires": ["ApplyManualWhiteBalance"],
       "related": ["ManualWB_R", "ManualWB_B", "ApplyManualWhiteBalance"],
       "category": "Vision.PreProcessing",
       "status": "live",
-      "tags": ["vision", "whitebalance", "session-b"]
+      "tags": ["vision", "whitebalance", "session-b", "software-wb"]
     },
     "ManualWB_B": {
       "process": "engine",
-      "blurb": "Commanded blue AWB gain for ApplyManualWhiteBalance (default 1.0, range 0.25–3.8). Slider alone does not hit VicOS.",
+      "blurb": "Commanded blue software-WB gain for ApplyManualWhiteBalance (default 1.0, range 0.25–3.8). Slider alone does not change pixels. Sensor AWB is intentionally pinned to 1,1,1.",
       "requires": ["ApplyManualWhiteBalance"],
       "related": ["ManualWB_R", "ManualWB_G", "ApplyManualWhiteBalance"],
       "category": "Vision.PreProcessing",
       "status": "live",
-      "tags": ["vision", "whitebalance", "session-b"]
+      "tags": ["vision", "whitebalance", "session-b", "software-wb"]
     },
     "ManualCameraControlLock": {
       "process": "engine",
@@ -50,25 +50,25 @@
     },
     "ApplyManualWhiteBalance": {
       "process": "engine",
-      "blurb": "Pushes ManualWB_R/G/B to the camera with current exposure/gain, disables AutoExp+WhiteBalance modes, and sets ManualCameraControlLock. Required after changing ManualWB_* sliders.",
-      "detail": "CONSOLE_FUNC Vision.PreProcessing. Builds Vision::CameraParams(cur.exp, cur.gain, ManualWB_R/G/B) then SetAndDisableCameraControl. Honour-test triples: (1,1,1), (2,1,1), (1,1,2). Judge by image colour, not overlay alone.",
-      "howTo": "1) Set ManualWB_R/G/B. 2) Call ApplyManualWhiteBalance. 3) Watch colour for several seconds (lock holds). 4) ClearManualCameraControlLock when done.",
+      "blurb": "Applies ManualWB_R/G/B to **pixels** via in-engine SoftwareWhiteBalance multiply after debayer. Overlay shows those gains; sensor AWB is intentionally pinned to 1,1,1. Disables AutoExp+WhiteBalance and sets ManualCameraControlLock. Required after changing ManualWB_* sliders.",
+      "detail": "CONSOLE_FUNC Vision.PreProcessing. SetAndDisableCameraControl with ManualWB for overlay, then CameraSetWhiteBalanceParameters(1,1,1), then SoftwareWhiteBalance::SetGains + SetEnabled(true). Honour-test triples: (1,1,1), (2,1,1), (1,1,2). Judge by image colour.",
+      "howTo": "1) Set ManualWB_R/G/B. 2) Call ApplyManualWhiteBalance. 3) Watch colour for several seconds (lock holds; pixels should shift). 4) ClearManualCameraControlLock when done.",
       "requires": ["ManualWB_R", "ManualWB_G", "ManualWB_B"],
       "related": ["ClearManualCameraControlLock", "ManualCameraControlLock"],
-      "evidence": "engine/components/visionComponent.cpp ApplyManualWhiteBalance; SetAndDisableCameraControl",
+      "evidence": "engine/components/visionComponent.cpp ApplyManualWhiteBalance; coretech/vision/engine/softwareWhiteBalance.cpp; docs/mapping/CAMERA-SOFTWARE-WB-PLAN.md",
       "category": "Vision.PreProcessing",
       "status": "live",
-      "tags": ["vision", "whitebalance", "console-func", "session-b"]
+      "tags": ["vision", "whitebalance", "console-func", "session-b", "software-wb"]
     },
     "ClearManualCameraControlLock": {
       "process": "engine",
-      "blurb": "Clears ManualCameraControlLock and re-enables AutoExp + WhiteBalance after a Session B manual WB test.",
-      "howTo": "Call after ApplyManualWhiteBalance trials. Confirm ManualCameraControlLock is false.",
+      "blurb": "Disables software WB (gains 1,1,1), clears ManualCameraControlLock, and re-enables AutoExp + WhiteBalance after a manual WB test. Sensor AWB stays the daemon path after unlock.",
+      "howTo": "Call after ApplyManualWhiteBalance trials. Confirm ManualCameraControlLock is false and colour returns toward stock.",
       "related": ["ApplyManualWhiteBalance", "ManualCameraControlLock", "AutoExp", "WhiteBalance"],
-      "evidence": "engine/components/visionComponent.cpp ClearManualCameraControlLock",
+      "evidence": "engine/components/visionComponent.cpp ClearManualCameraControlLock; docs/mapping/CAMERA-SOFTWARE-WB-PLAN.md",
       "category": "Vision.PreProcessing",
       "status": "live",
-      "tags": ["vision", "console-func", "session-b"]
+      "tags": ["vision", "console-func", "session-b", "software-wb"]
     }
   }
 }

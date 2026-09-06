@@ -16,6 +16,7 @@
 #include "coretech/vision/engine/image_impl.h"
 #include "coretech/vision/engine/imageCache.h"
 #include "coretech/vision/engine/debayer.h"
+#include "coretech/vision/engine/softwareWhiteBalance.h"
 
 #include "opencv2/core.hpp"
 #include "opencv2/imgproc.hpp"
@@ -230,7 +231,12 @@ bool ImageBuffer::GetRGBFromBAYER(ImageRGB& rgb, ImageCacheSize size) const
   Debayer::OutArgs outArgs(rgb.get_CvMat_().data, outHeight, outWidth, outScale, outFormat);
 
   Result res = Debayer::Instance().Invoke(method, inArgs, outArgs);
-  return res == RESULT_OK;
+  if(res != RESULT_OK)
+  {
+    return false;
+  }
+  SoftwareWhiteBalance::ApplyToImage(rgb);
+  return true;
 }
 
 bool ImageBuffer::GetRGBFromRawRGB(ImageRGB& rgb, ImageCacheSize size) const

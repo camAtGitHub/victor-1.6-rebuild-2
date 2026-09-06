@@ -44,7 +44,8 @@
 #include "coretech/common/engine/math/polygon_impl.h"
 
 // Include debayer.h because ConsoleVars for gamma must be here; they didn't work in debayer.cpp 
-#include "coretech/vision/engine/debayer.h" 
+#include "coretech/vision/engine/debayer.h"
+#include "coretech/vision/engine/softwareWhiteBalance.h" 
 
 #include "util/cpuProfiler/cpuProfiler.h"
 #include "util/helpers/templateHelpers.h"
@@ -153,10 +154,18 @@ namespace Vector {
     const Vision::CameraParams params(cur.exposureTime_ms, cur.gain,
                                       kManualWB_R, kManualWB_G, kManualWB_B);
     LOG_INFO("VisionComponent.ApplyManualWhiteBalance",
-             "Exp:%dms Gain:%.3f WB:%.3f %.3f %.3f",
+             "Exp:%dms Gain:%.3f WB:%.3f %.3f %.3f (software; daemon pinned 1,1,1)",
              params.exposureTime_ms, params.gain,
              params.whiteBalanceGainR, params.whiteBalanceGainG, params.whiteBalanceGainB);
     s_VisionComponent->SetAndDisableCameraControl(params);
+    // Overlay/engine keep ManualWB; pin VicOS AWB to unity so software WB is the colour path.
+    auto cameraService = CameraService::getInstance();
+    if(cameraService)
+    {
+      cameraService->CameraSetWhiteBalanceParameters(1.f, 1.f, 1.f);
+    }
+    Vision::SoftwareWhiteBalance::SetGains(kManualWB_R, kManualWB_G, kManualWB_B);
+    Vision::SoftwareWhiteBalance::SetEnabled(true);
     // Set after SetAndDisable: playpen also uses that API and must not leave AE/WB locked.
     kManualCameraControlLock = true;
   }
@@ -169,10 +178,12 @@ namespace Vector {
       LOG_WARNING("VisionComponent.ClearManualCameraControlLock.NoComponent", "");
       return;
     }
+    Vision::SoftwareWhiteBalance::SetEnabled(false);
+    Vision::SoftwareWhiteBalance::SetGains(1.f, 1.f, 1.f);
     kManualCameraControlLock = false;
     s_VisionComponent->EnableAutoExposure(true);
     s_VisionComponent->EnableWhiteBalance(true);
-    LOG_INFO("VisionComponent.ClearManualCameraControlLock", "Lock cleared; AE+WB re-enabled");
+    LOG_INFO("VisionComponent.ClearManualCameraControlLock", "Lock cleared; AE+WB re-enabled; software WB off");
   }
   CONSOLE_FUNC(ClearManualCameraControlLock, "Vision.PreProcessing");
 
@@ -2255,11 +2266,17 @@ namespace Vector {
 
   void VisionComponent::EnableAutoExposure(bool enable)
   {
+#if REMOTE_CONSOLE_ENABLED
+    _visionModeConsoleVars[static_cast<u32>(VisionMode::AutoExp)].second = enable;
+#endif
     EnableMode(VisionMode::AutoExp, enable);
   }
 
   void VisionComponent::EnableWhiteBalance(bool enable)
   {
+#if REMOTE_CONSOLE_ENABLED
+    _visionModeConsoleVars[static_cast<u32>(VisionMode::WhiteBalance)].second = enable;
+#endif
     EnableMode(VisionMode::WhiteBalance, enable);
   }
 

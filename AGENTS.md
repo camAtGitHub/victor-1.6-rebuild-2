@@ -245,8 +245,9 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 | `resources/webserver/webVizModules/freeplay.js` | Production FreePlay: Ops stack\|log + gates; client log tags; latest-factor gates; secondary timeline |
 | `webviz-ux-demo.html` | Standalone Ops vs Timeline mock (reference only; not robot-deployed) |
 | `docs/mapping/GLOSSARY.md` | ~130 repo terms |
-| `docs/mapping/CAMERA-HW-V1-V2.md` | Camera 1.0 vs Whiskey vs Xray/2.0; AWB rails; black-level first (gamma uses `1/G`) |
+| `docs/mapping/CAMERA-HW-V1-V2.md` | Camera 1.0 vs Whiskey vs Xray/2.0; AWB rails; Session B VicOS ignore; software WB after debayer |
 | `docs/mapping/CAMERA-SESSION-B-PLAN.md` | Session B plan + protocol: bypass + manual WB Apply/lock |
+| `docs/mapping/CAMERA-SOFTWARE-WB-PLAN.md` | In-engine software WB: Phases 1–2 implemented (manual RGB multiply); Phase 3 auto gated on robot colour A/B |
 | `docs/mapping/IDEA-backpack-lights-flags.md` | Idea: Anki lights flag + customBackpackLights folder + Wired option |
 | `docs/mapping/IDEA-personality-packs.md` | Idea: selectable JSON freeplay personality packs (+ voice activate) |
 | `docs/mapping/IDEA-custom-firmware-vibe-brainstorm.md` | Ideation: 8 wild firmware personas / Soul Profile spine (wiki character lens) |
@@ -343,7 +344,7 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 - **Which parts are rebuild-specific vs. stock Anki 1.6?** — `CHANGES.md`. Observed: wirepod
   cloud, anim 16 ms, platform OTA/diagnostics notes. Upstream `docs/` = stock 1.6.
 - **Version pins** — `VERSION` = `1.6.1`; `VICTOR_COMPAT_VERSION` = `210`.
-- **Camera 1.0 vs 2.0 / low light?** — **Xray (Vector 2.0, `HW_VER` ≥ `0x20`)** is the different camera (1600×1200 → 800×600 vs 1280×720 → 640×360). **Whiskey (2019) is not a camera change.** Same AE ceiling 66 ms / gain 3.8 — v2 still looks **darker + green-gray** (AWB **3.8 / 1 / 3.8** vs v1 ~1.5 / 1.8). **Corrected:** console gamma is applied as **`x^(1/G)`** (2.1 *brightens* more than 1.7); do **not** lower gamma to fix darkness. Prefer **black-level** fix/A/B, then commanded-WB tests; “smaller pixels” unproven. Map: `docs/mapping/CAMERA-HW-V1-V2.md`.
+- **Camera 1.0 vs 2.0 / low light?** — **Xray (Vector 2.0, `HW_VER` ≥ `0x20`)** is the different camera (1600×1200 → 800×600 vs 1280×720 → 640×360). **Whiskey (2019) is not a camera change.** Same AE ceiling 66 ms / gain 3.8 — v2 still looks **darker + green-gray** (AWB **3.8 / 1 / 3.8** vs v1 ~1.5 / 1.8). **Corrected:** console gamma is applied as **`x^(1/G)`** (2.1 *brightens* more than 1.7); do **not** lower gamma to fix darkness. Session B: VicOS AWB **ignored** (overlay moves, pixels do not). Colour path is now **in-engine software WB** (`ApplyManualWhiteBalance` → `SoftwareWhiteBalance` multiply after debayer; daemon pinned 1,1,1). “Smaller pixels” unproven. Map: `CAMERA-HW-V1-V2.md`; plan: `CAMERA-SOFTWARE-WB-PLAN.md`.
 - **Glossary / indexes** — `docs/mapping/GLOSSARY.md`, `UPSTREAM-DOCS-INDEX.md`, `HIGH-LEVEL.md`.
 - **Custom firmware north star (ideation)?** — **Kinetic Familiar** — saved charter
   `docs/mapping/KINETIC-FAMILIAR.md` (name + goal/intent locked; what’s-first TBD). Hermit/night-lock
@@ -389,6 +390,8 @@ if you ran out of context mid-folder, say so here.
 | 2026-09-06 | Grok | Console-first camera plan: §7 lists exact `:8888/consolevars` **category tabs + var names** for Session A (0 deploys) vs missing knobs for Session B (1 instrumented deploy). | User runs Session A on robot; then decide Session B knobs. |
 | 2026-09-06 | Grok | **Session A live** on `192.168.50.189`: gamma 1.7 darker / 2.5 brighter (confirms `1/G`); `UnderExposedThreshold=0` no AWB/green change; rail 66/3.8/AWB3.8. Logged in `CAMERA-HW-V1-V2.md` §7. | Session B when ready: 1 deploy with black-level bypass + manual WB. |
 | 2026-09-06 | Grok | **Session B instrumentation implemented** (no flash yet): `DebayerBypassBlackLevel`; `ManualWB_R/G/B` + `ApplyManualWhiteBalance` + lock/Clear; cvcatalog shard; plan `CAMERA-SESSION-B-PLAN.md`. | User rebuild/deploy; run B0–B3 on `192.168.50.189`. |
+| 2026-09-06 | Grok | **Session B live:** bypass = no visible change; Apply WB updates overlay through extremes (3.8/1/0.25, 0.25/1/3.8) but **image colour unchanged** → VicOS AWB not applied. Logged in `CAMERA-HW-V1-V2.md` §7. | Next fix path: software WB in this repo and/or VicOS daemon (prebuilt). |
+| 2026-09-06 | Grok | **Software WB Phases 1–2 implemented** (`SoftwareWhiteBalance` after `GetRGBFromBAYER`; Apply pins daemon AWB 1,1,1 and multiplies pixels). **Phase 4 docs:** plan `CAMERA-SOFTWARE-WB-PLAN.md`, `CAMERA-HW-V1-V2.md` §7–§8, cvcatalog Apply/Clear/ManualWB blurbs, AGENTS landmark + quick answer. | On-robot Phase 2 colour A/B; Phase 3 auto gated on pass. |
 
 ---
 

@@ -1,14 +1,16 @@
 # Camera hardware: Vector 1.0 vs 2.0 (low light / AWB)
 
 **Path:** `docs/mapping/CAMERA-HW-V1-V2.md`  
-**Mapped:** 2026-08-23; **revised:** 2026-09-06 (external vision review — gamma inversion, black-level priority, WB test, path bugs)  
-**Confidence:** high (code paths, AE/AWB math, Xray branches, gamma `1/G` inversion); medium (whether VicOS/`mm-anki-camera` honors AWB — daemon is prebuilt); low (sensor QE / “smaller pixels” as the darkness root cause — unproven)  
+**Mapped:** 2026-08-23; **revised:** 2026-09-06 (external vision review; Session B VicOS AWB ignore; software WB Phases 1–2)  
+**Confidence:** high (code paths, AE/AWB math, Xray branches, gamma `1/G` inversion, Session B: daemon AWB does not tint pixels); medium (whether 8-bit software multiply is enough to un-green Xray — on-robot A/B pending); low (sensor QE / “smaller pixels” as the darkness root cause — unproven)  
 **Upstream docs:** [`docs/architecture/whats_in_victor.md`](../architecture/whats_in_victor.md) (stock 1280×720 only), [`docs/architecture/visionSystem.md`](../architecture/visionSystem.md) (AE exists; no HW split).  
-**Related:** `CHANGES.md` (Vector 2.0 + WireOS gamma/denoiser), `engine/vision/README.md`, `platform/camera/`, cvcatalog `engine-autoexp.json` / `engine-vision-ae-illum.json`.
+**Related:** `CHANGES.md` (Vector 2.0 + WireOS gamma/denoiser), `engine/vision/README.md`, `platform/camera/`, cvcatalog `engine-autoexp.json` / `engine-vision-ae-illum.json` / `engine-session-b-camera.json`. Plans: [`CAMERA-SESSION-B-PLAN.md`](CAMERA-SESSION-B-PLAN.md), [`CAMERA-SOFTWARE-WB-PLAN.md`](CAMERA-SOFTWARE-WB-PLAN.md).
 
-How the three head revisions differ in **camera** code, why 2.0 looks grainy green-gray in the dark, and which console/config knobs exist. **No production code was changed** for this note.
+How the three head revisions differ in **camera** code, why 2.0 looks grainy green-gray in the dark, and which console/config knobs exist.
 
 **Review note (2026-09-06):** An external pass with minor vision-systems experience inspected this tree (their baseline commit `5eec29b`). Code findings below were re-checked in *this* workspace. Their results were **not** robot-tested. Where the original 2026-08-23 write-up was wrong, it is corrected in place (especially §5 gamma).
+
+**Software WB (2026-09-06, Phases 1–2 implemented):** `ApplyManualWhiteBalance` now enables in-engine `Anki::Vision::SoftwareWhiteBalance` — saturating per-channel multiply on `ImageRGB` **after** `Debayer::Invoke` in `ImageBuffer::GetRGBFromBAYER`. Engine/overlay `CameraParams` still show ManualWB; VicOS AWB is **pinned to 1,1,1** so a future daemon fix cannot double-apply. Plan: [`CAMERA-SOFTWARE-WB-PLAN.md`](CAMERA-SOFTWARE-WB-PLAN.md). **Phase 3 (auto gray-world) is gated on on-robot colour A/B.**
 
 ---
 
@@ -80,12 +82,12 @@ AE is **pegged on both** (max shutter and max analog gain). Same numbers **do no
 - Green **fixed at 1.0**.
 - `newR = oldR * (meanG / meanR)` (same for B), using pixels with R,G,B all in **[15, 240]** (`IsWellExposed`).
 - Result clamped to **the analog-gain range 0.25–3.8**. There is **no separate AWB max**.
-- Applied to the camera for the **next** frame (`CameraService::CameraSetWhiteBalanceParameters`).
+- Historically applied to the camera for the **next** frame (`CameraService::CameraSetWhiteBalanceParameters`). **Session B closed this as overlay-only:** VicOS/`mm-anki-camera` does not tint the viewed stream. Colour is now **software WB** after debayer ([`CAMERA-SOFTWARE-WB-PLAN.md`](CAMERA-SOFTWARE-WB-PLAN.md)).
 - Statistics are taken on the **already gamma-processed RGB** image (not linear / pre-gamma Bayer).
 
 So **`AWB 3.800 1.000 3.800` is the clamp**, not a settled balance. Gray-world still saw G ≫ R and G ≫ B and could not boost chroma further.
 
-If the daemon applies those channel gains, R/B analog paths are roughly **gain × AWB ≈ 3.8 × 3.8 ≈ 14×** vs green at **3.8×** → chroma noise (grainy green-gray). If the daemon **ignores** AWB, the engine still ramps to 3.8 and the image stays green from the processed frame. Distinguishing those two needs **commanding different gains**, not merely disabling the mode (§7).
+If the daemon applied those channel gains, R/B analog paths would be roughly **gain × AWB ≈ 3.8 × 3.8 ≈ 14×** vs green at **3.8×** → chroma noise (grainy green-gray). Session B showed the daemon **ignores** commanded AWB (overlay tracks ManualWB; pixels do not). The engine can still *report* 3.8/1/3.8 while the image stays green from the processed frame. **Do not treat `camera_set_awb` as the colour path.**
 
 Initial params in `VisionSystem` ctor: exp 31 ms, gain 1.0, WB **(2.0, 1.0, 2.0)**.
 
@@ -214,19 +216,21 @@ Dark room, v2, same pose. Prefer WebViz camera view + mirror overlay.
 
 **Do not use for camera look:** `Vision.PreProcessing` CLAHE vars (`UseCLAHE_u8`, `Clahe*`) — markers only. `Vision.PreProcessing` → `MinCameraGain` — **dead**. `Vision.General.VisionModes` → `SaveImages` — needs saver params/behavior, not a one-click dump.
 
-### Session B — instrumented knobs (**implemented**; needs rebuild/flash)
+### Session B — instrumented knobs (**implemented and live**; 2026-09-06)
 
-Plan: [`CAMERA-SESSION-B-PLAN.md`](CAMERA-SESSION-B-PLAN.md). After flashing a build with these changes:
+Plan: [`CAMERA-SESSION-B-PLAN.md`](CAMERA-SESSION-B-PLAN.md). Knobs below still exist; **Apply now also drives software WB** (Phases 1–2 — needs a new flash vs the Session B binary):
 
 | Category (tab) | Name | Notes |
 |---|---|---|
 | `Vision.Debayer` | `DebayerBypassBlackLevel` | **true** = skip Xray black-level crush; live (no `ResetGamma`) |
-| `Vision.PreProcessing` | `ManualWB_R` / `ManualWB_G` / `ManualWB_B` | 0.25–3.8; sliders alone do **not** hit VicOS |
-| `Vision.PreProcessing` | **`ApplyManualWhiteBalance`** *(func)* | Pushes current exp/gain + ManualWB_* ; sets lock |
+| `Vision.PreProcessing` | `ManualWB_R` / `ManualWB_G` / `ManualWB_B` | 0.25–3.8; sliders alone do **not** change pixels |
+| `Vision.PreProcessing` | **`ApplyManualWhiteBalance`** *(func)* | Enables **software WB multiply** with ManualWB_* after debayer; overlay shows those gains; VicOS AWB pinned **1,1,1**; sets lock |
 | `Vision.PreProcessing` | `ManualCameraControlLock` | Set by Apply; blocks AE/WB camera pushes |
-| `Vision.PreProcessing` | **`ClearManualCameraControlLock`** *(func)* | Clears lock; re-enables AutoExp+WB |
+| `Vision.PreProcessing` | **`ClearManualCameraControlLock`** *(func)* | Disables software WB (gains 1,1,1); clears lock; re-enables AutoExp+WB |
 
-**On-robot protocol (B0–B3):** see plan § Phase 4. Honour triples: `(1,1,1)`, `(2,1,1)`, `(1,1,2)`.
+**On-robot protocol (B0–B3):** see Session B plan § Phase 4. Honour triples were `(1,1,1)`, `(2,1,1)`, `(1,1,2)` — **overlay moved, pixels did not** (results below).
+
+**After software WB (Phases 1–2):** the same Apply knobs now change **pixels** via `SoftwareWhiteBalance`. Re-run T0–T3 on-robot per [`CAMERA-SOFTWARE-WB-PLAN.md`](CAMERA-SOFTWARE-WB-PLAN.md) Phase 2. Do not expect VicOS AWB to tint.
 
 Optional max exp/gain probe (Phase 2b) was **not** implemented in this pass.
 
@@ -241,9 +245,10 @@ Optional max exp/gain probe (Phase 2b) was **not** implemented in this pass.
 
 | Phase | Deploys |
 |---|---|
-| Session A (gamma, AE pegged, WB-off freeze, optional underexpose) | **0** |
-| Session B (black-level + manual WB [+ optional max limits]) | **1** |
-| First real fix A/B | **+1** when implementing |
+| Session A (gamma, AE pegged, WB-off freeze, optional underexpose) | **0** (done) |
+| Session B (black-level + VicOS honour test) | **1** (done; overlay-only) |
+| Software WB Phases 1–2 (in-engine multiply) | **+1** to flash; then on-robot colour A/B |
+| Phase 3 auto software WB | **+1** only if Phase 2 colour A/B passes |
 
 ### Session A live results (2026-09-06, robot `192.168.50.189`)
 
@@ -260,7 +265,42 @@ Same dark scene; overlay stayed **AWB 3.800 / 1.000 / 3.800 · EXP 66 · GAIN 3.
 
 **Closed on-robot:** console gamma is `x^(1/G)` (higher G lifts shadows). Lowering gamma is not a darkness fix. Green is not fixed by gamma or by opening the underexpose WB gate. AE/AWB remain at the rail in this scene.
 
-**Still needs Session B deploy:** black-level bypass A/B; commanded WB triples (VicOS honour); optional max exp/gain.
+### Session B live results (2026-09-06, robot `192.168.50.189`, post-instrumentation flash)
+
+Same dark scene. `DebayerBypassBlackLevel` / `ApplyManualWhiteBalance` / lock confirmed present on `:8888`.
+
+| Step | Change | Overlay AWB · EXP · GAIN | Image |
+|---|---|---|---|
+| B0 | bypass **false** | 3.8 / 1 / 3.8 · 66 · 3.8 | Baseline green + dark (same as Session A) |
+| B1 | bypass **true** | unchanged rail | **No visible change** |
+| B2 T0 | Apply WB **(1,1,1)** + lock | **1 / 1 / 1** · 66 · 3.8 | Essentially **same colour** (tiny darker only vs screenshots); lock held |
+| B2 T1 | Apply **(2,1,1)** | **2 / 1 / 1** | **Same** |
+| B2 T2 | Apply **(1,1,2)** | **1 / 1 / 2** | **Same** |
+| B2 T3 | Apply **(3.8, 1, 0.25)** | **3.8 / 1 / 0.25** | **Same** |
+| B2 T4 | Apply **(0.25, 1, 3.8)** | **0.25 / 1 / 3.8** | **Same** |
+| B3 | Clear lock; bypass **false** | restored | — |
+
+**Closed on-robot (Session B):**
+
+1. **Black-level crush is not the visible darkness/green driver** in this scene (bypass no-op to the eye).
+2. **Engine successfully commands and reports AWB** (overlay tracks ManualWB after Apply).
+3. **VicOS / `mm-anki-camera` does not appear to apply channel AWB gains** to the viewed stream — even rail-to-rail extremes produce no colour shift. Green/dark fixes that rely on sensor AWB will not work from this tree alone.
+
+**Still open:** residual darkness root (sensor/optics/analog gain curve); optional max exp/gain honour (Phase 2b not built); PHOTO vs NEON parity tooling.
+
+### Software WB — Phases 1–2 implemented (on-robot colour A/B pending)
+
+Plan: [`CAMERA-SOFTWARE-WB-PLAN.md`](CAMERA-SOFTWARE-WB-PLAN.md).
+
+`ApplyManualWhiteBalance` now:
+
+1. Keeps engine/overlay `CameraParams` at ManualWB_R/G/B (overlay still shows the commanded triple).
+2. Pins VicOS `CameraSetWhiteBalanceParameters(1, 1, 1)` so daemon AWB cannot double-apply if it ever starts honouring gains.
+3. `SoftwareWhiteBalance::SetGains` + `SetEnabled(true)` — saturating per-channel multiply at the end of `ImageBuffer::GetRGBFromBAYER` (after successful `Debayer::Invoke`). Default disabled / identity until Apply.
+
+`ClearManualCameraControlLock` disables software WB (gains 1,1,1) and re-enables AutoExp/WhiteBalance.
+
+**Next on robot:** flash this build and run the Phase 2 table (T0 identity, T1 warmer `(2,1,1)`, T2 cooler `(1,1,2)`). **Pass criterion:** T1/T2 clearly different from each other and from T0. Phase 3 (auto gray-world software WB) is gated on that pass.
 
 ---
 
@@ -268,28 +308,28 @@ Same dark scene; overlay stayed **AWB 3.800 / 1.000 / 3.800 · EXP 66 · GAIN 3.
 
 Scope: **this** tree only. Daemon/ISP edits are out of band (`mm-anki-camera` prebuilt).
 
-**Preferred order (aligned with external review):**
+**Preferred order (post Session B + software WB landing):**
 
-1. **Fix / calibrate black-level first**  
-   - A/B bypass `BlackLevelAndNormalize` at fixed exp/gain/WB.  
-   - Permanent: measure per-Bayer-channel black (covered lens) and white; normalise from measured offsets — not a hardcoded subtract-6 + `×255/256`. Excess subtraction erases weak R/B.
+1. **On-robot colour A/B of software WB (next — this is the colour path)**  
+   Phases 1–2 are implemented. Flash and run the Phase 2 table in [`CAMERA-SOFTWARE-WB-PLAN.md`](CAMERA-SOFTWARE-WB-PLAN.md): T0 `(1,1,1)` identity, T1 `(2,1,1)` warmer, T2 `(1,1,2)` cooler. Do **not** expect VicOS `camera_set_awb` to tint pixels (Session B closed that). If T1/T2 look identical, the multiply is not on the viewed path — debug before auto.
 
-2. **Verify and stabilise white balance**  
-   - Commanded-gain test (§7).  
-   - If daemon ignores WB → software WB before (or without relying on) sensor gains.  
-   - Make AWB **confidence-aware**: prefer stats on linear / pre-gamma data; require enough usable pixels; smooth updates; **hold last good balance** when signal is inadequate. Give WB **its own** validated limits — do **not** blindly lower the shared 0.25–3.8 cap (can worsen green if the true fix is “stop updating from bad stats”).
+2. **Auto software gray-world (Phase 3)** — only after Phase 2 colour A/B passes. Estimate on **uncorrected** RGB; hold last good when TooDark / too few well-exposed pixels; **never** send estimated gains to the daemon (always 1,1,1). Give software WB **its own** validated limits — do not blindly reuse analog 0.25–3.8.
 
-3. **Make processing consistent across paths**  
+3. **Night / TooDark brightness lift** (optional, parallel to colour once A/B is logged). Higher console gamma already brightens (`1/G`). Session B black-level bypass was a no-op to the eye in the dark test scene; covered-lens per-channel calibration remains a later measurement, not the colour path.
+
+4. **Make processing consistent across paths** (park until colour/brightness is measured)  
    - EIGHTH: apply black-level to **red** as well (or none — but not G/B-only).  
    - `DO_GREEN_AVG` branches must not silently skip black-level.  
    - Align PHOTO (10-bit, no subtract) vs NEON (7-bit + subtract) policy deliberately.
 
-4. **Denoise only after the above**  
+5. **Denoise only after the above**  
    - Do **not** “just call” `TemporalDenoiseGreen`: it is **never invoked**; `prevG1`/`prevG2`/`prevValid` are **reset every conversion** inside local `StoreInfo`; arguments are SIMD vectors, not a previous frame buffer. A real fix needs motion-aware frame history, preferably preserving RAW10 precision, plus chroma denoise — new design, not a one-line enable.
 
-5. **Gamma** — leave Xray 2.1 unless measurement says otherwise; it is a **shadow lift**, not the darkness bug. Raising console gamma further would brighten more; lowering worsens darkness.
+6. **Gamma** — leave Xray 2.1 unless measurement says otherwise; it is a **shadow lift**, not the darkness bug. Raising console gamma further would brighten more; lowering worsens darkness.
 
-6. **Longer shutter / higher gain** — only if VicOS honors values past current limits [UNKNOWN].
+7. **Longer shutter / higher gain** — only if VicOS honors values past current limits [UNKNOWN].
+
+8. **VicOS/`mm-anki-camera` AWB ignore root-cause** — parallel/optional; daemon is prebuilt and out of this tree.
 
 Hardware may still limit how close 2.0 can get to 1.0 after software is cleaned up; that needs RAW + response curves, not more speculation.
 
@@ -303,25 +343,29 @@ Hardware may still limit how close 2.0 can get to 1.0 after software is cleaned 
 | `robot/include/anki/cozmo/shared/factory/emrHelper_vicos.h` | `IsWhiskey` / `IsXray` |
 | `platform/camera/cameraService_vicos.cpp` | 1MP vs 2MP formats; `CameraSetParameters` / AWB |
 | `platform/camera/vicos/camera_client/` | IPC to VicOS `mm-anki-camera` |
-| `engine/components/visionComponent.cpp` | `kDebayerGamma`, apply AE/AWB to camera |
+| `engine/components/visionComponent.cpp` | `kDebayerGamma`; `ApplyManualWhiteBalance` / Clear (software WB + daemon pin 1,1,1) |
 | `engine/vision/visionSystem.cpp` | AE/AWB tick, initial params |
+| `coretech/vision/engine/softwareWhiteBalance.h/.cpp` | In-engine saturating R/G/B multiply; default off |
+| `coretech/vision/engine/imageBuffer/imageBuffer.cpp` | `GetRGBFromBAYER` calls `SoftwareWhiteBalance::ApplyToImage` after Invoke |
 | `coretech/vision/engine/cameraParamsController.cpp` | Gray-world + MinTime/MinGain; WB Off = hold gains |
 | `coretech/vision/engine/debayer.cpp` | **`gamma = 1/gamma`** before ops |
 | `coretech/vision/engine/debayer/neon/raw10.cpp` | Xray black-level; path inconsistencies; dead temporal denoise |
 | `coretech/vision/engine/debayer/raw10.cpp` | CPU PHOTO path (10-bit LUT, no black subtract) |
 | `resources/config/engine/vision_config.json` | ImageQuality / mode schedules |
+| `resources/webserver/cvcatalog/vars/engine-session-b-camera.json` | Console blurbs for bypass + ManualWB Apply/Clear |
 
 ---
 
 ## 10. Open questions
 
-- [UNKNOWN] Does `mm-anki-camera` apply commanded AWB r/g/b on Xray? (Need explicit gain triples — §7.)
+- ~~[UNKNOWN] Does `mm-anki-camera` apply commanded AWB r/g/b on Xray?~~ — **Closed Session B:** overlay tracks ManualWB; **image colour unchanged** even at 3.8/1/0.25 and 0.25/1/3.8. Colour path is software WB.
+- [UNKNOWN] On-robot: does software WB T1 `(2,1,1)` vs T2 `(1,1,2)` visibly shift colour vs T0? (Phase 2 gate in [`CAMERA-SOFTWARE-WB-PLAN.md`](CAMERA-SOFTWARE-WB-PLAN.md).)
 - [UNKNOWN] Analog gain curve / ISO mapping for “3.8” on 2.0 vs 1.0.
 - [UNKNOWN] 2.0 sensor part number / CFA / QE (not in this tree).
 - [UNKNOWN] Whether raising `MAX_CAMERA_EXPOSURE_TIME_MS` or `MAX_CAMERA_GAIN` is honored on Xray.
-- [UNKNOWN] How much of the observed darkness remains after bypassing black-level (robot A/B).
+- ~~[UNKNOWN] How much of the observed darkness remains after bypassing black-level (robot A/B).~~ — **Closed Session B:** bypass **no visible change** in the dark test scene.
 - ~~[INFERRED] v2 darker because gamma 2.1 darkens~~ — **retracted**; LUT uses `1/G`.
-- [INFERRED] Black-level crush + bad AWB updates are the main **software** contributors to dark + green-gray; hardware floor unproven until measured.
+- [INFERRED] Session B: green is not from applied sensor AWB (daemon ignores it). Remaining software colour lever is the post-debayer multiply; hardware floor unproven until measured.
 
 ---
 
