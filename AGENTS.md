@@ -345,7 +345,7 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 - **Which parts are rebuild-specific vs. stock Anki 1.6?** — `CHANGES.md`. Observed: wirepod
   cloud, anim 16 ms, platform OTA/diagnostics notes. Upstream `docs/` = stock 1.6.
 - **Version pins** — `VERSION` = `1.6.1`; `VICTOR_COMPAT_VERSION` = `210`.
-- **Camera 1.0 vs 2.0 / low light?** — **Xray (Vector 2.0, `HW_VER` ≥ `0x20`)** is the different camera (1600×1200 → 800×600 vs 1280×720 → 640×360). **Whiskey (2019) is not a camera change.** Same AE ceiling 66 ms / gain 3.8 — v2 still looks **darker + green-gray** (AWB **3.8 / 1 / 3.8** vs v1 ~1.5 / 1.8). **Corrected:** console gamma is applied as **`x^(1/G)`** (2.1 *brightens* more than 1.7); do **not** lower gamma to fix darkness. Session B: VicOS AWB **ignored** (overlay moves, pixels do not). Colour path is now **in-engine software WB** (`ApplyManualWhiteBalance` → `SoftwareWhiteBalance` multiply after debayer; daemon pinned 1,1,1). “Smaller pixels” unproven. Map: `CAMERA-HW-V1-V2.md`; plan: `CAMERA-SOFTWARE-WB-PLAN.md`.
+- **Camera 1.0 vs 2.0 / low light?** — **Xray** (`HW_VER` ≥ `0x20`): different camera; Whiskey ≠ camera. Gamma is **`x^(1/G)`**. VicOS AWB **ignored** (Session B). **Manual** software WB works; vizManager R/B **fixed** (Session D). **`SoftwareWBAuto` leave false** — v1 sticks at max R=B (purple), no walk-down when lit. **Next:** fix auto integrator/walk-down. Map: `CAMERA-HW-V1-V2.md` Status; plans: `CAMERA-SOFTWARE-WB-PLAN.md`, `CAMERA-SOFTWARE-WB-PHASE3-PLAN.md`.
 - **Glossary / indexes** — `docs/mapping/GLOSSARY.md`, `UPSTREAM-DOCS-INDEX.md`, `HIGH-LEVEL.md`.
 - **Custom firmware north star (ideation)?** — **Kinetic Familiar** — saved charter
   `docs/mapping/KINETIC-FAMILIAR.md` (name + goal/intent locked; what’s-first TBD). Hermit/night-lock
@@ -396,6 +396,8 @@ if you ran out of context mid-folder, say so here.
 | 2026-09-06 | Grok | **Phase 3 + R/B display fix:** Xray always `COLOR_RGB2BGR` (vizManager); MirrorMode unswap; `ScopedIdentity`+`InvalidateRGB`; `SoftwareWBAuto` (default off) + hold/rails; HAL pin 1,1,1. | Flash; re-A/B T1 red/T2 blue; then enable `SoftwareWBAuto`. |
 | 2026-09-06 | Grok | **Software WB Phases 1–2 implemented** (`SoftwareWhiteBalance` after `GetRGBFromBAYER`; Apply pins daemon AWB 1,1,1 and multiplies pixels). **Phase 4 docs:** plan `CAMERA-SOFTWARE-WB-PLAN.md`, `CAMERA-HW-V1-V2.md` §7–§8, cvcatalog Apply/Clear/ManualWB blurbs, AGENTS landmark + quick answer. | On-robot Phase 2 colour A/B; Phase 3 auto gated on pass. |
 | 2026-09-06 | Grok | **Phase 3 + R/B display fix:** Xray always `COLOR_RGB2BGR` (vizManager); MirrorMode unswap; `ScopedIdentity`+`InvalidateRGB`; `SoftwareWBAuto` (default off) + hold/rails; HAL pin 1,1,1. | Flash; re-A/B T1 red/T2 blue via vizManager; then enable `SoftwareWBAuto`. |
+| 2026-09-06 | Grok | **Session D:** T1 red / T2 blue (**R/B PASS**). Auto → **2.5/1/2.5 purple**, mug colours wrong; bright light no change. Auto disabled. | Fix auto: reset integrator, lower/slew rail, walk-down when lit. |
+| 2026-09-06 | Grok | **Pause camera:** MaxGain 1.3 trial still stuck (milder purple; yellow→blue). Docs Status in `CAMERA-HW-V1-V2.md`; Phase3 plan marked auto-v1 fail; Quick answers updated. `SoftwareWBAuto=false` on robot. | Resume: `/make-plan` or implement auto walk-down/integrator fix. |
 
 ---
 

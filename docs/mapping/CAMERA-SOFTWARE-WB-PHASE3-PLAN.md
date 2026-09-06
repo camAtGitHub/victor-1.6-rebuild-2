@@ -1,5 +1,7 @@
 # Plan: Software WB Phase 3 (auto) + R/B label fix
 
+**Status (2026-09-06 pause):** Implemented and flashed. **R/B display fix PASS** (Session D via vizManager). **Auto v1 FAIL for production use** — hits MaxGain R=B rail (purple), does not walk down when lit; leave `SoftwareWBAuto=false`. Resume with walk-down/integrator fix (see `CAMERA-HW-V1-V2.md` Status).
+
 **Goal:** (1) Make `ManualWB_R` / `ManualWB_B` match perceived colour on Xray Viz. (2) Add **auto** software gray-world that multiplies RGB in-engine, pins VicOS AWB to `(1,1,1)`, and holds last-good when too dark / starved.
 
 **Why:** Session C proved software multiply works, but `(2,1,1)` looked blue and `(1,1,2)` red. Root cause: Xray `ImageRGB::ConvertToShowableFormat` **skips** `COLOR_RGB2BGR`, so JPEG/Viz treats RGB bytes as BGR (`image.cpp:1989-1994`). Face MirrorMode also swaps on Xray. Phase 3 auto must estimate on **memory-correct** `pixel.r()/b()` — so the fix belongs in the **display path**, not a multiply swap (an `ApplyToImage` R↔B swap would make manual labels look right but break auto vs memory).

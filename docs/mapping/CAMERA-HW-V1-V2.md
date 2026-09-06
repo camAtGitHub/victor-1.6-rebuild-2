@@ -1,16 +1,33 @@
 # Camera hardware: Vector 1.0 vs 2.0 (low light / AWB)
 
 **Path:** `docs/mapping/CAMERA-HW-V1-V2.md`  
-**Mapped:** 2026-08-23; **revised:** 2026-09-06 (external vision review; Session B VicOS AWB ignore; software WB Phases 1–2)  
-**Confidence:** high (code paths, AE/AWB math, Xray branches, gamma `1/G` inversion, Session B: daemon AWB does not tint pixels); medium (whether 8-bit software multiply is enough to un-green Xray — on-robot A/B pending); low (sensor QE / “smaller pixels” as the darkness root cause — unproven)  
-**Upstream docs:** [`docs/architecture/whats_in_victor.md`](../architecture/whats_in_victor.md) (stock 1280×720 only), [`docs/architecture/visionSystem.md`](../architecture/visionSystem.md) (AE exists; no HW split).  
-**Related:** `CHANGES.md` (Vector 2.0 + WireOS gamma/denoiser), `engine/vision/README.md`, `platform/camera/`, cvcatalog `engine-autoexp.json` / `engine-vision-ae-illum.json` / `engine-session-b-camera.json`. Plans: [`CAMERA-SESSION-B-PLAN.md`](CAMERA-SESSION-B-PLAN.md), [`CAMERA-SOFTWARE-WB-PLAN.md`](CAMERA-SOFTWARE-WB-PLAN.md).
+**Mapped:** 2026-08-23; **revised:** 2026-09-06 (Sessions A–D on-robot; software WB + Phase 3 auto v1)  
+**Paused:** 2026-09-06 end of Session D — see **Status** below  
+**Confidence:** high (gamma `1/G`, Session B VicOS AWB ignore, manual software multiply, vizManager R/B after RGB2BGR); medium (auto walk-down / integrator bugs); low (sensor QE / “smaller pixels”)  
+**Upstream docs:** [`docs/architecture/whats_in_victor.md`](../architecture/whats_in_victor.md), [`docs/architecture/visionSystem.md`](../architecture/visionSystem.md).  
+**Related plans:** [`CAMERA-SESSION-B-PLAN.md`](CAMERA-SESSION-B-PLAN.md), [`CAMERA-SOFTWARE-WB-PLAN.md`](CAMERA-SOFTWARE-WB-PLAN.md), [`CAMERA-SOFTWARE-WB-PHASE3-PLAN.md`](CAMERA-SOFTWARE-WB-PHASE3-PLAN.md). Catalog: `engine-session-b-camera.json`.
 
 How the three head revisions differ in **camera** code, why 2.0 looks grainy green-gray in the dark, and which console/config knobs exist.
 
-**Review note (2026-09-06):** An external pass with minor vision-systems experience inspected this tree (their baseline commit `5eec29b`). Code findings below were re-checked in *this* workspace. Their results were **not** robot-tested. Where the original 2026-08-23 write-up was wrong, it is corrected in place (especially §5 gamma).
+### Status (pause 2026-09-06)
 
-**Software WB (2026-09-06, Phases 1–2 implemented):** `ApplyManualWhiteBalance` now enables in-engine `Anki::Vision::SoftwareWhiteBalance` — saturating per-channel multiply on `ImageRGB` **after** `Debayer::Invoke` in `ImageBuffer::GetRGBFromBAYER`. Engine/overlay `CameraParams` still show ManualWB; VicOS AWB is **pinned to 1,1,1** so a future daemon fix cannot double-apply. Plan: [`CAMERA-SOFTWARE-WB-PLAN.md`](CAMERA-SOFTWARE-WB-PLAN.md). **Phase 3 (auto gray-world) is gated on on-robot colour A/B.**
+| Area | State |
+|---|---|
+| Gamma | Confirmed `x^(1/G)` — do not lower to “fix” darkness (Session A) |
+| VicOS `camera_set_awb` | **Ignored** for pixels (Session B) — colour must be in-engine |
+| Black-level bypass | No visible change in dark test scene (Session B) |
+| Manual software WB | **Works** — Apply multiplies RGB after debayer |
+| vizManager R/B | **Fixed** — Xray always `COLOR_RGB2BGR` (Session D T1 red / T2 blue) |
+| `SoftwareWBAuto` | **Shipped default false** — v1 hits max R=B rail (purple), **stuck** when lighting improves (Session D). Leave off. |
+| Robot console | Leave `SoftwareWBAuto=false` |
+
+**Next when resuming (priority):**
+
+1. **Fix auto walk-down** — reset `CameraParamsController` current WB to 1,1,1 on enable; slew/limit steps; ensure bright scenes can **reduce** gains (hold/identity/stats). Then re-test auto.  
+2. Optional: tune MaxGain / gray-world for Xray dark (after walk-down works).  
+3. Parked: night brightness lift, black-level calib, PHOTO/NEON parity, VicOS daemon, denoise.
+
+Test UI: **vizManager** (JPEG via `ConvertToShowableFormat`). Robot used: `192.168.50.189:8888`.
 
 ---
 
@@ -313,9 +330,18 @@ Plan: [`CAMERA-SOFTWARE-WB-PLAN.md`](CAMERA-SOFTWARE-WB-PLAN.md).
 
 **Phase 3:** `SoftwareWBAuto` (default false) — in-engine gray-world, VicOS pinned 1,1,1, hold on TooDark/low well-exposed, rails Min/MaxGain. Plan: `CAMERA-SOFTWARE-WB-PHASE3-PLAN.md`.
 
-`ClearManualCameraControlLock` disables software WB (gains 1,1,1) and re-enables AutoExp/WhiteBalance.
+### Session D live results (2026-09-06) — vizManager + Phase 3 flash
 
-**Next on robot:** flash this build and run the Phase 2 table (T0 identity, T1 warmer `(2,1,1)`, T2 cooler `(1,1,2)`). **Pass criterion:** T1/T2 clearly different from each other and from T0. Phase 3 (auto gray-world software WB) is gated on that pass.
+| Step | Result |
+|---|---|
+| T1 `(2,1,1)` | **Very red/orange** — R/B display fix **PASS** |
+| T2 `(1,1,2)` | **Super blue** — R/B display fix **PASS** |
+| `SoftwareWBAuto=true` (MaxGain **2.5**) | Overlay → **2.5 / 1 / 2.5**; image **purple**; blue-green mug → **red/orange** |
+| MaxGain **1.3** then auto | Overlay → **1.3 / 1 / 1.3**; cast **blue/purple** (similar intensity to old green, less purple than 2.5); yellow toy → **blue**; bright light **still stuck** |
+| Auto off | restored |
+
+**Closed:** vizManager R/B labels correct after RGB2BGR fix.  
+**Open (auto):** always hits max R=B rail (green→magenta trade); **never walks down** when lit — integrator/hold/stats bug, not just rail height. Next: reset controller current on enable; slew; fix walk-down; reconsider gray-world on Xray dark.
 
 ---
 
@@ -323,14 +349,11 @@ Plan: [`CAMERA-SOFTWARE-WB-PLAN.md`](CAMERA-SOFTWARE-WB-PLAN.md).
 
 Scope: **this** tree only. Daemon/ISP edits are out of band (`mm-anki-camera` prebuilt).
 
-**Preferred order (post Session B + software WB landing):**
+**Preferred order (post Session D pause):**
 
-1. **On-robot colour A/B of software WB (next — this is the colour path)**  
-   Phases 1–2 are implemented. Flash and run the Phase 2 table in [`CAMERA-SOFTWARE-WB-PLAN.md`](CAMERA-SOFTWARE-WB-PLAN.md): T0 `(1,1,1)` identity, T1 `(2,1,1)` warmer, T2 `(1,1,2)` cooler. Do **not** expect VicOS `camera_set_awb` to tint pixels (Session B closed that). If T1/T2 look identical, the multiply is not on the viewed path — debug before auto.
-
-2. **Auto software gray-world (Phase 3)** — only after Phase 2 colour A/B passes. Estimate on **uncorrected** RGB; hold last good when TooDark / too few well-exposed pixels; **never** send estimated gains to the daemon (always 1,1,1). Give software WB **its own** validated limits — do not blindly reuse analog 0.25–3.8.
-
-3. **Night / TooDark brightness lift** (optional, parallel to colour once A/B is logged). Higher console gamma already brightens (`1/G`). Session B black-level bypass was a no-op to the eye in the dark test scene; covered-lens per-channel calibration remains a later measurement, not the colour path.
+1. **Fix `SoftwareWBAuto` walk-down / integrator** (next code) — see Status. Manual path is good; auto v1 is not.  
+2. **Re-test auto** on-robot (dark + bright; object colours). Keep default **false** until pass.  
+3. **Night / TooDark brightness lift** (optional). Higher console gamma already brightens (`1/G`). Black-level bypass was a no-op in dark Session B.
 
 4. **Make processing consistent across paths** (park until colour/brightness is measured)  
    - EIGHTH: apply black-level to **red** as well (or none — but not G/B-only).  
