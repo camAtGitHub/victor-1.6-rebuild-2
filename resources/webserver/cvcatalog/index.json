@@ -30,6 +30,7 @@
     "vars/anim-alexa.json",
     "vars/engine-led1.json",
     "vars/engine-autoexp.json",
+    "vars/engine-session-b-camera.json",
     "vars/anim-audio-tts.json",
     "vars/engine-led2.json",
     "vars/engine-custom-eye.json",

@@ -15,6 +15,7 @@
 #include "coretech/vision/engine/debayer/neon/raw10.h"
 #include "anki/cozmo/shared/factory/emrHelper.h"
 
+#include "util/console/consoleInterface.h"
 #include "util/logging/logging.h"
 
 #include <arm_neon.h>
@@ -34,6 +35,10 @@
 
 static constexpr uint8_t BLACK_LEVEL_8 = 6; // raw10 32
 static constexpr uint8_t WHITE_LEVEL_8 = 240;
+
+// Session B: live bypass for BlackLevelAndNormalize (no ResetGamma / op rebuild).
+// Registered here so cti_vision does not depend on an engine-defined symbol.
+CONSOLE_VAR(bool, kDebayerBypassBlackLevel, "Vision.Debayer", false);
 
 namespace Anki {
 namespace Vision {
@@ -334,8 +339,8 @@ Result HandleRAW10::operator()(const Debayer::InArgs& inArgs, Debayer::OutArgs& 
 // this essentially increases contrast in the final image
 inline void BlackLevelAndNormalize(uint8x8_t& data)
 {
-  // we only want to do this for 2.0
-  if (!Vector::IsXray()) {
+  // we only want to do this for 2.0 (Session B: DebayerBypassBlackLevel skips crush)
+  if (!Vector::IsXray() || kDebayerBypassBlackLevel) {
     return;
   }
 

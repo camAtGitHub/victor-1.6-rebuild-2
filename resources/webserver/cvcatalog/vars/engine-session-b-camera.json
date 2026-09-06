@@ -1,0 +1,74 @@
+{
+  "vars": {
+    "DebayerBypassBlackLevel": {
+      "process": "engine",
+      "blurb": "When true on Xray (Vector 2.0), skips BlackLevelAndNormalize in the NEON RAW10 debayer (no subtract-6 / ×255/256 crush). Live immediately — do not call ResetGamma. Default false = stock Xray behaviour.",
+      "detail": "Registered in coretech/vision/engine/debayer/neon/raw10.cpp. Early-return beside IsXray() inside BlackLevelAndNormalize so all NEON scales share one gate. Session B A/B: freeze exposure, toggle this, compare brightness/green. Does not affect the CPU PHOTO path (no black-level there). Category Vision.Debayer.",
+      "howTo": "1) Same dark scene as baseline. 2) Set DebayerBypassBlackLevel true via consolevars or /consolevarset. 3) Screenshot vs bypass false. 4) Set false when done.",
+      "category": "Vision.Debayer",
+      "related": ["DebayerGamma", "ResetGamma"],
+      "evidence": "coretech/vision/engine/debayer/neon/raw10.cpp BlackLevelAndNormalize; docs/mapping/CAMERA-SESSION-B-PLAN.md",
+      "status": "live",
+      "tags": ["vision", "debayer", "xray", "session-b", "camera"]
+    },
+    "ManualWB_R": {
+      "process": "engine",
+      "blurb": "Commanded red AWB gain for ApplyManualWhiteBalance (default 1.0, range 0.25–3.8). Slider alone does not hit VicOS — run ApplyManualWhiteBalance.",
+      "detail": "Session B VicOS honour test. Pair with ManualWB_G/B. Apply builds CameraParams from current exp/gain + these three gains and calls SetAndDisableCameraControl.",
+      "requires": ["ApplyManualWhiteBalance"],
+      "related": ["ManualWB_G", "ManualWB_B", "ApplyManualWhiteBalance", "WhiteBalance"],
+      "category": "Vision.PreProcessing",
+      "status": "live",
+      "tags": ["vision", "whitebalance", "session-b"]
+    },
+    "ManualWB_G": {
+      "process": "engine",
+      "blurb": "Commanded green AWB gain for ApplyManualWhiteBalance (default 1.0, range 0.25–3.8). Slider alone does not hit VicOS.",
+      "requires": ["ApplyManualWhiteBalance"],
+      "related": ["ManualWB_R", "ManualWB_B", "ApplyManualWhiteBalance"],
+      "category": "Vision.PreProcessing",
+      "status": "live",
+      "tags": ["vision", "whitebalance", "session-b"]
+    },
+    "ManualWB_B": {
+      "process": "engine",
+      "blurb": "Commanded blue AWB gain for ApplyManualWhiteBalance (default 1.0, range 0.25–3.8). Slider alone does not hit VicOS.",
+      "requires": ["ApplyManualWhiteBalance"],
+      "related": ["ManualWB_R", "ManualWB_G", "ApplyManualWhiteBalance"],
+      "category": "Vision.PreProcessing",
+      "status": "live",
+      "tags": ["vision", "whitebalance", "session-b"]
+    },
+    "ManualCameraControlLock": {
+      "process": "engine",
+      "blurb": "When true, VisionComponent::UpdateCameraParams skips pushing AE/WB from vision results to the camera. Set true by ApplyManualWhiteBalance; clear with ClearManualCameraControlLock.",
+      "detail": "Guards against VisionScheduleMediator re-scheduling AutoExp/WhiteBalance from vision_config defaults after EnableMode(false).",
+      "related": ["ApplyManualWhiteBalance", "ClearManualCameraControlLock", "AutoExp", "WhiteBalance"],
+      "category": "Vision.PreProcessing",
+      "status": "live",
+      "tags": ["vision", "session-b", "lock"]
+    },
+    "ApplyManualWhiteBalance": {
+      "process": "engine",
+      "blurb": "Pushes ManualWB_R/G/B to the camera with current exposure/gain, disables AutoExp+WhiteBalance modes, and sets ManualCameraControlLock. Required after changing ManualWB_* sliders.",
+      "detail": "CONSOLE_FUNC Vision.PreProcessing. Builds Vision::CameraParams(cur.exp, cur.gain, ManualWB_R/G/B) then SetAndDisableCameraControl. Honour-test triples: (1,1,1), (2,1,1), (1,1,2). Judge by image colour, not overlay alone.",
+      "howTo": "1) Set ManualWB_R/G/B. 2) Call ApplyManualWhiteBalance. 3) Watch colour for several seconds (lock holds). 4) ClearManualCameraControlLock when done.",
+      "requires": ["ManualWB_R", "ManualWB_G", "ManualWB_B"],
+      "related": ["ClearManualCameraControlLock", "ManualCameraControlLock"],
+      "evidence": "engine/components/visionComponent.cpp ApplyManualWhiteBalance; SetAndDisableCameraControl",
+      "category": "Vision.PreProcessing",
+      "status": "live",
+      "tags": ["vision", "whitebalance", "console-func", "session-b"]
+    },
+    "ClearManualCameraControlLock": {
+      "process": "engine",
+      "blurb": "Clears ManualCameraControlLock and re-enables AutoExp + WhiteBalance after a Session B manual WB test.",
+      "howTo": "Call after ApplyManualWhiteBalance trials. Confirm ManualCameraControlLock is false.",
+      "related": ["ApplyManualWhiteBalance", "ManualCameraControlLock", "AutoExp", "WhiteBalance"],
+      "evidence": "engine/components/visionComponent.cpp ClearManualCameraControlLock",
+      "category": "Vision.PreProcessing",
+      "status": "live",
+      "tags": ["vision", "console-func", "session-b"]
+    }
+  }
+}

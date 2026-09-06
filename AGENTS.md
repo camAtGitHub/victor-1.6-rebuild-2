@@ -245,8 +245,18 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 | `resources/webserver/webVizModules/freeplay.js` | Production FreePlay: Ops stack\|log + gates; client log tags; latest-factor gates; secondary timeline |
 | `webviz-ux-demo.html` | Standalone Ops vs Timeline mock (reference only; not robot-deployed) |
 | `docs/mapping/GLOSSARY.md` | ~130 repo terms |
-| `docs/mapping/CAMERA-HW-V1-V2.md` | Camera 1.0 vs Whiskey vs Xray/2.0; AE/AWB rails; low-light green-gray |
+| `docs/mapping/CAMERA-HW-V1-V2.md` | Camera 1.0 vs Whiskey vs Xray/2.0; AWB rails; black-level first (gamma uses `1/G`) |
+| `docs/mapping/CAMERA-SESSION-B-PLAN.md` | Session B plan + protocol: bypass + manual WB Apply/lock |
 | `docs/mapping/IDEA-backpack-lights-flags.md` | Idea: Anki lights flag + customBackpackLights folder + Wired option |
+| `docs/mapping/IDEA-personality-packs.md` | Idea: selectable JSON freeplay personality packs (+ voice activate) |
+| `docs/mapping/IDEA-custom-firmware-vibe-brainstorm.md` | Ideation: 8 wild firmware personas / Soul Profile spine (wiki character lens) |
+| `docs/mapping/IDEA-circadian-soul-constitution.md` | Idea: Hermit-by-day / Owl-by-night circadian firmware character constitution |
+| `docs/mapping/IDEA-tornado-spin-reaction.md` | Idea: flat table spin (fast yaw) → tornado anim + actions |
+| `docs/mapping/KINETIC-FAMILIAR.md` | **Saved charter:** Kinetic Familiar name + goal/intent (what’s-first TBD) |
+| `docs/mapping/KINETIC-FAMILIAR-SPR.md` | Memora SPR engram for cross-session / voice continuity |
+| `docs/mapping/KINETIC-FAMILIAR-VOICE-SYSTEM-PROMPT.md` | Voice AI prompt: no repo access; self-contained Kinetic Familiar + stack briefing |
+| `docs/mapping/IDEA-firmware-direction-amended.md` | Read-back that led to Kinetic Familiar (historical; see charter) |
+| `docs/mapping/IDEA-affect-micro-library.md` | ~20 nonverbal affect beats (eyes/motion/chirps) for firmware dialect |
 | `docs/mapping/TODO-overheat-backpack-lights.md` | Easy win: WireOS thermal JSON exists; restore clad/map/`if`s so they play (41 °C charger cooldown) |
 | `engine/components/cubes/` | L2 cube BLE/coordinator/lights stack |
 | `animProcess/src/cozmoAnim/{animation,faceDisplay,micData,speechRecognizer,audio,…}/` | L2 anim subsystems |
@@ -333,8 +343,12 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 - **Which parts are rebuild-specific vs. stock Anki 1.6?** — `CHANGES.md`. Observed: wirepod
   cloud, anim 16 ms, platform OTA/diagnostics notes. Upstream `docs/` = stock 1.6.
 - **Version pins** — `VERSION` = `1.6.1`; `VICTOR_COMPAT_VERSION` = `210`.
-- **Camera 1.0 vs 2.0 / low light?** — **Xray (Vector 2.0, `HW_VER` ≥ `0x20`)** is the cheaper/different camera (1600×1200 → 800×600 vs 1280×720 → 640×360). **Whiskey (2019) is not a camera change.** Same AE ceiling 66 ms / gain 3.8 — **v2 is still a lot darker** (smaller pixels + gamma 2.1 + black-level −6) **and** greener (**AWB 3.8 / 1.0 / 3.8** vs v1 ~1.5 / 1.8). Map: `docs/mapping/CAMERA-HW-V1-V2.md`.
+- **Camera 1.0 vs 2.0 / low light?** — **Xray (Vector 2.0, `HW_VER` ≥ `0x20`)** is the different camera (1600×1200 → 800×600 vs 1280×720 → 640×360). **Whiskey (2019) is not a camera change.** Same AE ceiling 66 ms / gain 3.8 — v2 still looks **darker + green-gray** (AWB **3.8 / 1 / 3.8** vs v1 ~1.5 / 1.8). **Corrected:** console gamma is applied as **`x^(1/G)`** (2.1 *brightens* more than 1.7); do **not** lower gamma to fix darkness. Prefer **black-level** fix/A/B, then commanded-WB tests; “smaller pixels” unproven. Map: `docs/mapping/CAMERA-HW-V1-V2.md`.
 - **Glossary / indexes** — `docs/mapping/GLOSSARY.md`, `UPSTREAM-DOCS-INDEX.md`, `HIGH-LEVEL.md`.
+- **Custom firmware north star (ideation)?** — **Kinetic Familiar** — saved charter
+  `docs/mapping/KINETIC-FAMILIAR.md` (name + goal/intent locked; what’s-first TBD). Hermit/night-lock
+  retracted. Affect beats: `IDEA-affect-micro-library.md`. Voice/off-repo continuity:
+  `KINETIC-FAMILIAR-VOICE-SYSTEM-PROMPT.md` + `KINETIC-FAMILIAR-SPR.md`.
 
 ---
 
@@ -364,6 +378,17 @@ if you ran out of context mid-folder, say so here.
 | 2026-08-23 | Grok | Camera 1.0 vs 2.0 (Xray ≠ Whiskey): AE/AWB, `DebayerGamma`, black-level stretch, dead temporal denoise, observed AWB 3.8/1/3.8 vs ~1.5/1.8. Wrote `docs/mapping/CAMERA-HW-V1-V2.md`; glossary + HIGH-LEVEL + Quick answers. | Feature phase if wanted: stop AWB at TooDark, Xray-only AE/gamma, wire TemporalDenoiseGreen. |
 | 2026-08-23 | Grok | User: v2 is **a lot darker**, not just greener, at same 66/3.8. Updated `CAMERA-HW-V1-V2.md` §3/§5/§8: tone curve (gamma 2.1, black −6) + smaller pixels; AE has no headroom. | Night gamma/black-level skip first if implementing. |
 | 2026-08-27 | Grok | Overheat backpack lights: JSON in WireOS pack is never selected (clad/map/`if`s reverted). Captured easy-win TODO `docs/mapping/TODO-overheat-backpack-lights.md` (41 °C charger cooldown; do not implement until asked). | Feature phase: restore four thermal triggers + anim selection. |
+| 2026-09-02 | Grok | Read `docs/ANKI-Vector-Robot-Wiki.pdf` character §§8.1–8.5; SCAMPER + reverse brainstorm for a custom firmware with a different feel. Wrote `docs/mapping/IDEA-custom-firmware-vibe-brainstorm.md` (8 wild personas + Soul Profile spine). | User picks 1–2 personas to deepen into a character constitution; no implementation yet. |
+| 2026-09-02 | Grok | User chose Hermit+Owl as **one circadian soul**. Wrote `docs/mapping/IDEA-circadian-soul-constitution.md` (pillars, day/night love languages, taboos, Soul Profile spine). | Approve/edit constitution; then design or `/make-plan` when feature phase opens. |
+| 2026-09-02 | Grok | Recorded user idea: flat table spin (fast rotate) → tornado animation + actions → `docs/mapping/IDEA-tornado-spin-reaction.md` (sibling to `ReactToRobotShaken`). | Implement only when feature phase opens; design detector thresholds first. |
+| 2026-09-02 | Grok | User read-back: retract Hermit; want new eyes/PNG movies/motion/chirps + pounce L/R/aggressive + speed-racer + lights/easy wins; keep sound-first; park rival/glitch/archivist. Wrote `IDEA-firmware-direction-amended.md` + `IDEA-affect-micro-library.md`. | Confirm Kinetic Familiar; then prioritize A/B/C buckets when feature phase opens. |
+| 2026-09-02 | Grok | **Saved charter:** `docs/mapping/KINETIC-FAMILIAR.md` — name **Kinetic Familiar** + goal/intent/pillars/wishlist/parked locked; what’s-first explicitly deferred. Quick answer + landmark. | Open feature phase / pick first slice only when user asks. |
+| 2026-09-02 | Grok | Wrote Memora **SPR** `KINETIC-FAMILIAR-SPR.md` + full **voice/cross-model system prompt** `KINETIC-FAMILIAR-VOICE-SYSTEM-PROMPT.md` (charter + affect + dense engine/anim/robot latent map). | Paste system prompt into voice AI for off-repo design talk; update SPR after big decisions. |
+| 2026-09-02 | Grok | Rewrote voice system prompt for **no codebase/tools** voice AIs: self-contained stack briefing, forbid fake file reads, voice-first turns. | Paste `KINETIC-FAMILIAR-VOICE-SYSTEM-PROMPT.md` BEGIN–END block into voice model. |
+| 2026-09-06 | Grok | Reviewed external vision notes on green/dark camera: **agreed** gamma study was backwards (`debayer.cpp` `1/G`; 2.1 brightens more than 1.7); black-level first; WB-off test invalid; TemporalDenoiseGreen unfit; path bugs. Revised `CAMERA-HW-V1-V2.md` + Quick answers. | Feature phase only when asked: black-level A/B → commanded WB → path consistency. |
+| 2026-09-06 | Grok | Console-first camera plan: §7 lists exact `:8888/consolevars` **category tabs + var names** for Session A (0 deploys) vs missing knobs for Session B (1 instrumented deploy). | User runs Session A on robot; then decide Session B knobs. |
+| 2026-09-06 | Grok | **Session A live** on `192.168.50.189`: gamma 1.7 darker / 2.5 brighter (confirms `1/G`); `UnderExposedThreshold=0` no AWB/green change; rail 66/3.8/AWB3.8. Logged in `CAMERA-HW-V1-V2.md` §7. | Session B when ready: 1 deploy with black-level bypass + manual WB. |
+| 2026-09-06 | Grok | **Session B instrumentation implemented** (no flash yet): `DebayerBypassBlackLevel`; `ManualWB_R/G/B` + `ApplyManualWhiteBalance` + lock/Clear; cvcatalog shard; plan `CAMERA-SESSION-B-PLAN.md`. | User rebuild/deploy; run B0–B3 on `192.168.50.189`. |
 
 ---
 

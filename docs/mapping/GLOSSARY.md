@@ -172,8 +172,9 @@ Terms observed in upstream docs, mapping notes (`docs/mapping/`), and folder REA
 | **Xray** | Vector 2.0 (DDL) head rev: `HW_VER` ≥ `0x20`; `IsXray()`. Different camera (1600×1200 → 800×600, 2MP formats), LCD, eyes. CCIS may print `HW: 8`. | `cozmoConfig.h`, `CAMERA-HW-V1-V2.md`, `CHANGES.md` |
 | **EMR / HW_VER** | Factory EEPROM/record on the head; `Factory::GetEMR()->fields.HW_VER` drives `IsWhiskey` / `IsXray`. | `emrHelper_vicos.h`, `robot/fixture/stm/hwid.h` |
 | **AWB / gray-world** | Auto white balance: green gain fixed at 1.0; R/B scaled so channel means match green. Clamped to analog-gain range **0.25–3.8** (no separate AWB max). | `cameraParamsController.cpp`, `CAMERA-HW-V1-V2.md` |
-| **Debayer / RAW10** | Convert Bayer MIPI BGGR10 frames to RGB/Y; NEON path drops bottom 3 bits then applies gamma LUT. | `coretech/vision/engine/debayer/` |
-| **DebayerGamma** | Console gamma for RAW10→RGB (default 1.7; **2.1 on Xray**). Needs **`ResetGamma`** to apply. Gamma > 1 flattens darks. | `visionComponent.cpp`, `CAMERA-HW-V1-V2.md` |
+| **Debayer / RAW10** | Convert Bayer MIPI BGGR10 frames to RGB/Y; NEON path drops bottom 3 bits then applies gamma LUT. Xray NEON also runs `BlackLevelAndNormalize`. | `coretech/vision/engine/debayer/` |
+| **DebayerGamma** | Console gamma for RAW10→RGB (default 1.7; **2.1 on Xray**). Needs **`ResetGamma`** to apply. **`GetDefaultOpMap` uses `1/G` as the LUT exponent** — higher console G *brightens* shadows more. | `debayer.cpp`, `visionComponent.cpp`, `CAMERA-HW-V1-V2.md` |
+| **BlackLevelAndNormalize** | Xray-only NEON helper: subtract 6, clip to 234, `×255/256`. Crushes near-black / weak R/B; not a real white stretch. | `debayer/neon/raw10.cpp`, `CAMERA-HW-V1-V2.md` |
 | **Cube / light cube** | BLE interactive cube; FW under `robot/cube_firmware/`; host client `cubeBleClient/` + engine cube components. | `cubeConnections.md`, `robot/README.mapping.md` |
 | **Breakpad** | Google Breakpad crash dumps via `platform/victorCrashReports` / `lib/crash-reporting-vicos`. | `crash-reports.md`, `platform/README.md` |
 

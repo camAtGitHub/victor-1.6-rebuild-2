@@ -134,6 +134,48 @@ namespace Vector {
   }
   CONSOLE_FUNC(ResetGamma, "Vision.Debayer");
 
+  // Session B: DebayerBypassBlackLevel is CONSOLE_VAR'd in neon/raw10.cpp (same lib as the helper).
+
+  // Session B: command WB triples via ApplyManualWhiteBalance (sliders alone do not hit VicOS).
+  CONSOLE_VAR_RANGED(f32, kManualWB_R, "Vision.PreProcessing", 1.f, 0.25f, 3.8f);
+  CONSOLE_VAR_RANGED(f32, kManualWB_G, "Vision.PreProcessing", 1.f, 0.25f, 3.8f);
+  CONSOLE_VAR_RANGED(f32, kManualWB_B, "Vision.PreProcessing", 1.f, 0.25f, 3.8f);
+  CONSOLE_VAR(bool, kManualCameraControlLock, "Vision.PreProcessing", false);
+
+  void ApplyManualWhiteBalance(ConsoleFunctionContextRef context)
+  {
+    if(nullptr == s_VisionComponent)
+    {
+      LOG_WARNING("VisionComponent.ApplyManualWhiteBalance.NoComponent", "");
+      return;
+    }
+    const Vision::CameraParams& cur = s_VisionComponent->GetCurrentCameraParams();
+    const Vision::CameraParams params(cur.exposureTime_ms, cur.gain,
+                                      kManualWB_R, kManualWB_G, kManualWB_B);
+    LOG_INFO("VisionComponent.ApplyManualWhiteBalance",
+             "Exp:%dms Gain:%.3f WB:%.3f %.3f %.3f",
+             params.exposureTime_ms, params.gain,
+             params.whiteBalanceGainR, params.whiteBalanceGainG, params.whiteBalanceGainB);
+    s_VisionComponent->SetAndDisableCameraControl(params);
+    // Set after SetAndDisable: playpen also uses that API and must not leave AE/WB locked.
+    kManualCameraControlLock = true;
+  }
+  CONSOLE_FUNC(ApplyManualWhiteBalance, "Vision.PreProcessing");
+
+  void ClearManualCameraControlLock(ConsoleFunctionContextRef context)
+  {
+    if(nullptr == s_VisionComponent)
+    {
+      LOG_WARNING("VisionComponent.ClearManualCameraControlLock.NoComponent", "");
+      return;
+    }
+    kManualCameraControlLock = false;
+    s_VisionComponent->EnableAutoExposure(true);
+    s_VisionComponent->EnableWhiteBalance(true);
+    LOG_INFO("VisionComponent.ClearManualCameraControlLock", "Lock cleared; AE+WB re-enabled");
+  }
+  CONSOLE_FUNC(ClearManualCameraControlLock, "Vision.PreProcessing");
+
   namespace JsonKey
   {
     const char * const ImageQualityGroup = "ImageQuality";
@@ -1311,6 +1353,13 @@ namespace Vector {
       // Even though the vision system is paused, it is possible that we
       // are just finishing processing an image and don't want to send
       // auto exposure and white balance messages to the camera
+      return RESULT_OK;
+    }
+
+    // Session B: while manual lock is held, do not push AE/WB from vision results
+    // (VSM may still schedule those modes from JSON defaults after EnableMode(false)).
+    if(kManualCameraControlLock)
+    {
       return RESULT_OK;
     }
 
