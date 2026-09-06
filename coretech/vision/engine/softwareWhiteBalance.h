@@ -26,8 +26,18 @@ public:
   static void SetGains(f32 r, f32 g, f32 b);
   static void GetGains(f32& r, f32& g, f32& b);
 
-  // Saturating channel multiply. No-op if disabled or all gains ~1.
+  // Saturating channel multiply. No-op if disabled, ScopedIdentity active, or all gains ~1.
   static void ApplyToImage(ImageRGB& rgb);
+
+  // While in scope, ApplyToImage is a no-op (for uncorrected AE/WB stats).
+  class ScopedIdentity
+  {
+  public:
+    ScopedIdentity();
+    ~ScopedIdentity();
+    ScopedIdentity(const ScopedIdentity&) = delete;
+    ScopedIdentity& operator=(const ScopedIdentity&) = delete;
+  };
 };
 
 } // namespace Vision

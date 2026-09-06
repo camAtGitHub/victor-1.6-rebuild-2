@@ -88,6 +88,9 @@ public:
   const Image&    GetGray(ImageCacheSize size = GetDefaultImageCacheSize(), GetType* getType = nullptr);
   const ImageRGB& GetRGB(ImageCacheSize size  = GetDefaultImageCacheSize(), GetType* getType = nullptr);
 
+  // Drop cached RGB for a size so the next GetRGB re-debayers (e.g. software-WB stats).
+  void InvalidateRGB(ImageCacheSize size = GetDefaultImageCacheSize());
+
   const ImageBuffer& GetBuffer() const { return _buffer; }
   
 private:
@@ -124,6 +127,7 @@ private:
     }
     
     void Invalidate() { _hasValidGray = false; _hasValidRGB = false; _buffer.Invalidate(); }
+    void InvalidateRGB() { _hasValidRGB = false; }
     
     template<class ImageType>
     ImageType& Get();

@@ -99,6 +99,9 @@ public:
   const CameraParams& GetNextCameraParams() const { return _currentCameraParams; }
   ImageQuality GetImageQuality() const { return _imageQuality; }
 
+  // Well-exposed pixels counted in last ComputeExposureAndWhiteBalance (subsampled).
+  s32 GetLastWellExposedCount() const { return _lastWellExposedCount; }
+
   // Whether we've reached the end of the cycle of exposure values to try
   // In the following call to cycling exposure, the first value will be picked
   bool IsExposureCyclingComplete() const { return (_cycleTargetIter == _cyclingTargetValues.end()); }
@@ -115,6 +118,7 @@ private:
   // These are the camera parameters / image quality based on last update
   CameraParams _currentCameraParams;
   ImageQuality _imageQuality = ImageQuality::Good;
+  s32 _lastWellExposedCount = 0;
   
   // These are configurable parameters controlling how auto exposure and white
   // balancing are done

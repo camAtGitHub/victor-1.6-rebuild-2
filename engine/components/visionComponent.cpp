@@ -136,6 +136,8 @@ namespace Vector {
   CONSOLE_FUNC(ResetGamma, "Vision.Debayer");
 
   // Session B: DebayerBypassBlackLevel is CONSOLE_VAR'd in neon/raw10.cpp (same lib as the helper).
+  // Phase 3: defined in visionSystem.cpp — pin VicOS AWB to 1,1,1 when auto software WB is on.
+  CONSOLE_VAR_EXTERN(bool, kSoftwareWBAuto);
 
   // Session B: command WB triples via ApplyManualWhiteBalance (sliders alone do not hit VicOS).
   CONSOLE_VAR_RANGED(f32, kManualWB_R, "Vision.PreProcessing", 1.f, 0.25f, 3.8f);
@@ -1392,9 +1394,17 @@ namespace Vector {
       const bool isWhiteBalanceEnabled = procResult.modesProcessed.Contains(VisionMode::WhiteBalance);
       if(isWhiteBalanceEnabled)
       {
-        cameraService->CameraSetWhiteBalanceParameters(params.whiteBalanceGainR,
-                                                       params.whiteBalanceGainG,
-                                                       params.whiteBalanceGainB);
+        // Software auto WB: colour is in-engine multiply; never send estimated gains to VicOS.
+        if(kSoftwareWBAuto)
+        {
+          cameraService->CameraSetWhiteBalanceParameters(1.f, 1.f, 1.f);
+        }
+        else
+        {
+          cameraService->CameraSetWhiteBalanceParameters(params.whiteBalanceGainR,
+                                                         params.whiteBalanceGainG,
+                                                         params.whiteBalanceGainB);
+        }
       }
 
       const bool isAutoExposureEnabled = procResult.modesProcessed.Contains(VisionMode::AutoExp);

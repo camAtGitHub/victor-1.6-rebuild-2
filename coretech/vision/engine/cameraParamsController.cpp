@@ -728,13 +728,12 @@ Result CameraParamsController::ComputeExposureAndWhiteBalance(const Vision::Imag
 {
   _hist.Reset();
   
-  // Calculate the sum for each of the three color channels for use in white balancing
-  // Note: we technically care about averages, but since we are just using ratios of the different channels
-  //       below, the divisor cancels out, so we can just use sums for better efficiency. This also means
-  //       we don't have to worry about tracking the number of [sub-sampled] well-exposed pixels.
+  // Calculate the sum for each of the three color channels for use in white balancing.
+  // Ratios cancel the pixel count, but we still track well-exposed count for software-WB hold-last-good.
   s32 sumR = 0;
   s32 sumG = 0;
   s32 sumB = 0;
+  _lastWellExposedCount = 0;
   
   Vision::Image weights;
   const bool haveWeights = GetMeteringWeightMask(img.GetNumRows(), img.GetNumCols(), weights);
@@ -760,6 +759,7 @@ Result CameraParamsController::ComputeExposureAndWhiteBalance(const Vision::Imag
         sumR += pixel.r();
         sumG += pixel.g();
         sumB += pixel.b();
+        ++_lastWellExposedCount;
       }
       
       // Use green channel for brightness statistics to compute exposure adjustment

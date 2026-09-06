@@ -247,7 +247,8 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 | `docs/mapping/GLOSSARY.md` | ~130 repo terms |
 | `docs/mapping/CAMERA-HW-V1-V2.md` | Camera 1.0 vs Whiskey vs Xray/2.0; AWB rails; Session B VicOS ignore; software WB after debayer |
 | `docs/mapping/CAMERA-SESSION-B-PLAN.md` | Session B plan + protocol: bypass + manual WB Apply/lock |
-| `docs/mapping/CAMERA-SOFTWARE-WB-PLAN.md` | In-engine software WB: Phases 1–2 implemented (manual RGB multiply); Phase 3 auto gated on robot colour A/B |
+| `docs/mapping/CAMERA-SOFTWARE-WB-PLAN.md` | In-engine software WB Phases 1–2 (manual RGB multiply) |
+| `docs/mapping/CAMERA-SOFTWARE-WB-PHASE3-PLAN.md` | Phase 3 auto + Xray Viz RGB2BGR fix (vizManager) |
 | `docs/mapping/IDEA-backpack-lights-flags.md` | Idea: Anki lights flag + customBackpackLights folder + Wired option |
 | `docs/mapping/IDEA-personality-packs.md` | Idea: selectable JSON freeplay personality packs (+ voice activate) |
 | `docs/mapping/IDEA-custom-firmware-vibe-brainstorm.md` | Ideation: 8 wild firmware personas / Soul Profile spine (wiki character lens) |
@@ -391,7 +392,10 @@ if you ran out of context mid-folder, say so here.
 | 2026-09-06 | Grok | **Session A live** on `192.168.50.189`: gamma 1.7 darker / 2.5 brighter (confirms `1/G`); `UnderExposedThreshold=0` no AWB/green change; rail 66/3.8/AWB3.8. Logged in `CAMERA-HW-V1-V2.md` §7. | Session B when ready: 1 deploy with black-level bypass + manual WB. |
 | 2026-09-06 | Grok | **Session B instrumentation implemented** (no flash yet): `DebayerBypassBlackLevel`; `ManualWB_R/G/B` + `ApplyManualWhiteBalance` + lock/Clear; cvcatalog shard; plan `CAMERA-SESSION-B-PLAN.md`. | User rebuild/deploy; run B0–B3 on `192.168.50.189`. |
 | 2026-09-06 | Grok | **Session B live:** bypass = no visible change; Apply WB updates overlay through extremes (3.8/1/0.25, 0.25/1/3.8) but **image colour unchanged** → VicOS AWB not applied. Logged in `CAMERA-HW-V1-V2.md` §7. | Next fix path: software WB in this repo and/or VicOS daemon (prebuilt). |
+| 2026-09-06 | Grok | **Session C live (software WB):** T0 identity OK; T1 `(2,1,1)` → hella **blue**; T2 `(1,1,2)` → very **red**. Multiply works; **R/B labels swapped** vs perception. | Fix R/B map in Apply `SetGains`; re-A/B; then Phase 3 auto. |
+| 2026-09-06 | Grok | **Phase 3 + R/B display fix:** Xray always `COLOR_RGB2BGR` (vizManager); MirrorMode unswap; `ScopedIdentity`+`InvalidateRGB`; `SoftwareWBAuto` (default off) + hold/rails; HAL pin 1,1,1. | Flash; re-A/B T1 red/T2 blue; then enable `SoftwareWBAuto`. |
 | 2026-09-06 | Grok | **Software WB Phases 1–2 implemented** (`SoftwareWhiteBalance` after `GetRGBFromBAYER`; Apply pins daemon AWB 1,1,1 and multiplies pixels). **Phase 4 docs:** plan `CAMERA-SOFTWARE-WB-PLAN.md`, `CAMERA-HW-V1-V2.md` §7–§8, cvcatalog Apply/Clear/ManualWB blurbs, AGENTS landmark + quick answer. | On-robot Phase 2 colour A/B; Phase 3 auto gated on pass. |
+| 2026-09-06 | Grok | **Phase 3 + R/B display fix:** Xray always `COLOR_RGB2BGR` (vizManager); MirrorMode unswap; `ScopedIdentity`+`InvalidateRGB`; `SoftwareWBAuto` (default off) + hold/rails; HAL pin 1,1,1. | Flash; re-A/B T1 red/T2 blue via vizManager; then enable `SoftwareWBAuto`. |
 
 ---
 

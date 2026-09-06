@@ -288,7 +288,7 @@ Same dark scene. `DebayerBypassBlackLevel` / `ApplyManualWhiteBalance` / lock co
 
 **Still open:** residual darkness root (sensor/optics/analog gain curve); optional max exp/gain honour (Phase 2b not built); PHOTO vs NEON parity tooling.
 
-### Software WB — Phases 1–2 implemented (on-robot colour A/B pending)
+### Software WB — Phases 1–2 implemented
 
 Plan: [`CAMERA-SOFTWARE-WB-PLAN.md`](CAMERA-SOFTWARE-WB-PLAN.md).
 
@@ -297,6 +297,21 @@ Plan: [`CAMERA-SOFTWARE-WB-PLAN.md`](CAMERA-SOFTWARE-WB-PLAN.md).
 1. Keeps engine/overlay `CameraParams` at ManualWB_R/G/B (overlay still shows the commanded triple).
 2. Pins VicOS `CameraSetWhiteBalanceParameters(1, 1, 1)` so daemon AWB cannot double-apply if it ever starts honouring gains.
 3. `SoftwareWhiteBalance::SetGains` + `SetEnabled(true)` — saturating per-channel multiply at the end of `ImageBuffer::GetRGBFromBAYER` (after successful `Debayer::Invoke`). Default disabled / identity until Apply.
+
+### Session C live results (2026-09-06) — software WB flash
+
+| Step | Apply | Overlay | Image |
+|---|---|---|---|
+| S0 | SW WB off | 3.8 / 1 / 3.8 · 66 · 3.8 | Baseline green/dark |
+| T0 | **(1,1,1)** + lock | 1 / 1 / 1 | **Same as baseline** |
+| T1 | **(2,1,1)** | 2 / 1 / 1 | **Hella blue** (expected warmer) |
+| T2 | **(1,1,2)** | 1 / 1 / 2 | **Very red** |
+| Clear | SW WB off | — | restored |
+
+**Closed:** Software multiply **works** (colour changes; Session B did not).  
+**Bug (Session C):** `ManualWB_R` looked blue — Xray `ConvertToShowableFormat` skipped `COLOR_RGB2BGR` (vizManager JPEG). **Fix landed:** always RGB2BGR; MirrorMode uses non-swap pack. Re-A/B T1/T2 on next flash before `SoftwareWBAuto`.
+
+**Phase 3:** `SoftwareWBAuto` (default false) — in-engine gray-world, VicOS pinned 1,1,1, hold on TooDark/low well-exposed, rails Min/MaxGain. Plan: `CAMERA-SOFTWARE-WB-PHASE3-PLAN.md`.
 
 `ClearManualCameraControlLock` disables software WB (gains 1,1,1) and re-enables AutoExp/WhiteBalance.
 

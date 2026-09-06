@@ -26,6 +26,7 @@ namespace {
   f32  s_gainR = 1.f;
   f32  s_gainG = 1.f;
   f32  s_gainB = 1.f;
+  int  s_identityDepth = 0;
 }
 
 void SoftwareWhiteBalance::SetEnabled(bool enabled)
@@ -56,6 +57,20 @@ void SoftwareWhiteBalance::GetGains(f32& r, f32& g, f32& b)
   b = s_gainB;
 }
 
+SoftwareWhiteBalance::ScopedIdentity::ScopedIdentity()
+{
+  std::lock_guard<std::mutex> lock(s_mutex);
+  ++s_identityDepth;
+}
+
+SoftwareWhiteBalance::ScopedIdentity::~ScopedIdentity()
+{
+  std::lock_guard<std::mutex> lock(s_mutex);
+  if(s_identityDepth > 0) {
+    --s_identityDepth;
+  }
+}
+
 void SoftwareWhiteBalance::ApplyToImage(ImageRGB& rgb)
 {
   f32 gainR = 1.f;
@@ -63,7 +78,8 @@ void SoftwareWhiteBalance::ApplyToImage(ImageRGB& rgb)
   f32 gainB = 1.f;
   {
     std::lock_guard<std::mutex> lock(s_mutex);
-    if(!s_enabled ||
+    if(s_identityDepth > 0 ||
+       !s_enabled ||
        (Util::IsFltNear(s_gainR, 1.f) &&
         Util::IsFltNear(s_gainG, 1.f) &&
         Util::IsFltNear(s_gainB, 1.f)))

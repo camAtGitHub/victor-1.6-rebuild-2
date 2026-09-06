@@ -46,6 +46,7 @@
 #include "coretech/vision/engine/markerDetector.h"
 #include "coretech/vision/engine/neuralNetRunner.h"
 #include "coretech/vision/engine/petTracker.h"
+#include "coretech/vision/engine/softwareWhiteBalance.h"
 
 #include "clad/vizInterface/messageViz.h"
 #include "clad/robotInterface/messageEngineToRobot.h"
@@ -99,6 +100,13 @@ CONSOLE_VAR(bool, kMarkerDetector_VizCropScheduler, "Vision.MarkerDetection", fa
   
 // How long to disable auto exposure after using detections to meter
 CONSOLE_VAR(u32, kMeteringHoldTime_ms,    "Vision.PreProcessing", 2000);
+
+// Software WB auto (Phase 3): gray-world gains applied in-engine; VicOS AWB pinned to 1,1,1.
+// Default false — enable after on-robot R/B display fix A/B (Session C).
+CONSOLE_VAR(bool, kSoftwareWBAuto, "Vision.PreProcessing", false);
+CONSOLE_VAR(u32,  kSoftwareWBMinWellExposed, "Vision.PreProcessing", 100);
+CONSOLE_VAR_RANGED(f32, kSoftwareWBMinGain, "Vision.PreProcessing", 0.5f, 0.25f, 3.8f);
+CONSOLE_VAR_RANGED(f32, kSoftwareWBMaxGain, "Vision.PreProcessing", 2.5f, 0.25f, 3.8f);
   
 // Loose constraints on how fast Cozmo can move and still trust tracker (which has no
 // knowledge of or access to camera movement). Rough means of deciding these angles:
@@ -629,10 +637,82 @@ Result VisionSystem::UpdateCameraParams(Vision::ImageCache& imageCache)
   
   Vision::CameraParams nextParams;
   Result expResult = RESULT_FAIL;
+
+  // Rising/falling edge for software-WB auto (reset gains; do not inherit railed 3.8).
+  {
+    static bool s_prevSoftwareWBAuto = false;
+    if(kSoftwareWBAuto && !s_prevSoftwareWBAuto)
+    {
+      Vision::CameraParams resetParams = GetCurrentCameraParams();
+      resetParams.whiteBalanceGainR = 1.f;
+      resetParams.whiteBalanceGainG = 1.f;
+      resetParams.whiteBalanceGainB = 1.f;
+      SetNextCameraParams(resetParams);
+      Vision::SoftwareWhiteBalance::SetGains(1.f, 1.f, 1.f);
+      Vision::SoftwareWhiteBalance::SetEnabled(true);
+      PRINT_CH_INFO("VisionSystem", "VisionSystem.SoftwareWBAuto.Enabled",
+                    "Reset WB to 1,1,1; in-engine multiply on");
+    }
+    else if(!kSoftwareWBAuto && s_prevSoftwareWBAuto)
+    {
+      Vision::SoftwareWhiteBalance::SetEnabled(false);
+      Vision::SoftwareWhiteBalance::SetGains(1.f, 1.f, 1.f);
+      PRINT_CH_INFO("VisionSystem", "VisionSystem.SoftwareWBAuto.Disabled", "");
+    }
+    s_prevSoftwareWBAuto = kSoftwareWBAuto;
+  }
+
   if(imageCache.HasColor())
   {
-    const Vision::ImageRGB& inputImage = imageCache.GetRGB();
-    expResult = _cameraParamsController->ComputeNextCameraParams(inputImage, aeMode, wbMode, useCycling, nextParams);
+    if(kSoftwareWBAuto && (wbMode != Vision::CameraParamsController::WhiteBalanceMode::Off))
+    {
+      // Uncorrected Half RGB for gray-world (ScopedIdentity + drop cache + re-debayer).
+      const Vision::ImageCacheSize statsSize = Vision::ImageCache::GetDefaultImageCacheSize();
+      Vision::ImageRGB const* inputImagePtr = nullptr;
+      {
+        Vision::SoftwareWhiteBalance::ScopedIdentity identityScope;
+        imageCache.InvalidateRGB(statsSize);
+        inputImagePtr = &imageCache.GetRGB(statsSize);
+      }
+      expResult = _cameraParamsController->ComputeNextCameraParams(*inputImagePtr, aeMode, wbMode,
+                                                                   useCycling, nextParams);
+
+      if(RESULT_OK == expResult)
+      {
+        const bool tooDark = (_cameraParamsController->GetImageQuality() == Vision::ImageQuality::TooDark);
+        const bool starved = (_cameraParamsController->GetLastWellExposedCount() <
+                              (s32)kSoftwareWBMinWellExposed);
+        if(tooDark || starved)
+        {
+          // Hold last-good software gains (do not walk to the rail).
+          const Vision::CameraParams cur = GetCurrentCameraParams();
+          nextParams.whiteBalanceGainR = cur.whiteBalanceGainR;
+          nextParams.whiteBalanceGainG = cur.whiteBalanceGainG;
+          nextParams.whiteBalanceGainB = cur.whiteBalanceGainB;
+        }
+        else
+        {
+          nextParams.whiteBalanceGainR = Util::Clamp(nextParams.whiteBalanceGainR,
+                                                     kSoftwareWBMinGain, kSoftwareWBMaxGain);
+          nextParams.whiteBalanceGainB = Util::Clamp(nextParams.whiteBalanceGainB,
+                                                     kSoftwareWBMinGain, kSoftwareWBMaxGain);
+          nextParams.whiteBalanceGainG = 1.f;
+        }
+
+        Vision::SoftwareWhiteBalance::SetGains(nextParams.whiteBalanceGainR,
+                                               nextParams.whiteBalanceGainG,
+                                               nextParams.whiteBalanceGainB);
+        Vision::SoftwareWhiteBalance::SetEnabled(true);
+        // Re-debayer with new gains so Viz (later in Update) sees corrected colour.
+        imageCache.InvalidateRGB(statsSize);
+        (void)imageCache.GetRGB(statsSize);
+      }
+    }
+    else
+    {
+      const Vision::ImageRGB& inputImage = imageCache.GetRGB();
+      expResult = _cameraParamsController->ComputeNextCameraParams(inputImage, aeMode, wbMode, useCycling, nextParams);
+    }
   }
   else
   {

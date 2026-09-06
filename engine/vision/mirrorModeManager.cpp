@@ -290,11 +290,9 @@ Result MirrorModeManager::CreateMirrorModeImage(const Vision::ImageRGB& cameraIm
     }
   }
   
-  if (IsXray()) {
-    visionProcResult.mirrorModeImg.SetFromImageRGB2BGR(_screenImg, _gammaLUT);
-  } else {
-    visionProcResult.mirrorModeImg.SetFromImageRGB(_screenImg, _gammaLUT);
-  }
+  // Always pack RGB565 without R/B swap. Xray previously used SetFromImageRGB2BGR,
+  // which inverted channels vs non-Xray (Session C ManualWB_R looked blue on Viz).
+  visionProcResult.mirrorModeImg.SetFromImageRGB(_screenImg, _gammaLUT);
 
   return RESULT_OK;
 }

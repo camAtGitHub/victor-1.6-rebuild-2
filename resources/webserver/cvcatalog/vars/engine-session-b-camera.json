@@ -69,6 +69,40 @@
       "category": "Vision.PreProcessing",
       "status": "live",
       "tags": ["vision", "console-func", "session-b", "software-wb"]
+    },
+    "SoftwareWBAuto": {
+      "process": "engine",
+      "blurb": "When true, gray-world WB gains are applied in-engine (SoftwareWhiteBalance) and VicOS AWB is pinned to 1,1,1. Default false. Enable only after R/B display fix A/B (ManualWB_R should look red in vizManager).",
+      "detail": "VisionSystem::UpdateCameraParams: ScopedIdentity + InvalidateRGB for uncorrected stats; hold-last-good on TooDark or low well-exposed count; clamp to SoftwareWBMinGain/MaxGain. Manual Apply lock still overrides.",
+      "howTo": "1) Confirm ManualWB T1 red / T2 blue after display fix flash. 2) Clear manual lock. 3) Set SoftwareWBAuto true. 4) Well-lit then dark scenes — gains should not slam 3.8 in the dark.",
+      "related": ["SoftwareWBMinWellExposed", "SoftwareWBMinGain", "SoftwareWBMaxGain", "WhiteBalance", "ApplyManualWhiteBalance"],
+      "category": "Vision.PreProcessing",
+      "status": "live",
+      "tags": ["vision", "whitebalance", "software-wb", "phase3"]
+    },
+    "SoftwareWBMinWellExposed": {
+      "process": "engine",
+      "blurb": "Minimum well-exposed subsampled pixels required to update auto software WB (default 100). Below this, hold last gains.",
+      "category": "Vision.PreProcessing",
+      "related": ["SoftwareWBAuto"],
+      "status": "live",
+      "tags": ["vision", "software-wb", "phase3"]
+    },
+    "SoftwareWBMinGain": {
+      "process": "engine",
+      "blurb": "Min clamp for auto software WB R/B gains (default 0.5). Not the analog 0.25–3.8 rail.",
+      "category": "Vision.PreProcessing",
+      "related": ["SoftwareWBAuto", "SoftwareWBMaxGain"],
+      "status": "live",
+      "tags": ["vision", "software-wb", "phase3"]
+    },
+    "SoftwareWBMaxGain": {
+      "process": "engine",
+      "blurb": "Max clamp for auto software WB R/B gains (default 2.5). Avoids slamming the old 3.8 analog rail.",
+      "category": "Vision.PreProcessing",
+      "related": ["SoftwareWBAuto", "SoftwareWBMinGain"],
+      "status": "live",
+      "tags": ["vision", "software-wb", "phase3"]
     }
   }
 }

@@ -391,6 +391,15 @@ const ImageRGB& ImageCache::GetRGB(ImageCacheSize size, GetType* getType)
   return imgRGB;
 }
 
+void ImageCache::InvalidateRGB(ImageCacheSize size)
+{
+  auto iter = _resizedVersions.find(size);
+  if(iter != _resizedVersions.end())
+  {
+    iter->second.InvalidateRGB();
+  }
+}
+
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 template<class ImageType>
 static inline bool IsRequestingColor() {

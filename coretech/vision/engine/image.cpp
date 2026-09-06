@@ -29,7 +29,6 @@
 #endif
 
 #include <fstream>
-#include "anki/cozmo/shared/factory/emrHelper.h"
 
 namespace {
 
@@ -1987,11 +1986,9 @@ namespace Vision {
   }
 
   void ImageRGB::ConvertToShowableFormat(cv::Mat& showImg) const {
-    if (Vector::IsXray()) {
-      this->get_CvMat_().copyTo(showImg);
-    } else {
-      cv::cvtColor(this->get_CvMat_(), showImg, cv::COLOR_RGB2BGR);
-    }
+    // Xray previously skipped RGB2BGR which made Viz/JPEG treat RGB as BGR
+    // (Session C ManualWB_R looked blue). Always convert like the non-Xray path.
+    cv::cvtColor(this->get_CvMat_(), showImg, cv::COLOR_RGB2BGR);
   }
 
   void ImageRGB::SetFromShowableFormat(const cv::Mat& showImg) {
