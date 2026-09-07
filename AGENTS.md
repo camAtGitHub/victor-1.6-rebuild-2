@@ -346,7 +346,7 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 - **Which parts are rebuild-specific vs. stock Anki 1.6?** — `CHANGES.md`. Observed: wirepod
   cloud, anim 16 ms, platform OTA/diagnostics notes. Upstream `docs/` = stock 1.6.
 - **Version pins** — `VERSION` = `1.6.1`; `VICTOR_COMPAT_VERSION` = `210`.
-- **Camera 1.0 vs 2.0 / low light?** — **Xray** (`HW_VER` ≥ `0x20`): different camera; Whiskey ≠ camera. Gamma is **`x^(1/G)`**. VicOS AWB **ignored** (Session B). **Manual** software WB works; vizManager R/B **fixed** (Session D). **`SoftwareWBAuto` leave false** until Session E — v1 stuck at max R=B (purple); **walk-down fix in tree** (absolute integrator + slew), awaiting flash/robot. Map: `CAMERA-HW-V1-V2.md` Status; plans: `CAMERA-SOFTWARE-WB-PLAN.md`, `CAMERA-SOFTWARE-WB-PHASE3-PLAN.md`, `CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md`.
+- **Camera 1.0 vs 2.0 / low light?** — **Xray** (`HW_VER` ≥ `0x20`): different camera; Whiskey ≠ camera. Gamma is **`x^(1/G)`**. VicOS AWB **ignored** (Session B). **Manual** software WB works. **Xray Viz display:** keep pre-`17ecb816` showable path (no forced RGB2BGR — that swapped the scene); ManualWB uses `SetGains(B,G,R)` for perceived-red. **`SoftwareWBAuto` leave false** until Session E (walk-down fix in tree). Map: `CAMERA-HW-V1-V2.md` Status.
 - **Glossary / indexes** — `docs/mapping/GLOSSARY.md`, `UPSTREAM-DOCS-INDEX.md`, `HIGH-LEVEL.md`.
 - **Custom firmware north star (ideation)?** — **Kinetic Familiar** — saved charter
   `docs/mapping/KINETIC-FAMILIAR.md` (name + goal/intent locked; what’s-first TBD). Hermit/night-lock
