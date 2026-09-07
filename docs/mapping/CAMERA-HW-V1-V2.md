@@ -1,32 +1,32 @@
 # Camera hardware: Vector 1.0 vs 2.0 (low light / AWB)
 
 **Path:** `docs/mapping/CAMERA-HW-V1-V2.md`  
-**Mapped:** 2026-08-23; **revised:** 2026-09-07 (Sessions A–D on-robot; software WB + Phase 3 auto v1; walk-down fix in tree, awaiting Session E)  
-**Awaiting:** flash + Session E (walk-down fix landed 2026-09-07 — see **Status**)  
-**Confidence:** high (gamma `1/G`, Session B VicOS AWB ignore, manual software multiply, vizManager R/B after RGB2BGR); medium (auto walk-down fix in tree, untested on-robot); low (sensor QE / “smaller pixels”)  
+**Mapped:** 2026-08-23; **revised:** 2026-09-07 (Sessions A–D; software WB; walk-down fix; **Xray display RGB2BGR reverted**)  
+**Awaiting:** flash — verify natural colours with SW WB off; then ManualWB mapping; then Session E auto  
+**Confidence:** high (gamma `1/G`, Session B VicOS ignore, manual multiply); medium (auto walk-down untested; ManualWB B,G,R mapping after display restore); low (sensor QE)  
 **Upstream docs:** [`docs/architecture/whats_in_victor.md`](../architecture/whats_in_victor.md), [`docs/architecture/visionSystem.md`](../architecture/visionSystem.md).  
 **Related plans:** [`CAMERA-SESSION-B-PLAN.md`](CAMERA-SESSION-B-PLAN.md), [`CAMERA-SOFTWARE-WB-PLAN.md`](CAMERA-SOFTWARE-WB-PLAN.md), [`CAMERA-SOFTWARE-WB-PHASE3-PLAN.md`](CAMERA-SOFTWARE-WB-PHASE3-PLAN.md), [`CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md`](CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md). Catalog: `engine-session-b-camera.json`.
 
 How the three head revisions differ in **camera** code, why 2.0 looks grainy green-gray in the dark, and which console/config knobs exist.
 
-### Status (2026-09-07 — walk-down fix in tree; awaiting Session E)
+### Status (2026-09-07 — Xray display restored; walk-down awaiting flash)
 
 | Area | State |
 |---|---|
 | Gamma | Confirmed `x^(1/G)` — do not lower to “fix” darkness (Session A) |
 | VicOS `camera_set_awb` | **Ignored** for pixels (Session B) — colour must be in-engine |
 | Black-level bypass | No visible change in dark test scene (Session B) |
-| Manual software WB | **Works** — Apply multiplies RGB after debayer; lock still **gates auto** |
-| vizManager R/B | **Fixed** — Xray always `COLOR_RGB2BGR` (Session D T1 red / T2 blue) |
-| `SoftwareWBAuto` v1 | **FAIL** (Session D) — hits max R=B rail (purple), stuck when lit. Left default **false**. |
-| Walk-down fix | **Landed in tree, not yet flashed** — absolute gray-world (controller WB=`1,1,1` each tick); `SoftwareWBMaxChangeFraction` default **0.15**; `SoftwareWBMaxGain` default **1.5**; auto still default **false**; manual Apply lock gates auto. Plan: [`CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md`](CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md). |
-| Robot console | Leave `SoftwareWBAuto=false` until Session E pass |
+| Xray Viz / MirrorMode display | **Restored** pre-`17ecb816` branches (copy without RGB2BGR; `SetFromImageRGB2BGR`). Forcing RGB2BGR swapped the whole scene (yellow↔cyan). Session C “ManualWB_R→blue” was a **control mapping** issue, not proof Viz was wrong. |
+| Manual software WB | Apply multiplies after debayer; **`SetGains(ManualWB_B, G, ManualWB_R)`** so red control matches perceived red under Xray display order; lock gates auto |
+| `SoftwareWBAuto` v1 | **FAIL** on old flash (Session D). Walk-down fix **in tree** (absolute integrator + slew + lock gate) — re-test as Session E **after** colour sanity |
+| Robot console | Leave `SoftwareWBAuto=false` until Session E |
 
-**Next (priority):**
+**Next (priority) — one flash, this order:**
 
-1. **Flash this tree** and run **Session E** (vizManager): well-lit overlay R/B **settle below** MaxGain rail; dark→bright **walk-down**. Protocol in AUTO-FIX plan Phase 3 and §7 Session E below.  
-2. Optional: tune MaxGain / MaxChangeFraction live after Session E (no rebuild).  
-3. Parked: night brightness lift, black-level calib, PHOTO/NEON parity, VicOS daemon, denoise.
+1. **SW WB off or Apply (1,1,1)** — real red/green/blue objects look natural again (not yellow↔cyan).  
+2. **ManualWB_R=2** → warmer/red; **ManualWB_B=2** → cooler/blue (mapping check).  
+3. **Session E** auto walk-down (well-lit settle; dark→bright).  
+4. Parked: night brightness, black-level calib, VicOS, denoise.
 
 Test UI: **vizManager** (JPEG via `ConvertToShowableFormat`). Robot used: `192.168.50.189:8888`.
 
