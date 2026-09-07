@@ -123,9 +123,9 @@
     },
     "NightDebayerGamma": {
       "process": "engine",
-      "blurb": "Debayer gamma (console G in x^(1/G)) applied on NightGammaAuto enter when AE is pegged at max exp and max gain. Default 2.5 (Session A: brighter than daytime 2.1). Range 0.1–4. Slider does not rebuild the LUT until the next enter edge.",
+      "blurb": "Debayer gamma (console G in x^(1/G)) applied on NightGammaAuto enter when AE is pegged at max exp and max gain. Default **3.0** (on-robot soak: brighter than 2.5; grain OK). Range 0.1–4. Slider does not rebuild the LUT until the next enter edge.",
       "detail": "Same units as DebayerGamma. Higher G brightens (LUT is x^(1/G)). Only used when NightGammaAuto is on and AE is at the 66 ms / 3.8 rail. Changing this while already in night mode does not call SetGamma again — toggle NightGammaAuto or wait for unpeg/re-peg. Exit restores DebayerGamma, not this value.",
-      "howTo": "With NightGammaAuto true and AE pegged: 2.5 is the Session A night soak; 3.0 is brighter/grainier. To apply a new value after already entered, set NightGammaAuto false then true, or unpeg and re-peg.",
+      "howTo": "With NightGammaAuto true and AE pegged: 3.0 is the tuned night default. To apply a new value after already entered, set NightGammaAuto false then true, or unpeg and re-peg.",
       "category": "Vision.Debayer",
       "requires": ["NightGammaAuto"],
       "related": ["NightGammaAuto", "NightGammaExitHysteresisFrames", "DebayerGamma", "ResetGamma"],

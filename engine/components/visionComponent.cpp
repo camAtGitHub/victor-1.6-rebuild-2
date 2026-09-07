@@ -139,7 +139,7 @@ namespace Vector {
   // Night brightness: raise Debayer gamma while AE is pegged at max exp AND gain.
   // Default false until on-robot Session F. SetGamma only on enter/exit edges.
   CONSOLE_VAR(bool, kNightGammaAuto, "Vision.Debayer", false);
-  CONSOLE_VAR_RANGED(f32, kNightDebayerGamma, "Vision.Debayer", 2.5f, 0.1f, 4.f);
+  CONSOLE_VAR_RANGED(f32, kNightDebayerGamma, "Vision.Debayer", 3.0f, 0.1f, 4.f);
   CONSOLE_VAR(u32, kNightGammaExitHysteresisFrames, "Vision.Debayer", 15);
 
   // Session B: DebayerBypassBlackLevel is CONSOLE_VAR'd in neon/raw10.cpp (same lib as the helper).

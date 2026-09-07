@@ -72,9 +72,9 @@
     },
     "SoftwareWBAuto": {
       "process": "engine",
-      "blurb": "When true, gray-world WB gains are applied in-engine (SoftwareWhiteBalance) and VicOS AWB is pinned to 1,1,1. Default false. Enable only after R/B display fix A/B (ManualWB_R should look red in vizManager).",
-      "detail": "VisionSystem::UpdateCameraParams: absolute gray-world (controller cur WB reset to 1,1,1 each tick); ScopedIdentity + InvalidateRGB for uncorrected stats; hold-last-good via GetGains on TooDark or low well-exposed count; clamp to SoftwareWBMinGain/MaxGain; optional SoftwareWBMaxChangeFraction slew. Manual Apply lock still overrides.",
-      "howTo": "1) Confirm ManualWB T1 red / T2 blue after display fix flash. 2) Clear manual lock. 3) Set SoftwareWBAuto true. 4) Well-lit: overlay R/B should sit below MaxGain and walk down when brighter.",
+      "blurb": "When true, gray-world WB gains are applied in-engine (SoftwareWhiteBalance) and VicOS AWB is pinned to 1,1,1. Default **true on Xray** (Vector 2.0, Session E pass); false on 1.0/Whiskey.",
+      "detail": "VisionSystem::UpdateCameraParams: absolute gray-world (controller cur WB reset to 1,1,1 each tick); ScopedIdentity + InvalidateRGB for uncorrected stats; hold-last-good via GetGains on TooDark or low well-exposed count; clamp to SoftwareWBMinGain/MaxGain; optional SoftwareWBMaxChangeFraction slew. Manual Apply lock still overrides. CONSOLE_VAR default is IsXray().",
+      "howTo": "On Xray boots enabled. To disable: set SoftwareWBAuto false. Manual Apply still overrides while lock is held.",
       "related": ["SoftwareWBMinWellExposed", "SoftwareWBMinGain", "SoftwareWBMaxGain", "SoftwareWBMaxChangeFraction", "WhiteBalance", "ApplyManualWhiteBalance"],
       "category": "Vision.PreProcessing",
       "status": "live",

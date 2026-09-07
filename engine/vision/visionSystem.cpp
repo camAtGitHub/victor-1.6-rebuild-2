@@ -102,8 +102,8 @@ CONSOLE_VAR(bool, kMarkerDetector_VizCropScheduler, "Vision.MarkerDetection", fa
 CONSOLE_VAR(u32, kMeteringHoldTime_ms,    "Vision.PreProcessing", 2000);
 
 // Software WB auto (Phase 3): gray-world gains applied in-engine; VicOS AWB pinned to 1,1,1.
-// Default false — enable after on-robot R/B display fix A/B (Session C).
-CONSOLE_VAR(bool, kSoftwareWBAuto, "Vision.PreProcessing", false);
+// Default on for Xray (Vector 2.0) after Session E pass; off for 1.0 / Whiskey.
+CONSOLE_VAR(bool, kSoftwareWBAuto, "Vision.PreProcessing", IsXray());
 CONSOLE_VAR(u32,  kSoftwareWBMinWellExposed, "Vision.PreProcessing", 100);
 CONSOLE_VAR_RANGED(f32, kSoftwareWBMinGain, "Vision.PreProcessing", 0.5f, 0.25f, 3.8f);
 CONSOLE_VAR_RANGED(f32, kSoftwareWBMaxGain, "Vision.PreProcessing", 1.5f, 0.25f, 3.8f);
