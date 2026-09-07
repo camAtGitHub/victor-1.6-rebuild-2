@@ -18,15 +18,20 @@ How the three head revisions differ in **camera** code, why 2.0 looks grainy gre
 | Black-level bypass | No visible change in dark test scene (Session B) |
 | Xray Viz / MirrorMode display | **Restored** pre-`17ecb816` branches (copy without RGB2BGR; `SetFromImageRGB2BGR`). Forcing RGB2BGR swapped the whole scene (yellow↔cyan). Session C “ManualWB_R→blue” was a **control mapping** issue, not proof Viz was wrong. |
 | Manual software WB | Apply multiplies after debayer; **`SetGains(ManualWB_B, G, ManualWB_R)`** so red control matches perceived red under Xray display order; lock gates auto |
-| `SoftwareWBAuto` v1 | **FAIL** on old flash (Session D). Walk-down fix **in tree** (absolute integrator + slew + lock gate) — re-test as Session E **after** colour sanity |
-| Robot console | Leave `SoftwareWBAuto=false` until Session E |
+| `SoftwareWBAuto` | **Session E PASS** — settles below rail (~1.17/1/1.19), kills green cast, gains walk when darkened. Default still **false** in firmware; robot may leave on for soak. |
+| Robot console | Auto currently **true** on test robot after Session E |
 
-**Next (priority) — one flash, this order:**
+**Session E (2026-09-07) — PASS after display restore + walk-down flash:**
 
-1. **SW WB off or Apply (1,1,1)** — real red/green/blue objects look natural again (not yellow↔cyan).  
-2. **ManualWB_R=2** → warmer/red; **ManualWB_B=2** → cooler/blue (mapping check).  
-3. **Session E** auto walk-down (well-lit settle; dark→bright).  
-4. Parked: night brightness, black-level calib, VicOS, denoise.
+| Step | Result |
+|---|---|
+| SW WB off | Natural colours again (slight green baseline); no yellow↔cyan |
+| ManualWB_R=2 | **Very red** (mapping PASS) |
+| ManualWB_B=2 | **Very blue** (mapping PASS) |
+| `SoftwareWBAuto=true` (MaxGain 1.5, MaxChangeFraction 0.15) | Settled **~1.17 / 1 / 1.19** (below rail); colours **much closer to normal, no green** |
+| Darken scene | Gains moved (**~0.996 / … / 1.070**) — **walk-down PASS** |
+
+**Next (optional):** leave auto on if happy; tune MaxGain / MaxChangeFraction live; parked: night brightness, black-level calib, VicOS, denoise.
 
 Test UI: **vizManager** (JPEG via `ConvertToShowableFormat`). Robot used: `192.168.50.189:8888`.
 

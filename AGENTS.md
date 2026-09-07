@@ -346,7 +346,7 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 - **Which parts are rebuild-specific vs. stock Anki 1.6?** — `CHANGES.md`. Observed: wirepod
   cloud, anim 16 ms, platform OTA/diagnostics notes. Upstream `docs/` = stock 1.6.
 - **Version pins** — `VERSION` = `1.6.1`; `VICTOR_COMPAT_VERSION` = `210`.
-- **Camera 1.0 vs 2.0 / low light?** — **Xray** (`HW_VER` ≥ `0x20`): different camera; Whiskey ≠ camera. Gamma is **`x^(1/G)`**. VicOS AWB **ignored** (Session B). **Manual** software WB works. **Xray Viz display:** keep pre-`17ecb816` showable path (no forced RGB2BGR — that swapped the scene); ManualWB uses `SetGains(B,G,R)` for perceived-red. **`SoftwareWBAuto` leave false** until Session E (walk-down fix in tree). Map: `CAMERA-HW-V1-V2.md` Status.
+- **Camera 1.0 vs 2.0 / low light?** — **Xray** (`HW_VER` ≥ `0x20`): different camera; Whiskey ≠ camera. Gamma is **`x^(1/G)`**. VicOS AWB **ignored** (Session B). In-engine software WB: Xray Viz keeps pre-`17ecb816` showable path; ManualWB `SetGains(B,G,R)`. **`SoftwareWBAuto` Session E PASS** (settle ~1.17/1/1.19, walk-down works); firmware default still false. Map: `CAMERA-HW-V1-V2.md` Status.
 - **Glossary / indexes** — `docs/mapping/GLOSSARY.md`, `UPSTREAM-DOCS-INDEX.md`, `HIGH-LEVEL.md`.
 - **Custom firmware north star (ideation)?** — **Kinetic Familiar** — saved charter
   `docs/mapping/KINETIC-FAMILIAR.md` (name + goal/intent locked; what’s-first TBD). Hermit/night-lock
@@ -401,6 +401,7 @@ if you ran out of context mid-folder, say so here.
 | 2026-09-06 | Grok | **Pause camera:** MaxGain 1.3 trial still stuck (milder purple; yellow→blue). Docs Status in `CAMERA-HW-V1-V2.md`; Phase3 plan marked auto-v1 fail; Quick answers updated. `SoftwareWBAuto=false` on robot. | Resume: `/make-plan` or implement auto walk-down/integrator fix. |
 | 2026-09-07 | Grok | **Daytime auto peek:** MaxGain 1.3 → still 1.3/1/1.3, EXP/GAIN 66/3.8; bluer; yellow→blue, cyan→yellow, blue mug→yellow/brown. Auto off. Logged in `CAMERA-HW-V1-V2.md` Session D. | Same next: walk-down/integrator plan when ready. |
 | 2026-09-07 | Grok | **Revert Xray display RGB2BGR** (expert: Session C was label mismatch, not wrong Viz). Restore Xray showable copy + MirrorMode `SetFromImageRGB2BGR`; ManualWB `SetGains(B,G,R)` for perceived-red control. Keep walk-down auto code. | Flash; verify real R/G/B objects with SW WB off/(1,1,1); then ManualWB_R=2 → warmer. |
+| 2026-09-07 | Grok | **Session E PASS:** display natural; ManualWB R→red B→blue; auto settled ~1.17/1/1.19 (no green); darken → gains walked (~0.996…1.070). Logged in `CAMERA-HW-V1-V2.md`. | Optional: leave auto on; tune rails live; or commit docs. |
 | 2026-09-07 | Grok | **Phase 3 docs for auto walk-down fix:** persisted `CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md` (**Implemented**, awaiting Session E); Status + Session E protocol in `CAMERA-HW-V1-V2.md`; Phase3 banner; catalog slew knob already present. No C++ this pass. | Flash + Session E (well-lit settle below rail; dark→bright walk-down). |
 
 ---
