@@ -140,7 +140,7 @@
       "detail": "Category Vision.Debayer. Calls Vision::Debayer::Instance().SetGamma(kDebayerGamma). SetGamma rebuilds the default debayer op map when the gamma actually changes (mutex-protected). DebayerGamma is ranged ~0.1–4 (defaults ~1.7 normal Vector, ~2.1 xray). Affects RAW10→RGB/Y perception images used by engine vision, not the anim process procedural-face gamma (ProcFace_Gamma*). A leftover static s_debayerResetGamma is never read — only this func applies the var.",
       "howTo": "1) Set console var DebayerGamma. 2) Call ResetGamma. 3) Capture/process camera frames and judge brightness/contrast of vision output.",
       "requires": ["DebayerGamma"],
-      "related": [],
+      "related": ["DebayerGamma", "NightGammaAuto", "NightDebayerGamma"],
       "evidence": "engine/components/visionComponent.cpp:129-135; coretech/vision/engine/debayer.cpp:42-60; coretech/vision/engine/imageBuffer/imageBuffer.cpp Debayer::Instance().Invoke",
       "category": "Vision.Debayer",
       "status": "live",

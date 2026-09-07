@@ -51,6 +51,7 @@
 #include "util/helpers/templateHelpers.h"
 #include "util/logging/logging.h"
 #include "util/logging/DAS.h"
+#include "util/math/math.h"
 #include "util/string/stringUtils.h"
 #include "util/threading/threadPriority.h"
 
@@ -134,6 +135,12 @@ namespace Vector {
     Anki::Vision::Debayer::Instance().SetGamma(kDebayerGamma);
   }
   CONSOLE_FUNC(ResetGamma, "Vision.Debayer");
+
+  // Night brightness: raise Debayer gamma while AE is pegged at max exp AND gain.
+  // Default false until on-robot Session F. SetGamma only on enter/exit edges.
+  CONSOLE_VAR(bool, kNightGammaAuto, "Vision.Debayer", false);
+  CONSOLE_VAR_RANGED(f32, kNightDebayerGamma, "Vision.Debayer", 2.5f, 0.1f, 4.f);
+  CONSOLE_VAR(u32, kNightGammaExitHysteresisFrames, "Vision.Debayer", 15);
 
   // Session B: DebayerBypassBlackLevel is CONSOLE_VAR'd in neon/raw10.cpp (same lib as the helper).
   // Phase 3: defined in visionSystem.cpp — pin VicOS AWB to 1,1,1 when auto software WB is on.
@@ -1355,6 +1362,65 @@ namespace Vector {
     return RESULT_OK;
   }
 
+  // Night DebayerGamma auto: enter on AE peg (max exp AND max gain), exit after
+  // hysteresis unpegged frames. SetGamma only on edges (op-map rebuild is expensive).
+  namespace {
+  void UpdateNightGammaAuto(const Vision::CameraParams& params)
+  {
+    static bool s_nightGammaActive = false;
+    static u32  s_nightGammaUnpeggedFrames = 0;
+
+    if(nullptr == s_VisionComponent)
+    {
+      return;
+    }
+
+    if(!kNightGammaAuto)
+    {
+      if(s_nightGammaActive)
+      {
+        Anki::Vision::Debayer::Instance().SetGamma(kDebayerGamma);
+        s_nightGammaActive = false;
+        s_nightGammaUnpeggedFrames = 0;
+        LOG_INFO("VisionComponent.NightGammaAuto.Disabled",
+                 "Restored DebayerGamma=%.2f", kDebayerGamma);
+      }
+      return;
+    }
+
+    const bool peggedExp  = Util::IsNear(static_cast<f32>(params.exposureTime_ms),
+                                         static_cast<f32>(s_VisionComponent->GetMaxCameraExposureTime_ms()));
+    const bool peggedGain = Util::IsNear(params.gain, s_VisionComponent->GetMaxCameraGain());
+    const bool pegged = peggedExp && peggedGain;
+
+    if(pegged)
+    {
+      s_nightGammaUnpeggedFrames = 0;
+      if(!s_nightGammaActive)
+      {
+        Anki::Vision::Debayer::Instance().SetGamma(kNightDebayerGamma);
+        s_nightGammaActive = true;
+        LOG_INFO("VisionComponent.NightGammaAuto.Enter",
+                 "Exp:%dms Gain:%.3f SetGamma=%.2f",
+                 params.exposureTime_ms, params.gain, kNightDebayerGamma);
+      }
+    }
+    else if(s_nightGammaActive)
+    {
+      ++s_nightGammaUnpeggedFrames;
+      if(s_nightGammaUnpeggedFrames >= kNightGammaExitHysteresisFrames)
+      {
+        Anki::Vision::Debayer::Instance().SetGamma(kDebayerGamma);
+        s_nightGammaActive = false;
+        s_nightGammaUnpeggedFrames = 0;
+        LOG_INFO("VisionComponent.NightGammaAuto.Exit",
+                 "Exp:%dms Gain:%.3f restored DebayerGamma=%.2f",
+                 params.exposureTime_ms, params.gain, kDebayerGamma);
+      }
+    }
+  }
+  } // namespace
+
   Result VisionComponent::UpdateCameraParams(const VisionProcessingResult& procResult)
   {
     if(!_robot->IsPhysical() || procResult.imageQuality == Vision::ImageQuality::Unchecked)
@@ -1430,6 +1496,8 @@ namespace Vector {
       }
 
     }
+
+    UpdateNightGammaAuto(params);
 
     if(procResult.imageQuality != _lastImageQuality || _currentQualityBeginTime_ms==0)
     {

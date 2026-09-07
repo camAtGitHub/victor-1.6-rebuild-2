@@ -250,6 +250,7 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 | `docs/mapping/CAMERA-SOFTWARE-WB-PLAN.md` | In-engine software WB Phases 1–2 (manual RGB multiply) |
 | `docs/mapping/CAMERA-SOFTWARE-WB-PHASE3-PLAN.md` | Phase 3 auto + Xray Viz RGB2BGR fix (vizManager) |
 | `docs/mapping/CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md` | Auto walk-down: absolute integrator + slew; **implemented**, awaiting Session E |
+| `docs/mapping/CAMERA-NIGHT-BRIGHTNESS-PLAN.md` | Night brightness: `NightGammaAuto` AE-pegged DebayerGamma lift; **Phase 1 implemented**, Session F after flash |
 | `docs/mapping/IDEA-backpack-lights-flags.md` | Idea: Anki lights flag + customBackpackLights folder + Wired option |
 | `docs/mapping/IDEA-personality-packs.md` | Idea: selectable JSON freeplay personality packs (+ voice activate) |
 | `docs/mapping/IDEA-custom-firmware-vibe-brainstorm.md` | Ideation: 8 wild firmware personas / Soul Profile spine (wiki character lens) |
@@ -348,7 +349,7 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 - **Which parts are rebuild-specific vs. stock Anki 1.6?** — `CHANGES.md`. Observed: wirepod
   cloud, anim 16 ms, platform OTA/diagnostics notes. Upstream `docs/` = stock 1.6.
 - **Version pins** — `VERSION` = `1.6.1`; `VICTOR_COMPAT_VERSION` = `210`.
-- **Camera 1.0 vs 2.0 / low light?** — **Xray** (`HW_VER` ≥ `0x20`): different camera; Whiskey ≠ camera. Gamma is **`x^(1/G)`**. VicOS AWB **ignored** (Session B). In-engine software WB: Xray Viz keeps pre-`17ecb816` showable path; ManualWB `SetGains(B,G,R)`. **`SoftwareWBAuto` Session E PASS** (settle ~1.17/1/1.19, walk-down works); firmware default still false. Map: `CAMERA-HW-V1-V2.md` Status.
+- **Camera 1.0 vs 2.0 / low light?** — **Xray** (`HW_VER` ≥ `0x20`): different camera; Whiskey ≠ camera. Gamma is **`x^(1/G)`**. VicOS AWB **ignored** (Session B). In-engine software WB: Xray Viz keeps pre-`17ecb816` showable path; ManualWB `SetGains(B,G,R)`. **`SoftwareWBAuto` Session E PASS** (settle ~1.17/1/1.19, walk-down works); firmware default still false. **`NightGammaAuto`** (default false): when AE pegged at max exp+gain, optionally raise DebayerGamma (night default **2.5**) with hysteresis restore; Session F after flash. Map: `CAMERA-HW-V1-V2.md` Status; plan `CAMERA-NIGHT-BRIGHTNESS-PLAN.md`.
 - **Glossary / indexes** — `docs/mapping/GLOSSARY.md`, `UPSTREAM-DOCS-INDEX.md`, `HIGH-LEVEL.md`.
 - **Custom firmware north star (ideation)?** — **Kinetic Familiar** — saved charter
   `docs/mapping/KINETIC-FAMILIAR.md` (name + goal/intent locked; what’s-first TBD). Hermit/night-lock
@@ -409,6 +410,7 @@ if you ran out of context mid-folder, say so here.
 | 2026-09-07 | Grok | **Phase 3 docs for auto walk-down fix:** persisted `CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md` (**Implemented**, awaiting Session E); Status + Session E protocol in `CAMERA-HW-V1-V2.md`; Phase3 banner; catalog slew knob already present. No C++ this pass. | Flash + Session E (well-lit settle below rail; dark→bright walk-down). |
 | 2026-09-07 | Grok | Anki-deletion hunt: snake 2018 original is `kercre123/victor` (`0b3bafc`); rebuild master productized it (`1ca901bb` / oelinux submodule), this `cam_explore` HEAD does not. Wrote `docs/mapping/TODO-anki-deleted-recovery.md` (hunt method, **Singing**/VIC-24, SimpleVoiceResponse, catalog). Linked from overheat TODO + Quick answers. No C++. | Feature phase only when asked: Wwise bank check then Singing force-run; or fetch rebuild master for snake. |
 | 2026-09-07 | Grok | **Overheat backpack lights v1:** restored four triggers + map + stock JSON + checkpoint charger-cooldown `if`s (`charging && disconnected` on contacts). No `conditionHighTemperature` / no `IS_STATUS_FLAG_SET`. Plan `OVERHEAT-BACKPACK-LIGHTS-PLAN.md`. | Rebuild clad + flash; on-robot 41 °C A/B. Optional v1.1 `isBatteryOverheated` bit. |
+| 2026-09-07 | Grok | **NightGammaAuto Phase 1 + docs:** AE-pegged DebayerGamma lift (`NightGammaAuto` default false, night G 2.5, hysteresis 15). Plan `CAMERA-NIGHT-BRIGHTNESS-PLAN.md`; Status + Session F in `CAMERA-HW-V1-V2.md`. Phase 2 probe not built. | Flash + Session F (F0–F3). Phase 0b soak may already be on robot (DebayerGamma 2.5). |
 
 ---
 

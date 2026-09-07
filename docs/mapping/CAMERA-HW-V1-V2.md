@@ -1,15 +1,15 @@
 # Camera hardware: Vector 1.0 vs 2.0 (low light / AWB)
 
 **Path:** `docs/mapping/CAMERA-HW-V1-V2.md`  
-**Mapped:** 2026-08-23; **revised:** 2026-09-07 (Sessions A–D; software WB; walk-down fix; **Xray display RGB2BGR reverted**)  
-**Awaiting:** flash — verify natural colours with SW WB off; then ManualWB mapping; then Session E auto  
-**Confidence:** high (gamma `1/G`, Session B VicOS ignore, manual multiply); medium (auto walk-down untested; ManualWB B,G,R mapping after display restore); low (sensor QE)  
+**Mapped:** 2026-08-23; **revised:** 2026-09-07 (Sessions A–E; software WB; walk-down; **NightGammaAuto Phase 1**)  
+**Awaiting:** flash NightGammaAuto + **Session F** (Phase 0b soak may already be on robot: `DebayerGamma` 2.5)  
+**Confidence:** high (gamma `1/G`, Session B VicOS ignore, manual multiply, Session E auto); medium (night-gamma hysteresis untested on-robot); low (sensor QE)  
 **Upstream docs:** [`docs/architecture/whats_in_victor.md`](../architecture/whats_in_victor.md), [`docs/architecture/visionSystem.md`](../architecture/visionSystem.md).  
-**Related plans:** [`CAMERA-SESSION-B-PLAN.md`](CAMERA-SESSION-B-PLAN.md), [`CAMERA-SOFTWARE-WB-PLAN.md`](CAMERA-SOFTWARE-WB-PLAN.md), [`CAMERA-SOFTWARE-WB-PHASE3-PLAN.md`](CAMERA-SOFTWARE-WB-PHASE3-PLAN.md), [`CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md`](CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md). Catalog: `engine-session-b-camera.json`.
+**Related plans:** [`CAMERA-SESSION-B-PLAN.md`](CAMERA-SESSION-B-PLAN.md), [`CAMERA-SOFTWARE-WB-PLAN.md`](CAMERA-SOFTWARE-WB-PLAN.md), [`CAMERA-SOFTWARE-WB-PHASE3-PLAN.md`](CAMERA-SOFTWARE-WB-PHASE3-PLAN.md), [`CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md`](CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md), [`CAMERA-NIGHT-BRIGHTNESS-PLAN.md`](CAMERA-NIGHT-BRIGHTNESS-PLAN.md). Catalog: `engine-session-b-camera.json`, `engine-autoexp.json`.
 
 How the three head revisions differ in **camera** code, why 2.0 looks grainy green-gray in the dark, and which console/config knobs exist.
 
-### Status (2026-09-07 — Xray display restored; walk-down awaiting flash)
+### Status (2026-09-07 — Session E PASS; NightGammaAuto Phase 1 landed)
 
 | Area | State |
 |---|---|
@@ -19,7 +19,8 @@ How the three head revisions differ in **camera** code, why 2.0 looks grainy gre
 | Xray Viz / MirrorMode display | **Restored** pre-`17ecb816` branches (copy without RGB2BGR; `SetFromImageRGB2BGR`). Forcing RGB2BGR swapped the whole scene (yellow↔cyan). Session C “ManualWB_R→blue” was a **control mapping** issue, not proof Viz was wrong. |
 | Manual software WB | Apply multiplies after debayer; **`SetGains(ManualWB_B, G, ManualWB_R)`** so red control matches perceived red under Xray display order; lock gates auto |
 | `SoftwareWBAuto` | **Session E PASS** — settles below rail (~1.17/1/1.19), kills green cast, gains walk when darkened. Default still **false** in firmware; robot may leave on for soak. |
-| Robot console | Auto currently **true** on test robot after Session E |
+| Night brightness | **Phase 1 landed** — `NightGammaAuto` (default **false**), `NightDebayerGamma` **2.5**, `NightGammaExitHysteresisFrames` 15. Enter when AE is pegged at max exp **and** max gain; `SetGamma` on enter/exit edges only. Restores `DebayerGamma` (Xray 2.1) after hysteresis. Phase 2 VicOS max-exp/gain probe **not built**. |
+| Robot console | Auto currently **true** on test robot after Session E; Phase 0b may be soaking `DebayerGamma` **2.5** (manual, no flash) |
 
 **Session E (2026-09-07) — PASS after display restore + walk-down flash:**
 
@@ -31,9 +32,19 @@ How the three head revisions differ in **camera** code, why 2.0 looks grainy gre
 | `SoftwareWBAuto=true` (MaxGain 1.5, MaxChangeFraction 0.15) | Settled **~1.17 / 1 / 1.19** (below rail); colours **much closer to normal, no green** |
 | Darken scene | Gains moved (**~0.996 / … / 1.070**) — **walk-down PASS** |
 
-**Next (optional):** leave auto on if happy; tune MaxGain / MaxChangeFraction live; parked: night brightness, black-level calib, VicOS, denoise.
+**Next:** flash NightGammaAuto firmware; **Session F** (F0–F3). Optional: leave SoftwareWBAuto on; tune WB rails live. Parked: black-level calib, VicOS, denoise, Phase 2 probe.
 
 Test UI: **vizManager** (JPEG via `ConvertToShowableFormat`). Robot used: `192.168.50.189:8888`.
+
+**Session F (after NightGammaAuto flash)** — plan: [`CAMERA-NIGHT-BRIGHTNESS-PLAN.md`](CAMERA-NIGHT-BRIGHTNESS-PLAN.md). Leave `NightGammaAuto` **false** when done unless soak is wanted.
+
+| Step | Action | Pass |
+|---|---|---|
+| F0 | Night, AE pegged, `NightGammaAuto=false`, gamma 2.1 | Baseline dark |
+| F1 | Manual soak: DebayerGamma 2.5 + Reset (skip if Phase 0b already did this) | Brighter |
+| F2 | `NightGammaAuto=true`, night G 2.5 | Auto applies; brighter; WB still OK |
+| F3 | Add light so AE unpegs | Gamma returns to 2.1 after hysteresis |
+| F4 | Optional Phase 2 probe | **Not in this flash** |
 
 ---
 
@@ -191,8 +202,11 @@ Catalog: `resources/webserver/cvcatalog/vars/engine-autoexp.json`, `engine-visio
 | `WhiteBalance` | on (~every 5th frame) | yes | Gray-world; **Off preserves current gains** (adjR/adjB forced to 1) — does **not** force (1,1,1) |
 | `Exposure_TargetPercentile` | **0 = off** | yes | Must be **> 0** to override config; production uses 0.50 |
 | `Exposure_TargetValue` | 128 | yes | Ignored unless percentile > 0 |
-| `DebayerGamma` | 1.7 / **2.1 Xray** | **partial** | Slider no-op until **`ResetGamma`**; LUT uses **`1/G`** (§5.1) |
+| `DebayerGamma` | 1.7 / **2.1 Xray** | **partial** | Slider no-op until **`ResetGamma`**; LUT uses **`1/G`** (§5.1). NightGammaAuto, when on and AE-pegged, applies `NightDebayerGamma` instead until exit |
 | `ResetGamma` | func | yes | Applies `DebayerGamma` |
+| `NightGammaAuto` | **false** | after flash | Raise Debayer gamma while AE at max exp **and** max gain; default off until Session F |
+| `NightDebayerGamma` | **2.5** | enter-edge | Night LUT G (`x^(1/G)`); Session A soak value |
+| `NightGammaExitHysteresisFrames` | 15 | yes | Unpegged `UpdateCameraParams` ticks before restore |
 | `LinearizeForAutoExposure` | false | yes | Undo gamma before AE hist |
 | `UseCenterWeightedMetering` | true | yes | |
 | `Under/OverExposedThreshold` | 15 / 240 | yes | AWB skip band |
@@ -272,6 +286,7 @@ Optional max exp/gain probe (Phase 2b) was **not** implemented in this pass.
 | Session B (black-level + VicOS honour test) | **1** (done; overlay-only) |
 | Software WB Phases 1–2 (in-engine multiply) | **+1** to flash; then on-robot colour A/B |
 | Phase 3 auto software WB | **+1** only if Phase 2 colour A/B passes |
+| NightGammaAuto Phase 1 | **+1** flash; then Session F |
 
 ### Session A live results (2026-09-06, robot `192.168.50.189`)
 
@@ -375,7 +390,7 @@ Scope: **this** tree only. Daemon/ISP edits are out of band (`mm-anki-camera` pr
 
 1. **Flash + Session E** — re-test auto on-robot (well-lit settle below rail; dark→bright walk-down). Keep default **false** until pass. See Status + AUTO-FIX plan. Manual path is good; auto v1 is not.  
 2. Optional: tune MaxGain / MaxChangeFraction live after Session E.  
-3. **Night / TooDark brightness lift** (optional). Higher console gamma already brightens (`1/G`). Black-level bypass was a no-op in dark Session B.
+3. **Night / TooDark brightness lift** — **Phase 1 landed** (`NightGammaAuto`, default **false**, night G **2.5**). Flash + Session F. Phase 2 VicOS probe **not built**. Black-level bypass was a no-op in dark Session B.
 
 4. **Make processing consistent across paths** (park until colour/brightness is measured)  
    - EIGHTH: apply black-level to **red** as well (or none — but not G/B-only).  
@@ -403,7 +418,7 @@ Hardware may still limit how close 2.0 can get to 1.0 after software is cleaned 
 | `robot/include/anki/cozmo/shared/factory/emrHelper_vicos.h` | `IsWhiskey` / `IsXray` |
 | `platform/camera/cameraService_vicos.cpp` | 1MP vs 2MP formats; `CameraSetParameters` / AWB |
 | `platform/camera/vicos/camera_client/` | IPC to VicOS `mm-anki-camera` |
-| `engine/components/visionComponent.cpp` | `kDebayerGamma`; `ApplyManualWhiteBalance` / Clear (software WB + daemon pin 1,1,1) |
+| `engine/components/visionComponent.cpp` | `kDebayerGamma`; `kNightGammaAuto` / `UpdateNightGammaAuto`; `ApplyManualWhiteBalance` / Clear (software WB + daemon pin 1,1,1) |
 | `engine/vision/visionSystem.cpp` | AE/AWB tick, initial params |
 | `coretech/vision/engine/softwareWhiteBalance.h/.cpp` | In-engine saturating R/G/B multiply; default off |
 | `coretech/vision/engine/imageBuffer/imageBuffer.cpp` | `GetRGBFromBAYER` calls `SoftwareWhiteBalance::ApplyToImage` after Invoke |
@@ -413,6 +428,7 @@ Hardware may still limit how close 2.0 can get to 1.0 after software is cleaned 
 | `coretech/vision/engine/debayer/raw10.cpp` | CPU PHOTO path (10-bit LUT, no black subtract) |
 | `resources/config/engine/vision_config.json` | ImageQuality / mode schedules |
 | `resources/webserver/cvcatalog/vars/engine-session-b-camera.json` | Console blurbs for bypass + ManualWB Apply/Clear |
+| `resources/webserver/cvcatalog/vars/engine-autoexp.json` | Console blurbs for DebayerGamma + NightGammaAuto / NightDebayerGamma / hysteresis |
 
 ---
 
