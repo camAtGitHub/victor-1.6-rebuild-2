@@ -29,6 +29,7 @@
 #endif
 
 #include <fstream>
+#include "anki/cozmo/shared/factory/emrHelper.h"
 
 namespace {
 
@@ -1986,9 +1987,14 @@ namespace Vision {
   }
 
   void ImageRGB::ConvertToShowableFormat(cv::Mat& showImg) const {
-    // Xray previously skipped RGB2BGR which made Viz/JPEG treat RGB as BGR
-    // (Session C ManualWB_R looked blue). Always convert like the non-Xray path.
-    cv::cvtColor(this->get_CvMat_(), showImg, cv::COLOR_RGB2BGR);
+    // Xray: copy without RGB2BGR — underlying buffer channel order is compensated
+    // here for Viz/JPEG. Do not "fix" ManualWB label mismatches by forcing RGB2BGR
+    // (that swapped the whole scene; see Session D yellow↔cyan). Map WB controls instead.
+    if (Vector::IsXray()) {
+      this->get_CvMat_().copyTo(showImg);
+    } else {
+      cv::cvtColor(this->get_CvMat_(), showImg, cv::COLOR_RGB2BGR);
+    }
   }
 
   void ImageRGB::SetFromShowableFormat(const cv::Mat& showImg) {

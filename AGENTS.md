@@ -400,6 +400,7 @@ if you ran out of context mid-folder, say so here.
 | 2026-09-06 | Grok | **Session D:** T1 red / T2 blue (**R/B PASS**). Auto → **2.5/1/2.5 purple**, mug colours wrong; bright light no change. Auto disabled. | Fix auto: reset integrator, lower/slew rail, walk-down when lit. |
 | 2026-09-06 | Grok | **Pause camera:** MaxGain 1.3 trial still stuck (milder purple; yellow→blue). Docs Status in `CAMERA-HW-V1-V2.md`; Phase3 plan marked auto-v1 fail; Quick answers updated. `SoftwareWBAuto=false` on robot. | Resume: `/make-plan` or implement auto walk-down/integrator fix. |
 | 2026-09-07 | Grok | **Daytime auto peek:** MaxGain 1.3 → still 1.3/1/1.3, EXP/GAIN 66/3.8; bluer; yellow→blue, cyan→yellow, blue mug→yellow/brown. Auto off. Logged in `CAMERA-HW-V1-V2.md` Session D. | Same next: walk-down/integrator plan when ready. |
+| 2026-09-07 | Grok | **Revert Xray display RGB2BGR** (expert: Session C was label mismatch, not wrong Viz). Restore Xray showable copy + MirrorMode `SetFromImageRGB2BGR`; ManualWB `SetGains(B,G,R)` for perceived-red control. Keep walk-down auto code. | Flash; verify real R/G/B objects with SW WB off/(1,1,1); then ManualWB_R=2 → warmer. |
 | 2026-09-07 | Grok | **Phase 3 docs for auto walk-down fix:** persisted `CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md` (**Implemented**, awaiting Session E); Status + Session E protocol in `CAMERA-HW-V1-V2.md`; Phase3 banner; catalog slew knob already present. No C++ this pass. | Flash + Session E (well-lit settle below rail; dark→bright walk-down). |
 
 ---

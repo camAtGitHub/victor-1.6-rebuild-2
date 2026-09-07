@@ -166,7 +166,10 @@ namespace Vector {
     {
       cameraService->CameraSetWhiteBalanceParameters(1.f, 1.f, 1.f);
     }
-    Vision::SoftwareWhiteBalance::SetGains(kManualWB_R, kManualWB_G, kManualWB_B);
+    // Xray display leaves buffer order as-is for Viz; memory R/B are swapped vs what the
+    // eye sees. Map ManualWB_R → memory B and ManualWB_B → memory R so the red control
+    // tints the perceived-red channel without swapping the whole showable image.
+    Vision::SoftwareWhiteBalance::SetGains(kManualWB_B, kManualWB_G, kManualWB_R);
     Vision::SoftwareWhiteBalance::SetEnabled(true);
     // Set after SetAndDisable: playpen also uses that API and must not leave AE/WB locked.
     kManualCameraControlLock = true;
