@@ -1,6 +1,6 @@
 # Plan: Software WB Phase 3 (auto) + R/B label fix
 
-**Status (2026-09-06 pause):** Implemented and flashed. **R/B display fix PASS** (Session D via vizManager). **Auto v1 FAIL for production use** — hits MaxGain R=B rail (purple), does not walk down when lit; leave `SoftwareWBAuto=false`. Resume with walk-down/integrator fix (see `CAMERA-HW-V1-V2.md` Status).
+**Status (2026-09-07):** Implemented and flashed. **R/B display fix PASS** (Session D via vizManager). **Auto v1 FAIL for production use** — hits MaxGain R=B rail (purple), does not walk down when lit; leave `SoftwareWBAuto=false`. **Walk-down fix implemented on top of Phase 3** (absolute integrator + slew + manual lock gate) — see [`CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md`](CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md). Auto still default **false**. Awaiting on-robot Session E.
 
 **Goal:** (1) Make `ManualWB_R` / `ManualWB_B` match perceived colour on Xray Viz. (2) Add **auto** software gray-world that multiplies RGB in-engine, pins VicOS AWB to `(1,1,1)`, and holds last-good when too dark / starved.
 
@@ -10,7 +10,7 @@
 
 **Out of scope:** VicOS daemon edits; TemporalDenoise; night gamma product; Phase 2b max exp/gain; inventing a new WB estimator.
 
-**Default:** `kSoftwareWBAuto = false` until on-robot re-A/B after R/B display fix.
+**Default:** `kSoftwareWBAuto = false` until on-robot Session E pass (walk-down fix).
 
 ---
 

@@ -73,9 +73,9 @@
     "SoftwareWBAuto": {
       "process": "engine",
       "blurb": "When true, gray-world WB gains are applied in-engine (SoftwareWhiteBalance) and VicOS AWB is pinned to 1,1,1. Default false. Enable only after R/B display fix A/B (ManualWB_R should look red in vizManager).",
-      "detail": "VisionSystem::UpdateCameraParams: ScopedIdentity + InvalidateRGB for uncorrected stats; hold-last-good on TooDark or low well-exposed count; clamp to SoftwareWBMinGain/MaxGain. Manual Apply lock still overrides.",
-      "howTo": "1) Confirm ManualWB T1 red / T2 blue after display fix flash. 2) Clear manual lock. 3) Set SoftwareWBAuto true. 4) Well-lit then dark scenes — gains should not slam 3.8 in the dark.",
-      "related": ["SoftwareWBMinWellExposed", "SoftwareWBMinGain", "SoftwareWBMaxGain", "WhiteBalance", "ApplyManualWhiteBalance"],
+      "detail": "VisionSystem::UpdateCameraParams: absolute gray-world (controller cur WB reset to 1,1,1 each tick); ScopedIdentity + InvalidateRGB for uncorrected stats; hold-last-good via GetGains on TooDark or low well-exposed count; clamp to SoftwareWBMinGain/MaxGain; optional SoftwareWBMaxChangeFraction slew. Manual Apply lock still overrides.",
+      "howTo": "1) Confirm ManualWB T1 red / T2 blue after display fix flash. 2) Clear manual lock. 3) Set SoftwareWBAuto true. 4) Well-lit: overlay R/B should sit below MaxGain and walk down when brighter.",
+      "related": ["SoftwareWBMinWellExposed", "SoftwareWBMinGain", "SoftwareWBMaxGain", "SoftwareWBMaxChangeFraction", "WhiteBalance", "ApplyManualWhiteBalance"],
       "category": "Vision.PreProcessing",
       "status": "live",
       "tags": ["vision", "whitebalance", "software-wb", "phase3"]
@@ -98,11 +98,22 @@
     },
     "SoftwareWBMaxGain": {
       "process": "engine",
-      "blurb": "Max clamp for auto software WB R/B gains (default 2.5). Avoids slamming the old 3.8 analog rail.",
+      "blurb": "Max clamp for auto software WB R/B gains (default 1.5). Avoids slamming the old 3.8 analog rail. Live-tunable.",
       "category": "Vision.PreProcessing",
-      "related": ["SoftwareWBAuto", "SoftwareWBMinGain"],
+      "related": ["SoftwareWBAuto", "SoftwareWBMinGain", "SoftwareWBMaxChangeFraction"],
       "status": "live",
       "tags": ["vision", "software-wb", "phase3"]
+    },
+    "SoftwareWBMaxChangeFraction": {
+      "process": "engine",
+      "blurb": "Max relative step of auto software WB R/B gain per WB tick vs previous software gains (default 0.15). 0 = unlimited (old one-frame jump). Does not change JSON MaxChangeFraction / AE.",
+      "detail": "Applied after Min/MaxGain clamp in VisionSystem::UpdateCameraParams. Clamps next R/B into [prev*(1-f), prev*(1+f)] using SoftwareWhiteBalance::GetGains. Copy of cameraParamsController adj slew, software-only.",
+      "howTo": "With SoftwareWBAuto true: 0.1 crawls toward target; 0 recovers fast jump for A/B. Live-tunable; no rebuild.",
+      "related": ["SoftwareWBAuto", "SoftwareWBMinGain", "SoftwareWBMaxGain"],
+      "category": "Vision.PreProcessing",
+      "evidence": "engine/vision/visionSystem.cpp kSoftwareWBMaxChangeFraction; docs/mapping/CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md",
+      "status": "live",
+      "tags": ["vision", "whitebalance", "software-wb", "slew"]
     }
   }
 }

@@ -249,6 +249,7 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 | `docs/mapping/CAMERA-SESSION-B-PLAN.md` | Session B plan + protocol: bypass + manual WB Apply/lock |
 | `docs/mapping/CAMERA-SOFTWARE-WB-PLAN.md` | In-engine software WB Phases 1–2 (manual RGB multiply) |
 | `docs/mapping/CAMERA-SOFTWARE-WB-PHASE3-PLAN.md` | Phase 3 auto + Xray Viz RGB2BGR fix (vizManager) |
+| `docs/mapping/CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md` | Auto walk-down: absolute integrator + slew; **implemented**, awaiting Session E |
 | `docs/mapping/IDEA-backpack-lights-flags.md` | Idea: Anki lights flag + customBackpackLights folder + Wired option |
 | `docs/mapping/IDEA-personality-packs.md` | Idea: selectable JSON freeplay personality packs (+ voice activate) |
 | `docs/mapping/IDEA-custom-firmware-vibe-brainstorm.md` | Ideation: 8 wild firmware personas / Soul Profile spine (wiki character lens) |
@@ -345,7 +346,7 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 - **Which parts are rebuild-specific vs. stock Anki 1.6?** — `CHANGES.md`. Observed: wirepod
   cloud, anim 16 ms, platform OTA/diagnostics notes. Upstream `docs/` = stock 1.6.
 - **Version pins** — `VERSION` = `1.6.1`; `VICTOR_COMPAT_VERSION` = `210`.
-- **Camera 1.0 vs 2.0 / low light?** — **Xray** (`HW_VER` ≥ `0x20`): different camera; Whiskey ≠ camera. Gamma is **`x^(1/G)`**. VicOS AWB **ignored** (Session B). **Manual** software WB works; vizManager R/B **fixed** (Session D). **`SoftwareWBAuto` leave false** — v1 sticks at max R=B (purple), no walk-down when lit. **Next:** fix auto integrator/walk-down. Map: `CAMERA-HW-V1-V2.md` Status; plans: `CAMERA-SOFTWARE-WB-PLAN.md`, `CAMERA-SOFTWARE-WB-PHASE3-PLAN.md`.
+- **Camera 1.0 vs 2.0 / low light?** — **Xray** (`HW_VER` ≥ `0x20`): different camera; Whiskey ≠ camera. Gamma is **`x^(1/G)`**. VicOS AWB **ignored** (Session B). **Manual** software WB works; vizManager R/B **fixed** (Session D). **`SoftwareWBAuto` leave false** until Session E — v1 stuck at max R=B (purple); **walk-down fix in tree** (absolute integrator + slew), awaiting flash/robot. Map: `CAMERA-HW-V1-V2.md` Status; plans: `CAMERA-SOFTWARE-WB-PLAN.md`, `CAMERA-SOFTWARE-WB-PHASE3-PLAN.md`, `CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md`.
 - **Glossary / indexes** — `docs/mapping/GLOSSARY.md`, `UPSTREAM-DOCS-INDEX.md`, `HIGH-LEVEL.md`.
 - **Custom firmware north star (ideation)?** — **Kinetic Familiar** — saved charter
   `docs/mapping/KINETIC-FAMILIAR.md` (name + goal/intent locked; what’s-first TBD). Hermit/night-lock
@@ -398,6 +399,8 @@ if you ran out of context mid-folder, say so here.
 | 2026-09-06 | Grok | **Phase 3 + R/B display fix:** Xray always `COLOR_RGB2BGR` (vizManager); MirrorMode unswap; `ScopedIdentity`+`InvalidateRGB`; `SoftwareWBAuto` (default off) + hold/rails; HAL pin 1,1,1. | Flash; re-A/B T1 red/T2 blue via vizManager; then enable `SoftwareWBAuto`. |
 | 2026-09-06 | Grok | **Session D:** T1 red / T2 blue (**R/B PASS**). Auto → **2.5/1/2.5 purple**, mug colours wrong; bright light no change. Auto disabled. | Fix auto: reset integrator, lower/slew rail, walk-down when lit. |
 | 2026-09-06 | Grok | **Pause camera:** MaxGain 1.3 trial still stuck (milder purple; yellow→blue). Docs Status in `CAMERA-HW-V1-V2.md`; Phase3 plan marked auto-v1 fail; Quick answers updated. `SoftwareWBAuto=false` on robot. | Resume: `/make-plan` or implement auto walk-down/integrator fix. |
+| 2026-09-07 | Grok | **Daytime auto peek:** MaxGain 1.3 → still 1.3/1/1.3, EXP/GAIN 66/3.8; bluer; yellow→blue, cyan→yellow, blue mug→yellow/brown. Auto off. Logged in `CAMERA-HW-V1-V2.md` Session D. | Same next: walk-down/integrator plan when ready. |
+| 2026-09-07 | Grok | **Phase 3 docs for auto walk-down fix:** persisted `CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md` (**Implemented**, awaiting Session E); Status + Session E protocol in `CAMERA-HW-V1-V2.md`; Phase3 banner; catalog slew knob already present. No C++ this pass. | Flash + Session E (well-lit settle below rail; dark→bright walk-down). |
 
 ---
 

@@ -106,7 +106,10 @@ CONSOLE_VAR(u32, kMeteringHoldTime_ms,    "Vision.PreProcessing", 2000);
 CONSOLE_VAR(bool, kSoftwareWBAuto, "Vision.PreProcessing", false);
 CONSOLE_VAR(u32,  kSoftwareWBMinWellExposed, "Vision.PreProcessing", 100);
 CONSOLE_VAR_RANGED(f32, kSoftwareWBMinGain, "Vision.PreProcessing", 0.5f, 0.25f, 3.8f);
-CONSOLE_VAR_RANGED(f32, kSoftwareWBMaxGain, "Vision.PreProcessing", 2.5f, 0.25f, 3.8f);
+CONSOLE_VAR_RANGED(f32, kSoftwareWBMaxGain, "Vision.PreProcessing", 1.5f, 0.25f, 3.8f);
+CONSOLE_VAR_RANGED(f32, kSoftwareWBMaxChangeFraction, "Vision.PreProcessing", 0.15f, 0.f, 1.f);
+// Defined in visionComponent.cpp — ApplyManualWhiteBalance holds this so auto WB cannot clobber SetGains.
+CONSOLE_VAR_EXTERN(bool, kManualCameraControlLock);
   
 // Loose constraints on how fast Cozmo can move and still trust tracker (which has no
 // knowledge of or access to camera movement). Rough means of deciding these angles:
@@ -643,15 +646,18 @@ Result VisionSystem::UpdateCameraParams(Vision::ImageCache& imageCache)
     static bool s_prevSoftwareWBAuto = false;
     if(kSoftwareWBAuto && !s_prevSoftwareWBAuto)
     {
-      Vision::CameraParams resetParams = GetCurrentCameraParams();
-      resetParams.whiteBalanceGainR = 1.f;
-      resetParams.whiteBalanceGainG = 1.f;
-      resetParams.whiteBalanceGainB = 1.f;
-      SetNextCameraParams(resetParams);
-      Vision::SoftwareWhiteBalance::SetGains(1.f, 1.f, 1.f);
-      Vision::SoftwareWhiteBalance::SetEnabled(true);
-      PRINT_CH_INFO("VisionSystem", "VisionSystem.SoftwareWBAuto.Enabled",
-                    "Reset WB to 1,1,1; in-engine multiply on");
+      if(!kManualCameraControlLock)
+      {
+        Vision::CameraParams resetParams = GetCurrentCameraParams();
+        resetParams.whiteBalanceGainR = 1.f;
+        resetParams.whiteBalanceGainG = 1.f;
+        resetParams.whiteBalanceGainB = 1.f;
+        (void)_cameraParamsController->UpdateCurrentCameraParams(resetParams);
+        Vision::SoftwareWhiteBalance::SetGains(1.f, 1.f, 1.f);
+        Vision::SoftwareWhiteBalance::SetEnabled(true);
+        PRINT_CH_INFO("VisionSystem", "VisionSystem.SoftwareWBAuto.Enabled",
+                      "Reset WB to 1,1,1; in-engine multiply on");
+      }
     }
     else if(!kSoftwareWBAuto && s_prevSoftwareWBAuto)
     {
@@ -664,7 +670,7 @@ Result VisionSystem::UpdateCameraParams(Vision::ImageCache& imageCache)
 
   if(imageCache.HasColor())
   {
-    if(kSoftwareWBAuto && (wbMode != Vision::CameraParamsController::WhiteBalanceMode::Off))
+    if(kSoftwareWBAuto && !kManualCameraControlLock && (wbMode != Vision::CameraParamsController::WhiteBalanceMode::Off))
     {
       // Uncorrected Half RGB for gray-world (ScopedIdentity + drop cache + re-debayer).
       const Vision::ImageCacheSize statsSize = Vision::ImageCache::GetDefaultImageCacheSize();
@@ -674,6 +680,14 @@ Result VisionSystem::UpdateCameraParams(Vision::ImageCache& imageCache)
         imageCache.InvalidateRGB(statsSize);
         inputImagePtr = &imageCache.GetRGB(statsSize);
       }
+
+      // Absolute gray-world: next = cur*adj, so force cur WB to 1,1,1 this tick (keep exp/gain).
+      Vision::CameraParams integratorReset = GetCurrentCameraParams();
+      integratorReset.whiteBalanceGainR = 1.f;
+      integratorReset.whiteBalanceGainG = 1.f;
+      integratorReset.whiteBalanceGainB = 1.f;
+      (void)_cameraParamsController->UpdateCurrentCameraParams(integratorReset);
+
       expResult = _cameraParamsController->ComputeNextCameraParams(*inputImagePtr, aeMode, wbMode,
                                                                    useCycling, nextParams);
 
@@ -685,10 +699,11 @@ Result VisionSystem::UpdateCameraParams(Vision::ImageCache& imageCache)
         if(tooDark || starved)
         {
           // Hold last-good software gains (do not walk to the rail).
-          const Vision::CameraParams cur = GetCurrentCameraParams();
-          nextParams.whiteBalanceGainR = cur.whiteBalanceGainR;
-          nextParams.whiteBalanceGainG = cur.whiteBalanceGainG;
-          nextParams.whiteBalanceGainB = cur.whiteBalanceGainB;
+          f32 holdR = 1.f, holdG = 1.f, holdB = 1.f;
+          Vision::SoftwareWhiteBalance::GetGains(holdR, holdG, holdB);
+          nextParams.whiteBalanceGainR = holdR;
+          nextParams.whiteBalanceGainG = holdG;
+          nextParams.whiteBalanceGainB = holdB;
         }
         else
         {
@@ -697,6 +712,19 @@ Result VisionSystem::UpdateCameraParams(Vision::ImageCache& imageCache)
           nextParams.whiteBalanceGainB = Util::Clamp(nextParams.whiteBalanceGainB,
                                                      kSoftwareWBMinGain, kSoftwareWBMaxGain);
           nextParams.whiteBalanceGainG = 1.f;
+
+          if(Util::IsFltGTZero(kSoftwareWBMaxChangeFraction))
+          {
+            f32 prevR = 1.f, prevG = 1.f, prevB = 1.f;
+            Vision::SoftwareWhiteBalance::GetGains(prevR, prevG, prevB);
+            (void)prevG;
+            nextParams.whiteBalanceGainR = Util::Clamp(nextParams.whiteBalanceGainR,
+                                                       prevR * (1.f - kSoftwareWBMaxChangeFraction),
+                                                       prevR * (1.f + kSoftwareWBMaxChangeFraction));
+            nextParams.whiteBalanceGainB = Util::Clamp(nextParams.whiteBalanceGainB,
+                                                       prevB * (1.f - kSoftwareWBMaxChangeFraction),
+                                                       prevB * (1.f + kSoftwareWBMaxChangeFraction));
+          }
         }
 
         Vision::SoftwareWhiteBalance::SetGains(nextParams.whiteBalanceGainR,
@@ -1606,7 +1634,19 @@ Result VisionSystem::Update(const VisionPoseData& poseData, Vision::ImageCache& 
     _currentCameraParams = _nextCameraParams.second;
     cameraParamsRequested = false;
     
-    _cameraParamsController->UpdateCurrentCameraParams(_currentCameraParams);
+    if(kSoftwareWBAuto && !kManualCameraControlLock)
+    {
+      // Keep estimator WB in _currentCameraParams (overlay); controller cur must stay 1,1,1.
+      Vision::CameraParams controllerParams = _currentCameraParams;
+      controllerParams.whiteBalanceGainR = 1.f;
+      controllerParams.whiteBalanceGainG = 1.f;
+      controllerParams.whiteBalanceGainB = 1.f;
+      _cameraParamsController->UpdateCurrentCameraParams(controllerParams);
+    }
+    else
+    {
+      _cameraParamsController->UpdateCurrentCameraParams(_currentCameraParams);
+    }
   }
   
   if(_modes.IsEmpty())

@@ -1,30 +1,31 @@
 # Camera hardware: Vector 1.0 vs 2.0 (low light / AWB)
 
 **Path:** `docs/mapping/CAMERA-HW-V1-V2.md`  
-**Mapped:** 2026-08-23; **revised:** 2026-09-06 (Sessions A–D on-robot; software WB + Phase 3 auto v1)  
-**Paused:** 2026-09-06 end of Session D — see **Status** below  
-**Confidence:** high (gamma `1/G`, Session B VicOS AWB ignore, manual software multiply, vizManager R/B after RGB2BGR); medium (auto walk-down / integrator bugs); low (sensor QE / “smaller pixels”)  
+**Mapped:** 2026-08-23; **revised:** 2026-09-07 (Sessions A–D on-robot; software WB + Phase 3 auto v1; walk-down fix in tree, awaiting Session E)  
+**Awaiting:** flash + Session E (walk-down fix landed 2026-09-07 — see **Status**)  
+**Confidence:** high (gamma `1/G`, Session B VicOS AWB ignore, manual software multiply, vizManager R/B after RGB2BGR); medium (auto walk-down fix in tree, untested on-robot); low (sensor QE / “smaller pixels”)  
 **Upstream docs:** [`docs/architecture/whats_in_victor.md`](../architecture/whats_in_victor.md), [`docs/architecture/visionSystem.md`](../architecture/visionSystem.md).  
-**Related plans:** [`CAMERA-SESSION-B-PLAN.md`](CAMERA-SESSION-B-PLAN.md), [`CAMERA-SOFTWARE-WB-PLAN.md`](CAMERA-SOFTWARE-WB-PLAN.md), [`CAMERA-SOFTWARE-WB-PHASE3-PLAN.md`](CAMERA-SOFTWARE-WB-PHASE3-PLAN.md). Catalog: `engine-session-b-camera.json`.
+**Related plans:** [`CAMERA-SESSION-B-PLAN.md`](CAMERA-SESSION-B-PLAN.md), [`CAMERA-SOFTWARE-WB-PLAN.md`](CAMERA-SOFTWARE-WB-PLAN.md), [`CAMERA-SOFTWARE-WB-PHASE3-PLAN.md`](CAMERA-SOFTWARE-WB-PHASE3-PLAN.md), [`CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md`](CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md). Catalog: `engine-session-b-camera.json`.
 
 How the three head revisions differ in **camera** code, why 2.0 looks grainy green-gray in the dark, and which console/config knobs exist.
 
-### Status (pause 2026-09-06)
+### Status (2026-09-07 — walk-down fix in tree; awaiting Session E)
 
 | Area | State |
 |---|---|
 | Gamma | Confirmed `x^(1/G)` — do not lower to “fix” darkness (Session A) |
 | VicOS `camera_set_awb` | **Ignored** for pixels (Session B) — colour must be in-engine |
 | Black-level bypass | No visible change in dark test scene (Session B) |
-| Manual software WB | **Works** — Apply multiplies RGB after debayer |
+| Manual software WB | **Works** — Apply multiplies RGB after debayer; lock still **gates auto** |
 | vizManager R/B | **Fixed** — Xray always `COLOR_RGB2BGR` (Session D T1 red / T2 blue) |
-| `SoftwareWBAuto` | **Shipped default false** — v1 hits max R=B rail (purple), **stuck** when lighting improves (Session D). Leave off. |
-| Robot console | Leave `SoftwareWBAuto=false` |
+| `SoftwareWBAuto` v1 | **FAIL** (Session D) — hits max R=B rail (purple), stuck when lit. Left default **false**. |
+| Walk-down fix | **Landed in tree, not yet flashed** — absolute gray-world (controller WB=`1,1,1` each tick); `SoftwareWBMaxChangeFraction` default **0.15**; `SoftwareWBMaxGain` default **1.5**; auto still default **false**; manual Apply lock gates auto. Plan: [`CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md`](CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md). |
+| Robot console | Leave `SoftwareWBAuto=false` until Session E pass |
 
-**Next when resuming (priority):**
+**Next (priority):**
 
-1. **Fix auto walk-down** — reset `CameraParamsController` current WB to 1,1,1 on enable; slew/limit steps; ensure bright scenes can **reduce** gains (hold/identity/stats). Then re-test auto.  
-2. Optional: tune MaxGain / gray-world for Xray dark (after walk-down works).  
+1. **Flash this tree** and run **Session E** (vizManager): well-lit overlay R/B **settle below** MaxGain rail; dark→bright **walk-down**. Protocol in AUTO-FIX plan Phase 3 and §7 Session E below.  
+2. Optional: tune MaxGain / MaxChangeFraction live after Session E (no rebuild).  
 3. Parked: night brightness lift, black-level calib, PHOTO/NEON parity, VicOS daemon, denoise.
 
 Test UI: **vizManager** (JPEG via `ConvertToShowableFormat`). Robot used: `192.168.50.189:8888`.
@@ -337,11 +338,27 @@ Plan: [`CAMERA-SOFTWARE-WB-PLAN.md`](CAMERA-SOFTWARE-WB-PLAN.md).
 | T1 `(2,1,1)` | **Very red/orange** — R/B display fix **PASS** |
 | T2 `(1,1,2)` | **Super blue** — R/B display fix **PASS** |
 | `SoftwareWBAuto=true` (MaxGain **2.5**) | Overlay → **2.5 / 1 / 2.5**; image **purple**; blue-green mug → **red/orange** |
-| MaxGain **1.3** then auto | Overlay → **1.3 / 1 / 1.3**; cast **blue/purple** (similar intensity to old green, less purple than 2.5); yellow toy → **blue**; bright light **still stuck** |
+| MaxGain **1.3** then auto (night) | Overlay → **1.3 / 1 / 1.3**; cast **blue/purple**; yellow toy → **blue**; bright light **still stuck** |
+| Daytime MaxGain **1.3** auto (2026-09-07) | Still **1.3 / 1 / 1.3**, EXP/GAIN **66 / 3.8**; bluer; **yellow→blue, cyan→yellow, blue mug→yellow/brown** |
 | Auto off | restored |
 
 **Closed:** vizManager R/B labels correct after RGB2BGR fix.  
-**Open (auto):** always hits max R=B rail (green→magenta trade); **never walks down** when lit — integrator/hold/stats bug, not just rail height. Next: reset controller current on enable; slew; fix walk-down; reconsider gray-world on Xray dark.
+**Open (auto v1):** always hits max R=B rail; object colours inverted/wrong day and night; AE still pegged 66/3.8 even in daytime auto test. Daytime alone does not rescue auto v1. **Walk-down fix is now in tree** (absolute integrator + slew) — awaiting flash + Session E.
+
+### Session E protocol (walk-down fix — **not yet run**)
+
+Plan: [`CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md`](CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md). One flash of this tree; test via **vizManager**. Leave auto **false** when done.
+
+| Step | Action | Pass |
+|---|---|---|
+| 0 | Confirm `SoftwareWBAuto=false`; optional T1 `(2,1,1)` / T2 `(1,1,2)` | R/B still red / blue |
+| 1 | `SoftwareWBMaxGain=1.5`, `SoftwareWBMaxChangeFraction=0.15`, AutoExp+WB on | — |
+| 2 | Auto **true**, well-lit | Overlay R/B **below** max rail and **stable-ish**; colours not wildly inverted |
+| 3 | Cover lens / dark briefly then uncover (or move to window) | Gains **decrease** when brighter |
+| 4 | Tune MaxGain / MaxChangeFraction live if needed | no rebuild |
+| 5 | Auto **false** when done | restored |
+
+**Fail:** still glued to MaxGain R=B in good light after 10+ s.
 
 ---
 
@@ -349,10 +366,10 @@ Plan: [`CAMERA-SOFTWARE-WB-PLAN.md`](CAMERA-SOFTWARE-WB-PLAN.md).
 
 Scope: **this** tree only. Daemon/ISP edits are out of band (`mm-anki-camera` prebuilt).
 
-**Preferred order (post Session D pause):**
+**Preferred order (post walk-down fix in tree):**
 
-1. **Fix `SoftwareWBAuto` walk-down / integrator** (next code) — see Status. Manual path is good; auto v1 is not.  
-2. **Re-test auto** on-robot (dark + bright; object colours). Keep default **false** until pass.  
+1. **Flash + Session E** — re-test auto on-robot (well-lit settle below rail; dark→bright walk-down). Keep default **false** until pass. See Status + AUTO-FIX plan. Manual path is good; auto v1 is not.  
+2. Optional: tune MaxGain / MaxChangeFraction live after Session E.  
 3. **Night / TooDark brightness lift** (optional). Higher console gamma already brightens (`1/G`). Black-level bypass was a no-op in dark Session B.
 
 4. **Make processing consistent across paths** (park until colour/brightness is measured)  
