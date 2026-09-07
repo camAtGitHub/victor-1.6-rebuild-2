@@ -124,6 +124,19 @@ void BackpackLightComponent::UpdateCriticalBackpackLightConfig(bool isCloudStrea
 
     trigger = BackpackAnimationTrigger::LowBattery;
   }
+  // Charger cooldown: charging + disconnected on contacts (~41 C). Not engine conditionHighTemperature.
+  else if( _isBatteryLow && _isOnChargerContacts && _isBatteryCharging && _isBatteryDisconnected )
+  {
+    trigger = BackpackAnimationTrigger::ChargingLowBatteryOverheated;
+  }
+  else if ( !_isBatteryFull && _isOnChargerContacts && _isBatteryCharging && _isBatteryDisconnected )
+  {
+    trigger = BackpackAnimationTrigger::ChargingOverheated;
+  }
+  else if ( _isBatteryFull && _isOnChargerContacts && _isBatteryCharging && _isBatteryDisconnected )
+  {
+    trigger = BackpackAnimationTrigger::Overheated;
+  }
   // else if( _isBatteryLow && _isOnChargerContacts )
   // {
   //   trigger = BackpackAnimationTrigger::Charging;

@@ -260,7 +260,9 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 | `docs/mapping/KINETIC-FAMILIAR-VOICE-SYSTEM-PROMPT.md` | Voice AI prompt: no repo access; self-contained Kinetic Familiar + stack briefing |
 | `docs/mapping/IDEA-firmware-direction-amended.md` | Read-back that led to Kinetic Familiar (historical; see charter) |
 | `docs/mapping/IDEA-affect-micro-library.md` | ~20 nonverbal affect beats (eyes/motion/chirps) for firmware dialect |
-| `docs/mapping/TODO-overheat-backpack-lights.md` | Easy win: WireOS thermal JSON exists; restore clad/map/`if`s so they play (41 °C charger cooldown) |
+| `docs/mapping/TODO-overheat-backpack-lights.md` | Charger-cooldown v1 **implemented** (clad/map/`if`s + stock JSON); 41 °C; Phase 5/`vbuild` + on-robot A/B not run |
+| `docs/mapping/OVERHEAT-BACKPACK-LIGHTS-PLAN.md` | Overheat backpack lights charger-cooldown v1 plan (Phases 1–4 landed; 5 + on-robot A/B pending) |
+| `docs/mapping/TODO-anki-deleted-recovery.md` | Hunt Anki deletions on `kercre123/victor`; restore candidate **Singing** (VIC-24); SimpleVoiceResponse / snake notes |
 | `engine/components/cubes/` | L2 cube BLE/coordinator/lights stack |
 | `animProcess/src/cozmoAnim/{animation,faceDisplay,micData,speechRecognizer,audio,…}/` | L2 anim subsystems |
 | `robot/supervisor/`, `robot/hal/`, `robot/clad/` | L2 control path; `robot/syscon/` L1 shallow |
@@ -352,6 +354,8 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
   `docs/mapping/KINETIC-FAMILIAR.md` (name + goal/intent locked; what’s-first TBD). Hermit/night-lock
   retracted. Affect beats: `IDEA-affect-micro-library.md`. Voice/off-repo continuity:
   `KINETIC-FAMILIAR-VOICE-SYSTEM-PROMPT.md` + `KINETIC-FAMILIAR-SPR.md`.
+- **Deleted Anki leftovers we could restore?** — Hunt on **`kercre123/victor`** (`git log --diff-filter=D`, `master...snowboy`), not this 2026-root clone. Catalog + **Singing** (VIC-24) + SimpleVoiceResponse notes: `docs/mapping/TODO-anki-deleted-recovery.md`. Overheat lights: `TODO-overheat-backpack-lights.md`. Snake is already on Victor-Rebuild **master** (oelinux pin `1ca901bb`), not this `cam_explore` HEAD.
+- **Overheat backpack lights?** — Charger-cooldown v1 **wired**: clad + map + stock JSON + anim `if`s. Plan: `docs/mapping/OVERHEAT-BACKPACK-LIGHTS-PLAN.md`. Needs rebuild + on-robot A/B. Off-charger overheat still unwired (v1.1).
 
 ---
 
@@ -403,6 +407,8 @@ if you ran out of context mid-folder, say so here.
 | 2026-09-07 | Grok | **Revert Xray display RGB2BGR** (expert: Session C was label mismatch, not wrong Viz). Restore Xray showable copy + MirrorMode `SetFromImageRGB2BGR`; ManualWB `SetGains(B,G,R)` for perceived-red control. Keep walk-down auto code. | Flash; verify real R/G/B objects with SW WB off/(1,1,1); then ManualWB_R=2 → warmer. |
 | 2026-09-07 | Grok | **Session E PASS:** display natural; ManualWB R→red B→blue; auto settled ~1.17/1/1.19 (no green); darken → gains walked (~0.996…1.070). Logged in `CAMERA-HW-V1-V2.md`. | Optional: leave auto on; tune rails live; or commit docs. |
 | 2026-09-07 | Grok | **Phase 3 docs for auto walk-down fix:** persisted `CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md` (**Implemented**, awaiting Session E); Status + Session E protocol in `CAMERA-HW-V1-V2.md`; Phase3 banner; catalog slew knob already present. No C++ this pass. | Flash + Session E (well-lit settle below rail; dark→bright walk-down). |
+| 2026-09-07 | Grok | Anki-deletion hunt: snake 2018 original is `kercre123/victor` (`0b3bafc`); rebuild master productized it (`1ca901bb` / oelinux submodule), this `cam_explore` HEAD does not. Wrote `docs/mapping/TODO-anki-deleted-recovery.md` (hunt method, **Singing**/VIC-24, SimpleVoiceResponse, catalog). Linked from overheat TODO + Quick answers. No C++. | Feature phase only when asked: Wwise bank check then Singing force-run; or fetch rebuild master for snake. |
+| 2026-09-07 | Grok | **Overheat backpack lights v1:** restored four triggers + map + stock JSON + checkpoint charger-cooldown `if`s (`charging && disconnected` on contacts). No `conditionHighTemperature` / no `IS_STATUS_FLAG_SET`. Plan `OVERHEAT-BACKPACK-LIGHTS-PLAN.md`. | Rebuild clad + flash; on-robot 41 °C A/B. Optional v1.1 `isBatteryOverheated` bit. |
 
 ---
 
