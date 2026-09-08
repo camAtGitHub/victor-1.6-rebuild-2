@@ -104,13 +104,31 @@ bool BehaviorReactToGazeDirection::WantsToBeActivatedBehavior() const
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 void BehaviorReactToGazeDirection::OnBehaviorActivated()
 {
+<<<<<<< HEAD
   _dVars = DynamicVariables();
+=======
+  // reset dynamic variables
+  _dVars = DynamicVariables();
+
+>>>>>>> upstream/master
   TransitionToCheckGazeDirection();
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 void BehaviorReactToGazeDirection::TransitionToCheckForFace(const Radians& turnAngle)
 {
+<<<<<<< HEAD
+=======
+  if (!_dVars.didReact) {
+    _dVars.didReact = true;
+  } else {
+    // If we're doing this again assume we're looping
+    GetBEI().GetFaceWorldMutable().ClearGazeDirectionHistory(_dVars.faceIDToTurnBackTo);
+    CancelSelf();
+    return;
+  }
+
+>>>>>>> upstream/master
   // Turn to the angle, pick the correct (left or right) animation, and then search for a face.
   CompoundActionSequential* turnAction = new CompoundActionSequential();
   if (turnAngle > 0) {
@@ -141,6 +159,18 @@ void BehaviorReactToGazeDirection::TransitionToCheckForFace(const Radians& turnA
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 void BehaviorReactToGazeDirection::TransitionToLookAtFace(const SmartFaceID& faceToTurnTowards, const Radians& turnAngle)
 {
+<<<<<<< HEAD
+=======
+  if (!_dVars.didReact) {
+    _dVars.didReact = true;
+  } else {
+    // If we're doing this again assume we're looping
+    GetBEI().GetFaceWorldMutable().ClearGazeDirectionHistory(_dVars.faceIDToTurnBackTo);
+    CancelSelf();
+    return;
+  }
+
+>>>>>>> upstream/master
   // Using a turn towards face action and the face to turn towards, look for the
   // face we think is in the FOV if we were to turn to turn angle. The turn
   // angle is used to choose to play the left or right animation.
@@ -170,6 +200,18 @@ void BehaviorReactToGazeDirection::TransitionToLookAtFace(const SmartFaceID& fac
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 void BehaviorReactToGazeDirection::TransitionToCheckForPointOnSurface(const Pose3d& gazePose)
 {
+<<<<<<< HEAD
+=======
+  if (!_dVars.didReact) {
+    _dVars.didReact = true;
+  } else {
+    // If we're doing this again assume we're looping
+    GetBEI().GetFaceWorldMutable().ClearGazeDirectionHistory(_dVars.faceIDToTurnBackTo);
+    CancelSelf();
+    return;
+  }
+
+>>>>>>> upstream/master
   const auto& translation = gazePose.GetTranslation();
   auto makingEyeContact = GetBEI().GetFaceWorld().IsMakingEyeContact(kMaxTimeSinceTrackedFaceUpdated_ms);
 
