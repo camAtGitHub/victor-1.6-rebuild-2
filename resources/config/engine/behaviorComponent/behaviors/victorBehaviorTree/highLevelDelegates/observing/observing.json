@@ -59,6 +59,10 @@
         {
           "behavior": "BlockDrop",
           "cooldown_s": 2000.0
+        },
+        {
+          "behavior": "BrickBreaker",
+          "cooldown_s": 2000.0
         }
       ]
     }
