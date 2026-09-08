@@ -2,8 +2,8 @@
 
 **Path:** `docs/mapping/CAMERA-HW-V1-V2.md`  
 **Mapped:** 2026-08-23; **revised:** 2026-09-07 (Sessions A–E; software WB; walk-down; **NightGammaAuto Phase 1**)  
-**Awaiting:** flash NightGammaAuto + **Session F** (Phase 0b soak may already be on robot: `DebayerGamma` 2.5)  
-**Confidence:** high (gamma `1/G`, Session B VicOS ignore, manual multiply, Session E auto); medium (night-gamma hysteresis untested on-robot); low (sensor QE)  
+**Awaiting:** Session F3 (unpeg restore) — F0/F2 done 2026-09-07  
+**Confidence:** high (gamma `1/G`, Session B VicOS ignore, manual multiply, Session E auto, F2 night lift); medium (F3 hysteresis restore untested); low (sensor QE)  
 **Upstream docs:** [`docs/architecture/whats_in_victor.md`](../architecture/whats_in_victor.md), [`docs/architecture/visionSystem.md`](../architecture/visionSystem.md).  
 **Related plans:** [`CAMERA-SESSION-B-PLAN.md`](CAMERA-SESSION-B-PLAN.md), [`CAMERA-SOFTWARE-WB-PLAN.md`](CAMERA-SOFTWARE-WB-PLAN.md), [`CAMERA-SOFTWARE-WB-PHASE3-PLAN.md`](CAMERA-SOFTWARE-WB-PHASE3-PLAN.md), [`CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md`](CAMERA-SOFTWARE-WB-AUTO-FIX-PLAN.md), [`CAMERA-NIGHT-BRIGHTNESS-PLAN.md`](CAMERA-NIGHT-BRIGHTNESS-PLAN.md). Catalog: `engine-session-b-camera.json`, `engine-autoexp.json`.
 
@@ -32,19 +32,18 @@ How the three head revisions differ in **camera** code, why 2.0 looks grainy gre
 | `SoftwareWBAuto=true` (MaxGain 1.5, MaxChangeFraction 0.15) | Settled **~1.17 / 1 / 1.19** (below rail); colours **much closer to normal, no green** |
 | Darken scene | Gains moved (**~0.996 / … / 1.070**) — **walk-down PASS** |
 
-**Next:** flash NightGammaAuto firmware; **Session F** (F0–F3). Optional: leave SoftwareWBAuto on; tune WB rails live. Parked: black-level calib, VicOS, denoise, Phase 2 probe.
+**Next:** Session **F3** (add light → AE unpegs → gamma back to 2.1). Optional: raise `NightDebayerGamma` live (e.g. 2.8–3.0) if F2 lift is too mild. Parked: Phase 2 VicOS probe, black-level, denoise.
 
-Test UI: **vizManager** (JPEG via `ConvertToShowableFormat`). Robot used: `192.168.50.189:8888`.
+Test UI: **vizManager**. Robot: `192.168.50.189:8888`.
 
-**Session F (after NightGammaAuto flash)** — plan: [`CAMERA-NIGHT-BRIGHTNESS-PLAN.md`](CAMERA-NIGHT-BRIGHTNESS-PLAN.md). Leave `NightGammaAuto` **false** when done unless soak is wanted.
+**Session F live (2026-09-07)** — plan: [`CAMERA-NIGHT-BRIGHTNESS-PLAN.md`](CAMERA-NIGHT-BRIGHTNESS-PLAN.md).
 
-| Step | Action | Pass |
-|---|---|---|
-| F0 | Night, AE pegged, `NightGammaAuto=false`, gamma 2.1 | Baseline dark |
-| F1 | Manual soak: DebayerGamma 2.5 + Reset (skip if Phase 0b already did this) | Brighter |
-| F2 | `NightGammaAuto=true`, night G 2.5 | Auto applies; brighter; WB still OK |
-| F3 | Add light so AE unpegs | Gamma returns to 2.1 after hysteresis |
-| F4 | Optional Phase 2 probe | **Not in this flash** |
+| Step | Result |
+|---|---|
+| F0 | Night gamma off, G 2.1; AWB ~1.15/1/1.22; **66/3.8** |
+| F1 | Phase 0b manual 2.5 — bit brighter, bit grainier |
+| F2 | `NightGammaAuto=true` — **marginally brighter**, colour fine (~1.13/1/1.19); still **66/3.8** |
+| F3 | Light on → EXP **47**/GAIN **3.8**; light off → **66/3.8**. AWB ~1.1x. AE unpeg **PASS**. Subjective: under light slightly less lifted (→2.1); dark → night 2.5 again |
 
 ---
 
