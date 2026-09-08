@@ -33,6 +33,7 @@ namespace Anim {
 
 CONSOLE_VAR(u32, kOfflineTimeBeforeLights_ms, "Backpacklights", (1000*60*2));
 CONSOLE_VAR(u32, kOfflineCheckFreq_ms,        "Backpacklights", 5000);
+CONSOLE_VAR(u32, kCpuOverheatBackpackTemp_C,  "Backpacklights", 90);
 
 enum class BackpackLightSourcePrivate : BackpackLightSourceType
 {
@@ -93,10 +94,18 @@ void BackpackLightComponent::UpdateCriticalBackpackLightConfig(bool isCloudStrea
   // Streaming, Low Battery, Offline, Charging, or Nothing
   BackpackAnimationTrigger trigger = BackpackAnimationTrigger::Off;
 
+  // CPU temp via OSState, default 90 C; not charger cooldown.
+  const bool cpuOverheated =
+    OSState::getInstance()->GetTemperature_C() >= kCpuOverheatBackpackTemp_C;
+
   // If we are currently streaming to the cloud
   if(isCloudStreamOpen)
   {
     trigger = BackpackAnimationTrigger::Streaming;
+  }
+  else if( _isBatteryLow && !_isOnChargerContacts && cpuOverheated )
+  {
+    trigger = BackpackAnimationTrigger::LowBatteryCpuOverheated;
   }
   else if( _isBatteryLow && !_isOnChargerContacts )
   {
@@ -136,6 +145,10 @@ void BackpackLightComponent::UpdateCriticalBackpackLightConfig(bool isCloudStrea
   else if ( _isBatteryFull && _isOnChargerContacts && _isBatteryCharging && _isBatteryDisconnected )
   {
     trigger = BackpackAnimationTrigger::Overheated;
+  }
+  else if( cpuOverheated )
+  {
+    trigger = BackpackAnimationTrigger::CpuOverheated;
   }
   // else if( _isBatteryLow && _isOnChargerContacts )
   // {

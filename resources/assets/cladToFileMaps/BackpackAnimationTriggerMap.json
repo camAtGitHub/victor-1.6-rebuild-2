@@ -16,6 +16,10 @@
       "AnimName": "chargingOverheated"
   },
   {
+      "CladEvent": "CpuOverheated",
+      "AnimName": "cpuOverheated"
+  },
+  {
       "CladEvent": "DanceToTheBeat",
       "AnimName": "danceToTheBeat"
   },
@@ -34,6 +38,10 @@
   {
       "CladEvent": "LowBattery",
       "AnimName": "badCharger"
+  },
+  {
+      "CladEvent": "LowBatteryCpuOverheated",
+      "AnimName": "lowBatteryCpuOverheated"
   },
   {
       "CladEvent": "LowBatteryOverheated",

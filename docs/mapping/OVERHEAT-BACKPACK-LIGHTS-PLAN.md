@@ -6,6 +6,8 @@
 **Goal:** Restore critical backpack light triggers so the four existing thermal JSON patterns play during **charger cooldown** (~41 °C: `charging && disconnected` on contacts).  
 **Out of scope for v1:** off-charger `IS_BATTERY_OVERHEATED` lights, any change to `conditionHighTemperature.cpp`, designer app work, custom-pack UX.
 
+**Related (separate):** CPU ≥ 90 backpack lights are a **separate** pair of triggers (`CpuOverheated` / `LowBatteryCpuOverheated`), not `Overheated`. See [`CPU-OVERHEAT-BACKPACK-LIGHTS-PLAN.md`](CPU-OVERHEAT-BACKPACK-LIGHTS-PLAN.md).
+
 **Durable copy (after approval / during docs phase of execute):** also write this plan to `docs/mapping/OVERHEAT-BACKPACK-LIGHTS-PLAN.md` and flip the TODO status to point at it.
 
 ---
@@ -242,6 +244,7 @@ WireOS already has them — **do not modify WireOS** unless a content bug is fou
 ### Explicit non-goals this pass
 
 - Off-charger `LowBatteryOverheated` / `Overheated` via `IS_BATTERY_OVERHEATED` (needs `BatteryStatus.isBatteryOverheated` — v1.1)
+- CPU-hot backpack (`CpuOverheated` / `LowBatteryCpuOverheated`) — separate plan [`CPU-OVERHEAT-BACKPACK-LIGHTS-PLAN.md`](CPU-OVERHEAT-BACKPACK-LIGHTS-PLAN.md)
 - Restoring `Idle_09` / `Offline_Off`
 - Reverting `skipOverheatCheck = false` back to `IsXray()` (separate product decision; left by `92503631`)
 

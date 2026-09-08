@@ -51,6 +51,8 @@ Parsed by `BackpackLightAnimation::DefineFromJSON` in anim (and engine twin).
 Names map via `resources/assets/cladToFileMaps/BackpackAnimationTriggerMap.json`  
 (e.g. trigger `Petting` → `petting.json`). Keep the **same relative paths and basenames** as stock.
 
+This pack now includes `cpuOverheated.json` and `lowBatteryCpuOverheated.json` (CPU ≥ 90 °C / low-batt+CPU); a live custom overlay must include them too (full overlay, not a merge).
+
 ## Anki vs WireOS (not this folder)
 
 | Preference | Mechanism in **this** tree |

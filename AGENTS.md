@@ -263,6 +263,7 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 | `docs/mapping/IDEA-affect-micro-library.md` | ~20 nonverbal affect beats (eyes/motion/chirps) for firmware dialect |
 | `docs/mapping/TODO-overheat-backpack-lights.md` | Charger-cooldown v1 **implemented** (clad/map/`if`s + stock JSON); 41 °C; Phase 5/`vbuild` + on-robot A/B not run |
 | `docs/mapping/OVERHEAT-BACKPACK-LIGHTS-PLAN.md` | Overheat backpack lights charger-cooldown v1 plan (Phases 1–4 landed; 5 + on-robot A/B pending) |
+| `docs/mapping/CPU-OVERHEAT-BACKPACK-LIGHTS-PLAN.md` | CPU-hot backpack: `CpuOverheated` + `LowBatteryCpuOverheated`; custom packs need the two JSON (exclusive overlay) |
 | `docs/mapping/TODO-anki-deleted-recovery.md` | Hunt Anki deletions on `kercre123/victor`; restore candidate **Singing** (VIC-24); SimpleVoiceResponse / snake notes |
 | `engine/components/cubes/` | L2 cube BLE/coordinator/lights stack |
 | `animProcess/src/cozmoAnim/{animation,faceDisplay,micData,speechRecognizer,audio,…}/` | L2 anim subsystems |
@@ -357,6 +358,7 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
   `KINETIC-FAMILIAR-VOICE-SYSTEM-PROMPT.md` + `KINETIC-FAMILIAR-SPR.md`.
 - **Deleted Anki leftovers we could restore?** — Hunt on **`kercre123/victor`** (`git log --diff-filter=D`, `master...snowboy`), not this 2026-root clone. Catalog + **Singing** (VIC-24) + SimpleVoiceResponse notes: `docs/mapping/TODO-anki-deleted-recovery.md`. Overheat lights: `TODO-overheat-backpack-lights.md`. Snake is already on Victor-Rebuild **master** (oelinux pin `1ca901bb`), not this `cam_explore` HEAD.
 - **Overheat backpack lights?** — Charger-cooldown v1 **wired**: clad + map + stock JSON + anim `if`s. Plan: `docs/mapping/OVERHEAT-BACKPACK-LIGHTS-PLAN.md`. Needs rebuild + on-robot A/B. Off-charger overheat still unwired (v1.1).
+- **CPU-hot backpack lights?** — `CpuOverheated` / `LowBatteryCpuOverheated` via OSState::GetTemperature_C() ≥ kCpuOverheatBackpackTemp_C (90). Not charger-cooldown Overheated. JSON in stock, WireOS, both example custom packs. Live `/data/data/customBackpackLights/` must get the two files + anim restart. Needs rebuild + fake-temp A/B.
 
 ---
 
@@ -413,6 +415,7 @@ if you ran out of context mid-folder, say so here.
 | 2026-09-07 | Grok | Anki-deletion hunt: snake 2018 original is `kercre123/victor` (`0b3bafc`); rebuild master productized it (`1ca901bb` / oelinux submodule), this `cam_explore` HEAD does not. Wrote `docs/mapping/TODO-anki-deleted-recovery.md` (hunt method, **Singing**/VIC-24, SimpleVoiceResponse, catalog). Linked from overheat TODO + Quick answers. No C++. | Feature phase only when asked: Wwise bank check then Singing force-run; or fetch rebuild master for snake. |
 | 2026-09-07 | Grok | **Overheat backpack lights v1:** restored four triggers + map + stock JSON + checkpoint charger-cooldown `if`s (`charging && disconnected` on contacts). No `conditionHighTemperature` / no `IS_STATUS_FLAG_SET`. Plan `OVERHEAT-BACKPACK-LIGHTS-PLAN.md`. | Rebuild clad + flash; on-robot 41 °C A/B. Optional v1.1 `isBatteryOverheated` bit. |
 | 2026-09-07 | Grok | **NightGammaAuto Phase 1 + docs:** AE-pegged DebayerGamma lift (`NightGammaAuto` default false, night G 2.5, hysteresis 15). Plan `CAMERA-NIGHT-BRIGHTNESS-PLAN.md`; Status + Session F in `CAMERA-HW-V1-V2.md`. Phase 2 probe not built. | Flash + Session F (F0–F3). Phase 0b soak may already be on robot (DebayerGamma 2.5). |
+| 2026-09-08 | Grok | **CPU-hot backpack lights:** CpuOverheated + LowBatteryCpuOverheated (clad/map/JSON×4 packs + anim ifs + catalog). User JSON from /tmp. Custom is exclusive overlay. | Rebuild clad+anim; fake CPU 92 A/B; copy JSON onto live custom pack if CUSTOM LIGHTS ON. |
 
 ---
 

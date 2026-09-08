@@ -4,6 +4,8 @@
 **Opened:** 2026-08-27  
 **Why easy:** the four thermal JSON files already existed in the WireOS pack. The missing piece was restoring the trigger enum + map + a few `if`s in anim. Reverted commits were a recipe, not a patch to cherry-pick blindly.
 
+**Not this work:** CPU ≥ 90 backpack lights are a **separate** pair of triggers (`CpuOverheated` / `LowBatteryCpuOverheated`), not `Overheated`. See [`CPU-OVERHEAT-BACKPACK-LIGHTS-PLAN.md`](CPU-OVERHEAT-BACKPACK-LIGHTS-PLAN.md).
+
 ## What landed (charger-cooldown v1)
 
 WireOS (and custom example packs) include:
@@ -107,6 +109,7 @@ Those temps are the 47 / 50 / 60 table, and the robot shuts down 30 s later — 
 ## Related
 
 - `docs/mapping/OVERHEAT-BACKPACK-LIGHTS-PLAN.md` — charger-cooldown v1 plan (Phases 1–4 landed)
+- `docs/mapping/CPU-OVERHEAT-BACKPACK-LIGHTS-PLAN.md` — CPU ≥ 90 backpack lights (`CpuOverheated` / `LowBatteryCpuOverheated`); **not** this charger-cooldown `Overheated` trigger
 - `docs/mapping/TODO-anki-deleted-recovery.md` — hunt deleted Anki behaviors (singing, simple-voice); this lights TODO is a half-land, not a deleted class
 - `docs/mapping/IDEA-backpack-lights-flags.md` — custom vs WireOS vs Anki packs
 - `docs/mapping/BACKPACK-LIGHTS-DESIGNER-PLAN.md` — designer already has the four modes

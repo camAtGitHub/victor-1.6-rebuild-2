@@ -114,6 +114,17 @@
       "status": "live",
       "tags": ["backpack", "network", "offline", "timing"]
     },
+    "CpuOverheatBackpackTemp_C": {
+      "process": "anim",
+      "blurb": "CPU temperature in °C at or above which critical backpack lights use CpuOverheated (or LowBatteryCpuOverheated if also low battery off charger). Default 90.",
+      "detail": "Category Backpacklights. Compared with OSState::GetTemperature_C() in UpdateCriticalBackpackLightConfig. Independent of charger-cooldown Overheated (battery disconnect ~41 C) and of the face 92C overlay (ANKI_DEV_CHEATS). Not behind ANKI_DEV_CHEATS.",
+      "howTo": "Set SendFakeCpuTemperature true and FakeCpuTemperature_degC to 92 to test without heating. Lower this var to trip earlier.",
+      "related": ["SendFakeCpuTemperature", "FakeCpuTemperature_degC", "OfflineTimeBeforeLights_ms"],
+      "evidence": "animProcess/src/cozmoAnim/backpackLights/animBackpackLightComponent.cpp:36,97-99,106-108,149-151",
+      "category": "Backpacklights",
+      "status": "live",
+      "tags": ["backpack", "thermal", "cpu"]
+    },
     "PlaybackRecognizerSampleCountThreshold": {
       "process": "anim",
       "blurb": "If an “Alexa” mic detection ends within this many audio samples of the last Alexa playback-recognizer hit, the mic hit is treated as self-trigger (Vector hearing itself) and ignored. Default 5000 samples (~312 ms at 16 kHz); console range 1000–10000.",

@@ -28,6 +28,8 @@ Firmware requires **both** after copy:
 
 Then restart anim/engine or reboot. CCIS shows **CUSTOM LIGHTS ON**.
 
+This pack now includes `cpuOverheated.json` and `lowBatteryCpuOverheated.json` (CPU ≥ 90 °C / low-batt+CPU); a live custom overlay must include them too (full overlay, not a merge).
+
 ## Upload
 
 ```bash
