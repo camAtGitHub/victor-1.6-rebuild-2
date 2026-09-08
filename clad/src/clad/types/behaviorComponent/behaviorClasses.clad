@@ -32,13 +32,11 @@ enum uint_8 BehaviorClass {
   CountingAnimation,
   TextToSpeechLoop,
 
-  // appBehaviors
-  EyeColor,
-
   // attentionTransfer
   AttentionTransferIfNeeded,
 
   // basicCubeInteractions
+  CubeDrive,
   PickUpCube,
   PutDownBlock,
   PutDownBlockAtPose,
@@ -70,6 +68,9 @@ enum uint_8 BehaviorClass {
   // character/howOldAreYou
   HowOldAreYou,
 
+  // character/identifyVictor
+  RespondToNameAndPronouns,
+
   // coordinators
   CoordinateGlobalInterrupts,
   CoordinateInHabitat,
@@ -85,8 +86,11 @@ enum uint_8 BehaviorClass {
   DanceToTheBeatCoordinator,
   ListenForBeats,
 
+  // date
+  DisplayWallDate,
+  WallDateCoordinator,
+
   // devBehaviors
-  CubeDrive,
   DevBatteryLogging,
   DevCubeSpinnerConsole,
   DevDesignCubeLights,
@@ -150,6 +154,7 @@ enum uint_8 BehaviorClass {
   ExploringExamineObstacle,
 
   // eyeColor
+  EyeColor,
   EyeColorVoiceCommand,
 
   // freeplay/putDownDispatch
@@ -182,9 +187,6 @@ enum uint_8 BehaviorClass {
   // messaging
   LeaveAMessage,
   PlaybackMessage,
-
-  // nameVictor
-  RespondToNameAndPronouns,
 
   // observing
   ObservingLookAtFaces,
@@ -263,23 +265,24 @@ enum uint_8 BehaviorClass {
   // timer
   AdvanceClock,
   DisplayWallTime,
-  DisplayWallDate,
   ProceduralClock,
   TimerUtilityCoordinator,
   WallTimeCoordinator,
-  WallDateCoordinator,
 
   // userDefinedBehaviorTree
   UserDefinedBehaviorSelector,
   UserDefinedBehaviorTreeRouter,
 
   // victor
+  BlockDrop,
+  BrickBreaker,
   ConfirmObject,
   PetDetection,
   PoweringRobotOff,
   ReactToTouchPetting,
   ReactToUnclaimedIntent,
   RobustChargerObservation,
+  SnakeGame,
   TrackCube,
   TrackFace,
 

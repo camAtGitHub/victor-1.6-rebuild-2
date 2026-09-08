@@ -21,6 +21,10 @@
       "user_intent": "play_blackjack"
     },
     {
+      "cloud_intent": "intent_snake_victor_score",
+      "user_intent": "snake_victor_score"
+    },
+    {
       "cloud_intent": "intent_play_fistbump",
       "user_intent": "play_fistbump"
     },

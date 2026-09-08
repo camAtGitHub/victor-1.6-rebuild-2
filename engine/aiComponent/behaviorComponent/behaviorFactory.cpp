@@ -22,7 +22,6 @@
 #include "engine/aiComponent/behaviorComponent/behaviors/animationWrappers/behaviorAnimSequenceWithObject.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/animationWrappers/behaviorCountingAnimation.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/animationWrappers/behaviorTextToSpeechLoop.h"
-#include "engine/aiComponent/behaviorComponent/behaviors/eyeColor/behaviorEyeColor.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/attentionTransfer/behaviorAttentionTransferIfNeeded.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/basicCubeInteractions/behaviorCubeDrive.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/basicCubeInteractions/behaviorPickUpCube.h"
@@ -114,6 +113,7 @@
 #include "engine/aiComponent/behaviorComponent/behaviors/dispatch/behaviorDispatcherStrictPriorityWithCooldown.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/exploring/behaviorExploring.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/exploring/behaviorExploringExamineObstacle.h"
+#include "engine/aiComponent/behaviorComponent/behaviors/eyeColor/behaviorEyeColor.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/eyeColor/behaviorEyeColorVoiceCommand.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/freeplay/putDownDispatch/behaviorLookForFaceAndCube.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorFistBump.h"
@@ -183,12 +183,15 @@
 #include "engine/aiComponent/behaviorComponent/behaviors/timer/behaviorWallTimeCoordinator.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/userDefinedBehaviorTree/behaviorUserDefinedBehaviorSelector.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/userDefinedBehaviorTree/behaviorUserDefinedBehaviorTreeRouter.h"
+#include "engine/aiComponent/behaviorComponent/behaviors/victor/behaviorBlockDrop.h"
+#include "engine/aiComponent/behaviorComponent/behaviors/victor/behaviorBrickBreaker.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/victor/behaviorConfirmObject.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/victor/behaviorPetDetection.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/victor/behaviorPoweringRobotOff.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/victor/behaviorReactToTouchPetting.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/victor/behaviorReactToUnclaimedIntent.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/victor/behaviorRobustChargerObservation.h"
+#include "engine/aiComponent/behaviorComponent/behaviors/victor/behaviorSnakeGame.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/victor/behaviorTrackCube.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/victor/behaviorTrackFace.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/volume/behaviorVolume.h"
@@ -292,15 +295,15 @@ ICozmoBehaviorPtr BehaviorFactory::CreateBehavior(const Json::Value& config)
       break;
     }
     
-    case BehaviorClass::EyeColor:
-    {
-      newBehavior = ICozmoBehaviorPtr(new BehaviorEyeColor(config));
-      break;
-    }
-    
     case BehaviorClass::AttentionTransferIfNeeded:
     {
       newBehavior = ICozmoBehaviorPtr(new BehaviorAttentionTransferIfNeeded(config));
+      break;
+    }
+    
+    case BehaviorClass::CubeDrive:
+    {
+      newBehavior = ICozmoBehaviorPtr(new BehaviorCubeDrive(config));
       break;
     }
     
@@ -448,6 +451,12 @@ ICozmoBehaviorPtr BehaviorFactory::CreateBehavior(const Json::Value& config)
       break;
     }
     
+    case BehaviorClass::RespondToNameAndPronouns:
+    {
+      newBehavior = ICozmoBehaviorPtr(new BehaviorRespondToNameAndPronouns(config));
+      break;
+    }
+    
     case BehaviorClass::CoordinateGlobalInterrupts:
     {
       newBehavior = ICozmoBehaviorPtr(new BehaviorCoordinateGlobalInterrupts(config));
@@ -502,12 +511,18 @@ ICozmoBehaviorPtr BehaviorFactory::CreateBehavior(const Json::Value& config)
       break;
     }
     
-    case BehaviorClass::CubeDrive:
+    case BehaviorClass::DisplayWallDate:
     {
-      newBehavior = ICozmoBehaviorPtr(new BehaviorCubeDrive(config));
+      newBehavior = ICozmoBehaviorPtr(new BehaviorDisplayWallDate(config));
       break;
     }
-
+    
+    case BehaviorClass::WallDateCoordinator:
+    {
+      newBehavior = ICozmoBehaviorPtr(new BehaviorWallDateCoordinator(config));
+      break;
+    }
+    
     case BehaviorClass::DevBatteryLogging:
     {
       newBehavior = ICozmoBehaviorPtr(new BehaviorDevBatteryLogging(config));
@@ -826,6 +841,12 @@ ICozmoBehaviorPtr BehaviorFactory::CreateBehavior(const Json::Value& config)
       break;
     }
     
+    case BehaviorClass::EyeColor:
+    {
+      newBehavior = ICozmoBehaviorPtr(new BehaviorEyeColor(config));
+      break;
+    }
+    
     case BehaviorClass::EyeColorVoiceCommand:
     {
       newBehavior = ICozmoBehaviorPtr(new BehaviorEyeColorVoiceCommand(config));
@@ -891,7 +912,7 @@ ICozmoBehaviorPtr BehaviorFactory::CreateBehavior(const Json::Value& config)
       newBehavior = ICozmoBehaviorPtr(new BehaviorReactToPalmEdge(config));
       break;
     }
-
+    
     case BehaviorClass::KnowledgeGraphQuestion:
     {
       newBehavior = ICozmoBehaviorPtr(new BehaviorKnowledgeGraphQuestion(config));
@@ -922,12 +943,6 @@ ICozmoBehaviorPtr BehaviorFactory::CreateBehavior(const Json::Value& config)
       break;
     }
     
-    case BehaviorClass::RespondToNameAndPronouns:
-    {
-      newBehavior = ICozmoBehaviorPtr(new BehaviorRespondToNameAndPronouns(config));
-      break;
-    }
-
     case BehaviorClass::ObservingLookAtFaces:
     {
       newBehavior = ICozmoBehaviorPtr(new BehaviorObservingLookAtFaces(config));
@@ -981,7 +996,7 @@ ICozmoBehaviorPtr BehaviorFactory::CreateBehavior(const Json::Value& config)
       newBehavior = ICozmoBehaviorPtr(new BehaviorPossiblePerformance(config));
       break;
     }
-
+    
     case BehaviorClass::AestheticallyCenterFaces:
     {
       newBehavior = ICozmoBehaviorPtr(new BehaviorAestheticallyCenterFaces(config));
@@ -1131,23 +1146,25 @@ ICozmoBehaviorPtr BehaviorFactory::CreateBehavior(const Json::Value& config)
       newBehavior = ICozmoBehaviorPtr(new BehaviorReactToVoiceCommand(config));
       break;
     }
-
+    
     case BehaviorClass::PowerRobotOff:
     {
       newBehavior = ICozmoBehaviorPtr(new BehaviorPowerRobotOff(config));
       break;
     }
-
+    
     case BehaviorClass::PromptUserForVoiceCommand:
     {
       newBehavior = ICozmoBehaviorPtr(new BehaviorPromptUserForVoiceCommand(config));
       break;
     }
+    
     case BehaviorClass::RockPaperScissors:
     {
       newBehavior = ICozmoBehaviorPtr(new BehaviorRockPaperScissors(config));
       break;
     }
+    
     case BehaviorClass::SDKInterface:
     {
       newBehavior = ICozmoBehaviorPtr(new BehaviorSDKInterface(config));
@@ -1214,18 +1231,12 @@ ICozmoBehaviorPtr BehaviorFactory::CreateBehavior(const Json::Value& config)
       break;
     }
     
-    case BehaviorClass::DisplayWallDate:
-    {
-      newBehavior = ICozmoBehaviorPtr(new BehaviorDisplayWallDate(config));
-      break;
-    }
-
     case BehaviorClass::ProceduralClock:
     {
       newBehavior = ICozmoBehaviorPtr(new BehaviorProceduralClock(config));
       break;
     }
-
+    
     case BehaviorClass::TimerUtilityCoordinator:
     {
       newBehavior = ICozmoBehaviorPtr(new BehaviorTimerUtilityCoordinator(config));
@@ -1238,12 +1249,6 @@ ICozmoBehaviorPtr BehaviorFactory::CreateBehavior(const Json::Value& config)
       break;
     }
     
-    case BehaviorClass::WallDateCoordinator:
-    {
-      newBehavior = ICozmoBehaviorPtr(new BehaviorWallDateCoordinator(config));
-      break;
-    }
-
     case BehaviorClass::UserDefinedBehaviorSelector:
     {
       newBehavior = ICozmoBehaviorPtr(new BehaviorUserDefinedBehaviorSelector(config));
@@ -1253,6 +1258,18 @@ ICozmoBehaviorPtr BehaviorFactory::CreateBehavior(const Json::Value& config)
     case BehaviorClass::UserDefinedBehaviorTreeRouter:
     {
       newBehavior = ICozmoBehaviorPtr(new BehaviorUserDefinedBehaviorTreeRouter(config));
+      break;
+    }
+    
+    case BehaviorClass::BlockDrop:
+    {
+      newBehavior = ICozmoBehaviorPtr(new BehaviorBlockDrop(config));
+      break;
+    }
+    
+    case BehaviorClass::BrickBreaker:
+    {
+      newBehavior = ICozmoBehaviorPtr(new BehaviorBrickBreaker(config));
       break;
     }
     
@@ -1267,7 +1284,7 @@ ICozmoBehaviorPtr BehaviorFactory::CreateBehavior(const Json::Value& config)
       newBehavior = ICozmoBehaviorPtr(new BehaviorPetDetection(config));
       break;
     }
-
+    
     case BehaviorClass::PoweringRobotOff:
     {
       newBehavior = ICozmoBehaviorPtr(new BehaviorPoweringRobotOff(config));
@@ -1289,6 +1306,12 @@ ICozmoBehaviorPtr BehaviorFactory::CreateBehavior(const Json::Value& config)
     case BehaviorClass::RobustChargerObservation:
     {
       newBehavior = ICozmoBehaviorPtr(new BehaviorRobustChargerObservation(config));
+      break;
+    }
+    
+    case BehaviorClass::SnakeGame:
+    {
+      newBehavior = ICozmoBehaviorPtr(new BehaviorSnakeGame(config));
       break;
     }
     

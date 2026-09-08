@@ -99,18 +99,23 @@ enum uint_16 BehaviorID {
   BlackJackRequestToPlayAgain,
   BlackJackTextToSpeech,
 
-  // victorBehaviorTree/character
+  // victorBehaviorTree/blockDrop
+  BlockDrop,
+
+  // victorBehaviorTree/brickBreaker
+  BrickBreaker,
+
+  // victorBehaviorTree/character/howOldAreYou
   HowOldAreYou,
   HowOldAreYouCounting,
+
+  // victorBehaviorTree/character
+  RespondToNameAndPronouns,
 
   // victorBehaviorTree/clock
   ShowWallTime,
   SingletonFindFaceInFrontWallTime,
   SingletonWallTimeCoordinator,
-
-  // victorBehaviorTree/date
-  ShowWallDate,
-  SingletonWallDateCoordinator,
 
   // victorBehaviorTree
   ComeHereVoiceCommand,
@@ -138,6 +143,10 @@ enum uint_16 BehaviorID {
   ListenForBeats,
   ListenForBeatsLong,
   ListenForBeatsVoiceCommand,
+
+  // victorBehaviorTree/date
+  ShowWallDate,
+  SingletonWallDateCoordinator,
 
   // victorBehaviorTree
   DefaultTextToSpeechLoop,
@@ -219,10 +228,6 @@ enum uint_16 BehaviorID {
   InitialPickupAnimation,
   InteractWithFaces,
 
-  // victorBehaviorTree/highLevelDelegates/rockPaperScissors
-  RockPaperScissors,
-  RockPaperScissorsChooseMovePrompt,
-
   // victorBehaviorTree/highLevelDelegates/investigateCube
   InteractWithStaticCube,
   InvestigateCubeConnectionGate,
@@ -231,9 +236,6 @@ enum uint_16 BehaviorID {
   PlaceCubeByCharger,
   RollBlockIfNotVertical,
   TurnToLastFace,
-
-  // victorBehaviorTree/highLevelDelegates
-  Keepaway,
 
   // victorBehaviorTree/highLevelDelegates/knowledgeGraph
   KnowledgeGraphQuestion,
@@ -252,9 +254,6 @@ enum uint_16 BehaviorID {
   MessagingPlaybackTTS,
   MessagingRecordTTS,
   PlaybackMessage,
-
-  // victorBehaviorTree/highLevelDelegates/nameVictor
-  RespondToNameAndPronouns,
 
   // victorBehaviorTree/highLevelDelegates
   NothingToDo_Idle,
@@ -291,6 +290,7 @@ enum uint_16 BehaviorID {
   FindCube,
   FindCubeAndThen,
   FindFacesFetchCube,
+  Keepaway,
   PlayRollBlock,
   PlayWithCube,
   PopAWheelie,
@@ -306,6 +306,15 @@ enum uint_16 BehaviorID {
   PutDownBlock,
   PutDownBlockAtPose,
   PutDownDispatch_LookForFaceAndCube,
+
+  // victorBehaviorTree/highLevelDelegates/rebootRobot
+  PowerRobotOff,
+
+  // victorBehaviorTree/highLevelDelegates/rockPaperScissors
+  RockPaperScissors,
+  RockPaperScissorsChooseMovePrompt,
+
+  // victorBehaviorTree/highLevelDelegates
   SayName,
   ShortLookAroundForFaceAndCube,
 
@@ -393,6 +402,9 @@ enum uint_16 BehaviorID {
   PossibleIntentionalPerformance,
   PossibleUnintentionalPerformance,
 
+  // victorBehaviorTree
+  PetDetection,
+
   // victorBehaviorTree/prDemo
   PRDemoBigGreeting,
   PRDemoComeHere,
@@ -455,9 +467,6 @@ enum uint_16 BehaviorID {
   StuckOnEdge,
   TriggerWordWithoutIntent,
 
-  // victorBehaviorTree/rebootRobot
-  PowerRobotOff,
-
   // victorBehaviorTree
   ResetSafely,
 
@@ -473,6 +482,12 @@ enum uint_16 BehaviorID {
   // victorBehaviorTree
   SingletonICantDoThat,
   SingletonPoweringRobotOff,
+
+  // victorBehaviorTree/snakeGame
+  SnakeGame,
+  SnakeGameVictorScore,
+
+  // victorBehaviorTree
   StayOnChargerUntilCharged,
 
   // victorBehaviorTree/takeAPhoto
@@ -518,10 +533,6 @@ enum uint_16 BehaviorID {
   // victorBehaviorTree/weather
   WeatherResponses,
   WeatherTextToSpeech,
-
-  // victorBehaviorTree
-  PetDetection,
-
 }
 
 }

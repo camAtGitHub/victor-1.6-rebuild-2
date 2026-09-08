@@ -25,6 +25,21 @@
           "behavior" : "BlackJack",
           "cooldown_s" : 300.0,
           "weight" : 1.0
+        },
+        {
+          "behavior" : "SnakeGame",
+          "cooldown_s" : 300.0,
+          "weight" : 1.0
+        },
+        {
+          "behavior" : "BrickBreaker",
+          "cooldown_s" : 300.0,
+          "weight" : 1.0
+        },
+        {
+          "behavior" : "BlockDrop",
+          "cooldown_s" : 300.0,
+          "weight" : 1.0
         }
       ]
     }
