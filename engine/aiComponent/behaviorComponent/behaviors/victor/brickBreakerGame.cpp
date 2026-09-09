@@ -9,6 +9,15 @@ namespace {
 float Clamp(float v, float lo, float hi) { return std::max(lo, std::min(v, hi)); }
 constexpr float Radius = 2.f;
 constexpr int Top = 14;
+// Original L1 serve was 53+9=62 px/s. 25% faster becomes the floor; later
+// levels still add +9 px/s from that new baseline. Cap keeps the same rally
+// headroom as before so a step stays under one pixel.
+constexpr float kServeSpeedLevel1 = (53.f + 9.f) * 1.25f;
+constexpr float kServeSpeedPerLevel = 9.f;
+constexpr float kMaxBallSpeed = kServeSpeedLevel1 + (98.f - 62.f);
+constexpr float kPaddleSpeed = 105.f * 1.25f;
+constexpr float kStaleSpeedLevel1 = (70.f + 5.f) * 1.25f;
+constexpr float kStaleSpeedPerLevel = 5.f;
 // Tiny bitmap font: 3 columns x 5 rows, drawn at 2x for actual face readability.
 const char* Glyph(char c) {
   switch(c) {
@@ -58,12 +67,12 @@ void BrickBreakerGame::NewLayout() {
 void BrickBreakerGame::Serve() {
   _phase=Phase::Serving; _phaseTicks=120; _rallyTicks=0;
   _x=_paddle; _y=PaddleY()-Radius-1.f;
-  const float speed = 53.f + _level*9.f;
+  const float speed = kServeSpeedLevel1 + (_level-1)*kServeSpeedPerLevel;
   _vx = (Random()&1 ? 1.f : -1.f)*speed*0.45f;
   _vy = -std::sqrt(speed*speed-_vx*_vx);
 }
 void BrickBreakerGame::BounceFromPaddle() {
-  const float speed=std::min(98.f, std::sqrt(_vx*_vx+_vy*_vy)+1.f);
+  const float speed=std::min(kMaxBallSpeed, std::sqrt(_vx*_vx+_vy*_vy)+1.f);
   float offset=Clamp((_x-_paddle)/PaddleHalfWidth(), -1.f, 1.f);
   // Avoid a permanent vertical bounce and cap shallow angles.
   if (std::fabs(offset)<0.18f) { offset=(_vx<0 ? -0.18f : 0.18f); }
@@ -77,7 +86,7 @@ unsigned BrickBreakerGame::Step(float target) {
   if (!std::isfinite(target)) { target=_paddle; }
   const float half=PaddleHalfWidth();
   target=Clamp(target, 2.f+half, _width-2.f-half);
-  _paddle += Clamp(target-_paddle, -105.f*StepSeconds(), 105.f*StepSeconds());
+  _paddle += Clamp(target-_paddle, -kPaddleSpeed*StepSeconds(), kPaddleSpeed*StepSeconds());
   _paddle=Clamp(_paddle, 2.f+half, _width-2.f-half);
   if (_phase!=Phase::Playing) {
     if (_phase==Phase::Serving) { _x=_paddle; _y=PaddleY()-Radius-1.f; }
@@ -130,7 +139,7 @@ unsigned BrickBreakerGame::Step(float target) {
   } else if (_rallyTicks>120*8) {
     // Stale rallies get a small horizontal nudge, not an endless orbit.
     _vx=(_vx<0 ? -1.f : 1.f)*(18.f+Random()%18);
-    const float speed=70.f+_level*5.f;
+    const float speed=kStaleSpeedLevel1 + (_level-1)*kStaleSpeedPerLevel;
     _vy=(_vy<0 ? -1.f : 1.f)*std::sqrt(speed*speed-_vx*_vx);
     _rallyTicks=0;
   }
