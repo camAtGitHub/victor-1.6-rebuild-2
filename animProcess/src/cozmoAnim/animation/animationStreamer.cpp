@@ -735,6 +735,21 @@ namespace Anim {
     uint8_t* imageData_i = _faceImageGrayscale.GetDataPointer();
     std::copy_n(msg.faceData, numPixels, imageData_i + (msg.chunkIndex * kMaxNumPixelsPerChunk) );
 
+    // Match the sender's chunk count for the active display resolution.
+    const u32 expectedChunks =
+        (FACE_DISPLAY_NUM_PIXELS + kMaxNumPixelsPerChunk - 1) /
+        kMaxNumPixelsPerChunk;
+
+    if (!ANKI_VERIFY(expectedChunks > 0 && expectedChunks < 32,
+                     "AnimationStreamer.Grayscale.InvalidChunkCount",
+                     "Expected chunk count %u exceeds mask capacity",
+                     expectedChunks)) {
+      return;
+    }
+
+    const u32 kAllFaceImageGrayscaleChunksReceivedMask =
+        (u32{1} << expectedChunks) - 1u;
+
     if (_faceImageGrayscaleChunksReceivedBitMask == kAllFaceImageGrayscaleChunksReceivedMask) {
       auto* img = new Vision::ImageRGBA(static_cast<int16_t>(FACE_DISPLAY_HEIGHT), static_cast<int16_t>(FACE_DISPLAY_WIDTH));
       img->SetFromGray(_faceImageGrayscale);

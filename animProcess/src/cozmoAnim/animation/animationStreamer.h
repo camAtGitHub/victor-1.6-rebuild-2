@@ -310,7 +310,6 @@ namespace Anim {
     // Grayscale images
     u32                 _faceImageGrayscaleId                    = 0;      // Used only for tracking chunks of the same image as they are received
     u32                 _faceImageGrayscaleChunksReceivedBitMask = 0;
-    const u32           kAllFaceImageGrayscaleChunksReceivedMask = 0x7fff; // 15 bits for 15 expected chunks (FACE_DISPLAY_NUM_PIXELS / 1200 pixels_per_msg ~= 15)
 
     // RGB images
     Vision::ImageRGB565 _faceImageRGB565;
