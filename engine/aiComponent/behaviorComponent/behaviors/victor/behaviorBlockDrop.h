@@ -59,7 +59,6 @@ private:
     unsigned int inputTicks     = 0;
     unsigned int gameOverTicks  = 0;
     bool         lost           = false;
-    bool         liftUp         = false;
     bool         headUp         = false;
     int          highScore      = 0;
 

@@ -65,7 +65,7 @@ void BehaviorBrickBreaker::BehaviorUpdate() {
   if (steps==12) { _accumulator=0; } // discard backlog; never block the engine to catch up
   if ((events & BrickBreakerGame::BrickHit) && now-_lastSound>=0.15) {
     GetBEI().GetRobotAudioClient().PostEvent(
-      AudioMetaData::GameEvent::GenericEvent::Play__Robot_Vic_Sfx__Blackjack_Deal,
+      AudioMetaData::GameEvent::GenericEvent::Play__Robot_Vic_Sfx__Speaker_Test_05,
       AudioMetaData::GameObjectType::Behavior);
     _lastSound=now;
   }

@@ -49,6 +49,10 @@ const unsigned int kGameOverHoldTicks = 90;
 const float kBaseMistakeProb     = 0.02f;
 const float kMistakeProbPerLevel = 0.035f;
 
+// lift pump chance per cleared row (1→25%, 2→50%, 3→75%, 4+ always).
+// CARRY hides the screen, so the pump is always up then down in the same action.
+const float kLiftPumpChancePerLine = 0.25f;
+
 const uint8_t kOn    = 255;
 const uint8_t kGhost = 90;
 
@@ -339,15 +343,19 @@ void BehaviorBlockDrop::ReactToLineClear( uint8_t numLines )
     return;
   }
 
-  // pump the lift. four at once gets a spin as well
-  _dVars.liftUp = !_dVars.liftUp;
-  IAction* liftAction = new MoveLiftToHeightAction( _dVars.liftUp
-                                                    ? MoveLiftToHeightAction::Preset::CARRY
-                                                    : MoveLiftToHeightAction::Preset::LOW_DOCK );
+  // not every clear: 25% per row, always on a four-line. CARRY covers the face, so
+  // never leave the lift up — raise then lower in one sequence.
+  float pumpChance = kLiftPumpChancePerLine * static_cast<float>( numLines );
+  if( pumpChance > 1.0f ) {
+    pumpChance = 1.0f;
+  }
+  if( GetBEI().GetRNG().RandDbl() >= pumpChance ) {
+    return;
+  }
 
+  CompoundActionSequential* seq = new CompoundActionSequential();
+  seq->AddAction( new MoveLiftToHeightAction( MoveLiftToHeightAction::Preset::CARRY ), true );
   if( (numLines >= 4) && CanTurnInPlace() ) {
-    CompoundActionSequential* seq = new CompoundActionSequential();
-    seq->AddAction( liftAction, true );
     auto* turn = new TurnInPlaceAction( DEG_TO_RAD( 25.0f ), false );
     turn->SetAccel( MAX_BODY_ROTATION_ACCEL_RAD_PER_SEC2 / 2 );
     turn->SetMaxSpeed( MAX_BODY_ROTATION_SPEED_RAD_PER_SEC );
@@ -356,10 +364,9 @@ void BehaviorBlockDrop::ReactToLineClear( uint8_t numLines )
     turnBack->SetAccel( MAX_BODY_ROTATION_ACCEL_RAD_PER_SEC2 / 2 );
     turnBack->SetMaxSpeed( MAX_BODY_ROTATION_SPEED_RAD_PER_SEC );
     seq->AddAction( turnBack, true );
-    DelegateIfInControl( seq );
-  } else {
-    DelegateIfInControl( liftAction );
   }
+  seq->AddAction( new MoveLiftToHeightAction( MoveLiftToHeightAction::Preset::LOW_DOCK ), true );
+  DelegateIfInControl( seq );
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
