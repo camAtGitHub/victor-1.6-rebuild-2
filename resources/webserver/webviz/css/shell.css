@@ -609,7 +609,7 @@ a:hover {
   color: var(--wv-content-text);
 }
 
-.module-host button,
+.module-host button:not([class]),
 .module-host input[type="button"],
 .module-host input[type="submit"],
 .module-host .ui-button {
@@ -622,7 +622,7 @@ a:hover {
   cursor: pointer;
 }
 
-.module-host button:hover,
+.module-host button:not([class]):hover,
 .module-host input[type="button"]:hover,
 .module-host input[type="submit"]:hover,
 .module-host .ui-button:hover,
