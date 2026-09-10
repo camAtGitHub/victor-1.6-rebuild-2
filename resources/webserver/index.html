@@ -419,7 +419,6 @@
             elem.removeClass("is-active");
             elem.removeAttr("disabled");
             elem.attr("aria-selected", "false");
-            elem.attr("tabindex", "-1");
         });
     }
 
@@ -449,7 +448,6 @@
         $('#' + pageName).show();
         $(':button[name=' + pageName + ']').addClass("is-active");
         $(':button[name=' + pageName + ']').attr("aria-selected", "true");
-        $(':button[name=' + pageName + ']').attr("tabindex", "0");
 
         curPageName = pageName;
         syncPageHash(pageName);
@@ -496,7 +494,7 @@
                             value: parseFloat(item["val"]),
                             create: function(event, ui)
                                 {$(this).find('.ui-widget-header').css
-                                ({'background-color':'darkgrey','height':'14px'})}
+                                ({'height':'14px'})}
                         });
                     }
                 }
@@ -538,7 +536,7 @@
                             value: parseFloat(item["val"]),
                             create: function(event, ui)
                                 {$(this).find('.ui-widget-header').css
-                                ({'background-color':'darkgrey','height':'14px'})}
+                                ({'height':'14px'})}
                         });
                     }
                 }
