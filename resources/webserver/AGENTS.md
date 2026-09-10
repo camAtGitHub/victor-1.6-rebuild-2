@@ -99,7 +99,7 @@ Do not invent `--cv-*` light tokens. Do not darken WebViz module hosts for “co
 | **UI sans** | `"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif` |
 | **Mono** (var names, values, code) | `ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace` |
 
-Load Inter like WebViz (`fonts.googleapis.com` … `Inter:wght@400;500;600;700`) when the page is dark chrome.  
+Inter is **local** — `webviz/css/fonts.css` + `/fonts/inter-latin-*.woff2` (preload 400 from HTML). Do **not** load fonts.googleapis.com.  
 **Body ~13px / 1.45.** Labels for console var ids: mono ~12px.
 
 ### Geometry
@@ -123,7 +123,9 @@ Use **one frame language** everywhere:
 ### WebViz content exception
 
 WebViz **module hosts** keep a light content surface (`--wv-content-*`) under **both** shell themes so charts/tables stay readable. Overview surface uses shell tokens.  
-**Console vars chrome is full-theme** (no separate light content well) — Path A uses shell tokens end-to-end; light mode recolors the whole page when `data-theme=light`.
+Chrome widgets (shell / home / consolevars) were fixed for dark theme; **do not darken** `.module-host`.  
+**Console vars chrome is full-theme** (no separate light content well) — Path A uses shell tokens end-to-end; light mode recolors the whole page when `data-theme=light`.  
+**Home landing** (`index.html`) is also full-theme chrome (same `--wv-*`).
 
 ### Density
 
@@ -252,8 +254,8 @@ Module JS should keep working if the shell is absent; do not break stock module 
 | Extend `/consolevars` + existing set/list/call APIs | New REST paths for docs or theming |
 | Progressive catalog shards | One huge mandatory JSON |
 | Mark dead vars without disabling | Grey-out / remove orphan vars from UI |
-| Match Inter + mono + 8px radius | Bring back default jQuery UI light skin for new chrome |
-| scp-friendly resource edits | Require C++ rebuild for docs/theme |
+| Match local Inter + mono + 8px radius | Bring back Google Fonts CDN or default jQuery UI light skin |
+| scp-friendly resource edits | Require C++ rebuild for docs/theme; raise home poll rates |
 | Keep template injection markers | Rewrite generated HTML structure unless user asks |
 
 ---
@@ -263,6 +265,14 @@ Module JS should keep working if the shell is absent; do not break stock module 
 | Entry | Notes |
 |---|---|
 | `AGENTS.md` | This file |
+| `index.html` | Themed home landing (`:8888` / `:8889`) — MAIN/PERF/ENGINE/… tabs |
+| `home-chrome.css` | Home chrome on `--wv-*` (panels, tabs, tables, sparklines) |
+| `home-spark.js` | Client SVG sparklines from existing PERF/ENGINE polls |
+| `home-catalog.js` | Row explainers (`?`) keyed by `desc` |
+| `home-overlay.js` | ENGINE flag pills, mic clock, robot overlay SVG |
+| `images/vector-topdown.png` | Overlay photo (1000×710; lift right / backpack left) |
+| `fonts/` | Local Inter woff2 (`inter-latin-400/500/600/700`) |
+| `vendor/` | Local third-party JS/CSS (no CDN) |
 | `consolevarsui.html` | Path A template for `/consolevars` |
 | `consolevars-explorer.html` | Explorer template; needs C++ route to inject |
 | `cv-app.js` | Decorator / recipes |
@@ -270,10 +280,16 @@ Module JS should keep working if the shell is absent; do not break stock module 
 | `cv-catalog.json` | Monolithic catalog fallback |
 | `cvcatalog/` | Multi-file catalog (URL `/cvcatalog/`) |
 | `README.consolevars.md` | Human consolevars notes |
-| `webViz.html`, `webviz/` | Modern WebViz |
+| `webViz.html`, `webviz/` | Modern WebViz (`css/fonts.css` loads local Inter) |
 | `webVizModules/` | Per-module scripts |
 | `webServerConfig_*.json` | Port / feature flags for webserver process |
 | `style.css`, jQuery assets | Legacy shared CSS/JS |
+
+### Home landing notes
+
+- **Static deploy:** scp assets + hard-refresh. Civetweb `static_file_max_age` is **0** (`webServerProcess/src/webService.cpp`), so browsers should not stick on stale CSS/JS.
+- **C++ only when needed:** home UI is client-side. The one home-related C++ change is `/getenginestats` checkbox bits in `engine/cozmoEngine.cpp` (inactive slots emit empty lines so indices stay stable).
+- **Do not** raise poll rates or add new HTTP endpoints for home UI (sparklines / flags / overlay reuse existing `/getperfstats` and `/getenginestats`). See `docs/mapping/WEBSERVER-HOME.md`.
 
 ---
 
@@ -303,9 +319,10 @@ resources/webserver/.docs/
 
 - **Theme source?** `webviz/css/tokens.css` (mirror: `cv-tokens.css`)
 - **Color scheme?** `webviz.colorScheme` + `html[data-theme]` / `.wv-theme-*` + inline light vars; WebViz footer `#btnThemeToggle` / `theme.js`; consolevars tokens only in v1
-- **Font?** Inter (UI) + system mono (ids/values)
+- **Font?** Local Inter (`webviz/css/fonts.css` + `/fonts/inter-latin-*.woff2`) + system mono (ids/values)
+- **Home landing?** `index.html` + `home-*.{css,js}`; map: `docs/mapping/WEBSERVER-HOME.md`
 - **Console vars strategy?** Path A: CSS + JS decorate C++ markup; catalog explainers progressive
-- **New endpoints?** No
+- **New endpoints?** No (home extras reuse existing polls)
 - **Explorer route?** Optional; must not be required
 - **Dead var UX?** Glyph + tooltip; control stays usable
 - **Docs growth?** Add a small JSON shard from dump-backed exploration; reload page

@@ -12,6 +12,7 @@ Modular **host shell** for WebViz. Entry page is still `../webViz.html` (served 
 | Entry | What |
 |---|---|
 | `css/tokens.css` | Design tokens (dark defaults + light overrides; light module content surface) |
+| `css/fonts.css` | Local Inter `@font-face` → `/fonts/inter-latin-*.woff2` (no Google Fonts CDN) |
 | `css/shell.css` | App grid, nav, surfaces, toasts |
 | `js/config.js` | Port → module registry (engine 8888 / anim 8889) |
 | `js/socket.js` | WebSocket + reconnect + resubscribe |
@@ -105,4 +106,4 @@ Robot WebService does not gate WS by Origin (civetweb handler accepts connection
 
 - Harden individual modules (`behaviors.js` stratify id bug, etc.)
 - Optional enhanced Freeplay surface
-- Local vendor fallbacks when CDN is unreachable
+- Vendors + Inter are local under `../vendor/` and `../fonts/` (CDN removed)

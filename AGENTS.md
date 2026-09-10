@@ -243,6 +243,8 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 | `docs/mapping/WEBVIZ-FREEPLAY-PLAN.md` | FreePlay v1 implementation plan (phased; Allowed APIs; S1–S9) — **shipped** |
 | `docs/mapping/WEBVIZ-FREEPLAY-UX-PLAN.md` | FreePlay Ops UX uplift (P1–P6) — **implemented**; P7 docs closeout |
 | `resources/webserver/webVizModules/freeplay.js` | Production FreePlay: Ops stack\|log + gates; client log tags; latest-factor gates; secondary timeline |
+| `resources/webserver/index.html` | Themed home landing (`:8888`/`:8889`); sparklines/overlay/catalog — see `docs/mapping/WEBSERVER-HOME.md` |
+| `docs/mapping/WEBSERVER-HOME.md` | Home chrome map: endpoints, local vendor/Inter, ENGINE checkbox bits, no extra polls |
 | `webviz-ux-demo.html` | Standalone Ops vs Timeline mock (reference only; not robot-deployed) |
 | `docs/mapping/GLOSSARY.md` | ~130 repo terms |
 | `docs/mapping/CAMERA-HW-V1-V2.md` | Camera 1.0 vs Whiskey vs Xray/2.0; AWB rails; Session B VicOS ignore; software WB after debayer |
@@ -345,6 +347,11 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
   full-width gates (**latest factors** for owner — not time-aligned to scrubbed log).
   Secondary collapsed timeline optional. Design: `WEBVIZ-FREEPLAY-DESIGN.md` §5; UX plan
   P1–P6 shipped: `WEBVIZ-FREEPLAY-UX-PLAN.md`. Stock Behaviors/BehaviorConds tabs stay.
+- **Where is the themed webserver home?** — `resources/webserver/index.html` on engine
+  `:8888` / anim `:8889` (`home-chrome.css`, `home-spark.js`, `home-catalog.js`,
+  `home-overlay.js`; local `vendor/` + Inter). Sparklines/flags/overlay reuse
+  `/getperfstats` + `/getenginestats` (no extra polls). ENGINE checkbox bits honored in
+  `engine/cozmoEngine.cpp` (empty lines). Map: `docs/mapping/WEBSERVER-HOME.md`.
 - **How does drive-to-pose work?** — `ENGINE-PATH-PLANNING.md`: ≥40 mm → `XYPlanner` (threaded);
   short moves → FaceAndApproach / MinimalAngle. Robot path follower runs on `vic-robot`.
 - **Which parts are rebuild-specific vs. stock Anki 1.6?** — `CHANGES.md`. Observed: wirepod
@@ -416,6 +423,7 @@ if you ran out of context mid-folder, say so here.
 | 2026-09-07 | Grok | **Overheat backpack lights v1:** restored four triggers + map + stock JSON + checkpoint charger-cooldown `if`s (`charging && disconnected` on contacts). No `conditionHighTemperature` / no `IS_STATUS_FLAG_SET`. Plan `OVERHEAT-BACKPACK-LIGHTS-PLAN.md`. | Rebuild clad + flash; on-robot 41 °C A/B. Optional v1.1 `isBatteryOverheated` bit. |
 | 2026-09-07 | Grok | **NightGammaAuto Phase 1 + docs:** AE-pegged DebayerGamma lift (`NightGammaAuto` default false, night G 2.5, hysteresis 15). Plan `CAMERA-NIGHT-BRIGHTNESS-PLAN.md`; Status + Session F in `CAMERA-HW-V1-V2.md`. Phase 2 probe not built. | Flash + Session F (F0–F3). Phase 0b soak may already be on robot (DebayerGamma 2.5). |
 | 2026-09-08 | Grok | **CPU-hot backpack lights:** CpuOverheated + LowBatteryCpuOverheated (clad/map/JSON×4 packGs + anim ifs + catalog). User JSON from /tmp. Custom is exclusive overlay. | Rebuild clad+anim; fake CPU 92 A/B; copy JSON onto live custom pack if CUSTOM LIGHTS ON. |
+| 2026-09-10 | Grok | **Webserver home closeout:** themed home chrome, local CDN vendor + Inter, sparklines/flag pills/overlay, `/getenginestats` checkbox bits. Docs: `WEBSERVER-HOME.md` + `resources/webserver/AGENTS.md`. | scp/flash + on-robot smoke. |
 
 ---
 
