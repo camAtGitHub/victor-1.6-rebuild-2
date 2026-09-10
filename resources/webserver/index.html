@@ -345,17 +345,23 @@
         pmChart = null;
         return false;
     }
-    function ResizePerfMetricChart() {
-        if (!pmChartIsLive()) {
-            return;
+    function pmChartContainerReady($c) {
+        if (!$c || !$c.length) {
+            $c = $("#pm_chart_container");
         }
-        var $c = $("#pm_chart_container");
         if (!$c.length || !$c.is(":visible")) {
+            return false;
+        }
+        return ($c.width() >= 2) && ($c.height() >= 2);
+    }
+    function ResizePerfMetricChart() {
+        if (!pmChartContainerReady()) {
             return;
         }
-        var w = $c.width();
-        var h = $c.height();
-        if ((w < 2) || (h < 2)) {
+        if (!pmChartIsLive()) {
+            if (pmTickData.length > 0) {
+                DrawPerfMetricChart();
+            }
             return;
         }
         try {
@@ -560,6 +566,8 @@
         } else if (curPageName == "page_perfmetric") {
             if (pmAutoUpdate) {
                 clearTimeout(pmAutoUpdateTimerId);
+            }
+            if (pmGraphAutoUpdate) {
                 clearTimeout(pmGraphAutoUpdateTimerId);
             }
         }
@@ -1135,6 +1143,11 @@
         if (ticksInData == 0) {
             return;
         }
+        var $c = $("#pm_chart_container");
+        if (!pmChartContainerReady($c)) {
+            SchedulePerfMetricChartResize();
+            return;
+        }
         var firstTick = 0;
         var lastTick = ticksInData - 1;
         switch (pmXMode) {
@@ -1179,22 +1192,24 @@
         plotData.push(AddTickBudgetSeries(firstTick, lastTick));
 
         if (!pmChartIsLive()) {
-            $('#pm_chart_container').html("");
+            $c.html("");
             applyPmChartTheme(chartOptions);
             try {
-                pmChart = $.plot($('#pm_chart_container'), plotData, chartOptions);
+                pmChart = $.plot($c, plotData, chartOptions);
             } catch (ePlot) {
                 pmChart = null;
                 return;
             }
         } else {
             applyPmChartTheme(pmChart.getOptions());
-            var $cLive = $('#pm_chart_container');
-            if ($cLive.is(':visible') && ($cLive.width() > 2) && ($cLive.height() > 2)) {
-                try {
-                    pmChart.resize();
-                } catch (eResize) {}
-            }
+            try {
+                pmChart.resize();
+            } catch (eResize) {}
+        }
+
+        if (!pmChartIsLive() || !pmChartContainerReady($c)) {
+            SchedulePerfMetricChartResize();
+            return;
         }
 
         pmChart.getAxes().xaxis.options.min = firstTick;
