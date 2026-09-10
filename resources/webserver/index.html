@@ -69,6 +69,7 @@
     <link rel="stylesheet" href="/home-chrome.css" />
     <script src="jquery-1.12.4.js"></script>
     <script src="jquery-ui.js"></script>
+    <script src="/home-spark.js"></script>
     <script src="jquery.flot.min.js"></script>
     <script src="jquery.dataTables.min.js"></script>
     <script src="jquery.flot.orderBars.js"></script>
@@ -100,18 +101,18 @@
     var perfSavedTriggeredByTimer = false;
 
     var perfItems = [
-        { activeUpdate:true, val:"", hasGraph:true,  graphMax:1500000, desc:"CPU freq",        units:"kHz" },
-        { activeUpdate:true, val:"", hasGraph:true,  graphMax:150,     desc:"Temperature",     units:"Celsius" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:0,       graphMax:1500000, desc:"CPU freq",        units:"kHz" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:20,      graphMax:100,     desc:"Temperature",     units:"Celsius" },
         { activeUpdate:true, val:"", hasGraph:false, graphMax:0,       desc:"Uptime",          units:"seconds" },
         { activeUpdate:true, val:"", hasGraph:false, graphMax:0,       desc:"Idle time",       units:"seconds" },
         { activeUpdate:true, val:"", hasGraph:false, graphMax:0,       desc:"Real time clock", units:"" },
-        { activeUpdate:true, val:"", hasGraph:true,  graphMax:438388,  desc:"Memory Claimed",  units:"kB",      updateFunction:MemUseInfo1 },
-        { activeUpdate:true, val:"", hasGraph:true,  graphMax:438388,  desc:"Memory Used",     units:"kB",      updateFunction:MemUseInfo2 },
-        { activeUpdate:true, val:"", hasGraph:true,  graphMax:100,     desc:"Overall CPU",     units:"%",       updateFunction:CPUTimeInfo },
-        { activeUpdate:true, val:"", hasGraph:true,  graphMax:100,     desc:"CPU0",            units:"%",       updateFunction:CPUTimeInfo },
-        { activeUpdate:true, val:"", hasGraph:true,  graphMax:100,     desc:"CPU1",            units:"%",       updateFunction:CPUTimeInfo },
-        { activeUpdate:true, val:"", hasGraph:true,  graphMax:100,     desc:"CPU2",            units:"%",       updateFunction:CPUTimeInfo },
-        { activeUpdate:true, val:"", hasGraph:true,  graphMax:100,     desc:"CPU3",            units:"%",       updateFunction:CPUTimeInfo }
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:0,       graphMax:438388,  desc:"Memory Claimed",  units:"kB",      updateFunction:MemUseInfo1 },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:0,       graphMax:438388,  desc:"Memory Used",     units:"kB",      updateFunction:MemUseInfo2 },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:0,       graphMax:100,     desc:"Overall CPU",     units:"%",       updateFunction:CPUTimeInfo },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:0,       graphMax:100,     desc:"CPU0",            units:"%",       updateFunction:CPUTimeInfo },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:0,       graphMax:100,     desc:"CPU1",            units:"%",       updateFunction:CPUTimeInfo },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:0,       graphMax:100,     desc:"CPU2",            units:"%",       updateFunction:CPUTimeInfo },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:0,       graphMax:100,     desc:"CPU3",            units:"%",       updateFunction:CPUTimeInfo }
     ];
 
     const kNumCPUTimeValues = 8;    // Number of time values to read per cpu
@@ -140,40 +141,40 @@
     var engineSavedTriggeredByTimer = false;
 
     var engineItems = [
-        { activeUpdate:true, val:"", hasGraph:true,  graphMax:5,      desc:"Battery (filtered)",        units:"volts" },
-        { activeUpdate:true, val:"", hasGraph:true,  graphMax:5,      desc:"Battery (raw)",             units:"volts" },
-        { activeUpdate:true, val:"", hasGraph:true,  graphMax:5,      desc:"Charger (raw)",             units:"volts" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:3,      graphMax:5,      desc:"Battery (filtered)",        units:"volts" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:3,      graphMax:5,      desc:"Battery (raw)",             units:"volts" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:3,      graphMax:5,      desc:"Charger (raw)",             units:"volts" },
         { activeUpdate:true, val:"", hasGraph:false, graphMax:0,      desc:"Battery level",             units:"" },
-        { activeUpdate:true, val:"", hasGraph:true, graphMax:60,      desc:"Battery temp",              units:"C" },        
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:0,      graphMax:60,     desc:"Battery temp",              units:"C" },
         { activeUpdate:true, val:"", hasGraph:false, graphMax:0,      desc:"Battery charging",          units:"" },
         { activeUpdate:true, val:"", hasGraph:false, graphMax:0,      desc:"On charger contacts",       units:"" },
         { activeUpdate:true, val:"", hasGraph:false, graphMax:0,      desc:"On charger platform",       units:"" },
         { activeUpdate:true, val:"", hasGraph:false, graphMax:0,      desc:"Fully charged time",        units:"seconds" },
         { activeUpdate:true, val:"", hasGraph:false, graphMax:0,      desc:"Low battery time",          units:"seconds" },
         { activeUpdate:true, val:"", hasGraph:false, graphMax:0,      desc:"Off treads state",          units:"" },
-        { activeUpdate:true, val:"", hasGraph:false, graphMax:0,      desc:"Pose angle",                units:"degrees" },
-        { activeUpdate:true, val:"", hasGraph:false, graphMax:0,      desc:"Pose pitch",                units:"degrees" },
-        { activeUpdate:true, val:"", hasGraph:false, graphMax:0,      desc:"Head angle",                units:"degrees" },
-        { activeUpdate:true, val:"", hasGraph:true,  graphMax:100,    desc:"Lift height",               units:"mm" },
-        { activeUpdate:true, val:"", hasGraph:false, graphMax:0,      desc:"Left wheel speed",          units:"mmps" },
-        { activeUpdate:true, val:"", hasGraph:false, graphMax:0,      desc:"Right wheel speed",         units:"mmps" },
-        { activeUpdate:true, val:"", hasGraph:false, graphMax:0,      desc:"Accel X",                   units:"" },
-        { activeUpdate:true, val:"", hasGraph:false, graphMax:0,      desc:"Accel Y",                   units:"" },
-        { activeUpdate:true, val:"", hasGraph:false, graphMax:0,      desc:"Accel Z",                   units:"" },
-        { activeUpdate:true, val:"", hasGraph:false, graphMax:0,      desc:"Gyro X",                    units:"" },
-        { activeUpdate:true, val:"", hasGraph:false, graphMax:0,      desc:"Gyro Y",                    units:"" },
-        { activeUpdate:true, val:"", hasGraph:false, graphMax:0,      desc:"Gyro Z",                    units:"" },
-        { activeUpdate:true, val:"", hasGraph:true,  graphMax:5000,   desc:"Backpack touch sensor",     units:"" },
-        { activeUpdate:true, val:"", hasGraph:true,  graphMax:1024,   desc:"Cliff sensor 0 (FL)",       units:"" },
-        { activeUpdate:true, val:"", hasGraph:true,  graphMax:1024,   desc:"Cliff sensor 1 (FR)",       units:"" },
-        { activeUpdate:true, val:"", hasGraph:true,  graphMax:1024,   desc:"Cliff sensor 2 (BL)",       units:"" },
-        { activeUpdate:true, val:"", hasGraph:true,  graphMax:1024,   desc:"Cliff sensor 3 (BR)",       units:"" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:-180,   graphMax:180,    desc:"Pose angle",                units:"degrees" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:-180,   graphMax:180,    desc:"Pose pitch",                units:"degrees" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:-180,   graphMax:180,    desc:"Head angle",                units:"degrees" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:0,      graphMax:100,    desc:"Lift height",               units:"mm" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:-220,   graphMax:220,    desc:"Left wheel speed",          units:"mmps" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:-220,   graphMax:220,    desc:"Right wheel speed",         units:"mmps" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:-12000, graphMax:12000,  desc:"Accel X",                   units:"" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:-12000, graphMax:12000,  desc:"Accel Y",                   units:"" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:-12000, graphMax:12000,  desc:"Accel Z",                   units:"" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:-6,     graphMax:6,      desc:"Gyro X",                    units:"" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:-6,     graphMax:6,      desc:"Gyro Y",                    units:"" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:-6,     graphMax:6,      desc:"Gyro Z",                    units:"" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:0,      graphMax:5000,   desc:"Backpack touch sensor",     units:"" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:0,      graphMax:1024,   desc:"Cliff sensor 0 (FL)",       units:"" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:0,      graphMax:1024,   desc:"Cliff sensor 1 (FR)",       units:"" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:0,      graphMax:1024,   desc:"Cliff sensor 2 (BL)",       units:"" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:0,      graphMax:1024,   desc:"Cliff sensor 3 (BR)",       units:"" },
         { activeUpdate:true, val:"", hasGraph:false, graphMax:0,      desc:"Cliff sensor reads white",  units:"" },
         { activeUpdate:true, val:"", hasGraph:false, graphMax:0,      desc:"Prox latest data timestamp",units:"" },
-        { activeUpdate:true, val:"", hasGraph:true,  graphMax:1000,   desc:"Prox distance",             units:"mm" },
-        { activeUpdate:true, val:"", hasGraph:true,  graphMax:30,     desc:"Prox signal intensity",     units:"" },
-        { activeUpdate:true, val:"", hasGraph:true,  graphMax:0.5,    desc:"Prox ambient intensity",    units:"" },
-        { activeUpdate:true, val:"", hasGraph:true,  graphMax:196,    desc:"Prox SPAD count",           units:"" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:0,      graphMax:1000,   desc:"Prox distance",             units:"mm" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:0,      graphMax:30,     desc:"Prox signal intensity",     units:"" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:0,      graphMax:0.5,    desc:"Prox ambient intensity",    units:"" },
+        { activeUpdate:true, val:"", hasGraph:true,  graphMin:0,      graphMax:196,    desc:"Prox SPAD count",           units:"" },
         { activeUpdate:true, val:"", hasGraph:false, graphMax:0,      desc:"Prox range status",         units:"" },
         { activeUpdate:true, val:"", hasGraph:false, graphMax:0,      desc:"Carrying object ID",        units:"" },
         { activeUpdate:true, val:"", hasGraph:false, graphMax:0,      desc:"Carrying object on top ID", units:"" },
@@ -488,14 +489,8 @@
                     var item = perfItems[i];
                     // Set checkbox states to reflect the internal flags
                     $('#' + 'id_perf_checkbox_' + i).prop("checked", item["activeUpdate"]);
-                    if (item["hasGraph"]) {
-                        $('#' + 'id_graph_' + i).progressbar({
-                            max: parseFloat(item["graphMax"]),
-                            value: parseFloat(item["val"]),
-                            create: function(event, ui)
-                                {$(this).find('.ui-widget-header').css
-                                ({'height':'14px'})}
-                        });
+                    if (item["hasGraph"] && window.HomeSpark) {
+                        HomeSpark.mount(item, document.getElementById("id_graph_" + i));
                     }
                 }
                 if (perfAutoUpdate) {
@@ -530,14 +525,8 @@
                     var item = engineItems[i];
                     // Set checkbox states to reflect the internal flags
                     $('#' + 'id_engine_checkbox_' + i).prop("checked", item["activeUpdate"]);
-                    if (item["hasGraph"]) {
-                        $('#' + 'id_engine_graph_' + i).progressbar({
-                            max: parseFloat(item["graphMax"]),
-                            value: parseFloat(item["val"]),
-                            create: function(event, ui)
-                                {$(this).find('.ui-widget-header').css
-                                ({'height':'14px'})}
-                        });
+                    if (item["hasGraph"] && window.HomeSpark) {
+                        HomeSpark.mount(item, document.getElementById("id_engine_graph_" + i));
                     }
                 }
                 if (engineAutoUpdate) {
@@ -598,6 +587,13 @@
         perfItems[index]["activeUpdate"] = !perfItems[index]["activeUpdate"];
     }
 
+    function pushItemSpark(item, graphElId, numericVal) {
+        if (!item || !item["hasGraph"] || !window.HomeSpark) {
+            return;
+        }
+        HomeSpark.push(item, document.getElementById(graphElId), numericVal);
+    }
+
     function SendPerfUpdateRequest(triggeredByTimer) {
         if (perfRequestInProgress) {
             perfRequestQueued = true;
@@ -625,9 +621,7 @@
                         item["val"] = v;
                         $("#id_perf_row_value_" + i).html(v);
                         if (item["hasGraph"]) {
-                            var graph = $('#' + 'id_graph_' + i);
-                            graph.progressbar( "option", "value", parseFloat(v) );
-                            graph.progressbar( "option", "max", parseFloat(item["graphMax"]) );
+                            pushItemSpark(item, "id_graph_" + i, parseFloat(v));
                         }
                     }
                 }
@@ -657,10 +651,8 @@
         var freeMem_kB = parseInt(values[1]);
         var usedMem_kB = totalMem_kB - freeMem_kB;
         var v = usedMem_kB + " claimed, " + freeMem_kB + " free";
-        $("#id_perf_row_value_" + itemIndex).html(v);        
-        var graph = $('#' + 'id_graph_' + itemIndex);
-        graph.progressbar( "option", "value", usedMem_kB );
-        graph.progressbar( "option", "max", totalMem_kB );
+        $("#id_perf_row_value_" + itemIndex).html(v);
+        pushItemSpark(perfItems[itemIndex], "id_graph_" + itemIndex, usedMem_kB);
     }
 
     function MemUseInfo2(payload, itemIndex) {
@@ -670,9 +662,7 @@
         var usedMem_kB = totalMem_kB - availMem_kB;
         var v = usedMem_kB + " used, " + availMem_kB + " available";
         $("#id_perf_row_value_" + itemIndex).html(v);
-        var graph = $('#' + 'id_graph_' + itemIndex);
-        graph.progressbar( "option", "value", usedMem_kB );
-        graph.progressbar( "option", "max", totalMem_kB );
+        pushItemSpark(perfItems[itemIndex], "id_graph_" + itemIndex, usedMem_kB);
     }
 
     // http://www.linuxhowtos.org/System/procstat.htm
@@ -704,8 +694,7 @@
             var usedPct = deltaUsedTime * 100 / deltaTotalTime;
             // Note: In future, more of this data could be displayed.  Perhaps in a multi-section progress bar
             $("#id_perf_row_value_" + itemIndex).html(usedPct.toFixed(2));
-            var graph = $('#' + 'id_graph_' + itemIndex);
-            graph.progressbar( "option", "value", usedPct );
+            pushItemSpark(perfItems[itemIndex], "id_graph_" + itemIndex, usedPct);
 
             // Save the last reading for this CPU so it can be used next call
             prev["prevUsedTime"] = usedTime;
@@ -848,9 +837,7 @@
                         item["val"] = v;
                         $("#id_engine_row_value_" + i).html(v);
                         if (item["hasGraph"]) {
-                            var graph = $('#' + 'id_engine_graph_' + i);
-                            graph.progressbar( "option", "value", parseFloat(v) );
-                            graph.progressbar( "option", "max", parseFloat(item["graphMax"]) );
+                            pushItemSpark(item, "id_engine_graph_" + i, parseFloat(v));
                         }
                     }
                 }
@@ -1315,7 +1302,7 @@
             var s = "<tr><td><input id='id_perf_checkbox_" + r + "' type='checkbox' onClick='onPerfRowCheckboxClickHandler(" + r + ")'/>" +
                 "</td><td style='text-align:right'>" + data["desc"] +
                 "</td><td style='text-align:right' width='250px' id='id_perf_row_value_" + r +
-                "'></td><td>" + data["units"] + "</td><td width='300px' id='id_graph_" + r + "'></td></tr>";
+                "'></td><td>" + data["units"] + "</td><td class='home-spark-cell' id='id_graph_" + r + "'></td></tr>";
             table.append(s);
         }
         // Initialize the engine table
@@ -1326,8 +1313,12 @@
             var s = "<tr><td><input id='id_engine_checkbox_" + r + "' type='checkbox' onClick='onEngineRowCheckboxClickHandler(" + r + ")'/>" +
                 "</td><td style='text-align:right'>" + data["desc"] +
                 "</td><td style='text-align:right' width='180px' id='id_engine_row_value_" + r +
-                "'></td><td>" + data["units"] + "</td><td width='300px' id='id_engine_graph_" + r + "'></td></tr>";
+                "'></td><td>" + data["units"] + "</td><td class='home-spark-cell' id='id_engine_graph_" + r + "'></td></tr>";
             table.append(s);
+        }
+        if (window.HomeSpark) {
+            HomeSpark.mountAll(perfItems, "id_graph_");
+            HomeSpark.mountAll(engineItems, "id_engine_graph_");
         }
     });
     $(function() {
@@ -1342,6 +1333,9 @@
                 return;
             }
             if (this.id === "btnThemeToggle") {
+                return;
+            }
+            if (this.classList && this.classList.contains("home-spark")) {
                 return;
             }
 

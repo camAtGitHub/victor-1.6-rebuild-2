@@ -457,6 +457,117 @@ a:focus-visible {
   color: var(--wv-text);
 }
 
+/* PERF/ENGINE client sparklines (fixed size to avoid CLS) */
+.app--home td.home-spark-cell,
+.app--home td[id^="id_graph_"],
+.app--home td[id^="id_engine_graph_"] {
+  width: 128px;
+  min-width: 128px;
+  max-width: 128px;
+  height: 36px;
+  padding: 4px;
+  line-height: 0;
+  vertical-align: middle;
+}
+
+.home-spark {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 120px;
+  height: 28px;
+  min-width: 120px;
+  min-height: 28px;
+  padding: 0;
+  margin: 0;
+  border: 1px solid var(--wv-line-soft);
+  border-radius: var(--wv-radius-sm);
+  background: var(--wv-bg-input);
+  color: inherit;
+  font: inherit;
+  line-height: 0;
+  cursor: default;
+  overflow: visible;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.home-spark:hover {
+  border-color: var(--wv-line);
+  background: var(--wv-bg-input);
+  color: inherit;
+}
+.home-spark:focus,
+.home-spark:focus-visible {
+  outline: 2px solid var(--wv-accent);
+  outline-offset: 2px;
+}
+
+.home-spark-svg {
+  display: block;
+  width: 120px;
+  height: 28px;
+}
+
+.home-spark-line {
+  fill: none;
+  stroke: var(--wv-accent);
+  stroke-width: 1.25;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.home-spark.is-overflow .home-spark-line {
+  stroke: var(--wv-warn);
+}
+
+.home-spark-dot {
+  fill: var(--wv-accent);
+}
+.home-spark.is-overflow .home-spark-dot {
+  fill: var(--wv-warn);
+}
+
+.home-spark-zero {
+  stroke: var(--wv-line);
+  stroke-width: 0.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.home-spark-placeholder-line {
+  stroke: var(--wv-text-faint);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+  opacity: 0.55;
+  vector-effect: non-scaling-stroke;
+}
+
+.home-spark-overflow-tick {
+  fill: var(--wv-warn);
+}
+
+.home-spark-tip {
+  display: none;
+  position: fixed;
+  z-index: 400;
+  padding: 2px 6px;
+  background: var(--wv-bg-elev);
+  color: var(--wv-text);
+  border: 1px solid var(--wv-line);
+  border-radius: var(--wv-radius-sm);
+  font-family: var(--wv-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: nowrap;
+  box-shadow: var(--wv-shadow-sm);
+  pointer-events: none;
+}
+.home-spark-tip.is-open {
+  display: block;
+}
+
 /* Process status pills (color + word) */
 .status-pill {
   display: inline-block;
@@ -711,5 +822,10 @@ a:focus-visible {
     transition-duration: 0ms !important;
     animation-duration: 0ms !important;
     animation-iteration-count: 1 !important;
+  }
+  .home-spark-line,
+  .home-spark-dot,
+  .home-spark--reduce .home-spark-line {
+    transition: none !important;
   }
 }
