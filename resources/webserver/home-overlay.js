@@ -11,9 +11,11 @@
  *   dir k at k×30° from +x (screen-right), clockwise in SVG y-down.
  *   Cliffs: FL (640,190) FR (640,520) BL (230,190) BR (230,520)
  *     (robot-left = screen-up; FL/FR on fork/right, BL/BR on backpack/left).
- *   Touch: gold LED bar ellipse (245,358) rx=70 ry=28.
+ *   Touch: rounded-rect in the gold LED ring inner window (x=180 y=334
+ *     w=128 h=42 rx=14). Stops at the charger overlay's right edge (170);
+ *     does not cover the rear cap.
  *   Prox beam: lift front, from x≈800 toward +x.
- *   Charger contacts: backpack rear cap around (150,355).
+ *   Charger contacts: backpack rear cap around (150,355); leave as-is.
  */
 (function (global) {
   "use strict";
@@ -338,7 +340,7 @@
 
   function captionFor(key) {
     if (!key) {
-      return "Nothing selected — click a table row or a hotspot. Clear deselects.";
+      return "";
     }
     if (key === "cliff-white") {
       return "Cliff white-detect (FL FR BL BR): " + (valOf("Cliff sensor reads white") || "—");
@@ -775,18 +777,19 @@
       ));
     }
 
-    var touchShape = svgEl("ellipse", {
+    var touchShape = svgEl("rect", {
       id: "overlay-shape-touch",
       "class": "hotspot-shape",
-      cx: "245",
-      cy: "358",
-      rx: "70",
-      ry: "28"
+      x: "180",
+      y: "334",
+      width: "128",
+      height: "42",
+      rx: "14"
     });
     var touchVal = svgEl("text", {
       id: "overlay-val-touch",
-      x: "245",
-      y: "400",
+      x: "244",
+      y: "396",
       "class": "overlay-val",
       "text-anchor": "middle"
     });

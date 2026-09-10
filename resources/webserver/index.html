@@ -127,7 +127,7 @@
     };
 
     var procAutoUpdate = true;
-    var procAutoUpdatePeriod_ms = 1000;
+    var procAutoUpdatePeriod_ms = 3000;
     var procAutoUpdatePeriodMin_ms = 1000;   // Minimum auto update period
     var procAutoUpdateTimerId = 0;
     var procRequestInProgress = false;
@@ -203,7 +203,6 @@
     var pmGraphAutoUpdateRequestQueued = false;
     var pmGraphAutoUpdateSavedTriggeredByTimer = false;
     var pmGraphAutoUpdateLastFrameIndex = -1;   // -1 means 'dump everything the first time'
-    var pmGraphMinMaxYAxisForTimeData = 0;
     var pmChart = null;
     var pmChartResizeTimer = 0;
     var chartOptions = {
@@ -220,7 +219,8 @@
       },
       legend: {
         show: true,
-        position: "sw"
+        container: "#pm_chart_legend",
+        noColumns: 3
       },
       yaxis: {
         min: 0.0,
@@ -233,9 +233,7 @@
         tickDecimals: 0
       },
       grid: {
-        show: true,
-        markings: setMarkings,
-        markingsLineWidth: 2
+        show: true
       }
     }
     var pmTickData = [];
@@ -267,9 +265,6 @@
             wvToken("--wv-good", "#3ecf8e")
         ];
     }
-    function pmBudgetColor() {
-        return wvToken("--wv-bad", "#f07178");
-    }
     function applyPmChartTheme(opts) {
         if (!opts) {
             return opts;
@@ -277,7 +272,6 @@
         var text = wvToken("--wv-text-dim", "#8b95a8");
         var line = wvToken("--wv-line", "#2a3344");
         var bg = wvToken("--wv-bg-input", "#0e1218");
-        var elev = wvToken("--wv-bg-elev", "#12161e");
         var mono = wvToken("--wv-mono", "ui-monospace, monospace");
         opts.colors = pmBarColors();
         if (!opts.grid) {
@@ -287,14 +281,16 @@
         opts.grid.tickColor = line;
         opts.grid.borderColor = line;
         opts.grid.backgroundColor = bg;
-        opts.grid.markings = setMarkings;
-        opts.grid.markingsLineWidth = 2;
+        opts.grid.markings = [];
         if (!opts.legend) {
             opts.legend = {};
         }
-        opts.legend.backgroundColor = elev;
+        opts.legend.show = true;
+        opts.legend.container = "#pm_chart_legend";
+        opts.legend.noColumns = 3;
+        opts.legend.backgroundColor = "transparent";
         opts.legend.labelBoxBorderColor = line;
-        opts.legend.backgroundOpacity = 0.9;
+        opts.legend.backgroundOpacity = 0;
         if (!opts.xaxis) {
             opts.xaxis = {};
         }
@@ -306,15 +302,6 @@
         opts.xaxis.font = { color: text, size: 11, family: mono };
         opts.yaxis.font = { color: text, size: 11, family: mono };
         return opts;
-    }
-    function setMarkings(axes) {
-        var markings = [];
-        markings.push({
-            yaxis: { from: tickBudget_ms, to: tickBudget_ms },
-            color: pmBudgetColor(),
-            lineWidth: 2
-        });
-        return markings;
     }
     function applyPmRecordingPill(statusText) {
         var el = document.getElementById("id_pm_status");
@@ -1125,19 +1112,6 @@
         };
     }
 
-    function AddTickBudgetSeries(firstTick, lastTick) {
-        return {
-            data: [[firstTick, tickBudget_ms], [lastTick, tickBudget_ms]],
-            label: "tick budget",
-            color: pmBudgetColor(),
-            bars: { show: false, order: null },
-            lines: { show: true, lineWidth: 2 },
-            points: { show: false },
-            shadowSize: 0,
-            hoverable: false
-        };
-    }
-
     function DrawPerfMetricChart() {
         var ticksInData = pmTickData.length;
         if (ticksInData == 0) {
@@ -1189,7 +1163,13 @@
                 seriesIndex += 1;
             }
         }
-        plotData.push(AddTickBudgetSeries(firstTick, lastTick));
+
+        if (plotData.length === 0) {
+            pmChart = null;
+            $c.html("<p class=\"pm-chart-empty\">Select one or more data selectors, then click 'Render Graph'</p>");
+            $("#pm_chart_legend").empty();
+            return;
+        }
 
         if (!pmChartIsLive()) {
             $c.html("");
@@ -1217,16 +1197,7 @@
 
         pmChart.setData(plotData);
 
-        pmChart.getAxes().yaxis.options.max = null; // null means 'automatic'
-        if (pmShowMsInYAxis) {
-            // When showing any tick-time-related data, ensure the vertical scale of the
-            // graph does not get small enough that the tick budget line is no longer on
-            // the graph (enforce a minimum to the max y axis value)
-            var dataMax = pmChart.getAxes().yaxis.datamax;
-            if (dataMax < pmGraphMinMaxYAxisForTimeData) {
-                pmChart.getAxes().yaxis.options.max = pmGraphMinMaxYAxisForTimeData;
-            }
-        }
+        pmChart.getAxes().yaxis.options.max = null; // automatic — scale to selected series only
 
         pmChart.setupGrid();
         pmChart.draw();
@@ -1522,11 +1493,6 @@
             allowConsoleVarsPage = (payload[6] === "true");
             allowPerfMetricPage = (payload[7] === "true");
             tickBudget_ms = parseInt(payload[8]);
-            // Set the 'minumum max' of y axis value (for time-related data), so that the
-            // red budget marking is always on the chart even with very low time values
-            const nextHighest = 10;
-            pmGraphMinMaxYAxisForTimeData = Math.floor((tickBudget_ms + nextHighest) / nextHighest);
-            pmGraphMinMaxYAxisForTimeData *= nextHighest;
             fillChromeMeta();
             var hashPage = pageNameFromHash();
             SetPage(hashPage || startPage);
@@ -1811,7 +1777,7 @@
                         <h3>Robot overlay</h3>
                         <button type="button" class="btn engine-overlay-clear" id="engine_overlay_clear">Clear</button>
                     </div>
-                    <p class="engine-overlay-hint">Lift at right, backpack at left. Click or focus a table row or hotspot to select. Clear deselects. Live values follow the ENGINE poll.</p>
+                    <p class="engine-overlay-hint">Click or focus a table row or hotspot to select. Clear deselects</p>
                     <div class="engine-overlay-stage">
                         <img src="/images/vector-topdown.png" width="1000" height="710"
                              alt="Vector from above, lift at right, backpack at left"
@@ -1819,7 +1785,7 @@
                         <svg id="engine_overlay_svg" class="engine-overlay-svg" viewBox="0 0 1000 710"
                              role="group" aria-label="Sensor hotspots on Vector"></svg>
                     </div>
-                    <p class="engine-overlay-caption" id="engine_overlay_caption">Nothing selected — click a table row or a hotspot. Clear deselects.</p>
+                    <p class="engine-overlay-caption" id="engine_overlay_caption"></p>
                 </aside>
                 </div>
             </div>
@@ -1971,8 +1937,11 @@
             <button type="button" class="btn" id='btn_pm_toggle_graph_auto_update'>Toggle Graph Auto Update</button>
             <span   id='pm_graph_auto_update' class="live-state"></span>
             </div>
+            <div class="pm-chart-wrap">
             <div id='pm_chart_container'>
               <p class="pm-chart-empty">To get a graph, first click 'Dump all', then select one or more data selectors, then click 'Render Graph'</p>
+            </div>
+            <div id="pm_chart_legend" class="pm-chart-legend" aria-label="Graph legend"></div>
             </div>
             <div id='id_pm_dump_result' class='consoleoutput'></div>
           </div>
@@ -1985,7 +1954,8 @@
 
         <footer class="status" role="contentinfo">
             <span class="left" id="statusLeft">Ready</span>
-            <span class="right" id="statusRight">click theme · double-click system</span>
+            <span class="right" id="statusRight"></span>
+            <span class="theme-toggle-label" id="themeToggleLabel">Theme:</span>
             <button
                 type="button"
                 class="btn btn-icon theme-toggle"

@@ -289,7 +289,7 @@ Module JS should keep working if the shell is absent; do not break stock module 
 
 - **Static deploy:** scp assets + hard-refresh. Civetweb `static_file_max_age` is **0** (`webServerProcess/src/webService.cpp`), so browsers should not stick on stale CSS/JS.
 - **C++ only when needed:** home UI is client-side. The one home-related C++ change is `/getenginestats` checkbox bits in `engine/cozmoEngine.cpp` (inactive slots emit empty lines so indices stay stable).
-- **Do not** raise poll rates or add new HTTP endpoints for home UI (sparklines / flags / overlay reuse existing `/getperfstats` and `/getenginestats`). See `docs/mapping/WEBSERVER-HOME.md`.
+- **Do not** raise poll rates or add new HTTP endpoints for home UI (sparklines / flags / overlay reuse existing `/getperfstats` and `/getenginestats`). PROCESSES default is **3000 ms** (min 1000); other home polls stay 1000 ms. See `docs/mapping/WEBSERVER-HOME.md`.
 
 ---
 

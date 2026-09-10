@@ -933,6 +933,18 @@ a:focus-visible {
   min-width: 0;
 }
 
+.pm-chart-wrap {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0 0 var(--wv-space-3);
+  background: var(--wv-bg-input);
+  border: 1px solid var(--wv-line);
+  border-radius: var(--wv-radius);
+  overflow: hidden;
+}
+
 #pm_chart_container {
   box-sizing: border-box;
   position: relative;
@@ -940,13 +952,13 @@ a:focus-visible {
   max-width: 100%;
   min-width: 0;
   height: 300px;
-  margin: 0 0 var(--wv-space-3);
+  margin: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--wv-bg-input);
-  border: 1px solid var(--wv-line);
-  border-radius: var(--wv-radius);
+  background: transparent;
+  border: none;
+  border-radius: 0;
   color: var(--wv-text-dim);
   overflow: hidden;
 }
@@ -973,17 +985,42 @@ a:focus-visible {
   font-size: 11px;
 }
 
-#pm_chart_container .legend table {
-  color: var(--wv-text) !important;
+#pm_chart_container > .legend {
+  display: none !important;
+}
+
+.pm-chart-legend {
+  box-sizing: border-box;
+  min-height: 1.6em;
+  padding: 6px 10px 8px;
+  border-top: 1px solid var(--wv-line);
   background: var(--wv-bg-elev);
-  border: 1px solid var(--wv-line);
-  border-radius: var(--wv-radius-sm);
+  color: var(--wv-text);
   font-family: var(--wv-sans);
   font-size: 11px;
 }
-#pm_chart_container .legendLabel {
+.pm-chart-legend:empty {
+  display: none;
+}
+.pm-chart-legend table {
+  margin: 0;
+  border-collapse: collapse;
+  color: var(--wv-text) !important;
+  background: transparent;
+  border: none;
+}
+.pm-chart-legend tr {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 16px 2px 0;
+}
+.pm-chart-legend .legendColorBox {
+  padding: 0;
+}
+.pm-chart-legend .legendLabel {
   color: var(--wv-text);
-  padding-left: 4px;
+  padding-left: 6px;
+  white-space: nowrap;
 }
 
 #id_pm_status.status-pill {
@@ -1053,6 +1090,13 @@ a:focus-visible {
   flex: 0 1 auto;
   min-width: 0;
   max-width: min(42vw, 28rem);
+}
+.status .theme-toggle-label {
+  flex: 0 0 auto;
+  color: var(--wv-text-dim);
+  font-size: 11px;
+  font-family: var(--wv-sans);
+  white-space: nowrap;
 }
 .status .theme-toggle {
   flex: 0 0 auto;

@@ -776,6 +776,13 @@ a:hover {
   min-width: 0;
   max-width: min(42vw, 28rem);
 }
+.status .theme-toggle-label {
+  flex: 0 0 auto;
+  color: var(--wv-text-dim);
+  font-size: 11px;
+  font-family: var(--wv-sans);
+  white-space: nowrap;
+}
 /* Icon-only control — same language as status text / .btn-link (no box frame) */
 .status .theme-toggle {
   flex: 0 0 auto;

@@ -44,7 +44,13 @@ Console-var pages use the separate `/consolevars*` family (see `resources/webser
 | Flag pills / mic / overlay | `home-overlay.js` | Decode `StatusFlags` + mic directions from ENGINE values; SVG hotspots over the top-down photo |
 | Overlay photo | `images/vector-topdown.png` | Downscaled from `/tmp/robotTopDown.png` (1000×710). **Lift/front RIGHT**, backpack/rear LEFT |
 
-Default poll period **1000 ms** (min **250**). Do **not** raise rates, add per-row HTTP, or open WebSockets for these extras.
+Default poll periods: PERF / ENGINE / PERF METRIC **1000 ms** (min **250**); PROCESSES **3000 ms** (min **1000**). Do **not** raise rates, add per-row HTTP, or open WebSockets for these extras.
+
+Header chrome (home, consolevars, WebViz): on `:8888` an **Animation** link to the same path on `:8889`; on `:8889` an **Engine** link to `:8888`. Footer shows `Theme: dark` / `Theme: light` next to the toggle (no “click theme · double-click system”).
+
+PERF METRIC graph: selected data series only (no forced tick-budget series or Y-scale rail). Legend sits **under** the plot in `#pm_chart_legend`, not over the bars.
+
+ENGINE overlay hint is only: “Click or focus a table row or hotspot to select. Clear deselects”. Backpack-touch hotspot is a rounded rect in the gold LED ring inner window; it does not overlap the charger overlay.
 
 ## CDN gone
 

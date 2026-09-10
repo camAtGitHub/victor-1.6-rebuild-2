@@ -203,7 +203,8 @@
 
         <footer class="status" role="contentinfo">
             <span class="left" id="cvStatus">Starting…</span>
-            <span class="right" id="statusRight">—</span>
+            <span class="right" id="statusRight"></span>
+            <span class="theme-toggle-label" id="themeToggleLabel">Theme:</span>
             <button
                 type="button"
                 class="btn btn-icon theme-toggle"
@@ -227,8 +228,6 @@
       if (pillP) pillP.textContent = process === "—" ? "consolevars" : process;
       if (pillPort) pillPort.textContent = port ? (":" + port) : window.location.host || "—";
       if (sub && process !== "—") sub.textContent = process;
-      var right = document.getElementById("statusRight");
-      if (right) right.textContent = "click theme · double-click system";
     })();
     </script>
     <script src="/webviz/js/theme.js"></script>

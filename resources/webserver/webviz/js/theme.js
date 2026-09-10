@@ -228,6 +228,41 @@
     }
     btn.title = title;
     btn.setAttribute("aria-label", title);
+    var labelEl = document.getElementById("themeToggleLabel");
+    if (labelEl) {
+      labelEl.textContent = effective === "light" ? "Theme: light" : "Theme: dark";
+    }
+  }
+
+  /**
+   * Header link to the other process webserver (engine :8888 ↔ anim :8889).
+   * Same path on the other port; no extra robot load.
+   */
+  function wireCrossProcessNav() {
+    var actions = document.querySelector(".top-actions");
+    if (!actions || document.getElementById("crossProcessNav")) {
+      return;
+    }
+    var loc = global.location;
+    if (!loc) {
+      return;
+    }
+    var port = String(loc.port || "");
+    if (port !== "8888" && port !== "8889") {
+      return;
+    }
+    var otherPort = port === "8888" ? "8889" : "8888";
+    var label = port === "8888" ? "Animation" : "Engine";
+    var host = loc.hostname || "127.0.0.1";
+    var path = loc.pathname || "/";
+    var hash = loc.hash || "";
+    var a = document.createElement("a");
+    a.id = "crossProcessNav";
+    a.className = "btn btn-link";
+    a.href = loc.protocol + "//" + host + ":" + otherPort + path + hash;
+    a.textContent = label;
+    a.title = label + " webserver :" + otherPort;
+    actions.appendChild(a);
   }
 
   /**
@@ -353,6 +388,7 @@
       });
     }
     syncToggleUi(resolve(getPreference()));
+    wireCrossProcessNav();
   }
 
   /**
