@@ -70,6 +70,8 @@
     <script src="jquery-1.12.4.js"></script>
     <script src="jquery-ui.js"></script>
     <script src="/home-spark.js"></script>
+    <script src="/home-catalog.js"></script>
+    <script src="/home-overlay.js"></script>
     <script src="jquery.flot.min.js"></script>
     <script src="jquery.dataTables.min.js"></script>
     <script src="jquery.flot.orderBars.js"></script>
@@ -529,6 +531,9 @@
                         HomeSpark.mount(item, document.getElementById("id_engine_graph_" + i));
                     }
                 }
+                if (window.HomeOverlay) {
+                    HomeOverlay.onPoll();
+                }
                 if (engineAutoUpdate) {
                     // When entering engine page and auto-update is on, do the first update immediately
                     engineAutoUpdateTimerId = setTimeout(SendEngineUpdateRequest, 0, true);
@@ -619,7 +624,12 @@
                     }
                     else {
                         item["val"] = v;
-                        $("#id_perf_row_value_" + i).html(v);
+                        var rawPerf = document.getElementById("id_perf_row_value_raw_" + i);
+                        if (rawPerf) {
+                            rawPerf.textContent = v;
+                        } else {
+                            $("#id_perf_row_value_" + i).html(v);
+                        }
                         if (item["hasGraph"]) {
                             pushItemSpark(item, "id_graph_" + i, parseFloat(v));
                         }
@@ -651,7 +661,12 @@
         var freeMem_kB = parseInt(values[1]);
         var usedMem_kB = totalMem_kB - freeMem_kB;
         var v = usedMem_kB + " claimed, " + freeMem_kB + " free";
-        $("#id_perf_row_value_" + itemIndex).html(v);
+        var memRaw1 = document.getElementById("id_perf_row_value_raw_" + itemIndex);
+        if (memRaw1) {
+            memRaw1.textContent = v;
+        } else {
+            $("#id_perf_row_value_" + itemIndex).html(v);
+        }
         pushItemSpark(perfItems[itemIndex], "id_graph_" + itemIndex, usedMem_kB);
     }
 
@@ -661,7 +676,12 @@
         var availMem_kB = parseInt(values[1]);
         var usedMem_kB = totalMem_kB - availMem_kB;
         var v = usedMem_kB + " used, " + availMem_kB + " available";
-        $("#id_perf_row_value_" + itemIndex).html(v);
+        var memRaw2 = document.getElementById("id_perf_row_value_raw_" + itemIndex);
+        if (memRaw2) {
+            memRaw2.textContent = v;
+        } else {
+            $("#id_perf_row_value_" + itemIndex).html(v);
+        }
         pushItemSpark(perfItems[itemIndex], "id_graph_" + itemIndex, usedMem_kB);
     }
 
@@ -693,7 +713,12 @@
         if (deltaTotalTime > 0) {
             var usedPct = deltaUsedTime * 100 / deltaTotalTime;
             // Note: In future, more of this data could be displayed.  Perhaps in a multi-section progress bar
-            $("#id_perf_row_value_" + itemIndex).html(usedPct.toFixed(2));
+            var cpuRaw = document.getElementById("id_perf_row_value_raw_" + itemIndex);
+            if (cpuRaw) {
+                cpuRaw.textContent = usedPct.toFixed(2);
+            } else {
+                $("#id_perf_row_value_" + itemIndex).html(usedPct.toFixed(2));
+            }
             pushItemSpark(perfItems[itemIndex], "id_graph_" + itemIndex, usedPct);
 
             // Save the last reading for this CPU so it can be used next call
@@ -835,12 +860,20 @@
                     }
                     else {
                         item["val"] = v;
-                        $("#id_engine_row_value_" + i).html(v);
+                        var rawEl = document.getElementById("id_engine_row_value_raw_" + i);
+                        if (rawEl) {
+                            rawEl.textContent = v;
+                        } else {
+                            $("#id_engine_row_value_" + i).html(v);
+                        }
                         if (item["hasGraph"]) {
                             pushItemSpark(item, "id_engine_graph_" + i, parseFloat(v));
                         }
                     }
                 }
+            }
+            if (window.HomeOverlay) {
+                HomeOverlay.onPoll();
             }
             markRequestSuccess("engine");
             engineRequestInProgress = false;
@@ -1299,10 +1332,14 @@
         var numRows = perfItems.length;
         for (var r = 0; r < numRows; r++) {
             var data = perfItems[r];
-            var s = "<tr><td><input id='id_perf_checkbox_" + r + "' type='checkbox' onClick='onPerfRowCheckboxClickHandler(" + r + ")'/>" +
-                "</td><td style='text-align:right'>" + data["desc"] +
-                "</td><td style='text-align:right' width='250px' id='id_perf_row_value_" + r +
-                "'></td><td>" + data["units"] + "</td><td class='home-spark-cell' id='id_graph_" + r + "'></td></tr>";
+            var s = "<tr class='home-data-row' data-idx='" + r + "' data-desc='" + data["desc"] + "'>" +
+                "<td><input id='id_perf_checkbox_" + r + "' type='checkbox' onClick='onPerfRowCheckboxClickHandler(" + r + ")'/></td>" +
+                "<td class='home-desc-cell'><span class='home-desc-text'>" + data["desc"] + "</span></td>" +
+                "<td class='home-val-cell' width='250px' id='id_perf_row_value_" + r + "'>" +
+                "<span class='home-val-raw' id='id_perf_row_value_raw_" + r + "'></span>" +
+                "<span class='home-val-extra' id='id_perf_row_extra_" + r + "'></span></td>" +
+                "<td>" + data["units"] + "</td>" +
+                "<td class='home-spark-cell' id='id_graph_" + r + "'></td></tr>";
             table.append(s);
         }
         // Initialize the engine table
@@ -1310,15 +1347,25 @@
         var numRows = engineItems.length;
         for (var r = 0; r < numRows; r++) {
             var data = engineItems[r];
-            var s = "<tr><td><input id='id_engine_checkbox_" + r + "' type='checkbox' onClick='onEngineRowCheckboxClickHandler(" + r + ")'/>" +
-                "</td><td style='text-align:right'>" + data["desc"] +
-                "</td><td style='text-align:right' width='180px' id='id_engine_row_value_" + r +
-                "'></td><td>" + data["units"] + "</td><td class='home-spark-cell' id='id_engine_graph_" + r + "'></td></tr>";
+            var s = "<tr class='home-data-row' data-idx='" + r + "' data-desc='" + data["desc"] + "'>" +
+                "<td><input id='id_engine_checkbox_" + r + "' type='checkbox' onClick='onEngineRowCheckboxClickHandler(" + r + ")'/></td>" +
+                "<td class='home-desc-cell'><span class='home-desc-text'>" + data["desc"] + "</span></td>" +
+                "<td class='home-val-cell' width='180px' id='id_engine_row_value_" + r + "'>" +
+                "<span class='home-val-raw' id='id_engine_row_value_raw_" + r + "'></span>" +
+                "<span class='home-val-extra' id='id_engine_row_extra_" + r + "'></span></td>" +
+                "<td>" + data["units"] + "</td>" +
+                "<td class='home-spark-cell' id='id_engine_graph_" + r + "'></td></tr>";
             table.append(s);
         }
         if (window.HomeSpark) {
             HomeSpark.mountAll(perfItems, "id_graph_");
             HomeSpark.mountAll(engineItems, "id_engine_graph_");
+        }
+        if (window.HomeCatalog) {
+            HomeCatalog.decorate(perfItems, engineItems);
+        }
+        if (window.HomeOverlay) {
+            HomeOverlay.init();
         }
     });
     $(function() {
@@ -1335,7 +1382,9 @@
             if (this.id === "btnThemeToggle") {
                 return;
             }
-            if (this.classList && this.classList.contains("home-spark")) {
+            if (this.classList && (this.classList.contains("home-spark") ||
+                    this.classList.contains("home-help") ||
+                    this.classList.contains("engine-overlay-clear"))) {
                 return;
             }
 
@@ -1545,11 +1594,30 @@
                 <span   id='engine_last_update' class="last-update"></span>
                 <span   id='engine_request_error' class="request-error" hidden></span>
                 </div>
+                <div class="engine-layout">
+                <div class="engine-table-wrap">
                 <table id='engine_table'>
                     <tr>
                         <th>Active</th><th>Description</th><th>Value</th><th>Units</th><th>Graph</th>
                     </tr>
                 </table>
+                </div>
+                <aside class="panel engine-overlay-panel" id="engine_overlay_panel" aria-label="Robot overlay">
+                    <div class="engine-overlay-head">
+                        <h3>Robot overlay</h3>
+                        <button type="button" class="btn engine-overlay-clear" id="engine_overlay_clear">Clear</button>
+                    </div>
+                    <p class="engine-overlay-hint">Lift at right, backpack at left. Click or focus a table row or hotspot to select. Clear deselects. Live values follow the ENGINE poll.</p>
+                    <div class="engine-overlay-stage">
+                        <img src="/images/vector-topdown.png" width="1000" height="710"
+                             alt="Vector from above, lift at right, backpack at left"
+                             decoding="async" />
+                        <svg id="engine_overlay_svg" class="engine-overlay-svg" viewBox="0 0 1000 710"
+                             role="group" aria-label="Sensor hotspots on Vector"></svg>
+                    </div>
+                    <p class="engine-overlay-caption" id="engine_overlay_caption">Nothing selected — click a table row or a hotspot. Clear deselects.</p>
+                </aside>
+                </div>
             </div>
             <div id='engine_page_disabled' class="callout warn">The engine page is disabled in the Anim and standalone webservers.  Use the Engine webserver instead.</div>
         </div>
