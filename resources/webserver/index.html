@@ -6,9 +6,67 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Anki Webservices</title>
+    <title>Vector Home</title>
+
+    <!-- FOUC: set data-theme + class before any stylesheet that uses tokens -->
+    <script>
+    (function () {
+      var root = document.documentElement;
+      var dark = true;
+      try {
+        var p = localStorage.getItem("webviz.colorScheme") || "system";
+        if (p === "light") dark = false;
+        else if (p === "dark") dark = true;
+        else if (window.matchMedia) {
+          dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        }
+      } catch (e) {
+        dark = true;
+      }
+      var t = dark ? "dark" : "light";
+      root.setAttribute("data-theme", t);
+      root.classList.remove("wv-theme-light", "wv-theme-dark");
+      root.classList.add(dark ? "wv-theme-dark" : "wv-theme-light");
+      /* Inline light vars early so paint is correct even if tokens.css is cached without light block */
+      if (!dark) {
+        var L = {
+          "--wv-bg": "#f0f2f6",
+          "--wv-bg-elev": "#ffffff",
+          "--wv-bg-panel": "#e8ecf2",
+          "--wv-bg-hover": "#dde3ec",
+          "--wv-bg-active": "#d0d8e4",
+          "--wv-bg-input": "#ffffff",
+          "--wv-line": "#c5ccd8",
+          "--wv-line-soft": "#d8dee8",
+          "--wv-line-strong": "#9aa6b8",
+          "--wv-text": "#1a1d24",
+          "--wv-text-dim": "#5c667a",
+          "--wv-text-faint": "#8b95a8",
+          "--wv-text-inv": "#ffffff",
+          "--wv-accent-strong": "#3d87c4",
+          "--wv-content-bg": "#ffffff",
+          "--wv-content-text": "#1a1d24",
+          "--wv-content-line": "#c5cad3",
+          "--wv-toast-error-bg": "#fdecee",
+          "--wv-shadow-sm": "0 1px 2px rgba(0,0,0,0.08)",
+          "--wv-shadow-md": "0 8px 24px rgba(0,0,0,0.1)"
+        };
+        for (var k in L) {
+          if (Object.prototype.hasOwnProperty.call(L, k)) root.style.setProperty(k, L[k]);
+        }
+        try { root.style.setProperty("color-scheme", "light"); } catch (e2) {}
+      } else {
+        try { root.style.setProperty("color-scheme", "dark"); } catch (e3) {}
+      }
+    })();
+    </script>
+
+    <link rel="preload" href="/fonts/inter-latin-400.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/webviz/css/fonts.css" />
     <link rel="stylesheet" href="jquery-ui.css">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/webviz/css/tokens.css" />
+    <link rel="stylesheet" href="/home-chrome.css" />
     <script src="jquery-1.12.4.js"></script>
     <script src="jquery-ui.js"></script>
     <script src="jquery.flot.min.js"></script>
@@ -206,13 +264,162 @@
       return str.replace(" ","&nbsp;");
     }
 
+    var homeLastSuccessAt = {
+        perf: 0,
+        proc: 0,
+        engine: 0,
+        pm: 0
+    };
+
+    function setStatusLeft(msg, kind) {
+        var el = document.getElementById("statusLeft");
+        if (!el) {
+            return;
+        }
+        el.textContent = msg;
+        el.className = "left" + (kind ? " is-" + kind : "");
+    }
+
+    function processLabelFromWhich(w) {
+        var n = parseInt(w, 10);
+        if (n === whichWebServerEnum.ENGINE) {
+            return "Engine";
+        }
+        if (n === whichWebServerEnum.ANIM) {
+            return "Anim";
+        }
+        if (n === whichWebServerEnum.STANDALONE) {
+            return "Standalone";
+        }
+        return "";
+    }
+
+    function fillChromeMeta() {
+        var port = String(window.location.port || "");
+        var fromPort = port === "8889" ? "Anim" : port === "8888" ? "Engine" : port === "8887" ? "Standalone" : "";
+        var process = processLabelFromWhich(whichWebServer) || fromPort || "—";
+        var pillP = document.getElementById("pillProcess");
+        var pillPort = document.getElementById("pillPort");
+        var sub = document.getElementById("brandSubtitle");
+        if (pillP) {
+            pillP.textContent = process;
+        }
+        if (pillPort) {
+            pillPort.textContent = port ? (":" + port) : (window.location.host || "—");
+        }
+        if (sub && process !== "—") {
+            sub.textContent = process;
+        }
+    }
+
+    function pageNameFromHash() {
+        var h = (window.location.hash || "").replace(/^#/, "");
+        if (!h) {
+            return "";
+        }
+        if (h.indexOf("page_") !== 0) {
+            return "";
+        }
+        if (document.getElementById(h)) {
+            return h;
+        }
+        return "";
+    }
+
+    function syncPageHash(pageName) {
+        if (!pageName) {
+            return;
+        }
+        var next = "#" + pageName;
+        if ((window.location.hash || "") === next) {
+            return;
+        }
+        if (window.history && typeof history.replaceState === "function") {
+            try {
+                history.replaceState(null, "", next);
+            } catch (e) {
+                /* ignore */
+            }
+        }
+    }
+
+    function autoUpdateLabel(isOn) {
+        return "Auto update is " + (isOn ? "ON (Live)" : "off (Paused)");
+    }
+
+    function formatLastUpdate(ts) {
+        if (!ts) {
+            return "Last update: never";
+        }
+        var s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+        return "Last update: " + s + "s ago";
+    }
+
+    function refreshLastUpdateLabels() {
+        var map = [
+            ["perf", "perf_last_update"],
+            ["proc", "proc_last_update"],
+            ["engine", "engine_last_update"],
+            ["pm", "pm_last_update"]
+        ];
+        for (var i = 0; i < map.length; i++) {
+            var el = document.getElementById(map[i][1]);
+            if (el) {
+                el.textContent = formatLastUpdate(homeLastSuccessAt[map[i][0]]);
+            }
+        }
+    }
+
+    function markRequestSuccess(kind) {
+        homeLastSuccessAt[kind] = Date.now();
+        var err = document.getElementById(kind + "_request_error");
+        if (err) {
+            err.textContent = "";
+            err.hidden = true;
+        }
+        refreshLastUpdateLabels();
+    }
+
+    function markRequestError(kind) {
+        var err = document.getElementById(kind + "_request_error");
+        if (err) {
+            err.hidden = false;
+            err.textContent = "Request failed — Retry with Update NOW";
+        }
+        setStatusLeft("Request failed — Retry with Update NOW", "bad");
+    }
+
+    function setLiveStateEl(selector, isOn) {
+        var el = $(selector);
+        el.html(autoUpdateLabel(isOn));
+        el.toggleClass("is-live", isOn);
+        el.toggleClass("is-paused", !isOn);
+    }
+
+    function applyProcessStatusPills() {
+        $('#table_processes td#status').each(function() {
+            var raw = ($(this).text() || "").replace(/^\s+|\s+$/g, "");
+            var low = raw.toLowerCase();
+            var cls = "status-pill";
+            if ((low.indexOf("run") >= 0) || (low === "active")) {
+                cls += " is-running";
+            } else if ((low.indexOf("fail") >= 0) || (low.indexOf("dead") >= 0) ||
+                       (low.indexOf("inact") >= 0) || (low.indexOf("stop") >= 0) ||
+                       (low.indexOf("exit") >= 0)) {
+                cls += " is-stopped";
+            }
+            this.className = cls;
+        });
+    }
 
     function ClearAllPages() {
         $('div[id^="page_"]').hide();
         $(':button[name^="page_"]').each(function () {
             var elem = $(this);
-            elem.css('background-color', 'White');
+            elem.removeClass("is-active");
             elem.removeAttr("disabled");
+            elem.attr("aria-selected", "false");
+            elem.attr("tabindex", "-1");
         });
     }
 
@@ -240,10 +447,12 @@
         ClearAllPages();
         $('#content').hide();
         $('#' + pageName).show();
-        $(':button[name=' + pageName + ']').css('background-color', 'LightBlue');
-        $(':button[name=' + pageName + ']').attr("disabled", "disabled");
+        $(':button[name=' + pageName + ']').addClass("is-active");
+        $(':button[name=' + pageName + ']').attr("aria-selected", "true");
+        $(':button[name=' + pageName + ']').attr("tabindex", "0");
 
         curPageName = pageName;
+        syncPageHash(pageName);
 
         // Page ENTRY actions:
         if (pageName == "page_main") {
@@ -365,7 +574,7 @@
     }
 
     function UpdatePerfHeader() {
-        $("#perf_auto_update").html("Auto update is " + (perfAutoUpdate ? "ON" : "off"));
+        setLiveStateEl("#perf_auto_update", perfAutoUpdate);
         $("#perf_cur_update_period").html("Update period: " + perfAutoUpdatePeriod_ms + "ms");
         $('#update_freq_value').val(perfAutoUpdatePeriod_ms);
     }
@@ -425,7 +634,15 @@
                     }
                 }
             }
+            markRequestSuccess("perf");
             perfRequestInProgress = false;
+            if (perfRequestQueued) {
+                perfRequestQueued = false;
+                SendPerfUpdateRequest(perfSavedTriggeredByTimer);
+            }
+        }).fail(function() {
+            perfRequestInProgress = false;
+            markRequestError("perf");
             if (perfRequestQueued) {
                 perfRequestQueued = false;
                 SendPerfUpdateRequest(perfSavedTriggeredByTimer);
@@ -499,7 +716,7 @@
     }
 
     function UpdateProcHeader() {
-        $("#proc_auto_update").html("Auto update is " + (procAutoUpdate ? "ON" : "off"));
+        setLiveStateEl("#proc_auto_update", procAutoUpdate);
         $("#proc_cur_update_period").html("Update period: " + procAutoUpdatePeriod_ms + "ms");
         $('#proc_update_freq_value').val(procAutoUpdatePeriod_ms);
     }
@@ -559,7 +776,16 @@
                 var procData = payload[i].split('=');
                 $('#' + procData[0]).find('#status').html(procData[1]);
             }
+            applyProcessStatusPills();
+            markRequestSuccess("proc");
             procRequestInProgress = false;
+            if (procRequestQueued) {
+                procRequestQueued = false;
+                SendProcUpdateRequest(procSavedTriggeredByTimer);
+            }
+        }).fail(function() {
+            procRequestInProgress = false;
+            markRequestError("proc");
             if (procRequestQueued) {
                 procRequestQueued = false;
                 SendProcUpdateRequest(procSavedTriggeredByTimer);
@@ -571,7 +797,7 @@
     }
 
     function UpdateEngineHeader() {
-        $("#engine_auto_update").html("Auto update is " + (engineAutoUpdate ? "ON" : "off"));
+        setLiveStateEl("#engine_auto_update", engineAutoUpdate);
         $("#engine_cur_update_period").html("Update period: " + engineAutoUpdatePeriod_ms + "ms");
         $('#engine_update_freq_value').val(engineAutoUpdatePeriod_ms);
     }
@@ -631,7 +857,15 @@
                     }
                 }
             }
+            markRequestSuccess("engine");
             engineRequestInProgress = false;
+            if (engineRequestQueued) {
+                engineRequestQueued = false;
+                SendEngineUpdateRequest(engineSavedTriggeredByTimer);
+            }
+        }).fail(function() {
+            engineRequestInProgress = false;
+            markRequestError("engine");
             if (engineRequestQueued) {
                 engineRequestQueued = false;
                 SendEngineUpdateRequest(engineSavedTriggeredByTimer);
@@ -669,38 +903,49 @@
         d.dialog("open");
     }
 
+    function postConsoleFuncCall(funcName, okMsg, failMsg) {
+        $.post("consolefunccall", {func:funcName, args:""}, function(result){
+            setStatusLeft(okMsg, "ok");
+        }).fail(function() {
+            setStatusLeft(failMsg, "bad");
+        });
+    }
+
     function ButtonHandler_ConsoleVarsLoad() {
         console.log('ButtonHandler_ConsoleVarsLoad');
         StartConfirmDialog("", "Load console vars from disk:", function() {
-            $.post("consolefunccall", {func:"LoadConsoleVars", args:""}, function(result){});
+            postConsoleFuncCall("LoadConsoleVars", "Load console vars: done", "Load console vars: failed");
         });
     }
     function ButtonHandler_ConsoleVarsSave() {
         console.log('ButtonHandler_ConsoleVarsSave');
         StartConfirmDialog("", "Save console vars to disk:", function() {
-            $.post("consolefunccall", {func:"SaveConsoleVars", args:""}, function(result){});
+            postConsoleFuncCall("SaveConsoleVars", "Save console vars: done", "Save console vars: failed");
         });
     }
     function ButtonHandler_ConsoleVarsReset() {
         console.log('ButtonHandler_ConsoleVarsReset');
         StartConfirmDialog("", "Reset console vars in memory to defaults:", function() {
-            $.post("consolefunccall", {func:"ResetConsoleVars", args:""}, function(result){});
+            postConsoleFuncCall("ResetConsoleVars", "Reset console vars: done", "Reset console vars: failed");
         });
     }
     function ButtonHandler_ConsoleVarsDelete() {        
         console.log('ButtonHandler_ConsoleVarsDelete');
         StartConfirmDialog("", "Delete console vars file on disk:", function() {
-            $.post("consolefunccall", {func:"DeleteConsoleVars", args:""}, function(result){});
+            postConsoleFuncCall("DeleteConsoleVars", "Delete console vars: done", "Delete console vars: failed");
         });
     }
 
     function UpdatePerfMetricHeader() {
-        $("#pm_auto_update").html("Auto update is " + (pmAutoUpdate ? "ON" : "off"));
+        setLiveStateEl("#pm_auto_update", pmAutoUpdate);
         $("#pm_cur_update_period").html("Update period: " + pmAutoUpdatePeriod_ms + "ms");
         $('#pm_update_freq_value').val(pmAutoUpdatePeriod_ms);
     }
     function UpdatePerfMetricGraphAutoUpdateHeader() {
-        $("#pm_graph_auto_update").html("Graph auto update is " + (pmGraphAutoUpdate ? "ON" : "off"));
+        var el = $("#pm_graph_auto_update");
+        el.html("Graph auto update is " + (pmGraphAutoUpdate ? "ON (Live)" : "off (Paused)"));
+        el.toggleClass("is-live", pmGraphAutoUpdate);
+        el.toggleClass("is-paused", !pmGraphAutoUpdate);
         $("#pm_cur_graph_update_period").html("Update period: " + pmGraphAutoUpdatePeriod_ms + "ms");
         $('#pm_graph_update_freq_value').val(pmGraphAutoUpdatePeriod_ms);
     }
@@ -816,7 +1061,15 @@
             $('#id_pm_status').html(payload[0]);
             pmMaxNumFrames = payload[2];
             $('#id_pm_status_frames').html("Frames recorded: " + payload[1] + " of " + pmMaxNumFrames);
+            markRequestSuccess("pm");
             pmRequestInProgress = false;
+            if (pmRequestQueued) {
+                pmRequestQueued = false;
+                SendPerfMetricUpdateRequest(pmSavedTriggeredByTimer);
+            }
+        }).fail(function() {
+            pmRequestInProgress = false;
+            markRequestError("pm");
             if (pmRequestQueued) {
                 pmRequestQueued = false;
                 SendPerfMetricUpdateRequest(pmSavedTriggeredByTimer);
@@ -956,8 +1209,16 @@
                 }
                 // Now refresh the graph
                 DrawPerfMetricChart();
+                markRequestSuccess("pm");
 
                 pmGraphAutoUpdateRequestInProgress = false;
+                if (pmGraphAutoUpdateRequestQueued) {
+                    pmGraphAutoUpdateRequestQueued = false;
+                    SendPerfMetricGraphUpdateRequest(pmGraphAutoUpdateSavedTriggeredByTimer);
+                }
+            }).fail(function() {
+                pmGraphAutoUpdateRequestInProgress = false;
+                markRequestError("pm");
                 if (pmGraphAutoUpdateRequestQueued) {
                     pmGraphAutoUpdateRequestQueued = false;
                     SendPerfMetricGraphUpdateRequest(pmGraphAutoUpdateSavedTriggeredByTimer);
@@ -983,6 +1244,9 @@
 
 
     $(document).ready(function() {
+        fillChromeMeta();
+        refreshLastUpdateLabels();
+        setInterval(refreshLastUpdateLabels, 1000);
         ClearAllPages();
         $("#btn_toggle_auto_update").click(ButtonHandler_ToggleAutoUpdate);
         $("#btn_set_update_period").click(ButtonHandler_SetUpdatePeriod);
@@ -1041,14 +1305,16 @@
             const nextHighest = 10;
             pmGraphMinMaxYAxisForTimeData = Math.floor((tickBudget_ms + nextHighest) / nextHighest);
             pmGraphMinMaxYAxisForTimeData *= nextHighest;
-            SetPage(startPage);
+            fillChromeMeta();
+            var hashPage = pageNameFromHash();
+            SetPage(hashPage || startPage);
         });
         // Initialize the perf table
         var table = $("#perf_table");
         var numRows = perfItems.length;
         for (var r = 0; r < numRows; r++) {
             var data = perfItems[r];
-            var s = "<tr height='34px'><td><input id='id_perf_checkbox_" + r + "' type='checkbox' onClick='onPerfRowCheckboxClickHandler(" + r + ")'/>" +
+            var s = "<tr><td><input id='id_perf_checkbox_" + r + "' type='checkbox' onClick='onPerfRowCheckboxClickHandler(" + r + ")'/>" +
                 "</td><td style='text-align:right'>" + data["desc"] +
                 "</td><td style='text-align:right' width='250px' id='id_perf_row_value_" + r +
                 "'></td><td>" + data["units"] + "</td><td width='300px' id='id_graph_" + r + "'></td></tr>";
@@ -1059,7 +1325,7 @@
         var numRows = engineItems.length;
         for (var r = 0; r < numRows; r++) {
             var data = engineItems[r];
-            var s = "<tr height='34px'><td><input id='id_engine_checkbox_" + r + "' type='checkbox' onClick='onEngineRowCheckboxClickHandler(" + r + ")'/>" +
+            var s = "<tr><td><input id='id_engine_checkbox_" + r + "' type='checkbox' onClick='onEngineRowCheckboxClickHandler(" + r + ")'/>" +
                 "</td><td style='text-align:right'>" + data["desc"] +
                 "</td><td style='text-align:right' width='180px' id='id_engine_row_value_" + r +
                 "'></td><td>" + data["units"] + "</td><td width='300px' id='id_engine_graph_" + r + "'></td></tr>";
@@ -1071,14 +1337,23 @@
         // $(".widget input[type=submit]").button();
 
         $("button").click(function(event) {
-            var name = event.target.name;
+            var name = this.name || "";
             if (name.startsWith('page_')) {
                 SetPage(name);
                 event.preventDefault();
                 return;
             }
+            if (this.id === "btnThemeToggle") {
+                return;
+            }
 
             event.preventDefault();
+        });
+        $(window).on("hashchange", function() {
+            var h = pageNameFromHash();
+            if (h && (h !== curPageName)) {
+                SetPage(h);
+            }
         });
         $("input[type='submit']").click(function(event) {
             $.post("/"+event.target.value, function(data) {
@@ -1102,67 +1377,101 @@
 
 <!-- page content -->
 
-<body class="ui-widget-content" style="border:0;">
-    <div>
-        <body><div id="id_title0" style="color:blue; font-size:18pt; display:inline">title</div></body>
-        &nbsp;&nbsp;&nbsp;&nbsp;
-        <body><div id="id_title1" style="display:inline">title</div></body>
+<body class="ui-widget-content">
+    <div class="app app--home" id="app">
+        <header class="top" role="banner">
+            <a class="skip-link" href="#content-main">Skip to content</a>
+            <div class="brand" title="Vector Home">
+                <div class="mark" aria-hidden="true">H</div>
+                <h1 class="title">Vector Home <em id="brandSubtitle">—</em></h1>
+            </div>
 
-        <hr>
-        <div>&nbsp
-            <button type="button" name="page_main">MAIN</button>&nbsp&nbsp&nbsp
-            <button type="button" name="page_consolevars">CONSOLE VARS/FUNCS</button>&nbsp&nbsp&nbsp
-            <button type="button" name="page_files">FILES</button>&nbsp&nbsp&nbsp
-            <button type="button" name="page_perf">PERF</button>&nbsp&nbsp&nbsp
-            <button type="button" name="page_processes">PROCESSES</button>&nbsp&nbsp&nbsp
-            <button type="button" name="page_engine">ENGINE</button>&nbsp&nbsp&nbsp
-            <button type="button" name="page_perfmetric">PERF METRIC</button>&nbsp&nbsp&nbsp
+            <div class="meta-pills" aria-label="Page meta">
+                <span class="pill" id="pillProcess">—</span>
+                <span class="pill pill-secondary" id="pillPort">—</span>
+            </div>
+
+            <div class="top-actions">
+                <a class="btn btn-link" href="/webViz.html" title="WebViz">WebViz</a>
+                <a class="btn btn-link" href="/consolevars" title="Console Vars">Console Vars</a>
+                <a class="btn btn-link" href="/" title="Web server home">Home</a>
+            </div>
+        </header>
+
+        <nav class="home-tabs" role="tablist" aria-label="Home sections">
+            <button type="button" name="page_main" role="tab" aria-controls="page_main" aria-selected="false">MAIN</button>
+            <button type="button" name="page_consolevars" role="tab" aria-controls="page_consolevars" aria-selected="false">CONSOLE VARS/FUNCS</button>
+            <button type="button" name="page_files" role="tab" aria-controls="page_files" aria-selected="false">FILES</button>
+            <button type="button" name="page_perf" role="tab" aria-controls="page_perf" aria-selected="false">PERF</button>
+            <button type="button" name="page_processes" role="tab" aria-controls="page_processes" aria-selected="false">PROCESSES</button>
+            <button type="button" name="page_engine" role="tab" aria-controls="page_engine" aria-selected="false">ENGINE</button>
+            <button type="button" name="page_perfmetric" role="tab" aria-controls="page_perfmetric" aria-selected="false">PERF METRIC</button>
+        </nav>
+
+        <main id="content-main">
+            <p class="home-lede">
+                <span id="id_title0"></span>
+                <span id="id_title1"></span>
+            </p>
+
+        <div id="page_main" class="page-panel" role="tabpanel">
+            <h2>MAIN</h2>
+            <div class="panel">
+                <dl class="kv">
+                    <div>
+                        <dt>Connected to</dt>
+                        <dd id="main_robot_connection_type"></dd>
+                    </div>
+                    <div>
+                        <dt>Robot Name</dt>
+                        <dd id="main_robot_name"></dd>
+                    </div>
+                    <div>
+                        <dt>Robot Serial Number</dt>
+                        <dd id="main_robot_serial_number"></dd>
+                    </div>
+                    <div>
+                        <dt>MAC Address</dt>
+                        <dd id="main_robot_mac_address"></dd>
+                    </div>
+                    <div>
+                        <dt>SSID</dt>
+                        <dd id="main_robot_ssid"></dd>
+                    </div>
+                    <div>
+                        <dt>IP Address</dt>
+                        <dd id="main_robot_ip_address"></dd>
+                    </div>
+                    <div>
+                        <dt>Build Configuration</dt>
+                        <dd id="main_build_config"></dd>
+                    </div>
+                    <div>
+                        <dt>OS Version</dt>
+                        <dd id="main_os_version"></dd>
+                    </div>
+                    <div>
+                        <dt>OS Build Version</dt>
+                        <dd id="main_os_build_version"></dd>
+                    </div>
+                    <div>
+                        <dt>Build Sha</dt>
+                        <dd id="main_build_sha"></dd>
+                    </div>
+                    <div>
+                        <dt>Command Line</dt>
+                        <dd id="main_cmd_line"></dd>
+                    </div>
+                </dl>
+            </div>
         </div>
-        <hr>
 
-        <div id="page_main">
-            <table border=0>
-                <tr>
-                    <td width='160px' style='text-align:right'>Connected to:</td><td id="main_robot_connection_type"></td>
-                </tr>
-                <tr>
-                    <td style='text-align:right'>Robot Name:</td><td id="main_robot_name"></td>
-                </tr>
-                <tr>
-                    <td style='text-align:right'>Robot Serial Number:</td><td id="main_robot_serial_number"></td>
-                </tr>
-                <tr>
-                    <td style='text-align:right'>MAC Address:</td><td id="main_robot_mac_address"></td>
-                </tr>
-                <tr>
-                    <td style='text-align:right'>SSID:</td><td id="main_robot_ssid"></td>
-                </tr>
-                <tr>
-                    <td style='text-align:right'>IP Address:</td><td id="main_robot_ip_address"></td>
-                </tr>
-                <tr>
-                    <td style='text-align:right'>Build Configuration:</td><td id="main_build_config"></td>
-                </tr>
-                <tr>
-                    <td style='text-align:right'>OS Version:</td><td id="main_os_version"></td>
-                </tr>
-                <tr>
-                    <td style='text-align:right'>OS Build Version:</td><td id="main_os_build_version"></td>
-                </tr>
-                <tr>
-                    <td style='text-align:right'>Build Sha:</td><td id="main_build_sha"></td>
-                </tr>
-                <tr>
-                    <td style='text-align:right'>Command Line:</td><td id="main_cmd_line"></td>
-                </tr>
-            </table>
-            <br>
-        </div>
-
-        <div id="page_consolevars">
+        <div id="page_consolevars" class="page-panel" role="tabpanel">
+            <h2>CONSOLE VARS / FUNCS</h2>
             <div id='consolevars_main_section'>
-                These are for the console variables and console functions in THIS process only.<br>
-                <table border=1>
+                <p>These are for the console variables and console functions in THIS process only.</p>
+                <div class="panel">
+                <table>
                     <tr>
                         <th>description</th><th>url</th>
                     </tr>
@@ -1191,193 +1500,257 @@
                         <td>Call console function</td><td>/consolefunccall?func=name_of_function&amp;args=arguments</td>
                     </tr>
                 </table>
-                <br/>
-                <div>
-                    <input type="submit" value="consolevars">
-                </div><br>
-                <div>
-                    <button id='btn_console_vars_load'>LOAD console vars</button>
-                    <button id='btn_console_vars_save'>SAVE console vars</button>
-                    <button id='btn_console_vars_delete'>DELETE console vars save file</button>
-                    <button id='btn_console_vars_reset'>RESET console vars to default values</button>
                 </div>
-                <br><br>
-                <a href="webViz.html">WebViz</a>
+                <div class="toolbar">
+                    <input type="submit" class="btn" value="consolevars">
+                </div>
+                <div class="toolbar">
+                    <button type="button" class="btn" id='btn_console_vars_load'>LOAD console vars</button>
+                    <button type="button" class="btn" id='btn_console_vars_save'>SAVE console vars</button>
+                    <button type="button" class="btn btn-danger" id='btn_console_vars_delete'>DELETE console vars save file</button>
+                    <button type="button" class="btn" id='btn_console_vars_reset'>RESET console vars to default values</button>
+                </div>
+                <p><a href="webViz.html">WebViz</a></p>
             </div>
-            <div id='consolevars_page_disabled'>The console vars/funcs page is disabled in the standalone webserver.  Use the Engine or Anim webserver instead.</div>
+            <div id='consolevars_page_disabled' class="callout warn">The console vars/funcs page is disabled in the standalone webserver.  Use the Engine or Anim webserver instead.</div>
         </div>
 
-        <div id="page_perf">
-            <br>
+        <div id="page_perf" class="page-panel" role="tabpanel">
+            <h2>PERF</h2>
             <div id='perf_main_section'>
-                <button id='btn_update_now'>Update NOW</button>&nbsp&nbsp&nbsp&nbsp
-                <input  id='update_freq_value' type='number' max='100000'></input>
-                <button id='btn_set_update_period'>Set update period (ms)</button>
-                <span   id='perf_cur_update_period'></span>&nbsp&nbsp&nbsp&nbsp
-                <button id='btn_toggle_auto_update'>Toggle Auto Update</button>
-                <span   id='perf_auto_update'></span>
-                <br><br>
-                <table id='perf_table' border=1>
+                <div class="toolbar">
+                <button type="button" class="btn" id='btn_update_now'>Update NOW</button>
+                <label for="update_freq_value">Period (ms)</label>
+                <input  id='update_freq_value' type='number' max='100000' inputmode="numeric"></input>
+                <button type="button" class="btn" id='btn_set_update_period'>Set update period (ms)</button>
+                <span   id='perf_cur_update_period'></span>
+                <button type="button" class="btn" id='btn_toggle_auto_update'>Toggle Auto Update</button>
+                <span   id='perf_auto_update' class="live-state"></span>
+                <span   id='perf_last_update' class="last-update"></span>
+                <span   id='perf_request_error' class="request-error" hidden></span>
+                </div>
+                <table id='perf_table'>
                     <tr>
                         <th>Active</th><th>Description</th><th>Value</th><th>Units</th><th>Graph</th>
                     </tr>
                 </table>
             </div>
-            <div id='perf_page_disabled'>The perf page is disabled in the Anim webserver.  Use the standalone or Engine webserver instead.</div>
-            <div id='perf_page_disabled_webots'>The perf page is disabled in pure webots sim, since it is for actual robot stats.</div>
+            <div id='perf_page_disabled' class="callout warn">The perf page is disabled in the Anim webserver.  Use the standalone or Engine webserver instead.</div>
+            <div id='perf_page_disabled_webots' class="callout warn">The perf page is disabled in pure webots sim, since it is for actual robot stats.</div>
         </div>
 
-        <div id="page_engine">
-            <br>
+        <div id="page_engine" class="page-panel" role="tabpanel">
+            <h2>ENGINE</h2>
             <div id='engine_main_section'>
-                <button id='btn_engine_update_now'>Update NOW</button>&nbsp&nbsp&nbsp&nbsp
-                <input  id='engine_update_freq_value' type='number' max='100000'></input>
-                <button id='btn_engine_set_update_period'>Set update period (ms)</button>
-                <span   id='engine_cur_update_period'></span>&nbsp&nbsp&nbsp&nbsp
-                <button id='btn_engine_toggle_auto_update'>Toggle Auto Update</button>
-                <span   id='engine_auto_update'></span>
-                <br><br>
-                <table id='engine_table' border=1>
+                <div class="toolbar">
+                <button type="button" class="btn" id='btn_engine_update_now'>Update NOW</button>
+                <label for="engine_update_freq_value">Period (ms)</label>
+                <input  id='engine_update_freq_value' type='number' max='100000' inputmode="numeric"></input>
+                <button type="button" class="btn" id='btn_engine_set_update_period'>Set update period (ms)</button>
+                <span   id='engine_cur_update_period'></span>
+                <button type="button" class="btn" id='btn_engine_toggle_auto_update'>Toggle Auto Update</button>
+                <span   id='engine_auto_update' class="live-state"></span>
+                <span   id='engine_last_update' class="last-update"></span>
+                <span   id='engine_request_error' class="request-error" hidden></span>
+                </div>
+                <table id='engine_table'>
                     <tr>
                         <th>Active</th><th>Description</th><th>Value</th><th>Units</th><th>Graph</th>
                     </tr>
                 </table>
             </div>
-            <div id='engine_page_disabled'>The engine page is disabled in the Anim and standalone webservers.  Use the Engine webserver instead.</div>
+            <div id='engine_page_disabled' class="callout warn">The engine page is disabled in the Anim and standalone webservers.  Use the Engine webserver instead.</div>
         </div>
 
-        <div id="page_processes">
-            <br>
+        <div id="page_processes" class="page-panel" role="tabpanel">
+            <h2>PROCESSES</h2>
             <div id='proc_main_section'>
-                <button id='btn_proc_update_now'>Update NOW</button>&nbsp&nbsp&nbsp&nbsp
-                <input  id='proc_update_freq_value' type='number' max='100000'></input>
-                <button id='btn_proc_set_update_period'>Set update period (ms)</button>
-                <span   id='proc_cur_update_period'></span>&nbsp&nbsp&nbsp&nbsp
-                <button id='btn_proc_toggle_auto_update'>Toggle Auto Update</button>
-                <span   id='proc_auto_update'></span>
-                <br><br>
-                <table id='table_processes' border=1>
+                <div class="toolbar">
+                <button type="button" class="btn" id='btn_proc_update_now'>Update NOW</button>
+                <label for="proc_update_freq_value">Period (ms)</label>
+                <input  id='proc_update_freq_value' type='number' max='100000' inputmode="numeric"></input>
+                <button type="button" class="btn" id='btn_proc_set_update_period'>Set update period (ms)</button>
+                <span   id='proc_cur_update_period'></span>
+                <button type="button" class="btn" id='btn_proc_toggle_auto_update'>Toggle Auto Update</button>
+                <span   id='proc_auto_update' class="live-state"></span>
+                <span   id='proc_last_update' class="last-update"></span>
+                <span   id='proc_request_error' class="request-error" hidden></span>
+                </div>
+                <table id='table_processes'>
                     <tr>
                         <th>Process:</th><th>Status:</th><th>Controls:</th>
                     </tr>
                     <tr id='vic-webserver'>
-                        <td width='120px'>Webserver</td><td id='status' width='120px'></td>
-                        <td>&nbsp&nbsp<button id='btn_proc_stop' style='width:80px'>STOP</button>
-                        &nbsp<button id='btn_proc_start' style='width:80px'>START</button>
-                        &nbsp<button id='btn_proc_restart' style='width:80px'>RESTART</button>&nbsp&nbsp</td>
+                        <td width='120px'>Webserver</td><td id='status' class="status-pill" width='120px'></td>
+                        <td>
+                        <button type="button" class="btn btn-danger" id='btn_proc_stop'>STOP</button>
+                        <button type="button" class="btn" id='btn_proc_start'>START</button>
+                        <button type="button" class="btn btn-danger" id='btn_proc_restart'>RESTART</button>
+                        </td>
                     </tr>
                     <tr id='vic-cloud'>
-                        <td width='120px'>Cloud</td><td id='status' width='120px'></td>
-                        <td>&nbsp&nbsp<button id='btn_proc_stop' style='width:80px'>STOP</button>
-                        &nbsp<button id='btn_proc_start' style='width:80px'>START</button>
-                        &nbsp<button id='btn_proc_restart' style='width:80px'>RESTART</button>&nbsp&nbsp</td>
+                        <td width='120px'>Cloud</td><td id='status' class="status-pill" width='120px'></td>
+                        <td>
+                        <button type="button" class="btn btn-danger" id='btn_proc_stop'>STOP</button>
+                        <button type="button" class="btn" id='btn_proc_start'>START</button>
+                        <button type="button" class="btn btn-danger" id='btn_proc_restart'>RESTART</button>
+                        </td>
                     </tr>
                     <tr id='vic-engine'>
-                        <td width='120px'>Engine</td><td id='status' width='120px'></td>
-                        <td>&nbsp&nbsp<button id='btn_proc_stop' style='width:80px'>STOP</button>
-                        &nbsp<button id='btn_proc_start' style='width:80px'>START</button>
-                        &nbsp<button id='btn_proc_restart' style='width:80px'>RESTART</button>&nbsp&nbsp</td>
+                        <td width='120px'>Engine</td><td id='status' class="status-pill" width='120px'></td>
+                        <td>
+                        <button type="button" class="btn btn-danger" id='btn_proc_stop'>STOP</button>
+                        <button type="button" class="btn" id='btn_proc_start'>START</button>
+                        <button type="button" class="btn btn-danger" id='btn_proc_restart'>RESTART</button>
+                        </td>
                     </tr>
                     <tr id='vic-anim'>
-                        <td width='120px'>Anim</td><td id='status' width='120px'></td>
-                        <td>&nbsp&nbsp<button id='btn_proc_stop' style='width:80px'>STOP</button>
-                        &nbsp<button id='btn_proc_start' style='width:80px'>START</button>
-                        &nbsp<button id='btn_proc_restart' style='width:80px'>RESTART</button>&nbsp&nbsp</td>
+                        <td width='120px'>Anim</td><td id='status' class="status-pill" width='120px'></td>
+                        <td>
+                        <button type="button" class="btn btn-danger" id='btn_proc_stop'>STOP</button>
+                        <button type="button" class="btn" id='btn_proc_start'>START</button>
+                        <button type="button" class="btn btn-danger" id='btn_proc_restart'>RESTART</button>
+                        </td>
                     </tr>
                     <tr id='vic-robot'>
-                        <td width='120px'>Robot</td><td id='status' width='120px'></td>
-                        <td>&nbsp&nbsp<button id='btn_proc_stop' style='width:80px'>STOP</button>
-                        &nbsp<button id='btn_proc_start' style='width:80px'>START</button>
-                        &nbsp<button id='btn_proc_restart' style='width:80px'>RESTART</button>&nbsp&nbsp</td>
+                        <td width='120px'>Robot</td><td id='status' class="status-pill" width='120px'></td>
+                        <td>
+                        <button type="button" class="btn btn-danger" id='btn_proc_stop'>STOP</button>
+                        <button type="button" class="btn" id='btn_proc_start'>START</button>
+                        <button type="button" class="btn btn-danger" id='btn_proc_restart'>RESTART</button>
+                        </td>
                     </tr>
                 </table>
             </div>
-            <div id='proc_page_disabled_webots'>The processes page is disabled in pure webots sim, since it is for the actual robot processes.</div>
+            <div id='proc_page_disabled_webots' class="callout warn">The processes page is disabled in pure webots sim, since it is for the actual robot processes.</div>
         </div>
 
-        <div id="page_files">
-            <div>
-                <input type="submit" value="persistent">
-                <input type="submit" value="resources">
-                <input type="submit" value="cache">
-                <input type="submit" value="currentgamelog">
+        <div id="page_files" class="page-panel" role="tabpanel">
+            <h2>FILES</h2>
+            <div class="toolbar file-actions">
+                <input type="submit" class="btn" value="persistent">
+                <input type="submit" class="btn" value="resources">
+                <input type="submit" class="btn" value="cache">
+                <input type="submit" class="btn" value="currentgamelog">
             </div>
         </div>
 
-        <div id="page_perfmetric">
-          <br>
+        <div id="page_perfmetric" class="page-panel" role="tabpanel">
+          <h2>PERF METRIC</h2>
           <div id='perfmetric_main_section'>
-            <button id='btn_pm_update_now'>Update NOW</button>&nbsp&nbsp&nbsp&nbsp
-            <input  id='pm_update_freq_value' type='number' max='100000'></input>
-            <button id='btn_pm_set_update_period'>Set update period (ms)</button>
-            <span   id='pm_cur_update_period'></span>&nbsp&nbsp&nbsp&nbsp
-            <button id='btn_pm_toggle_auto_update'>Toggle Auto Update</button>
-            <span   id='pm_auto_update'></span>
-            <br>
-            <button class='perfmetricbutton' id='btn_pm_start'>Start</button>&nbsp&nbsp&nbsp&nbsp
-            <button class='perfmetricbutton' id='btn_pm_stop'>Stop</button>&nbsp&nbsp&nbsp&nbsp
-            <span id='id_pm_status' display: inline-block; vertical-align: middle;></span>&nbsp&nbsp&nbsp&nbsp
+            <div class="toolbar">
+            <button type="button" class="btn" id='btn_pm_update_now'>Update NOW</button>
+            <label for="pm_update_freq_value">Period (ms)</label>
+            <input  id='pm_update_freq_value' type='number' max='100000' inputmode="numeric"></input>
+            <button type="button" class="btn" id='btn_pm_set_update_period'>Set update period (ms)</button>
+            <span   id='pm_cur_update_period'></span>
+            <button type="button" class="btn" id='btn_pm_toggle_auto_update'>Toggle Auto Update</button>
+            <span   id='pm_auto_update' class="live-state"></span>
+            <span   id='pm_last_update' class="last-update"></span>
+            <span   id='pm_request_error' class="request-error" hidden></span>
+            </div>
+            <div class="toolbar">
+            <button type="button" class='btn perfmetricbutton' id='btn_pm_start'>Start</button>
+            <button type="button" class='btn perfmetricbutton' id='btn_pm_stop'>Stop</button>
+            <span id='id_pm_status'></span>
             <span id='id_pm_status_frames'></span>
-            <br>
-            <button class='perfmetricbutton' id='btn_pm_dump'>Dump</button>&nbsp&nbsp&nbsp&nbsp
-            <button class='perfmetricbutton' id='btn_pm_dump_all'>Dump all</button>&nbsp&nbsp&nbsp&nbsp
-            <button class='perfmetricbutton' id='btn_pm_dump_log'>Dump summary to log</button>&nbsp&nbsp&nbsp&nbsp
-            <button class='perfmetricbutton' id='btn_pm_dump_log_all'>Dump all to log</button>&nbsp&nbsp&nbsp&nbsp
-            <button class='perfmetricbutton' id='btn_pm_dump_files'>Dump to files</button>&nbsp&nbsp&nbsp&nbsp
-            <br>Data Selectors:
+            </div>
+            <div class="toolbar">
+            <button type="button" class='btn perfmetricbutton' id='btn_pm_dump'>Dump</button>
+            <button type="button" class='btn perfmetricbutton' id='btn_pm_dump_all'>Dump all</button>
+            <button type="button" class='btn perfmetricbutton' id='btn_pm_dump_log'>Dump summary to log</button>
+            <button type="button" class='btn perfmetricbutton' id='btn_pm_dump_log_all'>Dump all to log</button>
+            <button type="button" class='btn perfmetricbutton' id='btn_pm_dump_files'>Dump to files</button>
+            </div>
+            <div class="toolbar">
+            <span>Data Selectors:</span>
             <select id='menu_pm_data_0'>
                 <option selected='selected' value=-1>(NONE)</option>
-            </select>&nbsp&nbsp&nbsp&nbsp
+            </select>
             <select id='menu_pm_data_1'>
                 <option selected='selected' value=-1>(NONE)</option>
-            </select>&nbsp&nbsp&nbsp&nbsp
+            </select>
             <select id='menu_pm_data_2'>
                 <option selected='selected' value=-1>(NONE)</option>
-            </select>&nbsp&nbsp&nbsp&nbsp
-            <br>
-            <button class='perfmetricbutton2' id='btn_pm_render'>Render Graph</button>&nbsp&nbsp&nbsp&nbsp
+            </select>
+            </div>
+            <div class="toolbar">
+            <button type="button" class='btn perfmetricbutton2' id='btn_pm_render'>Render Graph</button>
             <select class='pmxmodelistbox' id='menu_pm_xmode'>
                 <option selected='selected'>All Ticks!</option>
                 <option>Last N Ticks</option>
                 <option>Tick Range</option>
-            </select>&nbsp&nbsp&nbsp&nbsp
+            </select>
             <span id='span_all'></span>
             <span id='span_last_n'>
-                <input  id='pm_num_ticks' type='number' max='10000' class='perfmetricinput'"></input>
-                <button id='btn_num_ticks_set'>Set</button>
-                <span   id='pm_cur_num_ticks'></span>&nbsp&nbsp&nbsp&nbsp
+                <label for="pm_num_ticks">Num ticks</label>
+                <input  id='pm_num_ticks' type='number' max='10000' class='perfmetricinput' inputmode="numeric"></input>
+                <button type="button" class="btn" id='btn_num_ticks_set'>Set</button>
+                <span   id='pm_cur_num_ticks'></span>
             </span>
             <span id='span_range'>
-                <input  id='pm_first_tick' type='number' max='10000' class='perfmetricinput'></input>
-                <button id='btn_first_tick_set'>Set</button>
-                <span   id='pm_cur_first_tick'></span>&nbsp&nbsp&nbsp&nbsp
-                <input  id='pm_last_tick' type='number' max='10000' class='perfmetricinput'></input>
-                <button id='btn_last_tick_set'>Set</button>
-                <span   id='pm_cur_last_tick'></span>&nbsp&nbsp&nbsp&nbsp
+                <label for="pm_first_tick">First</label>
+                <input  id='pm_first_tick' type='number' max='10000' class='perfmetricinput' inputmode="numeric"></input>
+                <button type="button" class="btn" id='btn_first_tick_set'>Set</button>
+                <span   id='pm_cur_first_tick'></span>
+                <label for="pm_last_tick">Last</label>
+                <input  id='pm_last_tick' type='number' max='10000' class='perfmetricinput' inputmode="numeric"></input>
+                <button type="button" class="btn" id='btn_last_tick_set'>Set</button>
+                <span   id='pm_cur_last_tick'></span>
             </span>
-            <br>
-            <input  id='pm_graph_update_freq_value' type='number' max='100000'></input>
-            <button id='btn_pm_set_graph_update_period'>Set graph update period (ms)</button>
-            <span   id='pm_cur_graph_update_period'></span>&nbsp&nbsp&nbsp&nbsp
-            <button id='btn_pm_toggle_graph_auto_update'>Toggle Graph Auto Update</button>
-            <span   id='pm_graph_auto_update'></span>
-            <br><br>
+            </div>
+            <div class="toolbar">
+            <label for="pm_graph_update_freq_value">Graph period (ms)</label>
+            <input  id='pm_graph_update_freq_value' type='number' max='100000' inputmode="numeric"></input>
+            <button type="button" class="btn" id='btn_pm_set_graph_update_period'>Set graph update period (ms)</button>
+            <span   id='pm_cur_graph_update_period'></span>
+            <button type="button" class="btn" id='btn_pm_toggle_graph_auto_update'>Toggle Graph Auto Update</button>
+            <span   id='pm_graph_auto_update' class="live-state"></span>
+            </div>
             <div id='pm_chart_container' style="width:1000px;height:300px">To get a graph, first click 'Dump all', then select one or more data selectors, then click 'Render Graph'</div>
-            <br><br>
             <div id='id_pm_dump_result' class='consoleoutput'></div>
           </div>
-          <div id='perfmetric_page_disabled'>The PerfMetric page is disabled in the standalone webserver.  Use the Engine or Anim webserver instead.</div>
+          <div id='perfmetric_page_disabled' class="callout warn">The PerfMetric page is disabled in the standalone webserver.  Use the Engine or Anim webserver instead.</div>
         </div>
 
-        <div id="confirm_dialog" title="">
-          <p id='confirm_dialog_body'></p>
-          <p>Are you sure?</p>
-        </div>
+            <div id="content">
+            </div>
+        </main>
 
+        <footer class="status" role="contentinfo">
+            <span class="left" id="statusLeft">Ready</span>
+            <span class="right" id="statusRight">click theme · double-click system</span>
+            <button
+                type="button"
+                class="btn btn-icon theme-toggle"
+                id="btnThemeToggle"
+                title="Switch to light theme"
+                aria-label="Switch to light theme"
+                aria-pressed="false"
+            >
+                <span id="themeToggleIcon" aria-hidden="true">🌓</span>
+            </button>
+        </footer>
     </div>
 
-    <div id="content">
+    <div id="confirm_dialog" title="">
+      <p id='confirm_dialog_body'></p>
+      <p>Are you sure?</p>
     </div>
+
+    <script>
+    (function () {
+      var port = String(window.location.port || "");
+      var process = port === "8889" ? "Anim" : port === "8888" ? "Engine" : port === "8887" ? "Standalone" : "—";
+      var pillP = document.getElementById("pillProcess");
+      var pillPort = document.getElementById("pillPort");
+      var sub = document.getElementById("brandSubtitle");
+      if (pillP) pillP.textContent = process;
+      if (pillPort) pillPort.textContent = port ? (":" + port) : window.location.host || "—";
+      if (sub && process !== "—") sub.textContent = process;
+    })();
+    </script>
+    <script src="/webviz/js/theme.js"></script>
 </body>
 
 </html>
