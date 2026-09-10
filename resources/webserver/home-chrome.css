@@ -866,7 +866,8 @@ a:focus-visible {
   background: var(--wv-bg-input);
   color: var(--wv-text-dim);
 }
-.status-pill.is-running {
+.status-pill.is-running,
+.status-pill.is-recording {
   color: var(--wv-good);
   background: var(--wv-good-dim);
   border-color: var(--wv-good-border);
@@ -925,6 +926,92 @@ a:focus-visible {
 }
 .perfmetricinput {
   width: 5rem;
+}
+
+/* Phase 5: full-width Flot, readable dump, recording pill */
+#page_perfmetric #perfmetric_main_section {
+  min-width: 0;
+}
+
+#pm_chart_container {
+  box-sizing: border-box;
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: 300px;
+  margin: 0 0 var(--wv-space-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--wv-bg-input);
+  border: 1px solid var(--wv-line);
+  border-radius: var(--wv-radius);
+  color: var(--wv-text-dim);
+  overflow: hidden;
+}
+
+.pm-chart-empty {
+  margin: 0;
+  max-width: 40em;
+  padding: var(--wv-space-3);
+  color: var(--wv-text-dim);
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+#pm_chart_container canvas {
+  display: block;
+}
+
+#pm_chart_container .flot-text,
+#pm_chart_container .tickLabel,
+#pm_chart_container .flot-tick-label {
+  color: var(--wv-text-dim) !important;
+  font-family: var(--wv-mono);
+  font-size: 11px;
+}
+
+#pm_chart_container .legend table {
+  color: var(--wv-text) !important;
+  background: var(--wv-bg-elev);
+  border: 1px solid var(--wv-line);
+  border-radius: var(--wv-radius-sm);
+  font-family: var(--wv-sans);
+  font-size: 11px;
+}
+#pm_chart_container .legendLabel {
+  color: var(--wv-text);
+  padding-left: 4px;
+}
+
+#id_pm_status.status-pill {
+  min-width: 6.5rem;
+  text-align: center;
+  font-weight: 600;
+}
+#id_pm_status_frames {
+  color: var(--wv-text-dim);
+  font-family: var(--wv-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+#id_pm_dump_result {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  font-family: var(--wv-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--wv-text);
+  background: var(--wv-bg-input);
+  white-space: pre;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: min(40vh, 28rem);
 }
 
 /* Status bar + theme toggle */

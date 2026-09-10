@@ -205,12 +205,14 @@
     var pmGraphAutoUpdateLastFrameIndex = -1;   // -1 means 'dump everything the first time'
     var pmGraphMinMaxYAxisForTimeData = 0;
     var pmChart = null;
+    var pmChartResizeTimer = 0;
     var chartOptions = {
       series: {
         bars: {
           show: true,
           order: 1  // For side-by-side bars instead of overlaying on top of each other
-        }
+        },
+        shadowSize: 0
       },
       bars: {
         align: "center",
@@ -232,7 +234,8 @@
       },
       grid: {
         show: true,
-        markings: setMarkings
+        markings: setMarkings,
+        markingsLineWidth: 2
       }
     }
     var pmTickData = [];
@@ -250,10 +253,125 @@
     const pmNumDataSelectors = 3;
     var pmShowMsInYAxis = false;
 
+    function wvToken(name, fallback) {
+        var v = "";
+        try {
+            v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        } catch (e) {}
+        return v || fallback;
+    }
+    function pmBarColors() {
+        return [
+            wvToken("--wv-accent", "#5b9fd4"),
+            wvToken("--wv-violet", "#c792ea"),
+            wvToken("--wv-good", "#3ecf8e")
+        ];
+    }
+    function pmBudgetColor() {
+        return wvToken("--wv-bad", "#f07178");
+    }
+    function applyPmChartTheme(opts) {
+        if (!opts) {
+            return opts;
+        }
+        var text = wvToken("--wv-text-dim", "#8b95a8");
+        var line = wvToken("--wv-line", "#2a3344");
+        var bg = wvToken("--wv-bg-input", "#0e1218");
+        var elev = wvToken("--wv-bg-elev", "#12161e");
+        var mono = wvToken("--wv-mono", "ui-monospace, monospace");
+        opts.colors = pmBarColors();
+        if (!opts.grid) {
+            opts.grid = {};
+        }
+        opts.grid.color = text;
+        opts.grid.tickColor = line;
+        opts.grid.borderColor = line;
+        opts.grid.backgroundColor = bg;
+        opts.grid.markings = setMarkings;
+        opts.grid.markingsLineWidth = 2;
+        if (!opts.legend) {
+            opts.legend = {};
+        }
+        opts.legend.backgroundColor = elev;
+        opts.legend.labelBoxBorderColor = line;
+        opts.legend.backgroundOpacity = 0.9;
+        if (!opts.xaxis) {
+            opts.xaxis = {};
+        }
+        if (!opts.yaxis) {
+            opts.yaxis = {};
+        }
+        opts.xaxis.color = text;
+        opts.yaxis.color = text;
+        opts.xaxis.font = { color: text, size: 11, family: mono };
+        opts.yaxis.font = { color: text, size: 11, family: mono };
+        return opts;
+    }
     function setMarkings(axes) {
         var markings = [];
-        markings.push({ yaxis: { from: tickBudget_ms, to: tickBudget_ms }, color: "#bb0000"});
+        markings.push({
+            yaxis: { from: tickBudget_ms, to: tickBudget_ms },
+            color: pmBudgetColor(),
+            lineWidth: 2
+        });
         return markings;
+    }
+    function applyPmRecordingPill(statusText) {
+        var el = document.getElementById("id_pm_status");
+        if (!el) {
+            return;
+        }
+        var raw = (statusText == null) ? "" : String(statusText).replace(/^\s+|\s+$/g, "");
+        el.textContent = raw;
+        var cls = "status-pill";
+        var low = raw.toLowerCase();
+        if (low.indexOf("record") >= 0) {
+            cls += " is-running is-recording";
+        } else if (low.indexOf("stop") >= 0) {
+            cls += " is-stopped";
+        }
+        el.className = cls;
+    }
+    function pmChartIsLive() {
+        if (!pmChart) {
+            return false;
+        }
+        try {
+            var ph = (typeof pmChart.getPlaceholder === "function") ? pmChart.getPlaceholder() : null;
+            if (ph && ph.length && ph[0] && document.documentElement.contains(ph[0])) {
+                return true;
+            }
+        } catch (e) {}
+        pmChart = null;
+        return false;
+    }
+    function ResizePerfMetricChart() {
+        if (!pmChartIsLive()) {
+            return;
+        }
+        var $c = $("#pm_chart_container");
+        if (!$c.length || !$c.is(":visible")) {
+            return;
+        }
+        var w = $c.width();
+        var h = $c.height();
+        if ((w < 2) || (h < 2)) {
+            return;
+        }
+        try {
+            pmChart.resize();
+            pmChart.setupGrid();
+            pmChart.draw();
+        } catch (e) {}
+    }
+    function SchedulePerfMetricChartResize() {
+        if (pmChartResizeTimer) {
+            clearTimeout(pmChartResizeTimer);
+        }
+        pmChartResizeTimer = setTimeout(function() {
+            pmChartResizeTimer = 0;
+            ResizePerfMetricChart();
+        }, 100);
     }
 
     var dialogOKFunction = undefined;
@@ -557,6 +675,7 @@
             }
             UpdatePMWidgets();
             DrawPerfMetricChart();
+            SchedulePerfMetricChartResize();
           }
           else {
             $("#perfmetric_main_section").hide();
@@ -968,7 +1087,7 @@
         $('#pm_graph_update_freq_value').val(pmGraphAutoUpdatePeriod_ms);
     }
 
-    function AddSeries(elementIndex, firstTick, lastTick) {
+    function AddSeries(elementIndex, firstTick, lastTick, seriesIndex) {
         var series = [];
         for (var tickIndex = firstTick; tickIndex <= lastTick; tickIndex++) {
             var data = [];
@@ -976,7 +1095,39 @@
             data.push(pmTickData[tickIndex][elementIndex]);
             series.push(data);
         }
-        return series;
+        var colors = pmBarColors();
+        var descIndex = elementIndex - 2;
+        var label = ((descIndex >= 0) && pmDataSelectorDescriptions[descIndex])
+            ? pmDataSelectorDescriptions[descIndex]
+            : ("series " + (seriesIndex + 1));
+        return {
+            data: series,
+            label: label,
+            color: colors[seriesIndex % colors.length],
+            bars: {
+                show: true,
+                order: seriesIndex + 1,
+                align: "center",
+                barWidth: 0.4,
+                fill: 0.7
+            },
+            lines: { show: false },
+            points: { show: false },
+            shadowSize: 0
+        };
+    }
+
+    function AddTickBudgetSeries(firstTick, lastTick) {
+        return {
+            data: [[firstTick, tickBudget_ms], [lastTick, tickBudget_ms]],
+            label: "tick budget",
+            color: pmBudgetColor(),
+            bars: { show: false, order: null },
+            lines: { show: true, lineWidth: 2 },
+            points: { show: false },
+            shadowSize: 0,
+            hoverable: false
+        };
     }
 
     function DrawPerfMetricChart() {
@@ -1012,6 +1163,7 @@
 
         var plotData = [];
         pmShowMsInYAxis = false;
+        var seriesIndex = 0;
         for (var i = 0; i < pmNumDataSelectors; i++) {
             var elementIndex = parseInt($('#menu_pm_data_' + i).val());
             if (elementIndex >= 0) {
@@ -1020,12 +1172,29 @@
                     pmShowMsInYAxis = true;
                 }
                 elementIndex += 2;  // Offset to get to the first real data
-                plotData.push(AddSeries(elementIndex, firstTick, lastTick));
+                plotData.push(AddSeries(elementIndex, firstTick, lastTick, seriesIndex));
+                seriesIndex += 1;
             }
         }
-        if (pmChart == null) {
+        plotData.push(AddTickBudgetSeries(firstTick, lastTick));
+
+        if (!pmChartIsLive()) {
             $('#pm_chart_container').html("");
-            pmChart = $.plot($('#pm_chart_container'), plotData, chartOptions);
+            applyPmChartTheme(chartOptions);
+            try {
+                pmChart = $.plot($('#pm_chart_container'), plotData, chartOptions);
+            } catch (ePlot) {
+                pmChart = null;
+                return;
+            }
+        } else {
+            applyPmChartTheme(pmChart.getOptions());
+            var $cLive = $('#pm_chart_container');
+            if ($cLive.is(':visible') && ($cLive.width() > 2) && ($cLive.height() > 2)) {
+                try {
+                    pmChart.resize();
+                } catch (eResize) {}
+            }
         }
 
         pmChart.getAxes().xaxis.options.min = firstTick;
@@ -1076,7 +1245,7 @@
         pmRequestInProgress = true;
         $.post("perfmetric?status", {}, function(result){
             var payload = result.split(",");
-            $('#id_pm_status').html(payload[0]);
+            applyPmRecordingPill(payload[0]);
             pmMaxNumFrames = payload[2];
             $('#id_pm_status_frames').html("Frames recorded: " + payload[1] + " of " + pmMaxNumFrames);
             markRequestSuccess("pm");
@@ -1305,6 +1474,26 @@
             });
         }
         InitConfirmDialog();
+
+        $(window).on("resize.pmChart", SchedulePerfMetricChartResize);
+        var pmChartEl = document.getElementById("pm_chart_container");
+        if (pmChartEl && (typeof ResizeObserver === "function")) {
+            var pmChartRO = new ResizeObserver(function() {
+                SchedulePerfMetricChartResize();
+            });
+            pmChartRO.observe(pmChartEl);
+        }
+        if (typeof MutationObserver === "function") {
+            var pmThemeMO = new MutationObserver(function() {
+                if (pmChartIsLive() && ($("#page_perfmetric").is(":visible"))) {
+                    DrawPerfMetricChart();
+                }
+            });
+            pmThemeMO.observe(document.documentElement, {
+                attributes: true,
+                attributeFilter: ["data-theme", "class"]
+            });
+        }
 
         $.post("getinitialconfig", function(data) {
             var payload = data.split("\n");
@@ -1712,7 +1901,7 @@
             <div class="toolbar">
             <button type="button" class='btn perfmetricbutton' id='btn_pm_start'>Start</button>
             <button type="button" class='btn perfmetricbutton' id='btn_pm_stop'>Stop</button>
-            <span id='id_pm_status'></span>
+            <span id='id_pm_status' class="status-pill"></span>
             <span id='id_pm_status_frames'></span>
             </div>
             <div class="toolbar">
@@ -1767,7 +1956,9 @@
             <button type="button" class="btn" id='btn_pm_toggle_graph_auto_update'>Toggle Graph Auto Update</button>
             <span   id='pm_graph_auto_update' class="live-state"></span>
             </div>
-            <div id='pm_chart_container' style="width:1000px;height:300px">To get a graph, first click 'Dump all', then select one or more data selectors, then click 'Render Graph'</div>
+            <div id='pm_chart_container'>
+              <p class="pm-chart-empty">To get a graph, first click 'Dump all', then select one or more data selectors, then click 'Render Graph'</p>
+            </div>
             <div id='id_pm_dump_result' class='consoleoutput'></div>
           </div>
           <div id='perfmetric_page_disabled' class="callout warn">The PerfMetric page is disabled in the standalone webserver.  Use the Engine or Anim webserver instead.</div>
