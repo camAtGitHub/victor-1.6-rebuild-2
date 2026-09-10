@@ -382,8 +382,8 @@
     selectedKey = key || "";
     markRowsForKey(selectedKey);
     setText("engine_overlay_caption", captionFor(selectedKey));
-    if (selectedKey && global.HomeCatalog && HomeCatalog.closePopovers) {
-      /* keep help popovers from covering the overlay caption */
+    if (global.HomeCatalog && typeof HomeCatalog.closePopovers === "function") {
+      HomeCatalog.closePopovers();
     }
   }
 
@@ -626,21 +626,6 @@
     }
   }
 
-  function rowFocused(ev) {
-    var t = ev.target;
-    if (t && t.classList && t.classList.contains("home-help")) {
-      return;
-    }
-    var tr = t && t.closest ? t.closest("#engine_table tr.home-data-row") : null;
-    if (!tr) {
-      return;
-    }
-    var key = tr.getAttribute("data-overlay") || "";
-    if (key) {
-      selectKey(key);
-    }
-  }
-
   function hotspotActivate(ev) {
     var g = ev.currentTarget;
     var key = g.getAttribute("data-overlay") || "";
@@ -676,7 +661,6 @@
       rows[i].setAttribute("data-desc", desc);
       if (key) {
         rows[i].setAttribute("data-overlay", key);
-        rows[i].setAttribute("tabindex", "0");
       }
     }
   }
@@ -860,6 +844,9 @@
   }
 
   function init() {
+    if (inited) {
+      return;
+    }
     var panel = $("engine_overlay_panel");
     var svg = $("engine_overlay_svg");
     if (!panel || !svg) {
@@ -871,7 +858,6 @@
     var table = $("engine_table");
     if (table) {
       table.addEventListener("click", rowClicked);
-      table.addEventListener("focusin", rowFocused);
     }
     var clearBtn = $("engine_overlay_clear");
     if (clearBtn) {
