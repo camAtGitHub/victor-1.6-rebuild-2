@@ -31,6 +31,44 @@ button {
   background: none;
 }
 
+/* Chrome native <select>: html color-scheme:dark paints OS option lists dark.
+   Pair that with light --wv-text so closed + open lists stay readable. */
+select {
+  background-color: var(--wv-bg-input);
+  color: var(--wv-text);
+  border: 1px solid var(--wv-line);
+  border-radius: var(--wv-radius-sm);
+}
+
+select option {
+  background-color: var(--wv-bg-input);
+  color: var(--wv-text);
+}
+
+/* jQuery UI menus appended to body (selectmenu). Chrome tokens, not module paper. */
+.ui-selectmenu-menu,
+.ui-selectmenu-menu .ui-menu,
+.ui-menu.ui-widget {
+  background: var(--wv-bg-panel);
+  color: var(--wv-text);
+  border: 1px solid var(--wv-line);
+}
+
+.ui-selectmenu-menu .ui-menu .ui-menu-item-wrapper,
+.ui-menu .ui-menu-item,
+.ui-menu .ui-menu-item-wrapper {
+  color: var(--wv-text);
+}
+
+.ui-selectmenu-menu .ui-menu .ui-state-active,
+.ui-selectmenu-menu .ui-menu .ui-menu-item-wrapper.ui-state-active,
+.ui-menu .ui-state-active,
+.ui-menu .ui-menu-item-wrapper.ui-state-active {
+  background: var(--wv-bg-hover);
+  color: var(--wv-text);
+  border: 0;
+}
+
 a {
   color: var(--wv-accent);
   text-decoration: none;
@@ -540,6 +578,8 @@ a:hover {
   border: 1px solid var(--wv-content-line);
   /* Match stock tab-content padding so modules lay out as before */
   padding: 15px;
+  /* Native <select>/<option>/<button> follow this, not html's dark scheme */
+  color-scheme: light;
 }
 
 /* Overview uses shell chrome tokens (not content paper) */
@@ -548,6 +588,76 @@ a:hover {
   color: var(--wv-text);
   border: none;
   padding: var(--wv-space-5);
+  color-scheme: inherit;
+}
+
+/* Light-paper widgets inside the content well. Hover stays dark-text
+   (#dde3ec = light-theme --wv-bg-hover); do not use dark --wv-bg-hover. */
+.module-host select,
+.module-host option,
+.module-host select option {
+  color-scheme: light;
+  background-color: var(--wv-content-bg);
+  color: var(--wv-content-text);
+  border-color: var(--wv-content-line);
+}
+
+.module-host option:checked,
+.module-host option:hover,
+.module-host option:focus {
+  background-color: #dde3ec;
+  color: var(--wv-content-text);
+}
+
+.module-host button,
+.module-host input[type="button"],
+.module-host input[type="submit"],
+.module-host .ui-button {
+  color-scheme: light;
+  background: var(--wv-content-bg);
+  color: var(--wv-content-text);
+  border: 1px solid var(--wv-content-line);
+  border-radius: var(--wv-radius-sm);
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.module-host button:hover,
+.module-host input[type="button"]:hover,
+.module-host input[type="submit"]:hover,
+.module-host .ui-button:hover,
+.module-host .ui-button:focus {
+  background: #dde3ec;
+  color: var(--wv-content-text);
+}
+
+.module-host .ui-selectmenu-button.ui-button,
+.module-host .ui-selectmenu-button {
+  color-scheme: light;
+  background: var(--wv-content-bg);
+  color: var(--wv-content-text);
+  border: 1px solid var(--wv-content-line);
+}
+
+.module-host .ui-menu,
+.module-host .ui-selectmenu-menu,
+.module-host .ui-selectmenu-menu .ui-menu {
+  color-scheme: light;
+  background: var(--wv-content-bg);
+  color: var(--wv-content-text);
+  border: 1px solid var(--wv-content-line);
+}
+
+.module-host .ui-menu .ui-menu-item,
+.module-host .ui-menu .ui-menu-item-wrapper {
+  color: var(--wv-content-text);
+}
+
+.module-host .ui-menu .ui-state-active,
+.module-host .ui-menu .ui-menu-item-wrapper.ui-state-active {
+  background: #dde3ec;
+  color: var(--wv-content-text);
+  border: 0;
 }
 
 .overview {

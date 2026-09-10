@@ -38,6 +38,21 @@ select {
   color: inherit;
 }
 
+/* Native <select> + OS option list: pair color-scheme with explicit colors.
+   Dark chrome uses --wv-bg-input / --wv-text (light text). */
+select,
+select option {
+  background-color: var(--wv-bg-input);
+  color: var(--wv-text);
+}
+
+select option:checked,
+select option:hover,
+select option:focus {
+  background-color: var(--wv-bg-hover);
+  color: var(--wv-text);
+}
+
 /* ── App chrome (header + scroll stage + footer; no nav) ──
    Class names match webViz shell so theme.js + shared muscle memory apply. */
 .app.app--consolevars {
@@ -166,6 +181,35 @@ select {
   background: transparent;
   border: none;
   text-decoration: underline;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 200px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--wv-radius-sm);
+  border: 1px solid var(--wv-line);
+  background: var(--wv-bg-input);
+}
+.search:focus-within {
+  border-color: var(--wv-accent);
+  box-shadow: 0 0 0 2px var(--wv-accent-dim);
+}
+.search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--wv-text);
+  font-size: 12px;
+  outline: none;
+}
+.search input::placeholder {
+  color: var(--wv-text-faint);
 }
 
 /* Main content scrolls; header/footer stay fixed */
@@ -564,6 +608,16 @@ select {
   outline: none;
 }
 
+#console select option,
+#main select option,
+#tabs select option,
+#console select.listbox option,
+#main select.listbox option,
+#tabs select.listbox option {
+  background: var(--wv-bg-input) !important;
+  color: var(--wv-text) !important;
+}
+
 #console input[type="text"]:focus,
 #console input.amount:focus,
 #main input[type="text"]:focus,
@@ -611,6 +665,39 @@ select {
 #tabs input[type="submit"]:hover {
   background: var(--wv-bg-active) !important;
   color: var(--wv-accent-strong) !important;
+}
+
+/* Raised jQuery UI / unstyled buttons on --wv-bg-panel (not the light jquery-ui skin) */
+#console .ui-button:not(.ui-selectmenu-button):not(.ui-slider-handle),
+#main .ui-button:not(.ui-selectmenu-button):not(.ui-slider-handle),
+#tabs .ui-button:not(.ui-selectmenu-button):not(.ui-slider-handle),
+#console button:not(.btn):not(.cv-help):not(.cv-linkvar):not(.theme-toggle),
+#main button:not(.btn):not(.cv-help):not(.cv-linkvar),
+#tabs button:not(.btn):not(.cv-help):not(.cv-linkvar),
+#console input[type="button"],
+#main input[type="button"],
+#tabs input[type="button"] {
+  background: var(--wv-bg-panel) !important;
+  color: var(--wv-text) !important;
+  border: 1px solid var(--wv-line) !important;
+  border-radius: var(--wv-radius-sm) !important;
+  padding: 5px 10px !important;
+  font: 500 12px/1.3 var(--wv-sans) !important;
+  cursor: pointer;
+}
+
+#console .ui-button:not(.ui-selectmenu-button):not(.ui-slider-handle):hover,
+#main .ui-button:not(.ui-selectmenu-button):not(.ui-slider-handle):hover,
+#tabs .ui-button:not(.ui-selectmenu-button):not(.ui-slider-handle):hover,
+#console button:not(.btn):not(.cv-help):not(.cv-linkvar):not(.theme-toggle):hover,
+#main button:not(.btn):not(.cv-help):not(.cv-linkvar):hover,
+#tabs button:not(.btn):not(.cv-help):not(.cv-linkvar):hover,
+#console input[type="button"]:hover,
+#main input[type="button"]:hover,
+#tabs input[type="button"]:hover {
+  background: var(--wv-bg-hover) !important;
+  color: var(--wv-text) !important;
+  border-color: var(--wv-line-strong) !important;
 }
 
 /* ── jQuery UI slider ── */
@@ -827,8 +914,8 @@ select {
   left: 0;
   top: calc(100% + 4px);
   z-index: var(--wv-z-toast);
-  min-width: min(28ch, 90vw);
-  max-width: min(72ch, 92vw);
+  min-width: min(36ch, 90vw);
+  max-width: min(126ch, 92vw);
   max-height: min(70vh, 32rem);
   overflow: auto;
   padding: 10px 12px;
@@ -919,7 +1006,7 @@ select {
   color: var(--wv-text-dim);
   font-size: 12px;
   margin: 0 0 8px;
-  max-width: 70ch;
+  max-width: min(210ch, 100%);
   white-space: normal;
 }
 

@@ -1,7 +1,7 @@
 /**
  * Console vars UI enhancer (Path A decorator).
  * Runs after C++ injects category HTML into consolevarsui.html (classic) or
- * consolevars-explorer.html. Explorer chrome (#cvRecipes, #cvSearch, #cvProcessBadge)
+ * consolevars-explorer.html. Explorer chrome (#cvRecipes, #cvSearch, #pillProcess)
  * is optional — missing nodes are skipped; catalog load + row decoration always run.
  * Catalog: /cvcatalog/index.json shards; fall back to /cv-catalog.json.
  * Never use URLs that start with /consolevars (handler steals them → HTML 200).
@@ -153,17 +153,31 @@
   }
 
   function setProcessBadge() {
+    var port = window.location.port || "";
+    var process =
+      processHint === "anim" ? "Anim" : port === "8888" ? "Engine" : "—";
+    var pillP = $("#pillProcess");
+    var pillPort = $("#pillPort");
+    var sub = $("#brandSubtitle");
+    if (pillP) {
+      pillP.textContent = process === "—" ? "consolevars" : process;
+    }
+    if (pillPort) {
+      pillPort.textContent = port ? ":" + port : window.location.host || "—";
+    }
+    if (sub && process !== "—") {
+      sub.textContent = process;
+    }
     var el = $("#cvProcessBadge");
     if (!el) return;
-    var port = window.location.port || "?";
     if (processHint === "anim") {
-      el.textContent = "Anim process · :" + port;
+      el.textContent = "Anim process · :" + (port || "?");
       el.className = "cv-badge cv-badge-anim";
-    } else if (String(port) === "8888") {
+    } else if (port === "8888") {
       el.textContent = "Engine process · :8888";
       el.className = "cv-badge cv-badge-engine";
     } else {
-      el.textContent = "Console · :" + port + " (treat as engine catalog)";
+      el.textContent = "Console · :" + (port || "?") + " (treat as engine catalog)";
       el.className = "cv-badge";
     }
   }

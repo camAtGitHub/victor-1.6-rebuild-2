@@ -4,194 +4,165 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Console Vars &amp; Functions</title>
+
+  <!-- FOUC: set data-theme + class before any stylesheet that uses tokens -->
+  <script>
+  (function () {
+    var root = document.documentElement;
+    var dark = true;
+    try {
+      var p = localStorage.getItem("webviz.colorScheme") || "system";
+      if (p === "light") dark = false;
+      else if (p === "dark") dark = true;
+      else if (window.matchMedia) {
+        dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      }
+    } catch (e) {
+      dark = true;
+    }
+    var t = dark ? "dark" : "light";
+    root.setAttribute("data-theme", t);
+    root.classList.remove("wv-theme-light", "wv-theme-dark");
+    root.classList.add(dark ? "wv-theme-dark" : "wv-theme-light");
+    /* Inline light vars early so paint is correct even if tokens.css is cached without light block */
+    if (!dark) {
+      var L = {
+        "--wv-bg": "#f0f2f6",
+        "--wv-bg-elev": "#ffffff",
+        "--wv-bg-panel": "#e8ecf2",
+        "--wv-bg-hover": "#dde3ec",
+        "--wv-bg-active": "#d0d8e4",
+        "--wv-bg-input": "#ffffff",
+        "--wv-line": "#c5ccd8",
+        "--wv-line-soft": "#d8dee8",
+        "--wv-line-strong": "#9aa6b8",
+        "--wv-text": "#1a1d24",
+        "--wv-text-dim": "#5c667a",
+        "--wv-text-faint": "#8b95a8",
+        "--wv-text-inv": "#ffffff",
+        "--wv-accent-strong": "#3d87c4",
+        "--wv-content-bg": "#ffffff",
+        "--wv-content-text": "#1a1d24",
+        "--wv-content-line": "#c5cad3",
+        "--wv-toast-error-bg": "#fdecee",
+        "--wv-shadow-sm": "0 1px 2px rgba(0,0,0,0.08)",
+        "--wv-shadow-md": "0 8px 24px rgba(0,0,0,0.1)"
+      };
+      for (var k in L) {
+        if (Object.prototype.hasOwnProperty.call(L, k)) root.style.setProperty(k, L[k]);
+      }
+      try { root.style.setProperty("color-scheme", "light"); } catch (e2) {}
+    } else {
+      try { root.style.setProperty("color-scheme", "dark"); } catch (e3) {}
+    }
+  })();
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
   <link rel="stylesheet" href="jquery-ui.css">
   <link rel="stylesheet" href="style.css">
-  <style>
-    :root {
-      --cv-bg: #0c0f14;
-      --cv-elev: #12161e;
-      --cv-panel: #161b24;
-      --cv-line: #2a3344;
-      --cv-text: #e8edf5;
-      --cv-dim: #8b95a8;
-      --cv-faint: #5c667a;
-      --cv-accent: #5b9fd4;
-      --cv-accent-dim: rgba(91, 159, 212, 0.14);
-      --cv-good: #3ecf8e;
-      --cv-warn: #e6b450;
-      --cv-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-      --cv-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      --cv-radius: 8px;
-    }
-    * { box-sizing: border-box; }
-    body.cv-body {
-      margin: 0;
-      min-height: 100vh;
-      font: 13px/1.45 var(--cv-sans);
-      background: var(--cv-bg);
-      color: var(--cv-text);
-    }
-    /* Override legacy style.css / jQuery UI noise for this page */
-    body.cv-body .ui-widget-content { background: transparent; border: 0; color: inherit; }
-    body.cv-body .ui-widget-header { background: transparent; border: 0; color: inherit; }
-    body.cv-body .ui-tabs .ui-tabs-nav { background: var(--cv-elev); border: 1px solid var(--cv-line); border-radius: var(--cv-radius); padding: 6px; }
-    body.cv-body .ui-tabs .ui-tabs-nav li { margin: 2px; }
-    body.cv-body .ui-tabs .ui-tabs-nav li a { color: var(--cv-dim); font-size: 12px; padding: 6px 10px; }
-    body.cv-body .ui-tabs .ui-tabs-nav li.ui-tabs-active a { color: var(--cv-text); }
-    body.cv-body .ui-tabs .ui-tabs-panel { background: var(--cv-panel); border: 1px solid var(--cv-line); border-radius: var(--cv-radius); margin-top: 10px; padding: 14px; color: var(--cv-text); }
-    body.cv-body fieldset { border: 1px solid var(--cv-line); border-radius: 6px; margin: 10px 0; padding: 10px 12px; }
-    body.cv-body legend { color: var(--cv-accent); font-weight: 600; padding: 0 6px; }
-    body.cv-body label { color: var(--cv-text); font-family: var(--cv-mono); font-size: 12px; margin-right: 8px; }
-    body.cv-body input[type="text"], body.cv-body select {
-      background: #0e1218; color: var(--cv-text); border: 1px solid var(--cv-line); border-radius: 4px; padding: 4px 6px;
-    }
-    body.cv-body .ui-slider { background: #1a2030; border-color: var(--cv-line); }
-    body.cv-body .ui-slider .ui-slider-handle { background: var(--cv-accent); border-color: var(--cv-accent); }
+  <link rel="stylesheet" href="/cv-tokens.css">
+  <link rel="stylesheet" href="/cv-chrome.css">
 
-    .cv-app {
+  <style>
+    /* Explorer layout only — chrome/tokens come from cv-tokens + cv-chrome. */
+    .app.app--consolevars .search {
+      flex: 1;
+      max-width: 320px;
+    }
+
+    .cv-explorer-body {
       display: grid;
       grid-template-columns: minmax(0, 1fr) 320px;
-      grid-template-rows: auto minmax(0, 1fr);
-      min-height: 100vh;
-      gap: 0;
+      min-height: 0;
+      overflow: hidden;
     }
-    .cv-top {
-      grid-column: 1 / -1;
-      display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
-      padding: 10px 14px;
-      background: var(--cv-elev);
-      border-bottom: 1px solid var(--cv-line);
-    }
-    .cv-brand { font-weight: 600; letter-spacing: -0.02em; }
-    .cv-brand em { font-style: normal; color: var(--cv-dim); font-weight: 500; font-size: 12px; margin-left: 6px; }
-    .cv-badge {
-      font-family: var(--cv-mono); font-size: 11px;
-      padding: 3px 10px; border-radius: 999px;
-      background: var(--cv-panel); border: 1px solid var(--cv-line); color: var(--cv-dim);
-    }
-    .cv-badge-engine { border-color: rgba(91,159,212,.45); color: var(--cv-accent); }
-    .cv-badge-anim { border-color: rgba(199,146,234,.45); color: #c792ea; }
-    .cv-search {
-      flex: 1; min-width: 160px; max-width: 320px;
-      display: flex; align-items: center; gap: 6px;
-      background: #0e1218; border: 1px solid var(--cv-line); border-radius: 6px; padding: 4px 10px;
-    }
-    .cv-search input {
-      flex: 1; border: 0; background: transparent; color: var(--cv-text); outline: none; font-size: 13px;
-    }
-    .cv-search input::placeholder { color: var(--cv-faint); }
-    .cv-top a { color: var(--cv-dim); font-size: 12px; }
-    .cv-top a:hover { color: var(--cv-accent); }
-    .cv-status { font-family: var(--cv-mono); font-size: 11px; color: var(--cv-faint); width: 100%; }
-
-    .cv-main {
-      padding: 14px;
-      overflow: auto;
+    .cv-explorer-body > .cv-stage {
       min-width: 0;
     }
+
     .cv-side {
-      border-left: 1px solid var(--cv-line);
-      background: var(--cv-elev);
+      border-left: 1px solid var(--wv-line);
+      background: var(--wv-bg-elev);
       padding: 12px;
       overflow: auto;
       min-height: 0;
     }
     .cv-side h2 {
-      font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
-      color: var(--cv-faint); margin: 0 0 10px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--wv-text-faint);
+      margin: 0 0 10px;
     }
-    .cv-muted { color: var(--cv-dim); font-size: 12px; }
+    .cv-muted { color: var(--wv-text-dim); font-size: 12px; }
     .cv-recipe {
-      background: var(--cv-panel);
-      border: 1px solid var(--cv-line);
-      border-radius: var(--cv-radius);
+      background: var(--wv-bg-panel);
+      border: 1px solid var(--wv-line);
+      border-radius: var(--wv-radius);
       padding: 12px;
       margin-bottom: 12px;
     }
     .cv-recipe h3 { margin: 0 0 6px; font-size: 13px; }
-    .cv-blurb { color: var(--cv-dim); font-size: 12px; margin: 0 0 8px; }
-    .cv-where { font-family: var(--cv-mono); font-size: 10px; color: var(--cv-faint); margin: 0 0 8px; }
+    .cv-blurb { color: var(--wv-text-dim); font-size: 12px; margin: 0 0 8px; }
+    .cv-where { font-family: var(--wv-mono); font-size: 10px; color: var(--wv-text-faint); margin: 0 0 8px; }
     .cv-steps { margin: 0 0 8px 1.1em; padding: 0; font-size: 12px; }
-    .cv-steps code { font-family: var(--cv-mono); color: var(--cv-accent); font-size: 11px; }
-    .cv-step-note { display: block; color: var(--cv-faint); font-size: 11px; margin: 2px 0 6px; }
-    .cv-tips { margin: 0 0 10px 1.1em; padding: 0; color: var(--cv-dim); font-size: 11px; }
+    .cv-steps code { font-family: var(--wv-mono); color: var(--wv-accent); font-size: 11px; }
+    .cv-step-note { display: block; color: var(--wv-text-faint); font-size: 11px; margin: 2px 0 6px; }
+    .cv-tips { margin: 0 0 10px 1.1em; padding: 0; color: var(--wv-text-dim); font-size: 11px; }
     .cv-recipe-actions { display: flex; gap: 6px; flex-wrap: wrap; }
     .cv-btn {
-      cursor: pointer; border: 1px solid var(--cv-line); background: var(--cv-bg);
-      color: var(--cv-dim); border-radius: 6px; padding: 5px 10px; font-size: 12px;
+      cursor: pointer;
+      border: 1px solid var(--wv-line);
+      background: var(--wv-bg);
+      color: var(--wv-text-dim);
+      border-radius: var(--wv-radius-sm);
+      padding: 5px 10px;
+      font-size: 12px;
     }
-    .cv-btn:hover { color: var(--cv-text); border-color: #3a465c; }
-    .cv-btn-primary { background: var(--cv-accent-dim); border-color: var(--cv-accent); color: var(--cv-accent); }
-    /* Compact Path A marks (shared /cv-app.js) */
-    .cv-marks {
-      display: inline-flex; align-items: center; gap: 4px;
-      position: relative; vertical-align: middle; margin: 0 4px 0 2px;
+    .cv-btn:hover { color: var(--wv-text); border-color: var(--wv-line-strong); }
+    .cv-btn-primary {
+      background: var(--wv-accent-dim);
+      border-color: var(--wv-accent);
+      color: var(--wv-accent);
     }
-    .cv-help {
-      cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
-      width: 16px; height: 16px; padding: 0;
-      border: 1px solid #3a465c; border-radius: 999px;
-      background: var(--cv-accent-dim); color: var(--cv-accent);
-      font: 600 11px/1 var(--cv-sans); outline: none;
-    }
-    .cv-help:hover, .cv-help[aria-expanded="true"] {
-      color: #7ab8e8; border-color: var(--cv-accent);
-    }
-    .cv-dead {
-      display: inline-flex; min-width: 14px; height: 14px; align-items: center; justify-content: center;
-      color: var(--cv-faint); font: 600 12px/1 var(--cv-sans); cursor: help;
-    }
-    .cv-row-dead > label { color: var(--cv-dim); }
+
+    /* Help blurbs: ≥3× the old 42ch explorer cap; match cv-chrome.css */
     .cv-popover {
-      display: block; position: absolute; left: 0; top: calc(100% + 4px); z-index: 100;
-      min-width: 18ch; max-width: min(42ch, 70vw); padding: 8px 10px;
-      background: var(--cv-elev); color: var(--cv-text);
-      border: 1px solid var(--cv-line); border-radius: 6px;
-      font: 12px/1.4 var(--cv-sans); white-space: normal; text-align: left;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      min-width: min(36ch, 90vw);
+      max-width: min(126ch, 92vw);
     }
-    .cv-popover[hidden] { display: none !important; }
-    .cv-popover .cv-blurb { margin: 0 0 4px; color: var(--cv-dim); }
-    .cv-popover .cv-status-note { margin: 4px 0 0; color: var(--cv-warn); font-size: 11px; }
-    .cv-popover .cv-evidence { margin: 4px 0 0; color: var(--cv-faint); font: 10px/1.35 var(--cv-mono); word-break: break-word; }
-    .cv-popover .cv-requires, .cv-popover .cv-related { margin: 6px 0 0; font-size: 11px; color: var(--cv-dim); }
-    .cv-linkvar {
-      cursor: pointer; border: 0; background: transparent; color: var(--cv-accent);
-      font-family: var(--cv-mono); font-size: 11px; text-decoration: underline; padding: 0 2px;
+    .cv-cat-blurb {
+      max-width: min(210ch, 100%);
     }
-    .cv-cat-blurb { color: var(--cv-dim); font-size: 12px; margin: 0 0 10px; max-width: 70ch; }
-    .cv-highlight { /* annotated highlight vars */
-      outline: 1px solid rgba(62, 207, 142, 0.25);
-      border-radius: 4px;
-      padding: 4px 6px 2px !important;
-      background: rgba(62, 207, 142, 0.05);
-    }
-    .cv-flash {
-      animation: cv-flash 1.6s ease;
-      outline: 2px solid var(--cv-warn) !important;
-      background: rgba(230, 180, 80, 0.12) !important;
-    }
-    @keyframes cv-flash {
-      0%, 100% { outline-color: var(--cv-warn); }
-      50% { outline-color: var(--cv-accent); }
-    }
+
     .cv-console-out {
-      margin-top: 16px; padding: 10px; border-radius: 6px;
-      background: #0e1218; border: 1px solid var(--cv-line);
-      font-family: var(--cv-mono); font-size: 11px; color: var(--cv-dim);
+      margin-top: 16px;
+      padding: 10px;
+      border-radius: var(--wv-radius-sm);
+      background: var(--wv-bg-input);
+      border: 1px solid var(--wv-line);
+      font-family: var(--wv-mono);
+      font-size: 11px;
+      color: var(--wv-text-dim);
     }
+
     /* C++ used display:inline-block on all divs — force block layout for rows / fieldsets */
-    body.cv-body #tabs div.cv-row,
-    body.cv-body #tabs fieldset,
-    body.cv-body #tabs .cv-cat-blurb { display: block; }
-    body.cv-body #tabs > div > div {
+    body.cv-explorer #tabs div.cv-row,
+    body.cv-explorer #tabs fieldset,
+    body.cv-explorer #tabs .cv-cat-blurb { display: block; }
+    body.cv-explorer #tabs > div > div {
       display: inline-block;
       vertical-align: top;
-      color: var(--cv-text);
+      color: var(--wv-text);
     }
+
     @media (max-width: 960px) {
-      .cv-app { grid-template-columns: 1fr; }
-      .cv-side { border-left: 0; border-top: 1px solid var(--cv-line); max-height: 40vh; }
+      .cv-explorer-body { grid-template-columns: 1fr; }
+      .cv-side { border-left: 0; border-top: 1px solid var(--wv-line); max-height: 40vh; }
     }
 /* -- generated style -- */
   </style>
@@ -208,7 +179,7 @@
     }
 
     $(function () {
-      // Tabs are initialized in consolevars-app.js (#tabs preferred)
+      // Tabs are initialized in cv-app.js (#tabs preferred)
 
       $(".slider").each(function () {
         var scale = $(this).data("scale"),
@@ -265,39 +236,84 @@
 // -- generated script --
   </script>
 </head>
-<body class="cv-body ui-widget-content" style="border:0;">
-  <div class="cv-app">
-    <header class="cv-top">
-      <div class="cv-brand">Console vars explorer <em>(new UI)</em></div>
-      <span class="cv-badge" id="cvProcessBadge">…</span>
-      <label class="cv-search">
-        <span style="color:var(--cv-faint);font-size:11px">Filter</span>
+<body class="cv-explorer ui-widget-content" style="border:0;">
+  <div class="app app--consolevars" id="app">
+    <header class="top" role="banner">
+      <div class="brand" title="Console Vars and Functions">
+        <div class="mark" aria-hidden="true">C</div>
+        <span class="title">Console Vars <em id="brandSubtitle">Explorer</em></span>
+      </div>
+
+      <div class="meta-pills" aria-label="Page meta">
+        <span class="pill" id="pillProcess">—</span>
+        <span class="pill pill-secondary" id="pillPort">—</span>
+      </div>
+
+      <label class="search" title="Filter vars">
+        <span class="visually-hidden" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Filter vars</span>
         <input type="search" id="cvSearch" placeholder="Faces, MirrorMode, Mood…" autocomplete="off" />
       </label>
-      <a href="/consolevars">Classic consolevars</a>
-      <a href="/">Home</a>
-      <a href="/webViz.html">WebViz</a>
-      <div class="cv-status" id="cvStatus">Loading catalog…</div>
+
+      <div class="top-actions">
+        <a class="btn btn-link" href="/consolevars" title="Classic consolevars">Classic</a>
+        <a class="btn btn-link" href="/webViz.html" title="WebViz">WebViz</a>
+        <a class="btn btn-link" href="/" title="Web server home">Home</a>
+      </div>
     </header>
 
-    <main class="cv-main" id="main">
-      <!-- C++ injects jQuery UI tabs markup at the next comment -->
+    <div class="cv-explorer-body">
+      <main class="cv-stage" id="stage">
+        <div id="console" class="ui-widget-content">
+          <div id="main">
+            <!-- C++ injects jQuery UI tabs markup at the next comment -->
 <!-- generated html -->
-      <div class="cv-console-out">
-        <div>Output from last console func call:</div>
-        <div id="id_consolefunc_result"></div>
-      </div>
-    </main>
+            <div class="cv-console-out">
+              <div>Output from last console func call:</div>
+              <div id="id_consolefunc_result"></div>
+            </div>
+          </div>
+        </div>
+      </main>
 
-    <aside class="cv-side" aria-label="Recipes and notes">
-      <h2>Recipes (curated)</h2>
-      <p class="cv-muted" style="margin-top:0">
-        Not every var is documented — only high-signal paths. Add entries in
-        <code>cvcatalog/</code> shards (or <code>cv-catalog.json</code>). Apply posts <code>consolevarset</code> for each step.
-      </p>
-      <div id="cvRecipes"></div>
-    </aside>
+      <aside class="cv-side" aria-label="Recipes and notes">
+        <h2>Recipes (curated)</h2>
+        <p class="cv-muted" style="margin-top:0">
+          Not every var is documented — only high-signal paths. Add entries in
+          <code>cvcatalog/</code> shards (or <code>cv-catalog.json</code>). Apply posts <code>consolevarset</code> for each step.
+        </p>
+        <div id="cvRecipes"></div>
+      </aside>
+    </div>
+
+    <footer class="status" role="contentinfo">
+      <span class="left" id="cvStatus">Loading catalog…</span>
+      <span class="right" id="statusRight">click theme · double-click system</span>
+      <button
+        type="button"
+        class="btn btn-icon theme-toggle"
+        id="btnThemeToggle"
+        title="Switch to light theme"
+        aria-label="Switch to light theme"
+        aria-pressed="false"
+      >
+        <span id="themeToggleIcon" aria-hidden="true">🌓</span>
+      </button>
+    </footer>
   </div>
+
+  <script>
+  (function () {
+    var port = String(window.location.port || "");
+    var process = port === "8889" ? "Anim" : port === "8888" ? "Engine" : "—";
+    var pillP = document.getElementById("pillProcess");
+    var pillPort = document.getElementById("pillPort");
+    var sub = document.getElementById("brandSubtitle");
+    if (pillP) pillP.textContent = process === "—" ? "consolevars" : process;
+    if (pillPort) pillPort.textContent = port ? (":" + port) : window.location.host || "—";
+    if (sub && process !== "—") sub.textContent = process;
+  })();
+  </script>
+  <script src="/webviz/js/theme.js"></script>
   <script src="/cv-app.js"></script>
 </body>
 </html>

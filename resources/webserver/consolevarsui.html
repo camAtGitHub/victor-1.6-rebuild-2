@@ -227,7 +227,7 @@
       var sub = document.getElementById("brandSubtitle");
       if (pillP) pillP.textContent = process === "—" ? "consolevars" : process;
       if (pillPort) pillPort.textContent = port ? (":" + port) : window.location.host || "—";
-      if (sub && process !== "—") sub.textContent = process.toLowerCase();
+      if (sub && process !== "—") sub.textContent = process;
       var right = document.getElementById("statusRight");
       if (right) right.textContent = "click theme · double-click system";
     })();

@@ -45,7 +45,7 @@
     installConsoleApi();
 
     UI.setConn("connecting", "connecting…");
-    UI.setStatus("Loading modules…", feedStatusLabel());
+    UI.setStatus("Loading modules…", "");
 
     state.socket = new SocketCtor({
       url: state.feed.wsUrl,
@@ -90,7 +90,7 @@
       selectModule("overview");
       UI.setStatus(
         "Shell ready · " + Object.keys(state.byKey).length + " modules",
-        feedStatusLabel()
+        ""
       );
 
       if (state.feed.mode === "remote") {
@@ -101,18 +101,6 @@
         );
       }
     });
-  }
-
-  function feedStatusLabel() {
-    var f = state.feed;
-    var p = state.profile;
-    if (!f || !p) {
-      return "—";
-    }
-    if (f.mode === "remote") {
-      return p.label + " @ " + f.host + ":" + f.port;
-    }
-    return p.processTitle + " :" + f.port;
   }
 
   function paintProfileChrome() {
@@ -277,7 +265,7 @@
       state.feed.wsUrl,
       "ok"
     );
-    UI.setStatus("Feed updated", feedStatusLabel());
+    UI.setStatus("Feed updated", "");
 
     if (options.syncUrl !== false) {
       try {
@@ -411,7 +399,7 @@
     var names = subscribedList();
 
     if (socketStatus === "connecting") {
-      UI.setStatus("Connecting… · " + n + " will resubscribe", feedStatusLabel());
+      UI.setStatus("Connecting… · " + n + " will resubscribe", "");
       return;
     }
     if (socketStatus === "dead" || socketStatus === "error" || (!open && socketStatus !== "live")) {
@@ -423,7 +411,7 @@
             " module" +
             (n === 1 ? "" : "s") +
             " remembered",
-          feedStatusLabel()
+          ""
         );
         return;
       }
@@ -435,7 +423,7 @@
         n +
         " subscribed" +
         (n > 0 && n <= 4 ? " (" + names.join(", ") + ")" : n > 4 ? " (" + names.slice(0, 3).join(", ") + "…)" : "");
-      UI.setStatus(left, feedStatusLabel());
+      UI.setStatus(left, "");
     }
   }
 
