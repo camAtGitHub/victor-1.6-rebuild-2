@@ -103,64 +103,257 @@ static int GetEngineStatsWebServerImpl(WebService::WebService::Request* request)
     return 0;
   }
 
+  // Slot count must match engineItems.length in resources/webserver/index.html.
+  // Inactive rows emit an empty line so payload[i] indexing does not shift.
+  enum {
+    kStat_BattVolts,
+    kStat_BattVoltsRaw,
+    kStat_ChargerVoltsRaw,
+    kStat_BattLevel,
+    kStat_BattTemp,
+    kStat_BattCharging,
+    kStat_OnChargerContacts,
+    kStat_OnChargerPlatform,
+    kStat_FullyChargedTime,
+    kStat_LowBatteryTime,
+    kStat_OffTreadsState,
+    kStat_PoseAngle,
+    kStat_PosePitch,
+    kStat_HeadAngle,
+    kStat_LiftHeight,
+    kStat_LeftWheelSpeed,
+    kStat_RightWheelSpeed,
+    kStat_AccelX,
+    kStat_AccelY,
+    kStat_AccelZ,
+    kStat_GyroX,
+    kStat_GyroY,
+    kStat_GyroZ,
+    kStat_Touch,
+    kStat_CliffFL,
+    kStat_CliffFR,
+    kStat_CliffBL,
+    kStat_CliffBR,
+    kStat_CliffWhite,
+    kStat_ProxTimestamp,
+    kStat_ProxDistance,
+    kStat_ProxSignal,
+    kStat_ProxAmbient,
+    kStat_ProxSpad,
+    kStat_ProxRangeStatus,
+    kStat_CarryingObjectID,
+    kStat_CarryingObjectOnTopID,
+    kStat_HeadTrackingObjectID,
+    kStat_LocalizedToObjectID,
+    kStat_StatusFlags,
+    kStat_MicRecentDirection,
+    kStat_MicSelectedDirection,
+    kNumStats
+  };
+  static_assert(kNumStats == 42, "GetEngineStats slots must match engineItems.length");
+
+  bool active[kNumStats];
+  const std::string& boolsString = request->_param1;
+  int i = 0;
+  for ( ; i < kNumStats && boolsString[i]; i++)
+  {
+    active[i] = (boolsString[i] == '1');
+  }
+  // Missing/short query: remaining bits on so unfiltered clients still get every field.
+  for ( ; i < kNumStats; i++)
+  {
+    active[i] = true;
+  }
+
   const auto robot = cozmoEngine->GetRobot();
+  std::stringstream ss;
 
   const auto& batteryComponent = robot->GetBatteryComponent();
-  std::stringstream ss;
-  ss << std::fixed << std::setprecision(3) << batteryComponent.GetBatteryVolts() << '\n';
-  ss << std::fixed << std::setprecision(3) << batteryComponent.GetBatteryVoltsRaw() << '\n';
-  ss << std::fixed << std::setprecision(3) << batteryComponent.GetChargerVoltsRaw() << '\n';
-  ss << EnumToString(batteryComponent.GetBatteryLevel()) << '\n';
-  ss << std::to_string(static_cast<int>(batteryComponent.GetBatteryTemperature_C())) << '\n';
-  ss << (batteryComponent.IsCharging() ? "true" : "false") << '\n';
-  ss << (batteryComponent.IsOnChargerContacts() ? "true" : "false") << '\n';
-  ss << (batteryComponent.IsOnChargerPlatform() ? "true" : "false") << '\n';
-  ss << std::to_string(static_cast<int>(batteryComponent.GetTimeAtLevelSec(BatteryLevel::Full))) << '\n';
-  ss << std::to_string(static_cast<int>(batteryComponent.GetTimeAtLevelSec(BatteryLevel::Low))) << '\n';
+  if (active[kStat_BattVolts]) {
+    ss << std::fixed << std::setprecision(3) << batteryComponent.GetBatteryVolts();
+  }
+  ss << '\n';
+  if (active[kStat_BattVoltsRaw]) {
+    ss << std::fixed << std::setprecision(3) << batteryComponent.GetBatteryVoltsRaw();
+  }
+  ss << '\n';
+  if (active[kStat_ChargerVoltsRaw]) {
+    ss << std::fixed << std::setprecision(3) << batteryComponent.GetChargerVoltsRaw();
+  }
+  ss << '\n';
+  if (active[kStat_BattLevel]) {
+    ss << EnumToString(batteryComponent.GetBatteryLevel());
+  }
+  ss << '\n';
+  if (active[kStat_BattTemp]) {
+    ss << std::to_string(static_cast<int>(batteryComponent.GetBatteryTemperature_C()));
+  }
+  ss << '\n';
+  if (active[kStat_BattCharging]) {
+    ss << (batteryComponent.IsCharging() ? "true" : "false");
+  }
+  ss << '\n';
+  if (active[kStat_OnChargerContacts]) {
+    ss << (batteryComponent.IsOnChargerContacts() ? "true" : "false");
+  }
+  ss << '\n';
+  if (active[kStat_OnChargerPlatform]) {
+    ss << (batteryComponent.IsOnChargerPlatform() ? "true" : "false");
+  }
+  ss << '\n';
+  if (active[kStat_FullyChargedTime]) {
+    ss << std::to_string(static_cast<int>(batteryComponent.GetTimeAtLevelSec(BatteryLevel::Full)));
+  }
+  ss << '\n';
+  if (active[kStat_LowBatteryTime]) {
+    ss << std::to_string(static_cast<int>(batteryComponent.GetTimeAtLevelSec(BatteryLevel::Low)));
+  }
+  ss << '\n';
 
   const auto& robotState = robot->GetRobotState();
 
-  ss << EnumToString(robot->GetOffTreadsState()) << '\n';
-  ss << std::fixed << std::setprecision(1) << RAD_TO_DEG(robotState.poseAngle_rad) << '\n';
-  ss << std::fixed << std::setprecision(1) << RAD_TO_DEG(robotState.posePitch_rad) << '\n';
-  ss << std::fixed << std::setprecision(1) << RAD_TO_DEG(robotState.headAngle_rad) << '\n';
-  ss << std::fixed << std::setprecision(3) << robotState.liftHeight_mm << '\n';
-  ss << std::fixed << std::setprecision(3) << robotState.leftWheelSpeed_mmps << '\n';
-  ss << std::fixed << std::setprecision(3) << robotState.rightWheelSpeed_mmps << '\n';
-  ss << std::fixed << std::setprecision(3) << robotState.accel.x << '\n';
-  ss << std::fixed << std::setprecision(3) << robotState.accel.y << '\n';
-  ss << std::fixed << std::setprecision(3) << robotState.accel.z << '\n';
-  ss << std::fixed << std::setprecision(3) << robotState.gyro.x << '\n';
-  ss << std::fixed << std::setprecision(3) << robotState.gyro.y << '\n';
-  ss << std::fixed << std::setprecision(3) << robotState.gyro.z << '\n';
+  if (active[kStat_OffTreadsState]) {
+    ss << EnumToString(robot->GetOffTreadsState());
+  }
+  ss << '\n';
+  if (active[kStat_PoseAngle]) {
+    ss << std::fixed << std::setprecision(1) << RAD_TO_DEG(robotState.poseAngle_rad);
+  }
+  ss << '\n';
+  if (active[kStat_PosePitch]) {
+    ss << std::fixed << std::setprecision(1) << RAD_TO_DEG(robotState.posePitch_rad);
+  }
+  ss << '\n';
+  if (active[kStat_HeadAngle]) {
+    ss << std::fixed << std::setprecision(1) << RAD_TO_DEG(robotState.headAngle_rad);
+  }
+  ss << '\n';
+  if (active[kStat_LiftHeight]) {
+    ss << std::fixed << std::setprecision(3) << robotState.liftHeight_mm;
+  }
+  ss << '\n';
+  if (active[kStat_LeftWheelSpeed]) {
+    ss << std::fixed << std::setprecision(3) << robotState.leftWheelSpeed_mmps;
+  }
+  ss << '\n';
+  if (active[kStat_RightWheelSpeed]) {
+    ss << std::fixed << std::setprecision(3) << robotState.rightWheelSpeed_mmps;
+  }
+  ss << '\n';
+  if (active[kStat_AccelX]) {
+    ss << std::fixed << std::setprecision(3) << robotState.accel.x;
+  }
+  ss << '\n';
+  if (active[kStat_AccelY]) {
+    ss << std::fixed << std::setprecision(3) << robotState.accel.y;
+  }
+  ss << '\n';
+  if (active[kStat_AccelZ]) {
+    ss << std::fixed << std::setprecision(3) << robotState.accel.z;
+  }
+  ss << '\n';
+  if (active[kStat_GyroX]) {
+    ss << std::fixed << std::setprecision(3) << robotState.gyro.x;
+  }
+  ss << '\n';
+  if (active[kStat_GyroY]) {
+    ss << std::fixed << std::setprecision(3) << robotState.gyro.y;
+  }
+  ss << '\n';
+  if (active[kStat_GyroZ]) {
+    ss << std::fixed << std::setprecision(3) << robotState.gyro.z;
+  }
+  ss << '\n';
 
-  const auto& touchSensorComponent = robot->GetTouchSensorComponent();
-  ss << touchSensorComponent.GetLatestRawTouchValue() << '\n';
+  if (active[kStat_Touch]) {
+    ss << robot->GetTouchSensorComponent().GetLatestRawTouchValue();
+  }
+  ss << '\n';
 
   const auto& cliffSensorComponent = robot->GetCliffSensorComponent();
   const auto& cliffDataRaw = cliffSensorComponent.GetCliffDataRaw();
-  ss << cliffDataRaw[0] << '\n';
-  ss << cliffDataRaw[1] << '\n';
-  ss << cliffDataRaw[2] << '\n';
-  ss << cliffDataRaw[3] << '\n';
+  if (active[kStat_CliffFL]) {
+    ss << cliffDataRaw[0];
+  }
+  ss << '\n';
+  if (active[kStat_CliffFR]) {
+    ss << cliffDataRaw[1];
+  }
+  ss << '\n';
+  if (active[kStat_CliffBL]) {
+    ss << cliffDataRaw[2];
+  }
+  ss << '\n';
+  if (active[kStat_CliffBR]) {
+    ss << cliffDataRaw[3];
+  }
+  ss << '\n';
+  if (active[kStat_CliffWhite]) {
+    ss << cliffSensorComponent.IsWhiteDetected(static_cast<CliffSensor>(0)) << ' '
+       << cliffSensorComponent.IsWhiteDetected(static_cast<CliffSensor>(1)) << ' '
+       << cliffSensorComponent.IsWhiteDetected(static_cast<CliffSensor>(2)) << ' '
+       << cliffSensorComponent.IsWhiteDetected(static_cast<CliffSensor>(3));
+  }
+  ss << '\n';
 
-  ss << cliffSensorComponent.IsWhiteDetected(static_cast<CliffSensor>(0)) << ' '
-     << cliffSensorComponent.IsWhiteDetected(static_cast<CliffSensor>(1)) << ' '
-     << cliffSensorComponent.IsWhiteDetected(static_cast<CliffSensor>(2)) << ' '
-     << cliffSensorComponent.IsWhiteDetected(static_cast<CliffSensor>(3)) << '\n';
+  // Six engineItems from one GetDebugString("\n"). Skip the call only if all six are off.
+  std::string proxParts[6];
+  const bool anyProx = (active[kStat_ProxTimestamp] ||
+                        active[kStat_ProxDistance] ||
+                        active[kStat_ProxSignal] ||
+                        active[kStat_ProxAmbient] ||
+                        active[kStat_ProxSpad] ||
+                        active[kStat_ProxRangeStatus]);
+  if (anyProx) {
+    std::istringstream proxStream(robot->GetProxSensorComponent().GetDebugString("\n"));
+    for (int p = 0; p < 6; ++p) {
+      std::getline(proxStream, proxParts[p]);
+    }
+  }
+  for (int p = 0; p < 6; ++p) {
+    if (active[kStat_ProxTimestamp + p]) {
+      ss << proxParts[p];
+    }
+    ss << '\n';
+  }
 
-  ss << robot->GetProxSensorComponent().GetDebugString() << '\n';
-
-  ss << robotState.carryingObjectID << '\n';
-  ss << robotState.carryingObjectOnTopID << '\n';
-  ss << robotState.headTrackingObjectID << '\n';
-  ss << robotState.localizedToObjectID << '\n';
-  ss << "0x" << std::uppercase << std::setfill('0') << std::setw(8) << std::hex << robotState.status << '\n';
+  if (active[kStat_CarryingObjectID]) {
+    ss << robotState.carryingObjectID;
+  }
+  ss << '\n';
+  if (active[kStat_CarryingObjectOnTopID]) {
+    ss << robotState.carryingObjectOnTopID;
+  }
+  ss << '\n';
+  if (active[kStat_HeadTrackingObjectID]) {
+    ss << robotState.headTrackingObjectID;
+  }
+  ss << '\n';
+  if (active[kStat_LocalizedToObjectID]) {
+    ss << robotState.localizedToObjectID;
+  }
+  ss << '\n';
+  if (active[kStat_StatusFlags]) {
+    ss << "0x" << std::uppercase << std::setfill('0') << std::setw(8) << std::hex
+       << robotState.status;
+  }
+  ss << '\n';
   ss << std::dec;
 
-  const auto& micDirectionHistory = robot->GetMicComponent().GetMicDirectionHistory();
-  ss << micDirectionHistory.GetRecentDirection() << '\n';
-  ss << micDirectionHistory.GetSelectedDirection() << '\n';
+  if (active[kStat_MicRecentDirection] || active[kStat_MicSelectedDirection]) {
+    const auto& micDirectionHistory = robot->GetMicComponent().GetMicDirectionHistory();
+    if (active[kStat_MicRecentDirection]) {
+      ss << micDirectionHistory.GetRecentDirection();
+    }
+    ss << '\n';
+    if (active[kStat_MicSelectedDirection]) {
+      ss << micDirectionHistory.GetSelectedDirection();
+    }
+    ss << '\n';
+  } else {
+    ss << '\n';
+    ss << '\n';
+  }
 
   request->_result = ss.str();
 
@@ -171,8 +364,6 @@ static int GetEngineStatsWebServerImpl(WebService::WebService::Request* request)
 // Note that this can be called at any arbitrary time, from a webservice thread
 static int GetEngineStatsWebServerHandler(struct mg_connection *conn, void *cbdata)
 {
-  // We ignore the query string because overhead is minimal
-
   auto* cozmoEngine = static_cast<CozmoEngine*>(cbdata);
   if (cozmoEngine->GetEngineState() != EngineState::Running)
   {
@@ -180,8 +371,12 @@ static int GetEngineStatsWebServerHandler(struct mg_connection *conn, void *cbda
     return 0;
   }
 
+  const mg_request_info* info = mg_get_request_info(conn);
+  const std::string boolsString = info->query_string ? info->query_string : "";
+
   auto ws = cozmoEngine->GetRobot()->GetContext()->GetWebService();
-  const int returnCode = ws->ProcessRequestExternal(conn, cbdata, GetEngineStatsWebServerImpl);
+  const int returnCode = ws->ProcessRequestExternal(conn, cbdata, GetEngineStatsWebServerImpl,
+                                                    boolsString);
 
   return returnCode;
 }
