@@ -51,10 +51,12 @@ Two freeplay slices: (A) **Observing** as the HLAI idle hub, (B) **wake-word →
 | 2 | `ReactToGazeDirection` | 15 s |
 | 3 | `ObservingLookAtFaces` | 30 s ± 0.5 random |
 | 4 | `ReactToMotion` | 0 |
-| 5 | `ObservingOffChargerHeadOnly` | 0 fallback |
+| 5 | `ObservingFaceGames` | 2000 s ± 0.3; anonymous `DispatcherRandom` Snake / BlockDrop / BrickBreaker (equal weight). `TimerInRange` 60 s settle so it is not the first act after drive-off. Must sit **above** HeadOnly (that idle always wants, cooldown 0). |
+| 6 | `ObservingOffChargerHeadOnly` | 0 fallback |
 
 `TrackingEyeContact` queue: `ObservingEyeContact` → `InteractWithFaces` → `PossibleIntentionalPerformance` (`EyeContact`).  
-`ObservingLookAtFaces`: `OnTreads` + `Stimulated >= 0.1`.
+`ObservingLookAtFaces`: `OnTreads` + `Stimulated >= 0.1`.  
+`ObservingFaceGames`: after 60 s in ObservingInternal scope, if the 2000 s group cooldown is expired and nothing above wants the stack, interrupts HeadOnly and rolls Snake / BlockDrop / BrickBreaker. Voice `play_anygame` still uses `PlayAGameVoiceCommand` (equal-weight + Blackjack) above HLAI.
 
 ### HLAI: Observing ↔ Socialize / Exploring
 

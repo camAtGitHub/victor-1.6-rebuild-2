@@ -266,7 +266,13 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 | `docs/mapping/TODO-overheat-backpack-lights.md` | Charger-cooldown v1 **implemented** (clad/map/`if`s + stock JSON); 41 °C; Phase 5/`vbuild` + on-robot A/B not run |
 | `docs/mapping/OVERHEAT-BACKPACK-LIGHTS-PLAN.md` | Overheat backpack lights charger-cooldown v1 plan (Phases 1–4 landed; 5 + on-robot A/B pending) |
 | `docs/mapping/CPU-OVERHEAT-BACKPACK-LIGHTS-PLAN.md` | CPU-hot backpack: `CpuOverheated` + `LowBatteryCpuOverheated`; custom packs need the two JSON (exclusive overlay) |
-| `docs/mapping/TODO-anki-deleted-recovery.md` | Hunt Anki deletions on `kercre123/victor`; restore candidate **Singing** (VIC-24); SimpleVoiceResponse / snake notes |
+| `docs/mapping/TODO-anki-deleted-recovery.md` | Hunt Anki deletions on `kercre123/victor`; restore candidate **Singing** (VIC-24); SimpleVoiceResponse; snake now on this tree |
+| `docs/mapping/KERCRE123-RESTORE-CANDIDATES.md` | Ranked 15 leak restores (TrackLaser / color / peekaboo / chirps / VWW / theremin / guard-dog…); 535-branch hunt 2026-09-10 |
+| `docs/mapping/WHY-ANKI-DELETED.md` | Why the leftovers died: VIC-1104/322/5402/6880 “unused/legacy”; GuardDog 1.7 that never came |
+| `docs/mapping/TWO-VECTOR-INTERACTIONS.md` | `kevin/rnd_multiVictor` multicast 225.0.0.37:12349 + cube landmark; ranked 2-Vector ideas |
+| `docs/mapping/EASINESS-RANKING.md` | All hunt items ranked by time-to-demo (Laser gate / TrackLaser first; singing/chirps last) |
+| `docs/mapping/TRACK-LASER-PLAN.md` | TrackLaser restore plan: Phase 1 dots (gate+console `Lasers`) then copy `db9431edc0^` class; force-run before Observing |
+| `docs/mapping/LASER-CONSOLE-SNAPSHOT.md` | 2026-09-13 live knobs that first produced FoundCentroid on `192.168.50.189` (wide, not ship) |
 | `engine/components/cubes/` | L2 cube BLE/coordinator/lights stack |
 | `animProcess/src/cozmoAnim/{animation,faceDisplay,micData,speechRecognizer,audio,…}/` | L2 anim subsystems |
 | `robot/supervisor/`, `robot/hal/`, `robot/clad/` | L2 control path; `robot/syscon/` L1 shallow |
@@ -365,7 +371,7 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
   `docs/mapping/KINETIC-FAMILIAR.md` (name + goal/intent locked; what’s-first TBD). Hermit/night-lock
   retracted. Affect beats: `IDEA-affect-micro-library.md`. Voice/off-repo continuity:
   `KINETIC-FAMILIAR-VOICE-SYSTEM-PROMPT.md` + `KINETIC-FAMILIAR-SPR.md`.
-- **Deleted Anki leftovers we could restore?** — Hunt on **`kercre123/victor`** (`git log --diff-filter=D`, `master...snowboy`), not this 2026-root clone. Catalog + **Singing** (VIC-24) + SimpleVoiceResponse notes: `docs/mapping/TODO-anki-deleted-recovery.md`. Overheat lights: `TODO-overheat-backpack-lights.md`. Snake is already on Victor-Rebuild **master** (oelinux pin `1ca901bb`), not this `cam_explore` HEAD.
+- **Deleted Anki leftovers we could restore?** — Hunt on **`kercre123/victor`**. Fun×viability: `KERCRE123-RESTORE-CANDIDATES.md`. **Easiest first:** `EASINESS-RANKING.md`. **TrackLaser plan:** `TRACK-LASER-PLAN.md` (dots first, then copy class). **Why they died:** `WHY-ANKI-DELETED.md`. **Two Vectors:** `TWO-VECTOR-INTERACTIONS.md`. Snake / RPS / CubeDrive **are on this tree**.
 - **Overheat backpack lights?** — Charger-cooldown v1 **wired**: clad + map + stock JSON + anim `if`s. Plan: `docs/mapping/OVERHEAT-BACKPACK-LIGHTS-PLAN.md`. Needs rebuild + on-robot A/B. Off-charger overheat still unwired (v1.1).
 - **CPU-hot backpack lights?** — `CpuOverheated` / `LowBatteryCpuOverheated` via OSState::GetTemperature_C() ≥ kCpuOverheatBackpackTemp_C (90). Not charger-cooldown Overheated. JSON in stock, WireOS, both example custom packs. Live `/data/data/customBackpackLights/` must get the two files + anim restart. Needs rebuild + fake-temp A/B.
 
@@ -427,6 +433,14 @@ if you ran out of context mid-folder, say so here.
 | 2026-09-08 | Grok | **CPU-hot backpack lights:** CpuOverheated + LowBatteryCpuOverheated (clad/map/JSON×4 packGs + anim ifs + catalog). User JSON from /tmp. Custom is exclusive overlay. | Rebuild clad+anim; fake CPU 92 A/B; copy JSON onto live custom pack if CUSTOM LIGHTS ON. |
 | 2026-09-10 | Grok | **Webserver home closeout:** themed home chrome, local CDN vendor + Inter, sparklines/flag pills/overlay, `/getenginestats` checkbox bits. Docs: `WEBSERVER-HOME.md` + `resources/webserver/AGENTS.md`. | scp/flash + on-robot smoke. |
 | 2026-09-10 | Grok | Home follow-up (no extra polls): PerfMetric drop forced tick-budget + legend under plot; PROCESSES default 3000 ms; overlay hint + backpack rounded-rect; Theme: dark/light footer; header Animation/Engine cross-port. | scp + hard-refresh; on-robot smoke. |
+| 2026-09-10 | Grok | Full `kercre123/victor` explore (535 branches, deletion log, 4 subagents). Ranked 15 restore ideas → `docs/mapping/KERCRE123-RESTORE-CANDIDATES.md`. Snake/RPS/CubeDrive already here; TrackLaser is the cheap wow (detector live, gate off). | Feature phase only when asked: Laser gate + Viz dots, then behavior. |
+| 2026-09-10 | Grok | Deletion *why* from commit/PR bodies → `WHY-ANKI-DELETED.md`. Deep-dive `kevin/rnd_multiVictor` (multicast + cube landmark fist-bump, never merged) + SCAMPER 2-Vector list → `TWO-VECTOR-INTERACTIONS.md`. | Feature phase only when asked. First 2-bot slice: wire-pod presence + greet, not 2017 drive-at-each-other. |
+| 2026-09-10 | Grok | Unified **easiness** ranking of every hunt item → `docs/mapping/EASINESS-RANKING.md` (gates → TrackLaser → color → … singing/Doom last). Laser DEPRECATED anims still mapped in `AnimationTriggerMap.json`. | Feature phase only when asked. |
+| 2026-09-10 | Grok | **TrackLaser plan** `docs/mapping/TRACK-LASER-PLAN.md`: Phase 1 gate+console `Lasers` dots; Phase 2 copy leak class with Stats/WB/activatable-scope adapters; force-run before Observing. | Execute with `/do` when asked; do not vbuild until Phase 5. |
+| 2026-09-10 | Grok | **/do Phase 1:** `features.json` Laser true (tree + robot file); live override `EnableFeature`; console `Lasers=true`, draw, debug=1 on `192.168.50.189`. No TrackLaser C++. | Human: wake Vector, head down, red/green pointer on floor; then Phase 2. |
+| 2026-09-11 | Grok | **/do Phases 2–3:** copied leak TrackLaser + Stats/WB/activatable-scope adapters; dropped `BehaviorObjectiveAchieved`; `trackLaser.json` + `generateBehaviorCode.py`. Live console: dark-ring fraction 1.0, MaxSurroundStdDev 80. | Phase 5 `vbuild`/flash when asked; force-run TrackLaser. No Observing hook. |
+| 2026-09-13 | Grok | First FoundCentroid streak on robot; polled knobs → `docs/mapping/LASER-CONSOLE-SNAPSHOT.md` (70/80, ring 0, sat −1, maxR 4000, VisionSystem on). | Tighten maxRadius next; head-down. Phase 5 still gated. |
+| 2026-09-12 | Grok | Observing face-games reachable: `ObservingFaceGames` anonymous `DispatcherRandom` (Snake/BlockDrop/BrickBreaker, equal weight) **above** HeadOnly in `observing.json`; 2000 s ±30% group cooldown + 60 s `TimerInRange` settle. No C++ / no BehaviorID gen. | Deploy `observing.json` + engine restart; ~60 s quiet Observing then a game. Voice `play_anygame` unchanged. |
 
 ---
 

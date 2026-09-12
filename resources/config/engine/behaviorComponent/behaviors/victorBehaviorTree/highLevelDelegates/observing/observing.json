@@ -45,24 +45,50 @@
           "cooldown_s": 0.0
         },
         {
+          // Face mini-games. Must sit above ObservingOffChargerHeadOnly: that idle
+          // always WantsToBeActivated with cooldown 0, so anything after it is dead.
+          // Group cooldown (~33 min ±30%) plus a 60 s settle timer so a game is not
+          // the first thing after walking off the charger. Equal-weight pick among
+          // the three; Snake still has its own ~50% WantsToBeActivated dice.
+          "behavior": "ObservingFaceGames",
+          "cooldown_s": 2000.0,
+          "cooldown_random_factor": 0.3
+        },
+        {
           // TODO:(bn) need to make stim go up here if faces are seen. maybe need a general purpose way to do
           // this? Just always do it?
           "behavior": "ObservingOffChargerHeadOnly",
           "cooldown_s": 0.0
-        },
+        }
+      ],
+
+      "anonymousBehaviors": [
         {
-          // I want snakegame to be rare, so that when it happens it's a special moment.
-          // That's why there's also a very low probability bool in the c++ code (rand() % 10 <= 2)
-          "behavior": "SnakeGame",
-          "cooldown_s": 2000.0
-        },
-        {
-          "behavior": "BlockDrop",
-          "cooldown_s": 2000.0
-        },
-        {
-          "behavior": "BrickBreaker",
-          "cooldown_s": 2000.0
+          "behaviorName": "ObservingFaceGames",
+          "behaviorClass": "DispatcherRandom",
+
+          "wantsToBeActivatedCondition": {
+            "conditionType": "TimerInRange",
+            "begin_s": 60.0
+          },
+
+          "behaviors": [
+            {
+              "behavior": "SnakeGame",
+              "cooldown_s": 0.0,
+              "weight": 1.0
+            },
+            {
+              "behavior": "BlockDrop",
+              "cooldown_s": 0.0,
+              "weight": 1.0
+            },
+            {
+              "behavior": "BrickBreaker",
+              "cooldown_s": 0.0,
+              "weight": 1.0
+            }
+          ]
         }
       ]
     }
