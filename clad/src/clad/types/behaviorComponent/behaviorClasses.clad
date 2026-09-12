@@ -166,6 +166,7 @@ enum uint_8 BehaviorClass {
   Keepaway,
   PounceWithProx,
   PuzzleMaze,
+  TrackLaser,
 
   // gateBehaviors
   ConnectToCube,

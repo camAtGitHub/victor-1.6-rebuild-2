@@ -121,6 +121,7 @@
 #include "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorKeepaway.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorPounceWithProx.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorPuzzleMaze.h"
+#include "engine/aiComponent/behaviorComponent/behaviors/freeplay/userInteractive/behaviorTrackLaser.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/gateBehaviors/behaviorConnectToCube.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/habitat/behaviorConfirmHabitat.h"
 #include "engine/aiComponent/behaviorComponent/behaviors/heldInPalm/behaviorInitialHeldInPalmReaction.h"
@@ -886,6 +887,12 @@ ICozmoBehaviorPtr BehaviorFactory::CreateBehavior(const Json::Value& config)
     case BehaviorClass::PuzzleMaze:
     {
       newBehavior = ICozmoBehaviorPtr(new BehaviorPuzzleMaze(config));
+      break;
+    }
+    
+    case BehaviorClass::TrackLaser:
+    {
+      newBehavior = ICozmoBehaviorPtr(new BehaviorTrackLaser(config));
       break;
     }
     
