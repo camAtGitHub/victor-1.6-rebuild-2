@@ -9,15 +9,17 @@ namespace {
 float Clamp(float v, float lo, float hi) { return std::max(lo, std::min(v, hi)); }
 constexpr float Radius = 2.f;
 constexpr int Top = 14;
-// Original L1 serve was 53+9=62 px/s. 25% faster becomes the floor; later
-// levels still add +9 px/s from that new baseline. Cap keeps the same rally
-// headroom as before so a step stays under one pixel.
-constexpr float kServeSpeedLevel1 = (53.f + 9.f) * 1.25f;
-constexpr float kServeSpeedPerLevel = 9.f;
-constexpr float kMaxBallSpeed = kServeSpeedLevel1 + (98.f - 62.f);
-constexpr float kPaddleSpeed = 105.f * 1.25f;
-constexpr float kStaleSpeedLevel1 = (70.f + 5.f) * 1.25f;
-constexpr float kStaleSpeedPerLevel = 5.f;
+// Original L1 serve was 53+9=62 px/s, then *1.25. Another ~33% on that
+// baseline (~103 px/s). Per-level add and rally cap scale the same way.
+// 120 Hz step is ~1.3 px at the cap; bricks are 6 px tall so it still
+// cannot tunnel a cell.
+constexpr float kSpeedScale = 1.25f * (4.f/3.f);
+constexpr float kServeSpeedLevel1 = (53.f + 9.f) * kSpeedScale;
+constexpr float kServeSpeedPerLevel = 9.f * (4.f/3.f);
+constexpr float kMaxBallSpeed = kServeSpeedLevel1 + (98.f - 62.f) * (4.f/3.f);
+constexpr float kPaddleSpeed = 105.f * kSpeedScale;
+constexpr float kStaleSpeedLevel1 = (70.f + 5.f) * kSpeedScale;
+constexpr float kStaleSpeedPerLevel = 5.f * (4.f/3.f);
 // Tiny bitmap font: 3 columns x 5 rows, drawn at 2x for actual face readability.
 const char* Glyph(char c) {
   switch(c) {
@@ -65,7 +67,7 @@ void BrickBreakerGame::NewLayout() {
   }
 }
 void BrickBreakerGame::Serve() {
-  _phase=Phase::Serving; _phaseTicks=120; _rallyTicks=0;
+  _phase=Phase::Serving; _phaseTicks=90; _rallyTicks=0;
   _x=_paddle; _y=PaddleY()-Radius-1.f;
   const float speed = kServeSpeedLevel1 + (_level-1)*kServeSpeedPerLevel;
   _vx = (Random()&1 ? 1.f : -1.f)*speed*0.45f;
@@ -81,7 +83,7 @@ void BrickBreakerGame::BounceFromPaddle() {
 }
 unsigned BrickBreakerGame::Step(float target) {
   if (_phase==Phase::Finished) { return None; }
-  if (++_ticks >= 90*120) { _phase=Phase::Finished; return None; }
+  if (++_ticks >= 60*120) { _phase=Phase::Finished; return None; }
   if (_flashTicks>0) { --_flashTicks; }
   if (!std::isfinite(target)) { target=_paddle; }
   const float half=PaddleHalfWidth();
@@ -102,7 +104,7 @@ unsigned BrickBreakerGame::Step(float target) {
   if (_x<2.f+Radius) { _x=2.f+Radius; _vx=std::fabs(_vx); }
   if (_x>_width-2.f-Radius) { _x=_width-2.f-Radius; _vx=-std::fabs(_vx); }
   if (_y<Top+Radius) { _y=Top+Radius; _vy=std::fabs(_vy); }
-  // Fixed timestep keeps displacement below one pixel at maximum speed.
+  // 120 Hz step is ~1.3 px at cap; bricks are 6 px so this cannot skip a cell.
   // Reflect on the entry axis; at a corner choose the smallest penetration.
   for (auto& b : _bricks) {
     if (!b.alive || _x+Radius<=b.x || _x-Radius>=b.x+b.w ||
@@ -127,7 +129,7 @@ unsigned BrickBreakerGame::Step(float target) {
   }
   if (_y-Radius>_height) {
     --_lives; events |= Miss;
-    _phase=(_lives==0 ? Phase::Finished : Phase::LifeLost); _phaseTicks=90;
+    _phase=(_lives==0 ? Phase::Finished : Phase::LifeLost); _phaseTicks=60;
     return events;
   }
   bool remaining=false;
@@ -135,8 +137,8 @@ unsigned BrickBreakerGame::Step(float target) {
   if (!remaining) {
     events |= Clear;
     if (_level==3) { _phase=Phase::Finished; _won=true; }
-    else { _phase=Phase::LevelCleared; _phaseTicks=120; }
-  } else if (_rallyTicks>120*8) {
+    else { _phase=Phase::LevelCleared; _phaseTicks=90; }
+  } else if (_rallyTicks>120*6) {
     // Stale rallies get a small horizontal nudge, not an endless orbit.
     _vx=(_vx<0 ? -1.f : 1.f)*(18.f+Random()%18);
     const float speed=kStaleSpeedLevel1 + (_level-1)*kStaleSpeedPerLevel;
@@ -171,8 +173,8 @@ bool BrickBreakerGame::Render(uint8_t* p, std::size_t size) const {
   number(4,2,_score,2);
   const char levelText[]={'L',static_cast<char>('0'+_level),0};
   text(_width/2-7,2,levelText,2);
-  for(int i=0;i<3;++i) {
-    const int x=_width-29+i*9;
+  for(int i=0;i<2;++i) {
+    const int x=_width-20+i*9;
     rect(x,4,6,6,i<_lives ? 255 : 45);
   }
   rect(0,Top-2,_width,2,110); rect(0,Top,2,_height-Top,110);

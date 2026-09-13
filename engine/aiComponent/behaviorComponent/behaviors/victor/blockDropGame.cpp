@@ -42,7 +42,7 @@ const int8_t kShapes[7][4][4][2] = {
 // classic line-clear payout, multiplied by level
 const uint32_t kLineScore[5] = { 0, 40, 100, 300, 1200 };
 
-const int kClearFlashTicks = 8;
+const int kClearFlashTicks = 6;
 const int kSpawnX          = 3;
 const int kSpawnY          = -1;
 

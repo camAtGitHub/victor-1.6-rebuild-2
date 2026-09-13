@@ -47,7 +47,7 @@ private:
   uint32_t _rng;
   std::array<Brick, BrickCount> _bricks;
   float _x=0, _y=0, _vx=0, _vy=0, _paddle=0;
-  int _score=0, _lives=3, _level=1, _ticks=0, _phaseTicks=0, _rallyTicks=0;
+  int _score=0, _lives=2, _level=1, _ticks=0, _phaseTicks=0, _rallyTicks=0;
   int _flashX=0, _flashY=0, _flashTicks=0;
   Phase _phase=Phase::Serving;
   bool _won=false;

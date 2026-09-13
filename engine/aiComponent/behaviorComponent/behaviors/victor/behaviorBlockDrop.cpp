@@ -43,11 +43,11 @@ const char* kHighScoreKey = "blockDropHighScoreVector";
 const unsigned int kInputTicks = 2;
 
 // how long the game-over card stays on the face before he reacts (engine ticks, ~30/sec)
-const unsigned int kGameOverHoldTicks = 90;
+const unsigned int kGameOverHoldTicks = 60;
 
 // how wrong he gets. base at level 1, plus this much per level, capped inside the solver
-const float kBaseMistakeProb     = 0.02f;
-const float kMistakeProbPerLevel = 0.035f;
+const float kBaseMistakeProb     = 0.027f;
+const float kMistakeProbPerLevel = 0.047f;
 
 // lift pump chance per cleared row (1→25%, 2→50%, 3→75%, 4+ always).
 // CARRY hides the screen, so the pump is always up then down in the same action.
@@ -284,10 +284,11 @@ void BehaviorBlockDrop::BehaviorUpdate()
   }
 
   // - - - gravity, speeding up with level - - -
+  // ~33% faster than the previous 13-2*level curve (L1 was 11 ticks).
   const uint32_t level = game.GetLevel();
-  unsigned int gravityPeriod = 13;
-  if( (2 * level) < 11 ) {
-    gravityPeriod = 13 - (2 * level);
+  unsigned int gravityPeriod = 10;
+  if( (2 * level) < 8 ) {
+    gravityPeriod = 10 - (2 * level);
   } else {
     gravityPeriod = 2;
   }

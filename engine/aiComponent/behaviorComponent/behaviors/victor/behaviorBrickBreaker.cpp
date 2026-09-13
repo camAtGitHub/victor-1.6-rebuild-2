@@ -51,7 +51,7 @@ void BehaviorBrickBreaker::BehaviorUpdate() {
   if (!IsActivated()) { return; }
   const double now=BaseStationTimer::getInstance()->GetCurrentTimeInSecondsDouble();
   // Wall-clock watchdog also handles failed delegation and sustained engine stalls.
-  if (now-_startTime > 100.0 || (!_game && now-_startTime > 5.0)) { CancelSelf(); return; }
+  if (now-_startTime > 75.0 || (!_game && now-_startTime > 5.0)) { CancelSelf(); return; }
   if (!_game) { return; }
   _accumulator += std::max(0.0,std::min(0.1,now-_lastTime));
   _lastTime=now;
@@ -79,7 +79,7 @@ void BehaviorBrickBreaker::BehaviorUpdate() {
   }
   if (_game->GetPhase()==BrickBreakerGame::Phase::Finished) {
     if (_finishTime==0) { _finishTime=now; }
-    if (now-_finishTime>=2.5) { CancelSelf(); }
+    if (now-_finishTime>=1.5) { CancelSelf(); }
   }
 }
 void BehaviorBrickBreaker::ReactToGame(unsigned events, double now) {
