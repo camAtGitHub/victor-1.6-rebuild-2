@@ -260,9 +260,22 @@ void BehaviorTrackLaser::InitHelper()
   _dVars.originalCameraSettings = GetBEI().GetVisionComponent().GetCurrentCameraParams();
 
   // Copy current params and overwrite exposure/gain only so WB is not pinned to 0.
+  // Spark JSON used 0.1; VIC-6653 raised MIN_CAMERA_GAIN to 0.25. Below-min fails
+  // AreCameraParamsValid and SetAndDisableCameraControl returns without darkening.
   Vision::CameraParams darkenedParams = _dVars.originalCameraSettings;
   darkenedParams.exposureTime_ms = static_cast<s32>(_iConfig.darkenedExposure_ms);
-  darkenedParams.gain = _iConfig.darkenedGain;
+  const f32 minGain = GetBEI().GetVisionComponent().GetMinCameraGain();
+  if (_iConfig.darkenedGain < minGain)
+  {
+    PRINT_NAMED_WARNING("BehaviorTrackLaser.InitHelper.GainBelowMin",
+                        "darkenedGain=%f clamped to min=%f (VIC-6653)",
+                        _iConfig.darkenedGain, minGain);
+    darkenedParams.gain = minGain;
+  }
+  else
+  {
+    darkenedParams.gain = _iConfig.darkenedGain;
+  }
 
   GetBEI().GetVisionComponent().SetAndDisableCameraControl(darkenedParams);
 

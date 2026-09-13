@@ -58,6 +58,14 @@ Found 34–110 px   later, y often negative (ground frame)
 
 ## Re-apply (if engine restarts)
 
+Host scripts (HTTP `:8888`):
+
+```
+./tools/laser-wide-console.sh              # 70/80, maxR 4000, sat -1, ring 0
+./tools/laser-tight-console.sh             # maxR 40, minR 2, sat 2/2, bbox 1.25
+./tools/laser-wide-console.sh 192.168.50.189
+```
+
 Console vars (except feature override file) reset. Minimum to see hits again:
 
 ```
