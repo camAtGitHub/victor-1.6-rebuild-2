@@ -15,6 +15,7 @@
 
 // todo: move nested classes into another file to avoid this
 #include "engine/aiComponent/behaviorComponent/behaviors/victor/snakeGame.h"
+#include <vector>
 
 namespace Anki {
 namespace Vector {
@@ -26,9 +27,8 @@ public:
   // Constructor. probMistakesFlat the the prob of a mistake in any step. probMistakesPerLength is
   // the additional probability per unit snake length. probWrongTurnsFlat is the prob of
   // moving in the wrong direction when a turn is needed (think-- you hit the wrong button).
-  // You probably want at least one of these to be active, otherwise, if the snake gets long and
-  // it realizes it's going to lose, it maintains a perfect circle with 1 cell gap in between tge
-  // start and end. todo: fix this for real
+  // Mistakes are optional flavour: the solver itself no longer stall-circles a 1-cell gap
+  // (that was Longify's return value being discarded).
   SnakeGameSolver( SnakeGame& game,
                    float probMistakesFlat,
                    float probMistakesPerLength,
@@ -41,8 +41,8 @@ public:
 
 private:
 
-  // todo: use best first or something else
-  // Breadth-first search from --> to, with snake and the walls as obstacles. Output is path.
+  // Breadth-first search from --> to. Snake body is a moving obstacle: cell
+  // body[k] (tail = 0) is free after k+1 steps, matching collide-then-pop-tail.
   bool BFS(const SnakeGame::Point& from,
            const SnakeGame::Point& to,
            const SnakeGame::Snake& snake,

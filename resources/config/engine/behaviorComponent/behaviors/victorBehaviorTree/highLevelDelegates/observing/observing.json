@@ -24,6 +24,11 @@
       "behaviorClass" : "DispatcherStrictPriorityWithCooldown",
     
       "interruptActiveBehavior": true,
+      // Face games (and anything else that returns false for gentle interrupt)
+      // must finish. Without this, LookAtFaces / ReactToMotion cancel a live
+      // BrickBreaker the moment someone watches. HeadOnly still allows gentle
+      // interrupt, so idle looking-around is stolen as before.
+      "requireGentleInterruption": true,
     
       "behaviors": [    
         {

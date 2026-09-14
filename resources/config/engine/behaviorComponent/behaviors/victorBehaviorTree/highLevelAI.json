@@ -320,7 +320,13 @@
 
     {
       "from": "Observing",
+      // Socializing / cube used to be interrupting, so a close face (someone
+      // watching BrickBreaker) cancelled the game. They are gentle now:
+      // HeadOnly still yields immediately, face games finish first.
+      // Pickup / pet / voice still live above HLAI in GlobalInterruptions.
       "interruptingTransitions": [
+      ],
+      "nonInterruptingTransitions": [
         {
           "to": "Socializing",
           "condition": {
@@ -355,9 +361,7 @@
               }
             ]
           }
-        }
-      ],
-      "nonInterruptingTransitions": [
+        },
         {
           "to": "Exploring",
           "condition": {

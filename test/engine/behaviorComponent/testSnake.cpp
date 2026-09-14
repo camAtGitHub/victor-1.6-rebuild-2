@@ -166,3 +166,40 @@ TEST(TestSnake, Controlled)
   }
 
 }
+
+TEST(TestSnake, GreedyDoesNotStall)
+{
+  // Zero-mistake greedy used to chase its tail in a 1-cell-gap loop (Longify
+  // result discarded) and never eat. Fail if we sit a few board-tours with no food.
+  Util::RandomGenerator rng(7);
+
+  const int displayHeight = 14;
+  const int displayWidth = 24;
+  SnakeGame game(displayWidth, displayHeight, 5, rng);
+  SnakeGameSolver solver(game, 0.0f, 0.0f, 0.0f, rng);
+
+  int lastScore = 0;
+  int stall = 0;
+  const int stallLimit = displayWidth * displayHeight * 3;
+
+  for( int k = 0; k < 8000; ++k ) {
+    game.Update();
+    if( game.GameOver() ) {
+      break;
+    }
+    if( game.GetScore() > lastScore ) {
+      lastScore = game.GetScore();
+      stall = 0;
+    } else {
+      ++stall;
+    }
+    EXPECT_LT( stall, stallLimit ) << "stalled chasing tail at tick " << k
+                                   << " score " << lastScore;
+    if( stall >= stallLimit ) {
+      break;
+    }
+    solver.ChooseAndApplyMove();
+  }
+
+  EXPECT_GT( lastScore, 10 );
+}

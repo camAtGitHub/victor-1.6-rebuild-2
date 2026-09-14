@@ -101,8 +101,8 @@ unsigned BrickBreakerGame::Step(float target) {
   unsigned events=None;
   const float oldX=_x, oldY=_y;
   _x+=_vx*StepSeconds(); _y+=_vy*StepSeconds();
-  if (_x<2.f+Radius) { _x=2.f+Radius; _vx=std::fabs(_vx); }
-  if (_x>_width-2.f-Radius) { _x=_width-2.f-Radius; _vx=-std::fabs(_vx); }
+  if (_x<2.f+Radius) { _x=2.f+Radius; _vx=std::fabs(_vx); events |= LeftWall; }
+  if (_x>_width-2.f-Radius) { _x=_width-2.f-Radius; _vx=-std::fabs(_vx); events |= RightWall; }
   if (_y<Top+Radius) { _y=Top+Radius; _vy=std::fabs(_vy); }
   // 120 Hz step is ~1.3 px at cap; bricks are 6 px so this cannot skip a cell.
   // Reflect on the entry axis; at a corner choose the smallest penetration.

@@ -12,7 +12,7 @@ class BrickBreakerGame
 {
 public:
   enum class Phase { Serving, Playing, LifeLost, LevelCleared, Finished };
-  enum Event : unsigned { None=0, BrickHit=1, PaddleHit=2, Miss=4, Clear=8 };
+  enum Event : unsigned { None=0, BrickHit=1, PaddleHit=2, Miss=4, Clear=8, LeftWall=16, RightWall=32 };
   struct Brick { int x=0, y=0, w=0, h=0; bool alive=false; };
   static constexpr int BrickCount = 24;
   BrickBreakerGame(int width, int height, uint32_t seed);

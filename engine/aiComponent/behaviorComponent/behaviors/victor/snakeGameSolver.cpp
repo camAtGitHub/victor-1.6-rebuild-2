@@ -17,9 +17,9 @@
 #include "util/logging/logging.h"
 #include "util/random/randomGenerator.h"
 
+#include <algorithm>
 #include <list>
 #include <vector>
-#include <unordered_map>
 
 namespace Anki {
 namespace Vector {
@@ -53,19 +53,31 @@ void SnakeGameSolver::ChooseAndApplyMove()
   }
   DEV_ASSERT( !_game.GameOver(),"" );
 
-  // brief description to find the next direction to apply:
-  // find the shortest path to the food. If it exists, move the snake along the entirety of the path
-  // to the goal to see if it ends up in a bind -- if it would then be able to reach its tail, use
-  // the first step of the path to the food.
-  // If that doesn't work, find the longest path to the tail. If it exists, apply the first step of that path.
-  // If that doesn't work, move the snake opposite of the direction of the food
+  // Greedy snake:
+  // 1. Shortest path to food, but only if after eating we can still reach the tail
+  //    (otherwise we would box ourselves in).
+  // 2. Else the *longest* path to the tail, so we fill space instead of circling
+  //    a 1-cell gap forever. (Longify used to be called and its result discarded,
+  //    which is exactly the bottom-right "looping after its tail" stall.)
+  // 3. Else any neighbour that is not a wall, the body, or a reverse.
 
-  const auto& food = _game.GetFood();
   const auto& snake = _game.GetSnake();
+  const int width = static_cast<int>(_game.GetWidth());
+  const int height = static_cast<int>(_game.GetHeight());
 
   auto initDirection = _game.GetDirection();
   SnakeGame::Direction direction = initDirection;
   bool hasDirection = false;
+
+  auto opposite = [](SnakeGame::Direction d) {
+    switch( d ) {
+      case SnakeGame::Direction::UP:    return SnakeGame::Direction::DOWN;
+      case SnakeGame::Direction::DOWN:  return SnakeGame::Direction::UP;
+      case SnakeGame::Direction::LEFT:  return SnakeGame::Direction::RIGHT;
+      case SnakeGame::Direction::RIGHT: return SnakeGame::Direction::LEFT;
+    }
+    return SnakeGame::Direction::UP;
+  };
 
   auto stepToDirection = [](const SnakeGame::Point& head, const SnakeGame::Point& firstStep) {
     SnakeGame::Direction direction = SnakeGame::Direction::UP;
@@ -77,74 +89,99 @@ void SnakeGameSolver::ChooseAndApplyMove()
       direction = SnakeGame::Direction::UP;
     } else if( firstStep.y - head.y == -1 ) {
       direction = SnakeGame::Direction::DOWN;
-    } else {
-      //assert
     }
     return direction;
   };
 
+  // Collision is checked BEFORE the tail pops, so every current body cell is lethal
+  // this tick — including the tail.
+  auto isLethalNow = [&](const SnakeGame::Point& p) {
+    if( (p.x < 0) || (p.y < 0) || (p.x >= width) || (p.y >= height) ) {
+      return true;
+    }
+    return snake.IsSnakeAt( static_cast<unsigned int>(p.x), static_cast<unsigned int>(p.y) );
+  };
+
+  auto applyFirstStep = [&](const std::vector<SnakeGame::Point>& path) {
+    if( path.empty() ) {
+      return false;
+    }
+    const auto& firstStep = path.front();
+    if( isLethalNow( firstStep ) ) {
+      return false;
+    }
+    direction = stepToDirection( snake.GetHead(), firstStep );
+    return true;
+  };
+
   std::vector<SnakeGame::Point> pathToFood;
-  if( BFS( snake.GetHead(), food, snake, pathToFood ) ) {
+  if( BFS( snake.GetHead(), _game.GetFood(), snake, pathToFood ) ) {
     auto snakeCopy = snake;
-    for( const auto& pt : pathToFood ) {
-      snakeCopy.body.push_back( pt );
-      snakeCopy.body.pop_front();
+    for( size_t i = 0; i < pathToFood.size(); ++i ) {
+      snakeCopy.body.push_back( pathToFood[i] );
+      // last step is the eat: grow, do not pop the tail
+      if( i + 1 < pathToFood.size() ) {
+        snakeCopy.body.pop_front();
+      }
     }
 
-    // make sure the shortest path doesn't put is in a dead end. compute path from future state to tail
-    // there's a bug here -- the next path doesn't include the extra unit the snake obtained for hitting
-    // the food. this would mean changing my BFS, so I'm just ignoring it. this is a greedy algorithm
-    // after all.
     std::vector<SnakeGame::Point> pathToTail;
     if( BFS( snakeCopy.GetHead(), snakeCopy.GetTail(), snakeCopy, pathToTail) ) {
-      const auto& firstStep = pathToFood.front();
-      direction = stepToDirection( snake.GetHead(), firstStep );
-      hasDirection = true;
+      hasDirection = applyFirstStep( pathToFood );
     }
   }
 
   if( !hasDirection ) {
-    // find the longest path to the tail by starting with the shortest path and Longify-ing it
     std::vector<SnakeGame::Point> pathToTail;
     if( BFS( snake.GetHead(), snake.GetTail(), snake, pathToTail) ) {
-      // repeatedly perturb to take over more room until there is no more
-      Longify( snake, snake.GetHead(), pathToTail );
-      // use the first step
-      const auto& firstStep = pathToTail.front();
-      direction = stepToDirection( snake.GetHead(), firstStep );
-      hasDirection = true;
-    } else {
-      // there's no path to the tail either.
-      // choose a direction far away from the food
-      if( (_game.GetDirection() == SnakeGame::Direction::UP)
-          || (_game.GetDirection() == SnakeGame::Direction::DOWN) )
-      {
-        direction = (snake.GetHead().x >= food.x)
-                    ? SnakeGame::Direction::RIGHT
-                    : SnakeGame::Direction::LEFT;
-      } else if( (_game.GetDirection() == SnakeGame::Direction::RIGHT)
-                 || (_game.GetDirection() == SnakeGame::Direction::LEFT) )
-      {
-        direction = (snake.GetHead().y >= food.y)
-                    ? SnakeGame::Direction::UP
-                    : SnakeGame::Direction::DOWN;
-      }
-      hasDirection = true;
+      pathToTail = Longify( snake, snake.GetHead(), pathToTail );
+      hasDirection = applyFirstStep( pathToTail );
     }
   }
 
-  // factor in some chance of a mistake or wrong turn
+  if( !hasDirection ) {
+    const SnakeGame::Direction dirs[4] = {
+      initDirection,
+      (initDirection == SnakeGame::Direction::UP || initDirection == SnakeGame::Direction::DOWN)
+        ? SnakeGame::Direction::LEFT : SnakeGame::Direction::UP,
+      (initDirection == SnakeGame::Direction::UP || initDirection == SnakeGame::Direction::DOWN)
+        ? SnakeGame::Direction::RIGHT : SnakeGame::Direction::DOWN,
+      opposite( initDirection )
+    };
+    for( const auto d : dirs ) {
+      if( d == opposite( initDirection ) ) {
+        continue;
+      }
+      if( !isLethalNow( snake.GetNextStep( d ) ) ) {
+        direction = d;
+        hasDirection = true;
+        break;
+      }
+    }
+  }
+
+  // factor in some chance of a mistake or wrong turn, but only into a cell
+  // that would not kill us this tick (random reverse-into-neck just looks broken)
   const bool wrongTurn =  (direction != _game.GetDirection()) && (_rng.RandDbl() < _pWrongTurns);
   const float pMistake = _pMistakesFlat + _pMistakesPerLength*(snake.GetLength() - _initialLength);
   const bool wrongMove = (_rng.RandDbl() < pMistake);
-  if( wrongTurn || wrongMove ) {
-    do { // todo not this
-      direction = static_cast<SnakeGame::Direction>( _rng.RandIntInRange(0, 3) );
-    } while ( direction == initDirection );
+  if( (wrongTurn || wrongMove) && hasDirection ) {
+    std::vector<SnakeGame::Direction> safeTurns;
+    for( int i = 0; i < 4; ++i ) {
+      const auto d = static_cast<SnakeGame::Direction>( i );
+      if( (d != initDirection) && (d != opposite( initDirection )) && !isLethalNow( snake.GetNextStep( d ) ) ) {
+        safeTurns.push_back( d );
+      }
+    }
+    if( !safeTurns.empty() ) {
+      direction = safeTurns[ static_cast<size_t>(_rng.RandIntInRange( 0, static_cast<int>(safeTurns.size()) - 1 )) ];
+    }
   }
 
   ASSERT_NAMED(hasDirection, "");
-  _game.SetDirection( direction );
+  if( hasDirection ) {
+    _game.SetDirection( direction );
+  }
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -153,69 +190,108 @@ bool SnakeGameSolver::BFS(const SnakeGame::Point& from,
                           const SnakeGame::Snake& snake,
                           std::vector<SnakeGame::Point>& path) const
 {
-  const int numNodes = _game.GetWidth() * _game.GetHeight();
+  const int width = static_cast<int>(_game.GetWidth());
+  const int height = static_cast<int>(_game.GetHeight());
+  const int numNodes = width * height;
+  if( (from.x < 0) || (from.y < 0) || (from.x >= width) || (from.y >= height)
+      || (to.x < 0) || (to.y < 0) || (to.x >= width) || (to.y >= height) ) {
+    return false;
+  }
+
+  auto sub2ind = [width](const SnakeGame::Point& pt) {
+    return (width * pt.y) + pt.x;
+  };
+  auto ind2sub = [width](int ind) -> SnakeGame::Point {
+    return SnakeGame::Point( ind % width, ind / width );
+  };
+
+  // body[k] (0 = tail) is still occupied for the first k+1 moves because the
+  // game checks collision before popping the tail. Empty cells are 0, so any
+  // d >= 1 may enter them.
+  std::vector<int> occupiedUntil( numNodes, 0 );
+  {
+    int k = 0;
+    for( const auto& p : snake.body ) {
+      if( (p.x >= 0) && (p.y >= 0) && (p.x < width) && (p.y < height) ) {
+        occupiedUntil[sub2ind(p)] = k + 1;
+      }
+      ++k;
+    }
+  }
+
   std::vector<bool> visited( numNodes, false );
-
-  // todo: consolidate these
+  std::vector<int> bps( numNodes, -1 );
+  std::vector<SnakeGame::Direction> bpDirections( numNodes, _game.GetDirection() );
   std::list<int> queue;
-  std::unordered_map<int, int> bps; // backpointers
-  std::unordered_map<int, SnakeGame::Direction> bpDirections; // the direction of the bp
 
-  // todo: avoid using these so much during the search
-  auto sub2ind = [this](const SnakeGame::Point& pt) {
-    return (_game.GetWidth() * pt.y) + pt.x;
-  };
-  auto ind2sub = [this](int ind) -> SnakeGame::Point {
-    SnakeGame::Point pt(0,0);
-    const int w = _game.GetWidth();
-    pt.x = ind % w;
-    pt.y = ind / w;
-    return pt;
-  };
-
-  auto start = sub2ind(from);
+  const int start = sub2ind(from);
+  const int goal = sub2ind(to);
   visited[start] = true;
   queue.push_back( start );
-
   bpDirections[start] = _game.GetDirection();
 
-  // todo: optimize this. this is shitty af.
+  std::vector<int> dist( numNodes, -1 );
+  dist[start] = 0;
 
   while( !queue.empty() ) {
-    // pop
-    auto nodeInd = queue.front();
+    const int nodeInd = queue.front();
     queue.pop_front();
 
-    auto pt = ind2sub(nodeInd);
+    const auto pt = ind2sub(nodeInd);
+    const auto bpDirection = bpDirections[nodeInd];
+    const int ndist = dist[nodeInd] + 1;
 
-    auto bpDirection = bpDirections[nodeInd];
-
-    std::vector<std::pair<int, SnakeGame::Direction>> adjacents; // todo: precompute these or at least simplify it
-    std::vector<std::pair<int, int>> directions; // x,y, each == +=1
-
-    // to avoid kinky routes, always push the direction we're traveling into the queue
-    // first. unless you like kinky stuff, then just use a constant direction vector
+    std::vector<std::pair<int, int>> directions; // x,y
+    // prefer continuing straight so the path is not unnecessarily kinky
     if( bpDirection == SnakeGame::Direction::UP ) {
       directions = { {0,1}, {-1,0}, {1,0} };
     } else if( bpDirection == SnakeGame::Direction::DOWN ) {
       directions = { {0,-1}, {-1,0}, {1,0} };
     } else if( bpDirection == SnakeGame::Direction::LEFT ) {
       directions = { {-1,0}, {0,1}, {0,-1} };
-    } else if( bpDirection == SnakeGame::Direction::RIGHT ) {
+    } else {
       directions = { {1,0}, {0,1}, {0,-1} };
     }
 
     for( const auto& direction : directions ) {
       SnakeGame::Point testPoint(pt.x + direction.first, pt.y + direction.second);
-      if( testPoint == to ) {
-        // BFS, can finish here
-        auto node = sub2ind(to);
-        bps[node] = nodeInd;
+      if( (testPoint.x < 0) || (testPoint.y < 0)
+          || (testPoint.x >= width) || (testPoint.y >= height) ) {
+        continue;
+      }
+      const int adj = sub2ind(testPoint);
+      if( visited[adj] ) {
+        continue;
+      }
+      // first time we could actually step here: ndist must be after this
+      // cell has vacated. If we arrive too early, leave it unvisited so a
+      // longer path can enter once the tail has moved.
+      if( ndist <= occupiedUntil[adj] ) {
+        continue;
+      }
 
+      SnakeGame::Direction thisDirection = SnakeGame::Direction::UP;
+      if( testPoint.x < pt.x ) {
+        thisDirection = SnakeGame::Direction::LEFT;
+      } else if( testPoint.x > pt.x ) {
+        thisDirection = SnakeGame::Direction::RIGHT;
+      } else if( testPoint.y < pt.y ) {
+        thisDirection = SnakeGame::Direction::DOWN;
+      } else {
+        thisDirection = SnakeGame::Direction::UP;
+      }
+
+      visited[adj] = true;
+      bps[adj] = nodeInd;
+      bpDirections[adj] = thisDirection;
+      dist[adj] = ndist;
+
+      if( adj == goal ) {
         path.clear();
         path.push_back(to);
-        while(true) { // todo: not this
-          auto parent = bps[node];
+        int node = adj;
+        while( true ) {
+          const int parent = bps[node];
           if( parent == start ) {
             break;
           }
@@ -223,42 +299,13 @@ bool SnakeGameSolver::BFS(const SnakeGame::Point& from,
           node = parent;
         }
         std::reverse( path.begin(), path.end() );
-        // success
         return true;
       }
 
-      // if the node lies on top of a snake our outside the boundaries, don't choose it
-      if( !snake.IsSnakeAt( testPoint.x ,testPoint.y )
-            && (testPoint.x>=0)
-            && (testPoint.y>=0)
-            && (testPoint.x<_game.GetWidth())
-            && (testPoint.y<_game.GetHeight()) )
-      {
-        SnakeGame::Direction thisDirection; // we shouldnt need to find this again
-        if( testPoint.x < pt.x ) {
-          thisDirection = SnakeGame::Direction::LEFT;
-        } else if( testPoint.x > pt.x ) {
-          thisDirection = SnakeGame::Direction::RIGHT;
-        } else if( testPoint.y < pt.y ) {
-          thisDirection = SnakeGame::Direction::DOWN;
-        } else if( testPoint.y > pt.y ) {
-          thisDirection = SnakeGame::Direction::UP;
-        }
-        adjacents.emplace_back( sub2ind( testPoint ), thisDirection );
-      }
-    }
-
-    for( const auto& adjPair : adjacents ) {
-      if( !visited[adjPair.first] ) {
-        visited[adjPair.first] = true;
-        queue.push_back( adjPair.first );
-        bps[adjPair.first] = nodeInd;
-        bpDirections[adjPair.first] = adjPair.second;
-      }
+      queue.push_back( adj );
     }
   }
 
-  // fail
   return false;
 }
 

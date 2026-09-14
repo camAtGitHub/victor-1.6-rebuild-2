@@ -7,6 +7,7 @@
 #include "coretech/vision/engine/image.h"
 #include "engine/actions/basicActions.h"
 #include "engine/actions/compoundActions.h"
+#include "engine/aiComponent/behaviorComponent/behaviorExternalInterface/beiRobotInfo.h"
 #include "engine/audio/engineRobotAudioClient.h"
 #include "engine/components/animationComponent.h"
 #include "clad/audio/audioEventTypes.h"
@@ -29,7 +30,7 @@ void BehaviorBrickBreaker::OnBehaviorActivated() {
   _accumulator=0; _finishTime=0;
   _startTime=BaseStationTimer::getInstance()->GetCurrentTimeInSecondsDouble();
   _lastMotion=_startTime;
-  // No wheel actions. Wait until head positioning has finished before owning the face.
+  // Wheel yaw is only a reaction to side-wall hits, after the game owns the face.
   DelegateIfInControl(new MoveHeadToAngleAction(MAX_HEAD_ANGLE), [this](ActionResult result) {
     if (result != ActionResult::SUCCESS) { CancelSelf(); return; }
     StartGame();
@@ -58,7 +59,12 @@ void BehaviorBrickBreaker::BehaviorUpdate() {
   unsigned events=0;
   int steps=0;
   while (_accumulator>=BrickBreakerGame::StepSeconds() && steps<12) {
-    events |= _game->Step(_solver->ChooseTarget(*_game));
+    const unsigned stepEvents=_game->Step(_solver->ChooseTarget(*_game));
+    events |= stepEvents;
+    // Each bounce cuts the previous yank short so 2–3 hits feel like impacts, not one long turn.
+    if (stepEvents & (BrickBreakerGame::LeftWall | BrickBreakerGame::RightWall)) {
+      YawForWall(stepEvents);
+    }
     _accumulator-=BrickBreakerGame::StepSeconds();
     ++steps;
   }
@@ -81,6 +87,21 @@ void BehaviorBrickBreaker::BehaviorUpdate() {
     if (_finishTime==0) { _finishTime=now; }
     if (now-_finishTime>=1.5) { CancelSelf(); }
   }
+}
+bool BehaviorBrickBreaker::CanTurnInPlace() const {
+  const auto& robotInfo = GetBEI().GetRobotInfo();
+  return !robotInfo.IsOnChargerPlatform() && !robotInfo.IsOnChargerContacts();
+}
+void BehaviorBrickBreaker::YawForWall(unsigned events) {
+  if (!CanTurnInPlace()) { return; }
+  // Screen right is the human's right as they look at the face = Vector's left.
+  // Right-wall hit → yaw robot-left / anticlockwise (positive). Left wall → clockwise.
+  const float degrees = (events & BrickBreakerGame::RightWall) ? 10.f : -10.f;
+  auto* turn = new TurnInPlaceAction(DEG_TO_RAD(degrees), false);
+  turn->SetAccel(MAX_BODY_ROTATION_ACCEL_RAD_PER_SEC2 / 2);
+  turn->SetMaxSpeed(MAX_BODY_ROTATION_SPEED_RAD_PER_SEC);
+  CancelDelegates();
+  DelegateIfInControl(turn);
 }
 void BehaviorBrickBreaker::ReactToGame(unsigned events, double now) {
   if (IsControlDelegated()) { return; }

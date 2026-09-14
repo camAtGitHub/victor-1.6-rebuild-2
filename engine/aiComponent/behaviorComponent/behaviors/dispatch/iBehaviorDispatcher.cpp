@@ -78,6 +78,7 @@ IBehaviorDispatcher::IBehaviorDispatcher(const Json::Value& config, bool shouldI
 void IBehaviorDispatcher::GetBehaviorJsonKeys(std::set<const char*>& expectedKeys) const
 {
   expectedKeys.insert( kInterruptBehaviorKey );
+  expectedKeys.insert( kRequireGentleInterruptionKey );
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

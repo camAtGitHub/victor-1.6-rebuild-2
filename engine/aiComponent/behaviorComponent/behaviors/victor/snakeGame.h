@@ -15,6 +15,7 @@
 
 #include <deque>
 #include <cstdint>
+#include <cstddef>
 
 namespace Anki {
 
@@ -36,7 +37,7 @@ public:
   };
   struct Point {
     Point( int xx, int yy ) : x(xx), y(yy) {}
-    bool operator==(const Point& other) { return x==other.x && y==other.y; }
+    bool operator==(const Point& other) const { return x==other.x && y==other.y; }
     int x;
     int y;
   };

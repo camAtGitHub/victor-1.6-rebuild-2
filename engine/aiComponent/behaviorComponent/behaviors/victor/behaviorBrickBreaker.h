@@ -24,6 +24,8 @@ protected:
 private:
   void StartGame();
   void ReactToGame(unsigned events, double now);
+  bool CanTurnInPlace() const;
+  void YawForWall(unsigned events);
   std::unique_ptr<Vision::Image> _image;
   std::unique_ptr<BrickBreakerGame> _game;
   std::unique_ptr<BrickBreakerSolver> _solver;
