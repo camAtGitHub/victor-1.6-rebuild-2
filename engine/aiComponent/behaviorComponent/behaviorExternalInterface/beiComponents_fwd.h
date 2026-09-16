@@ -44,6 +44,7 @@ enum class BEIComponentID{
   VariableSnapshotComponent,
   Vision,
   VisionScheduleMediator,
+  SocialPresenceEstimator,
 
   Count
 };

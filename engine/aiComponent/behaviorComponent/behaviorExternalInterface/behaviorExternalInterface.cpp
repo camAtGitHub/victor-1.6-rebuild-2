@@ -23,6 +23,7 @@
 #include "engine/cozmoContext.h"
 #include "engine/externalInterface/externalInterface.h"
 #include "engine/moodSystem/moodManager.h"
+#include "engine/receptiveSocialPresenceEstimator/socialPresenceEstimator.h"
 #include "engine/robot.h"
 
 
@@ -60,6 +61,7 @@ void BehaviorExternalInterface::InitDependent(Robot* robot, const BCCompMap& dep
   auto* heldInPalmTracker      = dependentComps.GetComponentPtr<HeldInPalmTracker>();
   auto* robotInfo              = dependentComps.GetComponentPtr<BEIRobotInfo>();
   auto* sleepTracker           = dependentComps.GetComponentPtr<SleepTracker>();
+  auto* socialPresenceEstimator = robot->GetComponentPtr<SocialPresenceEstimator>();
 
   Init(aiComponent,
        robot->GetComponentPtr<AnimationComponent>(),
@@ -99,7 +101,8 @@ void BehaviorExternalInterface::InitDependent(Robot* robot, const BCCompMap& dep
        robot->GetComponentPtr<VisionScheduleMediator>(),
        robot->GetComponentPtr<SettingsCommManager>(),
        robot->GetComponentPtr<SettingsManager>(),
-       sleepTracker);
+       sleepTracker,
+       socialPresenceEstimator);
 }
 
 
@@ -142,7 +145,8 @@ void BehaviorExternalInterface::Init(AIComponent*                   aiComponent,
                                      VisionScheduleMediator*        visionScheduleMediator,
                                      SettingsCommManager*           settingsCommManager,
                                      SettingsManager*               settingsManager,
-                                     SleepTracker*                  sleepTracker)
+                                     SleepTracker*                  sleepTracker,
+                                     SocialPresenceEstimator*       socialPresenceEstimator)
 {
   _arrayWrapper = std::make_unique<CompArrayWrapper>(aiComponent,
                                                      animationComponent,
@@ -182,7 +186,8 @@ void BehaviorExternalInterface::Init(AIComponent*                   aiComponent,
                                                      visionScheduleMediator,
                                                      settingsCommManager,
                                                      settingsManager,
-                                                     sleepTracker);
+                                                     sleepTracker,
+                                                     socialPresenceEstimator);
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -236,7 +241,8 @@ BehaviorExternalInterface::CompArrayWrapper::CompArrayWrapper(AIComponent*      
                                                               VisionScheduleMediator*        visionScheduleMediator,
                                                               SettingsCommManager*           settingsCommManager,
                                                               SettingsManager*               settingsManager,
-                                                              SleepTracker*                  sleepTracker)
+                                                              SleepTracker*                  sleepTracker,
+                                                              SocialPresenceEstimator*       socialPresenceEstimator)
 : _array({
     {BEIComponentID::AIComponent,               BEIComponentWrapper(aiComponent)},
     {BEIComponentID::Animation,                 BEIComponentWrapper(animationComponent)},
@@ -276,7 +282,8 @@ BehaviorExternalInterface::CompArrayWrapper::CompArrayWrapper(AIComponent*      
     {BEIComponentID::TouchSensor,               BEIComponentWrapper(touchSensorComponent)},
     {BEIComponentID::VariableSnapshotComponent, BEIComponentWrapper(variableSnapshotComponent)},
     {BEIComponentID::Vision,                    BEIComponentWrapper(visionComponent)},
-    {BEIComponentID::VisionScheduleMediator,    BEIComponentWrapper(visionScheduleMediator)}
+    {BEIComponentID::VisionScheduleMediator,    BEIComponentWrapper(visionScheduleMediator)},
+    {BEIComponentID::SocialPresenceEstimator,   BEIComponentWrapper(socialPresenceEstimator)}
 }){}
 
 } // namespace Vector

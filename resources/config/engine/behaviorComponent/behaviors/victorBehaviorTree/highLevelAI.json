@@ -125,6 +125,10 @@
                   "conditionType": "EngineErrorCodeReceived",
                   "engineErrorCode": "ImageQualityTooDark"
                 }
+              },
+              {
+                "conditionType": "SocialPresence",
+                "min": 0.0
               }
             ]
           }
@@ -339,6 +343,10 @@
                 "conditionType": "Emotion",
                 "emotion": "Stimulated",
                 "min": 0.5
+              },
+              {
+                "conditionType": "SocialPresence",
+                "min": 0.0
               }
             ]
           }
@@ -399,6 +407,10 @@
                 "conditionType": "Emotion",
                 "emotion": "Stimulated",
                 "min": 0.7
+              },
+              {
+                "conditionType": "SocialPresence",
+                "min": 0.0
               }
             ]
           }
@@ -528,7 +540,11 @@
           // even though we weren't planning to socialize, if we can now then we should (socializing is important)
           "to": "Socializing",
           "condition": {
-            "customCondition": "CloseFaceForSocializing"
+            "conditionType": "Compound",
+            "and": [
+              { "customCondition": "CloseFaceForSocializing" },
+              { "conditionType": "SocialPresence", "min": 0.0 }
+            ]
           }
         },
         {

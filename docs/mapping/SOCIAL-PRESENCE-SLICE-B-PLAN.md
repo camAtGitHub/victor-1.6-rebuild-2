@@ -1,6 +1,6 @@
 # Plan: Social Presence Slice B — HLAI reads RSPI (not a new stack)
 
-**Status:** plan only — **blocked on Slice A** ([`SOCIAL-PRESENCE-SLICE-A-PLAN.md`](SOCIAL-PRESENCE-SLICE-A-PLAN.md) Phase 6 green). Do not implement until `/do`. Do not `vbuild` until Phase 6.  
+**Status:** Phases 1–6 **in tree** (2026-09-16 `/do B` on `cam_socialPresence`). **`vbuild`/flash not run** (clad emit needed for `BEIConditionType::SocialPresence`). Do not treat as on-robot green until Phase 6 hardware checklist.  
 **Goal:** Existing HighLevelAI doors to **Socializing** also require “receptive” (RSPI not inhibited). Observing / Exploring / QuietMode / SleepCycle stay. **No new HLAI state. No QuietMode-from-low-RSPI.**  
 **Integration completeness:** public `GetRSPI()`, BEI getter like Mood, first-class JSON `conditionType: SocialPresence` usable from any behavior, HLAI transitions that already go to Socializing, unit test, generator-spec row, BehaviorConds visibility.  
 **CPU:** the condition is a cached-float compare on the 60 ms behavior tick. **No extra vision modes.**

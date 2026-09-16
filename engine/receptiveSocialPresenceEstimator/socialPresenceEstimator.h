@@ -136,6 +136,9 @@ public:
 
   float GetRSPI() const { return _rspi; }
 
+  // For unit tests / WebViz-adjacent debug. Does not change HLAI by itself.
+  void DevSetRSPI(float rspi) { _rspi = rspi; }
+
 
   // ******** Input Event Handlers ********
 

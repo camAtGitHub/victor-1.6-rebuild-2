@@ -61,6 +61,7 @@ enum uint_8 BEIConditionType {
   RobotTouched,
   SalientPointDetected,
   SettingsUpdatePending,
+  SocialPresence,
   SimpleMood,
   StuckOnEdge,
   TimePowerButtonPressed,

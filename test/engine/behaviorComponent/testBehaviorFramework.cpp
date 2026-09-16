@@ -47,6 +47,7 @@
 #include "engine/components/visionComponent.h"
 #include "engine/cozmoContext.h"
 #include "engine/faceWorld.h"
+#include "engine/receptiveSocialPresenceEstimator/socialPresenceEstimator.h"
 #include "engine/robot.h"
 #include "engine/robotDataLoader.h"
 #include "engine/unitTestKey.h"
@@ -123,7 +124,8 @@ void InitBEIPartial( const BEIComponentMap& map, BehaviorExternalInterface& bei 
            GetFromMap<VisionScheduleMediator>(map, BEIComponentID::VisionScheduleMediator),
            GetFromMap<SettingsCommManager>(map, BEIComponentID::SettingsCommManager),
            GetFromMap<SettingsManager>(map, BEIComponentID::SettingsManager),
-           GetFromMap<SleepTracker>(map, BEIComponentID::SleepTracker));
+           GetFromMap<SleepTracker>(map, BEIComponentID::SleepTracker),
+           GetFromMap<SocialPresenceEstimator>(map, BEIComponentID::SocialPresenceEstimator));
 }
 
 

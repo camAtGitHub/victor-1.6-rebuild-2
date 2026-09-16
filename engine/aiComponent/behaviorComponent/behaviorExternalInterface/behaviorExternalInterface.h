@@ -74,6 +74,7 @@ class VariableSnapshotComponent;
 class VisionComponent;
 class VisionScheduleMediator;
 class SleepTracker;
+class SocialPresenceEstimator;
   
 namespace Audio {
 class EngineRobotAudioClient;
@@ -170,7 +171,8 @@ public:
             VisionScheduleMediator*        visionScheduleMediator,
             SettingsCommManager*           settingsCommManager,
             SettingsManager*               settingsManager,
-            SleepTracker*                  sleepTracker);
+            SleepTracker*                  sleepTracker,
+            SocialPresenceEstimator*       socialPresenceEstimator);
     
   virtual ~BehaviorExternalInterface();
 
@@ -277,6 +279,9 @@ public:
 
   inline bool HasSleepTracker() const { return GetComponentWrapper(BEIComponentID::SleepTracker).IsComponentValid();}
   SleepTracker& GetSleepTracker() const {return GetComponentWrapper(BEIComponentID::SleepTracker).GetComponent<SleepTracker>();}
+
+  inline bool HasSocialPresenceEstimator() const { return GetComponentWrapper(BEIComponentID::SocialPresenceEstimator).IsComponentValid();}
+  SocialPresenceEstimator& GetSocialPresenceEstimator() const {return GetComponentWrapper(BEIComponentID::SocialPresenceEstimator).GetComponent<SocialPresenceEstimator>();}
   
   inline bool HasHeldInPalmTracker() const { return GetComponentWrapper(BEIComponentID::HeldInPalmTracker).IsComponentValid();}
   HeldInPalmTracker& GetHeldInPalmTracker() const {return GetComponentWrapper(BEIComponentID::HeldInPalmTracker).GetComponent<HeldInPalmTracker>();}
@@ -329,7 +334,8 @@ private:
                        VisionScheduleMediator*        visionSchedulMediator,
                        SettingsCommManager*           settingsCommManager,
                        SettingsManager*               settingsManager,
-                       SleepTracker*                  sleepTracker);
+                       SleepTracker*                  sleepTracker,
+                       SocialPresenceEstimator*       socialPresenceEstimator);
       ~CompArrayWrapper(){};
       EntityFullEnumeration<BEIComponentID, BEIComponentWrapper, BEIComponentID::Count> _array;
   };

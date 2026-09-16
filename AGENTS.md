@@ -464,6 +464,7 @@ if you ran out of context mid-folder, say so here.
 | 2026-09-16 | Grok | Two Social Presence plans: `SOCIAL-PRESENCE-SLICE-A-PLAN.md` (port leak estimator, CPU: no extra vision, poll salient, 10 Hz, subscribe-gated WebViz) then `SOCIAL-PRESENCE-SLICE-B-PLAN.md` (HLAI Socializing AND RSPI min 0 veto; Emotion-clone BEI). No C++. | `/do` A first; B after A graph green. Do not vbuild until each plan’s last phase. |
 | 2026-09-16 | Grok | Slice A **owns** WebViz JS: plan Phase 4b edits `socialPresence.js` in place (veto line at 0, receptive chip, RSPI+Quiet+Face default, no leak test events). Not a new chart stack. | `/do` A includes 4b (scp JS). |
 | 2026-09-16 | Grok | **`/do` Slice A:** UIC intent callback; `SocialPresenceEstimator` RobotComponent + WebViz `socialpresence`; tab 4b (veto line, receptive chip); cvcatalog `RSPE_WebVizPeriod_s`. No `vbuild`/flash. HLAI unchanged. | Flash `vic-engine` when asked; on-robot graph checklist; then Slice B. |
+| 2026-09-16 | Grok | **`/do` Slice B** on `cam_socialPresence`: BEI Has/Get + `BEIConditionType::SocialPresence` + Emotion-clone condition; HLAI socialize doors A/C/D/E AND `min: 0.0`; F still True. No QuietMode hook. No `vbuild`. | Clad emit + flash; on-robot quiet-then-face must not socialize while RSPI < 0. |
 
 ---
 

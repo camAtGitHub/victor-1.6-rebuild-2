@@ -38,6 +38,7 @@
 #include "engine/cozmoContext.h"
 #include "engine/faceWorld.h"
 #include "engine/moodSystem/moodManager.h"
+#include "engine/receptiveSocialPresenceEstimator/socialPresenceEstimator.h"
 #include "engine/components/battery/batteryComponent.h"
 #include "engine/robot.h"
 #include "test/engine/helpers/cubePlacementHelper.h"
@@ -365,6 +366,89 @@ TEST(BeiConditions, Emotion)
   EXPECT_FALSE( condStim->AreConditionsMet(bei) );
   moodManager.SetEmotion(EmotionType::Stimulated, 0.500001f);
   EXPECT_TRUE( condStim->AreConditionsMet(bei) );
+}
+
+TEST(BeiConditions, SocialPresence)
+{
+  const std::string jsonMax = R"json(
+  {
+    "conditionType": "SocialPresence",
+    "max": -0.5
+  })json";
+  const std::string jsonMin = R"json(
+  {
+    "conditionType": "SocialPresence",
+    "min": -0.5
+  })json";
+  const std::string jsonRange = R"json(
+  {
+    "conditionType": "SocialPresence",
+    "min": -0.75,
+    "max": -0.5
+  })json";
+  const std::string jsonValue = R"json(
+  {
+    "conditionType": "SocialPresence",
+    "value": -0.33
+  })json";
+
+  IBEIConditionPtr condMin;
+  IBEIConditionPtr condMax;
+  IBEIConditionPtr condRange;
+  IBEIConditionPtr condValue;
+  CreateBEI(jsonMax, condMax);
+  CreateBEI(jsonMin, condMin);
+  CreateBEI(jsonRange, condRange);
+  CreateBEI(jsonValue, condValue);
+
+  TestBehaviorFramework testBehaviorFramework(1, nullptr);
+  testBehaviorFramework.InitializeStandardBehaviorComponent();
+  BehaviorExternalInterface& bei = testBehaviorFramework.GetBehaviorExternalInterface();
+
+  Robot& robot = testBehaviorFramework.GetRobot();
+  BEIRobotInfo info(robot);
+  SocialPresenceEstimator estimator;
+  InitBEIPartial( { {BEIComponentID::SocialPresenceEstimator, &estimator}, {BEIComponentID::RobotInfo, &info} }, bei );
+
+  // max
+  condMax->Init(bei);
+  condMax->SetActive(bei, true);
+  EXPECT_FALSE( condMax->AreConditionsMet(bei) );
+  estimator.DevSetRSPI(-1.0f);
+  EXPECT_TRUE( condMax->AreConditionsMet(bei) );
+  estimator.DevSetRSPI(1.0f);
+  EXPECT_FALSE( condMax->AreConditionsMet(bei) );
+
+  // min
+  condMin->Init(bei);
+  condMin->SetActive(bei, true);
+  estimator.DevSetRSPI(-1.0f);
+  EXPECT_FALSE( condMin->AreConditionsMet(bei) );
+  estimator.DevSetRSPI(1.0f);
+  EXPECT_TRUE( condMin->AreConditionsMet(bei) );
+
+  // range
+  condRange->Init(bei);
+  condRange->SetActive(bei, true);
+  estimator.DevSetRSPI(-0.8f);
+  EXPECT_FALSE( condRange->AreConditionsMet(bei) );
+  estimator.DevSetRSPI(-0.4f);
+  EXPECT_FALSE( condRange->AreConditionsMet(bei) );
+  estimator.DevSetRSPI(-0.6f);
+  EXPECT_TRUE( condRange->AreConditionsMet(bei) );
+
+  // value
+  condValue->Init(bei);
+  condValue->SetActive(bei, true);
+  estimator.DevSetRSPI(-1.0f);
+  EXPECT_FALSE( condValue->AreConditionsMet(bei) );
+  estimator.DevSetRSPI(-0.330001f);
+  EXPECT_TRUE( condValue->AreConditionsMet(bei) );
+
+  // missing component
+  InitBEIPartial( { {BEIComponentID::RobotInfo, &info} }, bei );
+  EXPECT_FALSE( bei.HasSocialPresenceEstimator() );
+  EXPECT_FALSE( condMin->AreConditionsMet(bei) );
 }
 
 TEST(BeiConditions, SimpleMood)
