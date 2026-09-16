@@ -87,8 +87,11 @@
       }
       outputCsv += '\n';
     });
-    // make QA agree that this doesn't suffice for full logs
-    alert('Downloading behavior stacks. To help the engineers, it\'s useful to send them this file, a screenshot of this tab, _AND_ a full log (victor_log)')
+    if (window.WebVizUI && typeof window.WebVizUI.toast === 'function') {
+      window.WebVizUI.toast('Behaviors', 'Downloading a CSV of stack membership over time.', 'info');
+    } else if (typeof console !== 'undefined' && console.warn) {
+      console.warn('Behaviors: Downloading a CSV of stack membership over time.');
+    }
     // force download
     var elem = document.createElement('a');
     elem.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(outputCsv));
@@ -137,30 +140,40 @@
     data.sort();
     // create if needed, then populate a dropdown with behaviorIDs,
     // and when the user selects one, tell the engine to start that behavior
-    var dropDown = $(container).find('#behaviorDropdown');
+    var $root = $(container);
+    var forceMount = $root.find('#behaviorForceRun');
+    if( forceMount.length == 0 ) {
+      forceMount = $root;
+    }
+    var toolsMount = $root.find('#behaviorVizTools');
+    if( toolsMount.length == 0 ) {
+      toolsMount = $root;
+    }
+    var dropDown = $root.find('#behaviorDropdown');
     if( dropDown.length == 0 ) {
-      dropDown = $('<select></select>', {id: 'behaviorDropdown'}).appendTo(container);
+      dropDown = $('<select></select>', {id: 'behaviorDropdown'}).appendTo(forceMount);
       dropDown.change(function() {
         if( this.value ) {
           sendBehavior(this.value, false); // just default to false so they try it normally
         }
       });
-      $('<button type="button" id="resend">Resend</button>').click( function() {
-        var sel = $(container).find('#behaviorDropdown')[0];
-        var preset = $(container).find('#presetConditions').is(':checked');
+      $('<button type="button" id="resend" class="wv-mod-btn">Resend</button>').click( function() {
+        var sel = $root.find('#behaviorDropdown')[0];
+        var preset = $root.find('#presetConditions').is(':checked');
         if( sel && sel.value ) {
           sendBehavior(sel.value, preset);
         }
-      }).appendTo(container);
-      $('<input type="checkbox" id="presetConditions" />').appendTo(container);
-      $('<label for="presetConditions">Force</label>').appendTo(container);
-      $('<input type="checkbox" id="showActivatable" />').appendTo(container)
+      }).appendTo(forceMount);
+      $('<input type="checkbox" id="presetConditions" />').appendTo(forceMount);
+      $('<label for="presetConditions">Force</label>').appendTo(forceMount);
+    }
+    if( $root.find('#showActivatable').length == 0 ) {
+      $('<input type="checkbox" id="showActivatable" />').appendTo(toolsMount)
         .change( function() {
           showInactive = $(this).is(':checked');
-        })
-      $('<label for="showActivatable">Show activatable</label>').appendTo(container);
-
-      $('<button type="button" id="downloadTimeBars">Download as csv</button>').click(downloadAsCsv).appendTo(container);
+        });
+      $('<label for="showActivatable">Show activatable</label>').appendTo(toolsMount);
+      $('<button type="button" id="downloadTimeBars" class="wv-mod-btn">Download as csv</button>').click(downloadAsCsv).appendTo(toolsMount);
     }
     dropDown.empty();
     $("<option/>", {val: '', text:'Select a behaviorID to switch to immediately'}).appendTo(dropDown);
@@ -430,7 +443,35 @@
   var timeCursorTime;
   var maxLabelWidth = 190;
   var showInactive = false;
-    
+
+  var liveEls = { live: null, meta: null };
+  var lastPacketAt = 0;
+  var packetCount = 0;
+  var liveState = 'waiting';
+
+  function setLiveState(state) {
+    liveState = state;
+    if( !liveEls.live ) {
+      return;
+    }
+    liveEls.live.textContent = state;
+    liveEls.live.className = 'wv-mod-live wv-mod-live--' + state;
+  }
+
+  function notePacket() {
+    lastPacketAt = Date.now();
+    packetCount += 1;
+    setLiveState('live');
+    if( liveEls.meta ) {
+      liveEls.meta.textContent = packetCount + ' pkt';
+    }
+  }
+
+  function tickLiveIdle() {
+    if( lastPacketAt && (Date.now() - lastPacketAt > 3000) && liveState === 'live' ) {
+      setLiveState('idle');
+    }
+  }
 
   function update(source) {
     // Guard: empty stack / clearDisplay leaves no hierarchy; never touch global D3.
@@ -705,6 +746,7 @@
       timeCursorTime = calcTimeCursorTime();
       updateTimeCursor();
     }
+    tickLiveIdle();
   } // end update
 
   myMethods.init = function(elem) {
@@ -718,13 +760,31 @@
 
     hostElem = elem;
 
-    $('<h4>Usage: Move your mouse around the main window to see active behaviors and the times they were active. You may also drag your cursor in the bottom window to zoom in on a particular period of time. Click in the same box to zoom out. Zooming will pause live updates, so you should toggle the switch on the left when you\'re done.</h4>').appendTo( elem );
-    
-    activeFeatureDiv = $('<h3 id="activeFeature"></h3>').appendTo( elem );
-    currentBehaviorDiv = $('<h3 id="currentBehavior"></h3>').appendTo( elem );
-    currentBehaviorStateDiv = $('<h3 id="currentBehaviorDebugState"></h3>').appendTo( elem );
+    var $mod = $('<div class="wv-mod"></div>').appendTo(elem);
+    $mod.append(
+      '<header class="wv-mod-header">' +
+        '<div class="wv-mod-title-row">' +
+          '<h2 class="wv-mod-title">Behaviors</h2>' +
+          '<span class="wv-mod-live wv-mod-live--waiting" aria-live="polite">waiting</span>' +
+          '<span class="wv-mod-meta">—</span>' +
+        '</div>' +
+        '<p class="wv-mod-sub">Hover the timeline to see which behaviors were on the stack. Drag the lower strip to zoom (pauses live updates). Use the live-update control to resume.</p>' +
+      '</header>' +
+      '<details>' +
+        '<summary>Force-run</summary>' +
+        '<div id="behaviorForceRun" class="wv-mod-toolbar"></div>' +
+      '</details>' +
+      '<div id="behaviorVizTools" class="wv-mod-toolbar"></div>'
+    );
+    liveEls.live = $mod.find('.wv-mod-live')[0];
+    liveEls.meta = $mod.find('.wv-mod-meta')[0];
+    setLiveState('waiting');
 
-    hostSvg = d3.select(elem)
+    activeFeatureDiv = $('<h3 id="activeFeature"></h3>').appendTo($mod);
+    currentBehaviorDiv = $('<h3 id="currentBehavior"></h3>').appendTo($mod);
+    currentBehaviorStateDiv = $('<h3 id="currentBehaviorDebugState"></h3>').appendTo($mod);
+
+    hostSvg = d3.select($mod[0])
                 .append('svg')
                 .attr('width', params.frameWidth + params.margin.right + params.margin.left);
     var svg = hostSvg
@@ -852,6 +912,7 @@
     // Force-run list: array of behavior name strings
     if( Array.isArray(allData) ) {
       addControls( allData, elem );
+      notePacket();
       return;
     }
 
@@ -863,6 +924,7 @@
       if( typeof currentBehaviorStateDiv !== 'undefined' ) {
         currentBehaviorStateDiv.text('Latest state: ' + allData.debugState);
       }
+      notePacket();
       return;
     }
 
@@ -870,6 +932,7 @@
       if( typeof activeFeatureDiv !== 'undefined' ) {
         activeFeatureDiv.text('Active feature: ' + allData.activeFeature);
       }
+      notePacket();
       return;
     }
 
@@ -881,6 +944,8 @@
       // Only treat plain string lists via Array.isArray above; ignore anything else.
       return;
     }
+
+    notePacket();
 
     var stack = hasStack ? allData.stack : [];
 
@@ -1071,7 +1136,7 @@
         fill:red;
       }
 
-      * {
+      svg {
         font: 10px sans-serif;
       }
 

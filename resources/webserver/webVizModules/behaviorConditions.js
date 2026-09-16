@@ -14,9 +14,7 @@
 
   var instructions = 'Arrows &#8678 and &#8680 move to the next time the stack changed.<br/>'
     + 'Arrows &#8676; and &#8677; move backwards/forwards any change in factors, condition activation, or the stack.<br/>'
-    + 'If nothing changes with &#8676; and &#8677, it probably means a condition was activated for a behavior that is in the '
-    + 'process of activating, so continue clicking.<br/>'
-    + 'Note that conditions are only updated if they are evaluated.'
+    + 'Note that conditions are only updated if they are evaluated.';
 
   var history = [];
   var stacks = [];
@@ -35,6 +33,35 @@
 
   /** Module host element (#tab-behaviorconds). Prefer over document-global selectors. */
   var hostElem = null;
+
+  var liveEls = { live: null, meta: null };
+  var lastPacketAt = 0;
+  var packetCount = 0;
+  var liveState = 'waiting';
+
+  function setLiveState(state) {
+    liveState = state;
+    if( !liveEls.live ) {
+      return;
+    }
+    liveEls.live.textContent = state;
+    liveEls.live.className = 'wv-mod-live wv-mod-live--' + state;
+  }
+
+  function notePacket() {
+    lastPacketAt = Date.now();
+    packetCount += 1;
+    setLiveState('live');
+    if( liveEls.meta ) {
+      liveEls.meta.textContent = packetCount + ' pkt';
+    }
+  }
+
+  function tickLiveIdle() {
+    if( lastPacketAt && (Date.now() - lastPacketAt > 3000) && liveState === 'live' ) {
+      setLiveState('idle');
+    }
+  }
 
   function $host() {
     return hostElem ? $(hostElem) : $(document);
@@ -323,12 +350,28 @@
   }
 
   function AddEntry(time, change, stackIndex, condChangeIndex) {
-    history.push({
+    var entry = {
       time: time,
       whatChanged: change,
       stackIndex: stackIndex,
       condChangeIndex: condChangeIndex
-    });
+    };
+    // W5: stack snapshots can arrive after same-time factor/inactive packets.
+    // Insert 's' before the first 'c' or 'i' at this time so stepping sees stack first.
+    var insertAt = history.length;
+    if( change == 's' ) {
+      for( var i = 0; i < history.length; ++i ) {
+        var h = history[i];
+        if( h.time == time && (h.whatChanged == 'c' || h.whatChanged == 'i') ) {
+          insertAt = i;
+          break;
+        }
+      }
+    }
+    history.splice(insertAt, 0, entry);
+    if( insertAt < (history.length - 1) && insertAt <= drawIndex ) {
+      drawIndex += 1;
+    }
     TrimHistoryIfNeeded();
     UpdateSlider();
   }
@@ -450,9 +493,6 @@
   }
 
   function OnFactorsChanged(data) {
-    // todo: when the stack changes, we'll receive new conditions before
-    // receiving the stack. So when adding the stack, it should be inserted
-    // before the first 'c' entry of the same time.
     if( !data || typeof data !== 'object' ) {
       return;
     }
@@ -579,18 +619,32 @@
   myMethods.init = function(elem) {
     hostElem = elem;
     var $root = $(elem);
+    var $mod = $('<div class="wv-mod"></div>').appendTo($root);
+    $mod.append(
+      '<header class="wv-mod-header">' +
+        '<div class="wv-mod-title-row">' +
+          '<h2 class="wv-mod-title">Behavior conditions</h2>' +
+          '<span class="wv-mod-live wv-mod-live--waiting" aria-live="polite">waiting</span>' +
+          '<span class="wv-mod-meta">—</span>' +
+        '</div>' +
+        '<p class="wv-mod-sub">Step by stack change or by any factor change. Conditions appear when they are evaluated, not every tick.</p>' +
+      '</header>'
+    );
+    liveEls.live = $mod.find('.wv-mod-live')[0];
+    liveEls.meta = $mod.find('.wv-mod-meta')[0];
+    setLiveState('waiting');
 
-    $('<div class="bcInstructions">' + instructions + '</div>').appendTo($root);
-    var controls = $('<div id="controls"></div>').appendTo($root);
-    $('<div id="conditionsContainer"></div>').appendTo($root);
+    $('<div class="bcInstructions">' + instructions + '</div>').appendTo($mod);
+    var controls = $('<div id="controls"></div>').appendTo($mod);
+    $('<div id="conditionsContainer"></div>').appendTo($mod);
 
-    controls.append('<button type="button" class="button" id="backStack">&#8678;</button>');
-    controls.append('<button type="button" class="button" id="backButton">&#8676;</button>');
+    controls.append('<button type="button" class="button wv-mod-btn" id="backStack">&#8678;</button>');
+    controls.append('<button type="button" class="button wv-mod-btn" id="backButton">&#8676;</button>');
     controls.append('<input id="timeSlider" type="range" min="0" max="0" value="0" step="1" />');
-    controls.append('<button type="button" class="button" id="nextButton">&#8677;</button>');
-    controls.append('<button type="button" class="button" id="nextStack">&#8680;</button>');
+    controls.append('<button type="button" class="button wv-mod-btn" id="nextButton">&#8677;</button>');
+    controls.append('<button type="button" class="button wv-mod-btn" id="nextStack">&#8680;</button>');
     controls.append('<label id="timeSliderLabel">0</label>');
-    controls.append('<button type="button" class="button" id="clearHistory" title="Clear condition history">Clear</button>');
+    controls.append('<button type="button" class="button wv-mod-btn" id="clearHistory" title="Clear condition history">Clear</button>');
     controls.append('<div id="timeSliderTooltip"></div>');
     controls.append('<label for="chkScroll">Scroll to modified</label>');
     controls.append('<input id="chkScroll" type="checkbox" checked/>');
@@ -734,15 +788,20 @@
     }
     if( typeof data['factors'] !== 'undefined' ) {
       OnFactorsChanged( data );
+      notePacket();
     } else if( typeof data['inactive'] !== 'undefined' ) {
       OnInactive( data );
+      notePacket();
     } else if( typeof data['stack'] !== 'undefined' || typeof data['tree'] !== 'undefined' ) {
       OnStackChanged(data);
+      notePacket();
     }
     // else: ignore unknown shapes
   };
 
-  myMethods.update = function(dt, elem) {};
+  myMethods.update = function(dt, elem) {
+    tickLiveIdle();
+  };
 
   myMethods.getStyles = function() {
     return `
@@ -759,18 +818,14 @@
         margin-top:5px;
         padding: 5px 10px;
         font-family: monospace;
-      }
-      div {
         background-color:#ededed;
-      }
-      div.whiteBox {
-        background-color:white;
-      }
-      div {
         font-weight:normal;
         border:1px solid transparent;
       }
-      div.currentBehavior {
+      #conditionsContainer div.whiteBox {
+        background-color:white;
+      }
+      #conditionsContainer div.currentBehavior {
         font-weight:bold;
         border: 1px solid red;
       }
@@ -788,7 +843,7 @@
       button {
         vertical-align:middle;
       }
-      .newChange {
+      #conditionsContainer div.newChange {
         border: 1px solid red;
       }
       #timeSliderTooltip {

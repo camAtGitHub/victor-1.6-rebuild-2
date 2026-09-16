@@ -7,12 +7,12 @@
  *
  *  Instructions:
  *  1) Supply the four required methods in this file
- *  2) Add your module to the list of modules in the 
- *     <head> of webViz.html
- * 
- *  Dev tip: Instead of having to build for mac each time you want
- *    to test something, add a "myMethods.devShouldDumpData = true;" 
- *    just before "myMethods.init = ". Run with webots, but check the
+ *  2) Register the module in webviz/js/config.js
+ *     (MODULES_ENGINE for :8888, MODULES_ANIM for :8889) — not in
+ *     the <head> of webViz.html.
+ *
+ *  Dev tip (optional replay): add "myMethods.devShouldDumpData = true;"
+ *    just before "myMethods.init = ". Run with webots, then check the
  *    Overview tab for a dump of all data sent to your module. Paste
  *    that in a file resources/webserver/devData.json. Then close
  *    webots and start a web server in your webserver directory:

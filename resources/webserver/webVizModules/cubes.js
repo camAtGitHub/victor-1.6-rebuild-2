@@ -2,6 +2,7 @@
  * Cube connection information (i.e. are we connected to
  * a cube? Which one? Which ones do we know about?)
  * 2026-07: shell host scoping, safe onData, safe sendData (#tab-cubes)
+ * 2026-09: wv-mod chrome; NoTarget casing; grouped connection vs coordinator
  */
 
 (function(myMethods, sendData) {
@@ -10,6 +11,11 @@
   var cubeInfoDiv = null;
   var cccInfoDiv = null;
   var citInfoDiv = null;
+  var emptyEl = null;
+  var liveEl = null;
+  var metaEl = null;
+  var lastPacketAt = 0;
+  var packetCount = 0;
 
   function $host() {
     if( hostElem ) {
@@ -39,6 +45,34 @@
     } catch( e ) {
       console.warn( 'cubes: sendData failed', e );
     }
+  }
+
+  function setLiveState(state) {
+    if( !liveEl ) { return; }
+    liveEl.textContent = state;
+    liveEl.className = 'wv-mod-live wv-mod-live--' + state;
+  }
+
+  function updateMeta() {
+    if( !metaEl ) { return; }
+    metaEl.textContent = packetCount ? (packetCount + ' pkt') : '—';
+  }
+
+  function notePacket() {
+    lastPacketAt = Date.now();
+    packetCount += 1;
+    setLiveState('live');
+    updateMeta();
+    if( emptyEl && emptyEl.length ) {
+      emptyEl.hide();
+    }
+  }
+
+  function addBtn(parent, label, onClick) {
+    var btn = $('<button type="button" class="wv-mod-btn"></button>').text(label);
+    btn.on('click', onClick);
+    btn.appendTo(parent);
+    return btn;
   }
 
   function flashCubeLights() {
@@ -84,60 +118,51 @@
 
   myMethods.init = function(elem) {
     setHost( elem );
+    packetCount = 0;
+    lastPacketAt = 0;
 
-    $(elem).append('<div id="cubes-title">Cube connection info</div>');
+    var root = $('<div class="wv-mod"></div>');
+    root.append(
+      '<header class="wv-mod-header">' +
+        '<div class="wv-mod-title-row">' +
+          '<h2 class="wv-mod-title">Cubes</h2>' +
+          '<span class="wv-mod-live wv-mod-live--waiting" aria-live="polite">waiting</span>' +
+          '<span class="wv-mod-meta">—</span>' +
+        '</div>' +
+        '<p class="wv-mod-sub">Connection, coordinator subscriptions, and whether the robot is tracking a cube.</p>' +
+      '</header>'
+    );
+    emptyEl = $('<div class="wv-mod-empty">Waiting for cube status.</div>').appendTo(root);
 
-    var flashCubesButton = $('<input class="cubeButton" type="button" value="Flash Cube Lights"/>');
-    flashCubesButton.click( function(){ flashCubeLights(); });
-    flashCubesButton.appendTo( elem );
+    var connPanel = $('<section class="wv-mod-panel"></section>').appendTo(root);
+    var connBtns = $('<div class="cubes-btn-row"></div>').appendTo(connPanel);
+    addBtn(connBtns, 'Flash Cube Lights', function(){ flashCubeLights(); });
+    addBtn(connBtns, 'Connect To Cube', function(){ connectCube(); });
+    addBtn(connBtns, 'Disconnect From Cube', function(){ disconnectCube(); });
+    addBtn(connBtns, 'Forget Preferred Cube', function(){ forgetPreferredCube(); });
+    cubeInfoDiv = $('<div id="cubeInfo"></div>').appendTo(connPanel);
 
-    var connectCubeButton = $('<input class="cubeButton" type="button" value="Connect To Cube"/>');
-    connectCubeButton.click( function(){ connectCube(); });
-    connectCubeButton.appendTo( elem );
+    var cccPanel = $('<section class="wv-mod-panel"></section>').appendTo(root);
+    $('<h3 class="cubes-h">Coordinator</h3>').appendTo(cccPanel);
+    var interBtns = $('<div class="cubes-btn-row"></div>').appendTo(cccPanel);
+    addBtn(interBtns, 'Subscribe Interactable', function(){ setInteractableSubscription( true ); });
+    addBtn(interBtns, 'Unsubscribe Interactable', function(){ setInteractableSubscription( false ); });
+    addBtn(interBtns, 'Temp Subscribe Interactable', function(){ setTempInteractableSubscription(); });
+    var backBtns = $('<div class="cubes-btn-row"></div>').appendTo(cccPanel);
+    addBtn(backBtns, 'Subscribe Background', function(){ setBackgroundSubscription( true ); });
+    addBtn(backBtns, 'Unsubscribe Background', function(){ setBackgroundSubscription( false ); });
+    addBtn(backBtns, 'Temp Subscribe Background', function(){ setTempBackgroundSubscription(); });
+    cccInfoDiv = $('<div id="cccInfo"></div>').appendTo(cccPanel);
 
-    var disconnectCubeButton = $('<input class="cubeButton" type="button" value="Disconnect From Cube"/>');
-    disconnectCubeButton.click( function(){ disconnectCube(); });
-    disconnectCubeButton.appendTo( elem );
+    var citPanel = $('<section class="wv-mod-panel"></section>').appendTo(root);
+    $('<h3 class="cubes-h">Hold tracking</h3>').appendTo(citPanel);
+    citInfoDiv = $('<div id="citInfo"></div>').appendTo(citPanel);
 
-    var forgetPreferredCubeButton = $('<input class="cubeButton" type="button" value="Forget Preferred Cube"/>');
-    forgetPreferredCubeButton.click( function(){ forgetPreferredCube(); });
-    forgetPreferredCubeButton.appendTo( elem );
-
-    cubeInfoDiv = $('<h3 id="cubeInfo"></h3>').appendTo( elem );
-
-    $(elem).append('<div id="ccc-title">CubeConnectionCoordinator</div>');
-
-    var subInterButton = $('<input class="cccInteractableButton" type="button" value="Subscribe Interactable"/>');
-    subInterButton.click( function(){ setInteractableSubscription( true ); });
-    subInterButton.appendTo( elem );
-
-    var unSubInterButton = $('<input class="cccInteractableButton" type="button" value="Unsubscribe Interactable"/>');
-    unSubInterButton.click( function(){ setInteractableSubscription( false ); });
-    unSubInterButton.appendTo( elem );
-
-    var tempSubInterButton = $('<input class="cccInteractableButton" type="button" value="Temp Subscribe Interactable"/>');
-    tempSubInterButton.click( function(){ setTempInteractableSubscription(); });
-    tempSubInterButton.appendTo( elem );
-
-    $(elem).append('<div id="cccButtonBreak"></div>');
-
-    var subBackButton = $('<input class="cccBackgroundButton" type="button" value="Subscribe Background"/>');
-    subBackButton.click( function(){ setBackgroundSubscription( true ); });
-    subBackButton.appendTo( elem );
-
-    var unSubBackButton = $('<input class="cccBackgroundButton" type="button" value="Unsubscribe Background"/>');
-    unSubBackButton.click( function(){ setBackgroundSubscription( false ); });
-    unSubBackButton.appendTo( elem );
-
-    var tempSubBackButton = $('<input class="cccBackgroundButton" type="button" value="Temp Subscribe Background"/>');
-    tempSubBackButton.click( function(){ setTempBackgroundSubscription(); });
-    tempSubBackButton.appendTo( elem );
-
-    cccInfoDiv = $('<h3 id="cccInfo"></h3>').appendTo( elem );
-
-    $(elem).append('<div id="cit-title">CubeInteractionTracker</div>');
-
-    citInfoDiv = $('<h3 id="citInfo"></h3>').appendTo( elem );
+    root.appendTo(elem);
+    liveEl = root.find('.wv-mod-live')[0] || null;
+    metaEl = root.find('.wv-mod-meta')[0] || null;
+    setLiveState('waiting');
+    updateMeta();
   };
 
   myMethods.onData = function(data, elem) {
@@ -147,6 +172,7 @@
     }
 
     try {
+      notePacket();
       if( data.hasOwnProperty('commInfo') ) {
         if( !cubeInfoDiv || !cubeInfoDiv.length ) {
           cubeInfoDiv = $host().find( '#cubeInfo' );
@@ -210,7 +236,8 @@
 
         var citInfo = data["citInfo"] || {};
         citInfoDiv.empty();
-        if( citInfo["noTarget"] == true ){
+        // C++ sends NoTarget; accept lowercase fallback
+        if( citInfo.NoTarget === true || citInfo.noTarget === true ){
           citInfoDiv.append('<div class="citTypeTitle">' + "NO TARGET" + '</div>');
         }
         citInfoDiv.append('<div class="citTypeTitle">' + "Tracking State: " + (citInfo["trackingState"] != null ? citInfo["trackingState"] : '') + '</div>');
@@ -247,59 +274,42 @@
 
   myMethods.update = function(dt, elem) {
     if( elem ) { setHost( elem ); }
+    if( lastPacketAt && (Date.now() - lastPacketAt > 3000) ) {
+      if( liveEl && liveEl.textContent === 'live' ) {
+        setLiveState('idle');
+      }
+    }
   };
 
   myMethods.getStyles = function() {
     return `
-      #cubes-title {
-        font-size:16px;
-        margin-bottom:20px;
+      .cubes-h {
+        margin: 0 0 8px;
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      .cubes-btn-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 10px;
       }
 
       .cubeTypeTitle {
         margin-bottom:10px;
       }
 
-      .cubeButton {
-        margin-bottom:20px;
-        margin-right:10px;
-      }
-
       .cubeEntry {
         margin-left:10px;
-      }
-
-      #ccc-title {
-        font-size:16px;
-        margin-top:20px;
-        margin-bottom:20px;
       }
 
       .cccTypeTitle {
         margin-bottom:10px;
       }
 
-      .cccButtonBreak {
-      }
-
-      .cccInteractableButton {
-        margin-bottom:20px;
-        margin-right:10px;
-      }
-
-      .cccBackgroundButton {
-        margin-bottom:20px;
-        margin-right:10px;
-      }
-
       .subscriberEntry{
         margin-left:10px;
-      }
-
-      #cit-title {
-        font-size: 16px;
-        margin-top: 20px;
-        margin-bottom: 20px;
       }
 
       .citTypeTitle {

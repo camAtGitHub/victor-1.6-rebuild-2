@@ -34,6 +34,11 @@
   var chart = null;
   var plotData = [];
   var hostElem = null;
+  var lastPacketAt = 0;
+  var packetCount = 0;
+  var liveEl = null;
+  var metaEl = null;
+  var emptyEl = null;
 
   function $host() {
     if( hostElem ) {
@@ -57,6 +62,35 @@
 
   function chartContainer() {
     return $host().find( '#chartContainer' );
+  }
+
+  function setLiveState( state ) {
+    if( !liveEl ) { return; }
+    liveEl.textContent = state;
+    liveEl.className = "wv-mod-live wv-mod-live--" + state;
+  }
+
+  function updateLiveMeta() {
+    if( !metaEl ) { return; }
+    metaEl.textContent = packetCount > 0 ? (packetCount + " pkt") : "—";
+  }
+
+  function notePacket() {
+    packetCount += 1;
+    lastPacketAt = Date.now();
+    setLiveState( "live" );
+    updateLiveMeta();
+    if( emptyEl ) {
+      emptyEl.hidden = true;
+    }
+  }
+
+  function tickLiveIdle() {
+    if( lastPacketAt && (Date.now() - lastPacketAt > 3000) ) {
+      if( liveEl && liveEl.textContent === "live" ) {
+        setLiveState( "idle" );
+      }
+    }
   }
 
   function ensurePlot() {
@@ -115,11 +149,43 @@
   myMethods.init = function(elem) {
     setHost( elem );
 
-    try {
-      $.post( 'consolevarset', {key: 'ProfilerLogOutput', value: 2}, function(result){} );
-    } catch( e ) {
-      console.warn( 'cpuprofile: consolevarset failed', e );
-    }
+    var $root = $(
+      '<div class="wv-mod">' +
+        '<header class="wv-mod-header">' +
+          '<div class="wv-mod-title-row">' +
+            '<h2 class="wv-mod-title">CPU profile</h2>' +
+            '<span class="wv-mod-live wv-mod-live--waiting" data-wv="live" aria-live="polite">waiting</span>' +
+            '<span class="wv-mod-meta" data-wv="meta">—</span>' +
+          '</div>' +
+          '<p class="wv-mod-sub">Per-thread profiler samples.</p>' +
+        '</header>' +
+        '<div class="wv-mod-toolbar">' +
+          '<button type="button" class="wv-mod-btn" data-wv="sendHere">Send samples here</button>' +
+          '<button type="button" class="wv-mod-btn" data-wv="sendConsole">Send samples to console</button>' +
+        '</div>' +
+        '<div class="wv-mod-empty" data-wv="empty">Profiler output is not sent here. Send samples to this tab to plot them.</div>' +
+      '</div>'
+    );
+    $(elem).append( $root );
+
+    liveEl = $root.find( '[data-wv="live"]' )[0] || null;
+    metaEl = $root.find( '[data-wv="meta"]' )[0] || null;
+    emptyEl = $root.find( '[data-wv="empty"]' )[0] || null;
+
+    $root.on( 'click', '[data-wv="sendHere"]', function() {
+      try {
+        $.post( 'consolevarset', {key:'ProfilerLogOutput', value:2}, function(result){} );
+      } catch( e ) {
+        console.warn( 'cpuprofile: consolevarset failed', e );
+      }
+    });
+    $root.on( 'click', '[data-wv="sendConsole"]', function() {
+      try {
+        $.post( 'consolevarset', {key:'ProfilerLogOutput', value:0}, function(result){} );
+      } catch( e ) {
+        console.warn( 'cpuprofile: consolevarset failed', e );
+      }
+    });
 
     var $sel = $('<select id="chartSelect" name="Tick"><option>No active ticks</option></select>');
     $sel.on( 'change', function() {
@@ -128,9 +194,9 @@
         threads[currentThread].changed = true;
       }
     });
-    $(elem).append( $sel );
+    $root.append( $sel );
 
-    $(elem).append(
+    $root.append(
       '<div id="chartOptions">' +
       '<input id="mean" type="checkbox" checked="checked" />Mean ' +
       '<input id="min" type="checkbox" />Min ' +
@@ -138,8 +204,8 @@
       '</div>'
     );
 
-    $(elem).append( '<div id="chartContainer"></div>' );
-    $(elem).append( '<div id="chartFields"></div>' );
+    $root.append( '<div class="wv-mod-panel"><div id="chartContainer"></div></div>' );
+    $root.append( '<div id="chartFields"></div>' );
   };
 
   myMethods.onData = function(data, elem) {
@@ -153,6 +219,8 @@
       if( typeof threadName !== 'string' || !threadName ) {
         return;
       }
+
+      notePacket();
 
       var thread = null;
       var threadIdx = threadNameToIdxMap[threadName];
@@ -320,6 +388,7 @@
 
   myMethods.update = function(dt, elem) {
     if( elem ) { setHost( elem ); }
+    tickLiveIdle();
   };
 
   myMethods.getStyles = function() {

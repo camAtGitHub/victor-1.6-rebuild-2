@@ -18,6 +18,35 @@
   var rowHeight = 20;
   var hostElem = null;
 
+  var liveEls = { live: null, meta: null };
+  var lastPacketAt = 0;
+  var packetCount = 0;
+  var liveState = 'waiting';
+
+  function setLiveState(state) {
+    liveState = state;
+    if( !liveEls.live ) {
+      return;
+    }
+    liveEls.live.textContent = state;
+    liveEls.live.className = 'wv-mod-live wv-mod-live--' + state;
+  }
+
+  function notePacket() {
+    lastPacketAt = Date.now();
+    packetCount += 1;
+    setLiveState('live');
+    if( liveEls.meta ) {
+      liveEls.meta.textContent = packetCount + ' pkt';
+    }
+  }
+
+  function tickLiveIdle() {
+    if( lastPacketAt && (Date.now() - lastPacketAt > 3000) && liveState === 'live' ) {
+      setLiveState('idle');
+    }
+  }
+
   function $host() {
     if( hostElem ) {
       return $(hostElem);
@@ -77,14 +106,27 @@
   myMethods.init = function(elem) {
     setHost( elem );
 
+    var $mod = $('<div class="wv-mod"></div>').appendTo(elem);
+    $mod.append(
+      '<header class="wv-mod-header">' +
+        '<div class="wv-mod-title-row">' +
+          '<h2 class="wv-mod-title">Vision schedule</h2>' +
+          '<span class="wv-mod-live wv-mod-live--waiting" aria-live="polite">waiting</span>' +
+          '<span class="wv-mod-meta">—</span>' +
+        '</div>' +
+        '<p class="wv-mod-sub">Active vision modes and their update periods.</p>' +
+        '<p class="wv-mod-sub">This tab is served by the engine process (:8888).</p>' +
+      '</header>'
+    );
+    liveEls.live = $mod.find('.wv-mod-live')[0];
+    liveEls.meta = $mod.find('.wv-mod-meta')[0];
+    setLiveState('waiting');
+
     if( !isEngineFeed() ) {
-      $('<h3>You must use this tab with the engine process (feed port 8888). ' +
-        'If this page is on your PC, set Robot feed / WebViz.connect to the robot engine, ' +
-        'or open <code>?port=8888</code>.</h3>').appendTo(elem);
       return;
     }
 
-    $('<canvas></canvas>', {id: 'vsmCanvas'}).appendTo(elem);
+    $('<canvas></canvas>', {id: 'vsmCanvas'}).appendTo($mod);
 
     var canvas = canvasEl();
     if( !canvas ) { return; }
@@ -97,7 +139,7 @@
       context.textBaseline="top";
       context.textAlign = "start";
       context.fillStyle = '#000000';
-      context.fillText( "Waiting on Data...", 0, 0);
+      context.fillText( "Waiting for the vision schedule.", 0, 0);
     }
   };
 
@@ -106,6 +148,8 @@
     if( !data || typeof data !== 'object' ) {
       return;
     }
+
+    notePacket();
 
     try {
       var canvas = canvasEl();
@@ -166,6 +210,7 @@
 
   myMethods.update = function(dt, elem) {
     if( elem ) { setHost( elem ); }
+    tickLiveIdle();
   };
 
   myMethods.getStyles = function() {

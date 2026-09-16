@@ -16,13 +16,6 @@
 
   var WINDOW_S = 60;
   var DEFAULT_VISIBLE = ["RSPI", "Quiet", "Face"];
-  var TEST_EVENT_NAMES = {
-    ExplicitPositive: true,
-    ImplicitPositive: true,
-    ExplicitInhibitor: true,
-    PowerDecayNegative: true,
-    PowerDecayPositive: true
-  };
   var INHIBITOR_NAMES = { Sleep: true, Quiet: true, ShutUp: true };
   var vetoThreshold = 0;
   var SERIES_COLORS = [
@@ -541,9 +534,6 @@
         continue;
       }
       var name = entry.name;
-      if (TEST_EVENT_NAMES[name]) {
-        continue;
-      }
       if (seriesData[name]) {
         continue; // unique names only
       }
@@ -766,9 +756,6 @@
       var k;
       for (k in events) {
         if (events.hasOwnProperty(k)) {
-          if (TEST_EVENT_NAMES[k]) {
-            continue;
-          }
           list.push(events[k]);
         }
       }
@@ -779,10 +766,6 @@
     for (fi = 0; fi < list.length; fi++) {
       var ev0 = list[fi];
       if (!ev0 || typeof ev0 !== "object") {
-        continue;
-      }
-      var nm0 = typeof ev0.eventName === "string" ? ev0.eventName : "";
-      if (TEST_EVENT_NAMES[nm0]) {
         continue;
       }
       filtered.push(ev0);
@@ -879,9 +862,6 @@
     for (j = 0; j < arr.length; j++) {
       var g = arr[j];
       if (!g || typeof g !== "object" || typeof g.name !== "string") {
-        continue;
-      }
-      if (TEST_EVENT_NAMES[g.name]) {
         continue;
       }
       if (!seriesData[g.name]) {

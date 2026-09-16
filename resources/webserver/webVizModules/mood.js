@@ -48,6 +48,11 @@
 
   /** Module host element (#tab-mood). Prefer over document-global selectors. */
   var hostElem = null;
+  var liveEl = null;
+  var metaEl = null;
+  var liveState = 'waiting';
+  var lastPacketAt = 0;
+  var packetCount = 0;
 
   function $host() {
     if( hostElem ) {
@@ -67,6 +72,45 @@
     } else if( el.nodeType ) {
       hostElem = el;
     }
+  }
+
+  function setLiveState( state ) {
+    liveState = state;
+    if( !liveEl || !liveEl.length ) { return; }
+    liveEl.attr( 'class', 'wv-mod-live wv-mod-live--' + state );
+    liveEl.text( state );
+  }
+
+  function updateMeta() {
+    if( !metaEl || !metaEl.length ) { return; }
+    metaEl.text( packetCount ? (packetCount + ' pkt') : '—' );
+  }
+
+  function notePacket() {
+    packetCount += 1;
+    lastPacketAt = Date.now();
+    setLiveState( 'live' );
+    updateMeta();
+  }
+
+  function tickLiveIdle() {
+    if( lastPacketAt && (Date.now() - lastPacketAt > 3000) && (liveState === 'live') ) {
+      setLiveState( 'idle' );
+    }
+  }
+
+  function buildChrome( elem, title, sub ) {
+    var $mod = $( '<div class="wv-mod"></div>' );
+    var $header = $( '<header class="wv-mod-header"></header>' ).appendTo( $mod );
+    var $row = $( '<div class="wv-mod-title-row"></div>' ).appendTo( $header );
+    $row.append( $( '<h2 class="wv-mod-title"></h2>' ).text( title ) );
+    liveEl = $( '<span class="wv-mod-live wv-mod-live--waiting" aria-live="polite">waiting</span>' ).appendTo( $row );
+    metaEl = $( '<span class="wv-mod-meta">—</span>' ).appendTo( $row );
+    $header.append( $( '<p class="wv-mod-sub"></p>' ).text( sub ) );
+    $( elem ).append( $mod );
+    setLiveState( 'waiting' );
+    updateMeta();
+    return $mod;
   }
 
   function chartContainer() {
@@ -227,6 +271,7 @@
         var values = simpleMoods[simpleMood];
         var btn = $('<button/>', {
           text: simpleMood,
+          'class': 'wv-mod-btn',
           click: (function( values ) {
             return function() {
               safeSend( values );
@@ -328,9 +373,12 @@
   myMethods.init = function(elem) {
     setHost( elem );
     var $root = $(elem);
-
-    $root.append('<div id="chartContainer"></div>');
-    var bottomContainer = $('<div id="bottomContainer"></div>').appendTo($root);
+    var $mod = buildChrome( elem, 'Mood',
+      'Emotion traces over the last minute, with event markers and set-points.' );
+    var $chartPanel = $( '<div class="wv-mod-panel"></div>' ).appendTo( $mod );
+    $chartPanel.append('<div id="chartContainer"></div>');
+    var $ctrlPanel = $( '<div class="wv-mod-panel"></div>' ).appendTo( $mod );
+    var bottomContainer = $('<div id="bottomContainer"></div>').appendTo($ctrlPanel);
     var leftControls = $('<div id="leftControls"></div>').appendTo(bottomContainer);
     leftControls.append('<div id="simpleMoodDisplay"></div>');
     leftControls.append('<div>' +
@@ -345,16 +393,17 @@
                         '<input type="checkbox" id="showLegend" checked/>' +
                         '<label for="showLegend">Show chart legend</label>' +
                         '</div>');
-    leftControls.append('<div id="periodControl"' +
-                        '<label for="sendPeriod">Update period (seconds)</label>' +
-                        '<input type="text" id="sendPeriod" min="0" max="10.0" value="1.0" size="4"/>' +
-                        '</div');
+    leftControls.append(
+      '<div id="periodControl">' +
+      '<label for="sendPeriod">Update period (seconds)</label>' +
+      '<input type="text" id="sendPeriod" min="0" max="10.0" value="1.0" size="4"/>' +
+      '</div>'
+    );
     leftControls.append('<div>' +
                         '<input type="checkbox" id="dumpData"/>' +
                         '<label for="dumpData">Dump raw data</label>' +
                         '</div>');
     leftControls.append('<div id="downloadDataDump"></div>');
-    leftControls.append('</div>');
 
     $root.find('#showEvents').change(function() {
       var isChecked =  $(this).is(':checked');
@@ -376,6 +425,8 @@
       if( !c ) { return; }
       try {
         c.getOptions().legend.show = isChecked;
+        c.setupGrid();
+        c.draw();
       } catch( e ) {
         console.warn( 'mood: showLegend failed', e );
       }
@@ -391,7 +442,7 @@
       var isChecked =  $(this).is(':checked');
       var $dump = $host().find('#downloadDataDump');
       if( isChecked ) {
-        $dump.text('dumping... (stop to enable download)');
+        $dump.text('Recording… uncheck to download');
         $host().find('#downloadDataDumpLink').remove();
       }
       else {
@@ -444,6 +495,8 @@
       if( data == null || typeof data !== 'object' ) {
         return;
       }
+
+      notePacket();
 
       if( first && Array.isArray( data.moods ) && data.moods.length > 0 ) {
 
@@ -612,6 +665,7 @@
 
   myMethods.update = function(dt, elem) {
     if( elem ) { setHost( elem ); }
+    tickLiveIdle();
   };
 
   myMethods.getStyles = function() {

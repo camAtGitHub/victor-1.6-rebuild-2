@@ -35,6 +35,11 @@
   var chart = null;
   var prevCpuTime = [];
   var hostElem = null;
+  var lastPacketAt = 0;
+  var packetCount = 0;
+  var liveEl = null;
+  var metaEl = null;
+  var emptyEl = null;
 
   function $host() {
     if( hostElem ) {
@@ -58,6 +63,35 @@
 
   function chartContainer() {
     return $host().find( '#chartContainer' );
+  }
+
+  function setLiveState( state ) {
+    if( !liveEl ) { return; }
+    liveEl.textContent = state;
+    liveEl.className = "wv-mod-live wv-mod-live--" + state;
+  }
+
+  function updateLiveMeta() {
+    if( !metaEl ) { return; }
+    metaEl.textContent = packetCount > 0 ? (packetCount + " pkt") : "—";
+  }
+
+  function notePacket() {
+    packetCount += 1;
+    lastPacketAt = Date.now();
+    setLiveState( "live" );
+    updateLiveMeta();
+    if( emptyEl ) {
+      emptyEl.hidden = true;
+    }
+  }
+
+  function tickLiveIdle() {
+    if( lastPacketAt && (Date.now() - lastPacketAt > 3000) ) {
+      if( liveEl && liveEl.textContent === "live" ) {
+        setLiveState( "idle" );
+      }
+    }
   }
 
   function ensurePlot() {
@@ -101,13 +135,46 @@
   myMethods.init = function(elem) {
     setHost( elem );
 
-    try {
-      $.post('consolevarset', {key: 'WebvizUpdatePeriod', value: 3}, function(result){});
-    } catch( e ) {
-      console.warn( 'cpu: consolevarset failed', e );
-    }
+    $(elem).append(
+      '<div class="wv-mod">' +
+        '<header class="wv-mod-header">' +
+          '<div class="wv-mod-title-row">' +
+            '<h2 class="wv-mod-title">CPU</h2>' +
+            '<span class="wv-mod-live wv-mod-live--waiting" data-wv="live" aria-live="polite">waiting</span>' +
+            '<span class="wv-mod-meta" data-wv="meta">—</span>' +
+          '</div>' +
+          '<p class="wv-mod-sub">Per-core CPU use for this process.</p>' +
+        '</header>' +
+        '<div class="wv-mod-toolbar">' +
+          '<button type="button" class="wv-mod-btn" data-wv="start">Start 1 s stream</button>' +
+          '<button type="button" class="wv-mod-btn" data-wv="stop">Stop stream</button>' +
+        '</div>' +
+        '<div class="wv-mod-empty" data-wv="empty">CPU stream is off. Start a 1 second sample to see per-core use.</div>' +
+        '<div class="wv-mod-panel">' +
+          '<div id="chartContainer"></div>' +
+        '</div>' +
+      '</div>'
+    );
 
-    $(elem).append('<div id="chartContainer"></div>');
+    liveEl = $host().find( '[data-wv="live"]' )[0] || null;
+    metaEl = $host().find( '[data-wv="meta"]' )[0] || null;
+    emptyEl = $host().find( '[data-wv="empty"]' )[0] || null;
+
+    $host().on( 'click', '[data-wv="start"]', function() {
+      try {
+        // enum 3 = 1000ms, osState_vicos.cpp L58
+        $.post('consolevarset', {key:'WebvizUpdatePeriod', value:3}, function(result){});
+      } catch( e ) {
+        console.warn( 'cpu: consolevarset failed', e );
+      }
+    });
+    $host().on( 'click', '[data-wv="stop"]', function() {
+      try {
+        $.post('consolevarset', {key:'WebvizUpdatePeriod', value:0}, function(result){});
+      } catch( e ) {
+        console.warn( 'cpu: consolevarset failed', e );
+      }
+    });
 
     $host().on( 'click', '.legendLabel', function() {
       try {
@@ -178,6 +245,7 @@
     }
 
     try {
+      notePacket();
       var delta = parseFloat( data.deltaTime_ms );
       if( !isFinite( delta ) || delta < 0 ) {
         delta = 0;
@@ -235,6 +303,7 @@
 
   myMethods.update = function(dt, elem) {
     if( elem ) { setHost( elem ); }
+    tickLiveIdle();
   };
 
   myMethods.getStyles = function() {

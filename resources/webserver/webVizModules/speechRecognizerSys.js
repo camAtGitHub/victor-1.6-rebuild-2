@@ -13,6 +13,12 @@
   var hostElem = null;
   var MAX_ROWS = 2000;
 
+  var liveEl = null;
+  var metaEl = null;
+  var emptyEl = null;
+  var lastPacketAt = 0;
+  var packetCount = 0;
+
   var dataColumns = ['result', 'score', 'startTime_ms', 'endTime_ms', 'startSampleIndex', 'endSampleIndex', 'notch', 'playback'];
   var prettyColumns = ["TriggerCount", 'Result', 'Score', 'StartTime ms', 'EndTime ms', 'StartSampleIdx', 'EndSampleIdx', 'Notch', 'PlaybackRecog'];
   var enabledColumns = [true, true, true, true, true, true, true, true, true];
@@ -37,12 +43,67 @@
     }
   }
 
+  function setLiveState( state ) {
+    if( !liveEl ) { return; }
+    liveEl.textContent = state;
+    liveEl.className = 'wv-mod-live wv-mod-live--' + state;
+  }
+
+  function updateMeta() {
+    if( !metaEl ) { return; }
+    metaEl.textContent = packetCount ? ( packetCount + ' pkt' ) : '—';
+  }
+
+  function notePacket() {
+    lastPacketAt = Date.now();
+    packetCount += 1;
+    setLiveState( 'live' );
+    updateMeta();
+    if( emptyEl ) {
+      emptyEl.hidden = true;
+    }
+  }
+
+  function tickLiveIdle() {
+    if( lastPacketAt && ( Date.now() - lastPacketAt > 3000 ) ) {
+      if( liveEl && liveEl.textContent === 'live' ) {
+        setLiveState( 'idle' );
+      }
+    }
+  }
+
+  function mountChrome( elem, title, sub, emptyText ) {
+    var root = document.createElement( 'div' );
+    root.className = 'wv-mod';
+    root.innerHTML =
+      '<header class="wv-mod-header">' +
+        '<div class="wv-mod-title-row">' +
+          '<h2 class="wv-mod-title"></h2>' +
+          '<span class="wv-mod-live wv-mod-live--waiting" aria-live="polite">waiting</span>' +
+          '<span class="wv-mod-meta">—</span>' +
+        '</div>' +
+        '<p class="wv-mod-sub"></p>' +
+      '</header>';
+    root.querySelector( '.wv-mod-title' ).textContent = title;
+    root.querySelector( '.wv-mod-sub' ).textContent = sub;
+    liveEl = root.querySelector( '.wv-mod-live' );
+    metaEl = root.querySelector( '.wv-mod-meta' );
+    if( emptyText ) {
+      emptyEl = document.createElement( 'div' );
+      emptyEl.className = 'wv-mod-empty';
+      emptyEl.textContent = emptyText;
+      root.appendChild( emptyEl );
+    }
+    elem.appendChild( root );
+    return root;
+  }
+
   function scrollBody() {
     return $host().find( '.dataTables_scrollBody' );
   }
 
   function CreateTable( elem ) {
-    var tableElem = $( '<table class="display" style="width:100%"></table>' ).appendTo( elem );
+    var tableElem = $( '<table class="display wv-mod-table" style="width:100%"></table>' ).appendTo( elem );
     var thead = $( '<thead></thead>' ).appendTo( tableElem );
     $( '<tbody class="speech-recog-list"></tbody>' ).appendTo( tableElem );
 
@@ -117,8 +178,15 @@
   myMethods.init = function( elem ) {
     setHost( elem );
 
-    $( '<b>Column toggles:</b>' ).appendTo( elem );
-    var ul = $( '<ul class="colToggles"></ul>' ).appendTo( elem );
+    var root = mountChrome(
+      elem,
+      'Speech recognizer',
+      'Wake-word hits: score, timing, and ignore reasons.',
+      'Waiting for wake-word hits.'
+    );
+
+    $( '<b>Column toggles:</b>' ).appendTo( root );
+    var ul = $( '<ul class="colToggles"></ul>' ).appendTo( root );
     prettyColumns.forEach( function( col, idx ){
       var shouldDisplay = enabledColumns[idx] ? 'colEnabled' : '';
       ul.append( '<li class="toggleViz ' + shouldDisplay + '" data-column="' + idx + '">' + col + '</li>' );
@@ -135,7 +203,8 @@
       }
     });
 
-    CreateTable( elem );
+    var panel = $( '<div class="wv-mod-panel"></div>' ).appendTo( root );
+    CreateTable( panel );
 
     scrollBody().on( 'scroll', function() {
       if( !userScrolling ) {
@@ -170,6 +239,7 @@
         return;
       }
       tableDirty = true;
+      notePacket();
     } catch( e ) {
       console.warn( 'speechRecognizerSys: onData failed', e );
     }
@@ -177,6 +247,7 @@
 
   myMethods.update = function( dt, elem ) {
     if( elem ) { setHost( elem ); }
+    tickLiveIdle();
     if( tableDirty ) {
       tableDirty = false;
       DrawTable();

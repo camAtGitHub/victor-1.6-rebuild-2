@@ -8,6 +8,12 @@
   var hostElem = null;
   var MAX_RESULTS = 200;
 
+  var liveEl = null;
+  var metaEl = null;
+  var emptyEl = null;
+  var lastPacketAt = 0;
+  var packetCount = 0;
+
   function $host() {
     if( hostElem ) {
       return $(hostElem);
@@ -28,17 +34,71 @@
     }
   }
 
+  function setLiveState( state ) {
+    if( !liveEl ) { return; }
+    liveEl.textContent = state;
+    liveEl.className = 'wv-mod-live wv-mod-live--' + state;
+  }
+
+  function updateMeta() {
+    if( !metaEl ) { return; }
+    metaEl.textContent = packetCount ? ( packetCount + ' pkt' ) : '—';
+  }
+
+  function notePacket() {
+    lastPacketAt = Date.now();
+    packetCount += 1;
+    setLiveState( 'live' );
+    updateMeta();
+    if( emptyEl ) {
+      emptyEl.hidden = true;
+    }
+  }
+
+  function tickLiveIdle() {
+    if( lastPacketAt && ( Date.now() - lastPacketAt > 3000 ) ) {
+      if( liveEl && liveEl.textContent === 'live' ) {
+        setLiveState( 'idle' );
+      }
+    }
+  }
+
+  function mountChrome( elem, title, sub, emptyText ) {
+    var root = document.createElement( 'div' );
+    root.className = 'wv-mod';
+    root.innerHTML =
+      '<header class="wv-mod-header">' +
+        '<div class="wv-mod-title-row">' +
+          '<h2 class="wv-mod-title"></h2>' +
+          '<span class="wv-mod-live wv-mod-live--waiting" aria-live="polite">waiting</span>' +
+          '<span class="wv-mod-meta">—</span>' +
+        '</div>' +
+        '<p class="wv-mod-sub"></p>' +
+      '</header>';
+    root.querySelector( '.wv-mod-title' ).textContent = title;
+    root.querySelector( '.wv-mod-sub' ).textContent = sub;
+    liveEl = root.querySelector( '.wv-mod-live' );
+    metaEl = root.querySelector( '.wv-mod-meta' );
+    if( emptyText ) {
+      emptyEl = document.createElement( 'div' );
+      emptyEl.className = 'wv-mod-empty';
+      emptyEl.textContent = emptyText;
+      root.appendChild( emptyEl );
+    }
+    elem.appendChild( root );
+    return root;
+  }
+
   myMethods.init = function(elem) {
     setHost( elem );
-    var cloudDiv = $('<div id="cloud"></div>').appendTo(elem);
-    cloudDiv.append('<div id="cloudBottom"></div>' +
-                    '<div id="cloudRight"></div>' +
-                    '<div id="cloudLeft"></div>');
-    $(elem).append('<marquee direction="down" width="400" height="110" behavior="alternate" style="border:solid">' +
-                      '<marquee behavior="alternate">Cloud Intent Results</marquee>' +
-                    '</marquee>');
-
-    $(elem).append('<div id="result-table"></div>');
+    var root = mountChrome(
+      elem,
+      'Cloud intents',
+      'Cloud recognizer results as they arrive.',
+      'Waiting for cloud recognizer results.'
+    );
+    var panel = $( '<div class="wv-mod-panel"></div>' ).appendTo( root );
+    panel.append( '<div id="result-table"></div>' );
   };
 
   myMethods.onData = function(data, elem) {
@@ -82,6 +142,7 @@
         children.first().remove();
         children = parent.children();
       }
+      notePacket();
     } catch( e ) {
       console.warn( 'cloud: onData failed', e );
     }
@@ -89,73 +150,14 @@
 
   myMethods.update = function(dt, elem) {
     if( elem ) { setHost( elem ); }
+    tickLiveIdle();
   };
 
   myMethods.getStyles = function() {
     return `
-      #cloud {
-        width:175px;
-        height:100px;
-        position: relative;
-        float:right;
-      }
-
-      #cloud div {
-        border: solid 5px black;
-      }
-
-      #cloudBottom {
-        background-color: #fff;
-        border-radius: 50px;
-        height: 75px;
-        position: absolute;
-        top: 30px;
-        width: 175px;
-        z-index: 1;
-      }
-
-      #cloudRight {
-        background-color: #fff;
-        border-radius: 100%;
-        height: 75px;
-        left: 70px;
-        position: absolute;
-        top: 0px;
-        width: 75px;
-        z-index: 0;
-      }
-
-      #cloudLeft {
-        background-color: #fff;
-        border-radius: 100%;
-        height: 50px;
-        left: 25px;
-        position: absolute;
-        top: 15px;
-        width: 50px;
-        z-index: 0;
-      }
-
-      #cloud::before {
-        background-color: white;
-        border-radius: 50%;
-        content: '';
-        height: 49px;
-        left: 28px;
-        position: absolute;
-        top: 19px;
-        width: 44px;
-        z-index: 2;
-     }
-
-      #cloud::after {
-        position: absolute; top: 4px; left: 73px;
-        background-color: white;
-        border-radius: 50%;
-        content: '';
-        width: 69px;
-        height: 70px;
-        z-index: 2;
+      #result-table {
+        font-size: 12px;
+        line-height: 1.45;
       }
     `;
   };

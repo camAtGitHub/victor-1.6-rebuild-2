@@ -250,6 +250,7 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 | `docs/mapping/WEBVIZ-FREEPLAY-DESIGN.md` | FreePlay WebViz module design (no-C++; multi-subscribe; Ops grid §5; dual-theme) |
 | `docs/mapping/WEBVIZ-FREEPLAY-PLAN.md` | FreePlay v1 implementation plan (phased; Allowed APIs; S1–S9) — **shipped** |
 | `docs/mapping/WEBVIZ-FREEPLAY-UX-PLAN.md` | FreePlay Ops UX uplift (P1–P6) — **implemented**; P7 docs closeout |
+| `docs/mapping/WEBVIZ-TAB-GLOWUP-PLAN.md` | Glow-up remaining WebViz tabs to FreePlay/SP chrome; JS-only; no extra robot CPU; `/do` Phases 1–7 |
 | `resources/webserver/webVizModules/freeplay.js` | Production FreePlay: Ops stack\|log + gates; client log tags; latest-factor gates; secondary timeline |
 | `resources/webserver/index.html` | Themed home landing (`:8888`/`:8889`); sparklines/overlay/catalog — see `docs/mapping/WEBSERVER-HOME.md` |
 | `docs/mapping/WEBSERVER-HOME.md` | Home chrome map: endpoints, local vendor/Inter, ENGINE checkbox bits, no extra polls; PerfMetric legend/budget, overlay, theme label, cross-port nav |
@@ -373,6 +374,10 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
   PERF METRIC: selected series only, legend under the plot. Header **Animation**/
   **Engine** cross-port links. ENGINE checkbox bits honored in
   `engine/cozmoEngine.cpp` (empty lines). Map: `docs/mapping/WEBSERVER-HOME.md`.
+- **WebViz tab glow-up?** — Plan `docs/mapping/WEBVIZ-TAB-GLOWUP-PLAN.md`: wrap stock
+  tabs in FreePlay/SP chrome (shared `.wv-mod` kit, local CSS, no new JS libs).
+  Connect existing JS wires only; Cpu/CpuProfile stream opt-in (today they
+  `consolevarset` on init). No extra robot CPU. `/do` Phases 1–7; Phase 8 HIP C++ skip.
 - **How does drive-to-pose work?** — `ENGINE-PATH-PLANNING.md`: ≥40 mm → `XYPlanner` (threaded);
   short moves → FaceAndApproach / MinimalAngle. Robot path follower runs on `vic-robot`.
 - **Which parts are rebuild-specific vs. stock Anki 1.6?** — `CHANGES.md`. Observed: wirepod
@@ -465,6 +470,8 @@ if you ran out of context mid-folder, say so here.
 | 2026-09-16 | Grok | Slice A **owns** WebViz JS: plan Phase 4b edits `socialPresence.js` in place (veto line at 0, receptive chip, RSPI+Quiet+Face default, no leak test events). Not a new chart stack. | `/do` A includes 4b (scp JS). |
 | 2026-09-16 | Grok | **`/do` Slice A:** UIC intent callback; `SocialPresenceEstimator` RobotComponent + WebViz `socialpresence`; tab 4b (veto line, receptive chip); cvcatalog `RSPE_WebVizPeriod_s`. No `vbuild`/flash. HLAI unchanged. | Flash `vic-engine` when asked; on-robot graph checklist; then Slice B. |
 | 2026-09-16 | Grok | **`/do` Slice B** on `cam_socialPresence`: BEI Has/Get + `BEIConditionType::SocialPresence` + Emotion-clone condition; HLAI socialize doors A/C/D/E AND `min: 0.0`; F still True. No QuietMode hook. No `vbuild`. | Clad emit + flash; on-robot quiet-then-face must not socialize while RSPI < 0. |
+| 2026-09-16 | Grok | **WebViz tab glow-up plan** `docs/mapping/WEBVIZ-TAB-GLOWUP-PLAN.md`: FreePlay/SP visual kit, connect JS wires (Features none→default, cubes NoTarget, mood HTML/legend, conds reorder, audio hasCallback), Cpu/CpuProfile opt-in stream, product copy. No new libs/CDN/C++ by default. | `/do` Phase 1 first (kit + Overview + CPU-safety). |
+| 2026-09-16 | Grok | **`/do` WebViz glow-up Phases 1–7** (Phase 1 + 2–6 parallel, then 7): `.wv-mod` kit; Cpu/CpuProfile opt-in; connected JS wires; product copy; SP leak-filter gone. No C++ / no new libs. | scp + hard-refresh; on-robot smoke from plan. Skip Phase 8 HIP C++ unless asked. |
 
 ---
 

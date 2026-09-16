@@ -1,0 +1,258 @@
+/* Shared WebViz module kit; content-token paper; do not darken hosts.
+   Prefix .wv-mod* only. Body uses --wv-content-*; never --wv-bg / --wv-text.
+   Dim text = opacity on content text, not --wv-text-dim.
+   KPI column counts are set inline by modules — do not put them in @media. */
+
+.wv-mod {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--wv-space-3, 12px);
+  min-height: 100%;
+  min-width: 0;
+  color: var(--wv-content-text, #1a1d24);
+  font-family: var(--wv-sans, "Inter", system-ui, sans-serif);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.wv-mod *,
+.wv-mod *::before,
+.wv-mod *::after {
+  box-sizing: border-box;
+}
+
+.wv-mod-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.wv-mod-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--wv-space-2, 8px) var(--wv-space-3, 12px);
+}
+
+.wv-mod-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--wv-content-text, #1a1d24);
+}
+
+.wv-mod-live {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: var(--wv-radius-pill, 999px);
+  border: 1px solid var(--wv-content-line, #c5cad3);
+  background: var(--wv-content-bg, #ededed);
+  color: var(--wv-content-text, #1a1d24);
+  opacity: 0.55;
+}
+
+.wv-mod-live--waiting {
+  background: var(--wv-content-bg, #ededed);
+  color: var(--wv-content-text, #1a1d24);
+  opacity: 0.55;
+}
+
+.wv-mod-live--live {
+  opacity: 1;
+  background: var(--wv-good-dim, rgba(62, 207, 142, 0.12));
+  color: var(--wv-good, #3ecf8e);
+  border-color: var(--wv-good, #3ecf8e);
+}
+
+.wv-mod-live--idle {
+  opacity: 1;
+  background: var(--wv-warn-dim, rgba(230, 180, 80, 0.12));
+  color: var(--wv-warn, #e6b450);
+  border-color: var(--wv-warn, #e6b450);
+}
+
+.wv-mod-meta {
+  font-family: var(--wv-mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--wv-content-text, #1a1d24);
+  opacity: 0.55;
+}
+
+.wv-mod-sub {
+  margin: 0;
+  font-size: 12px;
+  color: var(--wv-content-text, #1a1d24);
+  opacity: 0.55;
+}
+
+.wv-mod-sub code {
+  font-family: var(--wv-mono, ui-monospace, monospace);
+  font-size: 11px;
+  opacity: 1;
+}
+
+.wv-mod-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--wv-space-2, 8px);
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.wv-mod-kpis {
+  display: grid;
+  gap: var(--wv-space-2, 8px);
+}
+
+.wv-mod-kpi {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+  padding: var(--wv-space-2, 8px) 10px;
+  border: 1px solid var(--wv-content-line, #c5cad3);
+  border-radius: var(--wv-radius, 8px);
+  background: var(--wv-content-bg, #ededed);
+  text-align: left;
+}
+
+.wv-mod-kpi-name {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+  color: var(--wv-content-text, #1a1d24);
+  opacity: 0.55;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.wv-mod-kpi-val {
+  font-family: var(--wv-mono, ui-monospace, monospace);
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--wv-content-text, #1a1d24);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.wv-mod-panel {
+  border: 1px solid var(--wv-content-line, #c5cad3);
+  border-radius: var(--wv-radius, 8px);
+  background: var(--wv-content-bg, #ededed);
+  box-shadow: var(--wv-shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.35));
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: visible;
+}
+
+.wv-mod-empty {
+  opacity: 0.55;
+  font-size: 12px;
+  padding: var(--wv-space-2, 8px) 0;
+  color: var(--wv-content-text, #1a1d24);
+}
+
+.wv-mod-empty[hidden] {
+  display: none !important;
+}
+
+.wv-mod-btn {
+  flex-shrink: 0;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--wv-radius-sm, 6px);
+  border: 1px solid var(--wv-content-line, #c5cad3);
+  background: var(--wv-content-bg, #ededed);
+  color: var(--wv-content-text, #1a1d24);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.wv-mod-btn:hover {
+  background: var(--wv-accent-dim, rgba(91, 159, 212, 0.14));
+}
+
+.wv-mod-btn:focus {
+  outline: 2px solid var(--wv-accent, #5b9fd4);
+  outline-offset: 1px;
+}
+
+.wv-mod-btn:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.wv-mod-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--wv-content-line, #c5cad3);
+  border-radius: var(--wv-radius-pill, 999px);
+  background: var(--wv-content-bg, #ededed);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--wv-content-text, #1a1d24);
+  opacity: 0.55;
+  cursor: pointer;
+}
+
+.wv-mod-chip:hover {
+  border-color: var(--wv-content-line, #c5cad3);
+  opacity: 0.8;
+}
+
+.wv-mod-chip:focus {
+  outline: 2px solid var(--wv-accent, #5b9fd4);
+  outline-offset: 1px;
+}
+
+.wv-mod-chip:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.wv-mod-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-family: var(--wv-sans, "Inter", system-ui, sans-serif);
+  color: var(--wv-content-text, #1a1d24);
+}
+
+.wv-mod-table th,
+.wv-mod-table td {
+  padding: var(--wv-space-1, 4px) var(--wv-space-2, 8px);
+  border-bottom: 1px solid var(--wv-content-line, #c5cad3);
+  text-align: left;
+  vertical-align: top;
+}
+
+.wv-mod-table th {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.55;
+}
+
+.wv-mod-table td {
+  font-family: var(--wv-mono, ui-monospace, monospace);
+  font-size: 12px;
+}

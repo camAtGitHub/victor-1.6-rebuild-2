@@ -130,6 +130,35 @@
   var hostResizeObserver = null;
   var resizeRaf = 0;
 
+  var liveEls = { live: null, meta: null };
+  var lastPacketAt = 0;
+  var packetCount = 0;
+  var liveState = 'waiting';
+
+  function setLiveState(state) {
+    liveState = state;
+    if( !liveEls.live ) {
+      return;
+    }
+    liveEls.live.textContent = state;
+    liveEls.live.className = 'wv-mod-live wv-mod-live--' + state;
+  }
+
+  function notePacket() {
+    lastPacketAt = Date.now();
+    packetCount += 1;
+    setLiveState('live');
+    if( liveEls.meta ) {
+      liveEls.meta.textContent = packetCount + ' pkt';
+    }
+  }
+
+  function tickLiveIdle() {
+    if( lastPacketAt && (Date.now() - lastPacketAt > 3000) && liveState === 'live' ) {
+      setLiveState('idle');
+    }
+  }
+
   function $host() {
     if( hostElem ) { return asJq( hostElem ); }
     // Fallback: stock/shell id only (never throw)
@@ -1243,10 +1272,25 @@
     elem = asJq( elem ); // 2018 webviz often passes a raw HTMLElement
     setHost( elem );
 
-    // Toolbar row — keep controls grouped so layout stays stable under shell host
-    var $toolbar = $('<div class="navMapToolbar"></div>').appendTo( elem );
+    var $mod = $('<div class="wv-mod"></div>').appendTo( elem );
+    $mod.append(
+      '<header class="wv-mod-header">' +
+        '<div class="wv-mod-title-row">' +
+          '<h2 class="wv-mod-title">Nav map</h2>' +
+          '<span class="wv-mod-live wv-mod-live--waiting" aria-live="polite">waiting</span>' +
+          '<span class="wv-mod-meta">—</span>' +
+        '</div>' +
+        '<p class="wv-mod-sub">On-robot memory map.</p>' +
+      '</header>'
+    );
+    liveEls.live = $mod.find('.wv-mod-live')[0];
+    liveEls.meta = $mod.find('.wv-mod-meta')[0];
+    setLiveState('waiting');
 
-    updateBtn = $('<input type="button" value="Update"/>');
+    // Toolbar row — keep controls grouped so layout stays stable under shell host
+    var $toolbar = $('<div class="navMapToolbar wv-mod-toolbar"></div>').appendTo( $mod );
+
+    updateBtn = $('<input type="button" class="wv-mod-btn" value="Update"/>');
     updateBtn.click( function() {
       if( dumpInput ) {
         $host().find( '#navMap-pastebin' ).html( '' );
@@ -1361,6 +1405,8 @@
       if( data == null || typeof data !== 'object' ) {
         return;
       }
+
+      notePacket();
 
       if( typeof canvasContainer === 'undefined' || !canvasContainer || !canvasContainer.length ) {
         if( elem && elem.length ) {
@@ -1559,6 +1605,7 @@
       callUpdate();
       timeTilAutoUpdate = kAutoUpdatePeriod_s;
     }
+    tickLiveIdle();
   };
 
   myMethods.getStyles = function() {

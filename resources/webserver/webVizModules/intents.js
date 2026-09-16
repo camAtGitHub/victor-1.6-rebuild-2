@@ -1,12 +1,17 @@
 /*
  * Intents WebViz module (engine :8888)
  * 2026-07: shell host scoping, safe onData, fixed invalid HTML (#tab-intents)
+ * 2026-09: wv-mod chrome; hide empty app select; toast instead of alert
  */
 
 (function(myMethods, sendData) {
 
   var intentTypes = ['user', 'cloud', 'app'];
   var hostElem = null;
+  var liveEl = null;
+  var metaEl = null;
+  var lastPacketAt = 0;
+  var packetCount = 0;
   var MAX_REPEAT_ENTRIES = 50;
 
   function $host() {
@@ -39,16 +44,62 @@
     }
   }
 
+  function setLiveState(state) {
+    if( !liveEl ) { return; }
+    liveEl.textContent = state;
+    liveEl.className = 'wv-mod-live wv-mod-live--' + state;
+  }
+
+  function updateMeta() {
+    if( !metaEl ) { return; }
+    metaEl.textContent = packetCount ? (packetCount + ' pkt') : '—';
+  }
+
+  function notePacket() {
+    lastPacketAt = Date.now();
+    packetCount += 1;
+    setLiveState('live');
+    updateMeta();
+  }
+
+  function toastOrWarn(title, message) {
+    if( window.WebVizUI && typeof window.WebVizUI.toast === 'function' ) {
+      window.WebVizUI.toast(title, message, 'warn');
+    } else {
+      console.warn(title + ': ' + message);
+    }
+  }
+
   myMethods.init = function(elem) {
     setHost( elem );
+    packetCount = 0;
+    lastPacketAt = 0;
 
-    // Fixed: was '</div' (invalid/unclosed)
-    $(elem).append('<div id="intent-title">Last-received intents:</div>');
+    var root = $('<div class="wv-mod"></div>');
+    root.append(
+      '<header class="wv-mod-header">' +
+        '<div class="wv-mod-title-row">' +
+          '<h2 class="wv-mod-title">Intents</h2>' +
+          '<span class="wv-mod-live wv-mod-live--waiting" aria-live="polite">waiting</span>' +
+          '<span class="wv-mod-meta">—</span>' +
+        '</div>' +
+        '<p class="wv-mod-sub">Pending and last-seen intents. Type a name and trigger it for testing.</p>' +
+      '</header>'
+    );
 
-    var dropDownList = $('<div></div>', {id:'dropDownList'}).appendTo( elem );
+    var pendingPanel = $('<section class="wv-mod-panel"></section>').appendTo(root);
+    $('<h3 class="intents-h">Pending / last intent</h3>').appendTo(pendingPanel);
+    var dropDownList = $('<div></div>', {id:'dropDownList'}).appendTo( pendingPanel );
 
-    $(elem).append('<div id="intent-title-resend">Resend intents:</div>');
-    var recentList = $('<div></div>', {id:'repeatEntriesList'}).appendTo( elem );
+    var recentPanel = $('<section class="wv-mod-panel"></section>').appendTo(root);
+    $('<h3 class="intents-h">Recent injections</h3>').appendTo(recentPanel);
+    var recentList = $('<div></div>', {id:'repeatEntriesList'}).appendTo( recentPanel );
+
+    root.appendTo(elem);
+    liveEl = root.find('.wv-mod-live')[0] || null;
+    metaEl = root.find('.wv-mod-meta')[0] || null;
+    setLiveState('waiting');
+    updateMeta();
 
     for( var i=0; i<intentTypes.length; ++i ) {
       var intent = intentTypes[i];
@@ -72,7 +123,7 @@
       }
       var text = $('<input/>', {class: 'intent-text'}).appendTo( container );
       text.attr('placeholder', placeholder );
-      var button = $('<input/>', {class: 'intent-submit', type:'submit', value:'Trigger'}).appendTo( container );
+      var button = $('<button type="button" class="wv-mod-btn intent-submit">Trigger</button>').appendTo( container );
       button.on('click', (function(intent) {
         return function() {
           var onClick = function(requestedIntent, textBox) {
@@ -86,7 +137,7 @@
               } else if( splitRequest.length == 1 ) {
                 url += encodeURIComponent(splitRequest[0]);
               } else {
-                alert('Format is either one string (the intent type), or two strings separated by a space: the intent type and its param');
+                toastOrWarn('Intents', 'Format is either one string (the intent type), or two strings separated by a space: the intent type and its param');
                 return;
               }
               try { $.get(url); } catch( eGet ) {
@@ -111,7 +162,7 @@
               }).length === 0 ) {
             var repeatEntry = $('<div></div>', {class: 'repeat-entry'}).appendTo( recentList );
             $('<div>' + $('<div/>').text(requestedIntent).html() + '</div>').appendTo( repeatEntry );
-            var repeatBtn = $('<input/>', {type:'submit', value:'Resend'}).appendTo( repeatEntry );
+            var repeatBtn = $('<button type="button" class="wv-mod-btn">Resend</button>').appendTo( repeatEntry );
             repeatBtn.on('click', function() { onClick(requestedIntent, textBox); } );
 
             // Cap resend list growth
@@ -133,6 +184,7 @@
     }
 
     try {
+      notePacket();
       // Engine may send a single blob or an array of blobs
       var items = Array.isArray( data ) ? data : [data];
       for( var i=0; i<items.length; ++i ) {
@@ -146,13 +198,17 @@
               container.find('.current-intent').text( blob.value != null ? blob.value : '' );
             } else if( blob.type == 'all-intents' ) {
               var list = Array.isArray( blob.list ) ? blob.list : [];
+              // App dropdown stays hidden until a real app all-intents list arrives (C++ currently sends user+cloud only)
+              if( intent === 'app' && list.length === 0 ) {
+                continue;
+              }
               var dropdown = container.find('.intent-list');
               dropdown.empty();
               $("<option/>", {val: '', text:'Select a ' + intent + ' intent'}).appendTo(dropdown);
               $(list).each(function() {
                 $("<option/>", {val: this, text: this}).appendTo(dropdown);
               });
-              dropdown.css('visibility', 'visible');
+              dropdown.addClass('is-populated');
             }
           }
         }
@@ -164,14 +220,19 @@
 
   myMethods.update = function(dt, elem) {
     if( elem ) { setHost( elem ); }
+    if( lastPacketAt && (Date.now() - lastPacketAt > 3000) ) {
+      if( liveEl && liveEl.textContent === 'live' ) {
+        setLiveState('idle');
+      }
+    }
   };
 
   myMethods.getStyles = function() {
     return `
-      #intent-title,
-      #intent-title-resend {
-        font-size:16px;
-        margin-bottom:20px;
+      .intents-h {
+        margin: 0 0 8px;
+        font-size: 13px;
+        font-weight: 650;
       }
 
       .intent-row {
@@ -184,17 +245,18 @@
         margin: 0px 5px;
       }
 
-      /* initially hidden */
-      .intent-list {
-        visibility:hidden
+      /* hidden until all-intents list arrives; app stays hidden (no C++ list) */
+      .intent-row .intent-list {
+        display: none;
+        min-width: 200px;
+      }
+      .intent-row .intent-list.is-populated {
+        display: table-cell;
       }
 
       .current-intent,
       .intent-text {
         min-width:100px;
-      }
-      .intent-list {
-        min-width: 200px;
       }
       .current-intent {
         padding-left:10px;

@@ -42,6 +42,11 @@
 
   /** Module host element (#tab-micdata). Prefer over document-global selectors. */
   var hostElem = null;
+  var liveEl = null;
+  var metaEl = null;
+  var liveState = 'waiting';
+  var lastPacketAt = 0;
+  var packetCount = 0;
 
   function $host() {
     if( hostElem ) {
@@ -61,6 +66,48 @@
     } else if( el.nodeType ) {
       hostElem = el;
     }
+  }
+
+  function setLiveState( state ) {
+    liveState = state;
+    if( !liveEl || !liveEl.length ) { return; }
+    liveEl.attr( 'class', 'wv-mod-live wv-mod-live--' + state );
+    liveEl.text( state );
+  }
+
+  function updateMeta() {
+    if( !metaEl || !metaEl.length ) { return; }
+    metaEl.text( packetCount ? (packetCount + ' pkt') : '—' );
+  }
+
+  function notePacket() {
+    packetCount += 1;
+    lastPacketAt = Date.now();
+    setLiveState( 'live' );
+    updateMeta();
+  }
+
+  function tickLiveIdle() {
+    if( lastPacketAt && (Date.now() - lastPacketAt > 3000) && (liveState === 'live') ) {
+      setLiveState( 'idle' );
+    }
+  }
+
+  function buildChrome( elem, title, sub, extraSub ) {
+    var $mod = $( '<div class="wv-mod"></div>' );
+    var $header = $( '<header class="wv-mod-header"></header>' ).appendTo( $mod );
+    var $row = $( '<div class="wv-mod-title-row"></div>' ).appendTo( $header );
+    $row.append( $( '<h2 class="wv-mod-title"></h2>' ).text( title ) );
+    liveEl = $( '<span class="wv-mod-live wv-mod-live--waiting" aria-live="polite">waiting</span>' ).appendTo( $row );
+    metaEl = $( '<span class="wv-mod-meta">—</span>' ).appendTo( $row );
+    $header.append( $( '<p class="wv-mod-sub"></p>' ).text( sub ) );
+    if( extraSub ) {
+      $header.append( $( '<p class="wv-mod-sub"></p>' ).text( extraSub ) );
+    }
+    $( elem ).append( $mod );
+    setLiveState( 'waiting' );
+    updateMeta();
+    return $mod;
   }
 
   function chartContainer() {
@@ -146,13 +193,10 @@
   myMethods.init = function(elem) {
     setHost( elem );
 
-    // Feed port, not location.port (dev PC static server + remote robot :8889)
-    var animOk = window.WebVizConfig && typeof window.WebVizConfig.isFeedPort === 'function'
-      ? window.WebVizConfig.isFeedPort( '8889' )
-      : String( location.port ) === '8889';
-    if( !animOk ) {
-      $('<h3>You must use this tab with the anim process (feed port 8889)</h3>').appendTo(elem);
-    }
+    var $mod = buildChrome( elem, 'Mic data',
+      'Mic direction on the animation process.',
+      'This tab is the animation process. Engine sound reactions are on :8888.' );
+    var $panel = $( '<div class="wv-mod-panel"></div>' ).appendTo( $mod );
 
     var angleFactorA = 0.866; // cos(30 degrees)
     var angleFactorB = 0.5; // sin(30 degrees)
@@ -174,7 +218,7 @@
       [-0.0, -0.0]
     ];
 
-    $('<canvas></canvas>', {id: 'myCanvas'}).appendTo(elem);
+    $('<canvas></canvas>', {id: 'myCanvas'}).appendTo($panel);
 
     var canvas = canvasEl();
     if( canvas ) {
@@ -184,7 +228,7 @@
 
     drawClockFace();
 
-    $(elem).append('<div id="chartContainer"></div>');
+    $panel.append('<div id="chartContainer"></div>');
 
     // Scope legend toggles to this host only (avoid cross-module collisions)
     $host().on( 'click', '.legendLabel', function() {
@@ -217,6 +261,8 @@
     if( !data || typeof data !== 'object' ) {
       return;
     }
+
+    notePacket();
 
     try {
       var canvas = canvasEl();
@@ -346,6 +392,7 @@
 
   myMethods.update = function(dt, elem) {
     if( elem ) { setHost( elem ); }
+    tickLiveIdle();
   };
 
   myMethods.getStyles = function() {

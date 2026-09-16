@@ -12,6 +12,11 @@
   var paused = false;
   var hostElem = null;
   var beatDetectorInfoDiv = null;
+  var liveEl = null;
+  var metaEl = null;
+  var liveState = 'waiting';
+  var lastPacketAt = 0;
+  var packetCount = 0;
 
   var dataColumns = ['timeSinceBeat', 'tempo_bpm', 'conf', 'aboveThresh'];
   var prettyColumns = ['Time Since Beat (sec)', 'Tempo (bpm)', 'Confidence', 'AboveThresh'];
@@ -35,6 +40,45 @@
     } else if( el.nodeType ) {
       hostElem = el;
     }
+  }
+
+  function setLiveState( state ) {
+    liveState = state;
+    if( !liveEl || !liveEl.length ) { return; }
+    liveEl.attr( 'class', 'wv-mod-live wv-mod-live--' + state );
+    liveEl.text( state );
+  }
+
+  function updateMeta() {
+    if( !metaEl || !metaEl.length ) { return; }
+    metaEl.text( packetCount ? (packetCount + ' pkt') : '—' );
+  }
+
+  function notePacket() {
+    packetCount += 1;
+    lastPacketAt = Date.now();
+    setLiveState( 'live' );
+    updateMeta();
+  }
+
+  function tickLiveIdle() {
+    if( lastPacketAt && (Date.now() - lastPacketAt > 3000) && (liveState === 'live') ) {
+      setLiveState( 'idle' );
+    }
+  }
+
+  function buildChrome( elem, title, sub ) {
+    var $mod = $( '<div class="wv-mod"></div>' );
+    var $header = $( '<header class="wv-mod-header"></header>' ).appendTo( $mod );
+    var $row = $( '<div class="wv-mod-title-row"></div>' ).appendTo( $header );
+    $row.append( $( '<h2 class="wv-mod-title"></h2>' ).text( title ) );
+    liveEl = $( '<span class="wv-mod-live wv-mod-live--waiting" aria-live="polite">waiting</span>' ).appendTo( $row );
+    metaEl = $( '<span class="wv-mod-meta">—</span>' ).appendTo( $row );
+    $header.append( $( '<p class="wv-mod-sub"></p>' ).text( sub ) );
+    $( elem ).append( $mod );
+    setLiveState( 'waiting' );
+    updateMeta();
+    return $mod;
   }
 
   function scrollBody() {
@@ -116,10 +160,12 @@
   myMethods.init = function( elem ) {
     setHost( elem );
 
-    $('<p>Beat detector component information</p>').appendTo( elem );
+    var $mod = buildChrome( elem, 'Beat detector',
+      'Tempo, confidence, and threshold from the beat detector.' );
+    var $panel = $( '<div class="wv-mod-panel"></div>' ).appendTo( $mod );
 
-    $( '<b>Column toggles:</b>' ).appendTo( elem );
-    var ul = $( '<ul class="colToggles"></ul>' ).appendTo( elem );
+    $( '<b>Column toggles:</b>' ).appendTo( $panel );
+    var ul = $( '<ul class="colToggles"></ul>' ).appendTo( $panel );
     prettyColumns.forEach( function( col, idx ){
       var shouldDisplay = enabledColumns[idx] ? 'colEnabled' : '';
       // Fixed invalid </div> on <li>
@@ -137,16 +183,16 @@
       }
     });
 
-    var chkPaused = $('<input />', { type: 'checkbox', id: 'chkPaused'}).appendTo( elem ).prop('checked', paused);
-    $('<label />', { 'for': 'chkPaused', text: 'Pause' }).appendTo( elem );
+    var chkPaused = $('<input />', { type: 'checkbox', id: 'chkPaused'}).appendTo( $panel ).prop('checked', paused);
+    $('<label />', { 'for': 'chkPaused', text: 'Pause' }).appendTo( $panel );
 
     chkPaused.change( function() {
       paused = $(this).is(':checked');
     });
 
-    beatDetectorInfoDiv = $('<h3 id="detectorInfo"></h3>').appendTo( elem );
+    beatDetectorInfoDiv = $('<h3 id="detectorInfo"></h3>').appendTo( $panel );
 
-    CreateTable( elem );
+    CreateTable( $panel );
 
     scrollBody().on( 'scroll', function() {
       if( !userScrolling ) {
@@ -165,10 +211,11 @@
 
   myMethods.onData = function( data, elem ) {
     if( elem ) { setHost( elem ); }
-    if( paused ) {
+    if( !data || typeof data !== 'object' ) {
       return;
     }
-    if( !data || typeof data !== 'object' ) {
+    notePacket();
+    if( paused ) {
       return;
     }
 
@@ -199,6 +246,7 @@
 
   myMethods.update = function( dt, elem ) {
     if( elem ) { setHost( elem ); }
+    tickLiveIdle();
     if( tableDirty ) {
       tableDirty = false;
       DrawTable();

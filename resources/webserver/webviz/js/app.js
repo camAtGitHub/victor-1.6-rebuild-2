@@ -623,9 +623,7 @@
     host.innerHTML =
       '<div class="overview">' +
       "<h2>WebViz</h2>" +
-      "<p>Live debug surface for Vector. Each module subscribes over WebSocket " +
-      "when you open it. This shell replaces the old folder-tab UI with a modular host — " +
-      "module scripts under <code>webVizModules/</code> are unchanged.</p>" +
+      "<p>Live debug for this robot process. Open a module in the sidebar to start its data stream. The stream stays on until you click Unsubscribe in the header, or close this page. Overview itself does not subscribe.</p>" +
       '<div class="card-grid">' +
       '<div class="card"><h3>Process</h3><p><b>' +
       escapeHtml(p.label) +
@@ -659,17 +657,11 @@
       "</a></p></div>" +
       "</div>" +
       '<div class="callout">' +
-      "<b>Dev PC + robot feed:</b> serve this folder on your machine, then in the browser console:<br/>" +
-      "<code>WebViz.connect('192.168.x.x')</code> &nbsp;or&nbsp; " +
-      "<code>?host=192.168.x.x&amp;port=8888</code> in the URL. " +
-      "Assets stay local; WebSocket goes to the robot." +
+      "Viewing from a PC: point the data feed at the robot with WebViz.connect('robot-ip') or ?host=…&amp;port=8888. Page assets stay on this machine." +
       "</div>" +
       '<div class="callout">' +
-      "<b>Tip:</b> Open a module in the sidebar to subscribe. Data only streams for open (subscribed) modules. " +
-      "Force-refresh assets with <code>Cmd/Ctrl+Shift+R</code> if tabs look stale after a deploy." +
+      "Force-refresh with Cmd/Ctrl+Shift+R after a deploy if a tab looks stale." +
       "</div>" +
-      "<p>Stock shell kept as <code>webViz.legacy.html</code>. Module API is still " +
-      "<code>init</code> / <code>onData</code> / <code>update</code> / <code>getStyles</code> + <code>sendData</code>.</p>" +
       '<div id="devDataDump"><div>{</div><div>}</div></div>' +
       "</div>";
   }
@@ -1150,13 +1142,13 @@
     }
     window.jQuery.getJSON("devData.json").done(function (data) {
       state.fakeData = data;
-      UI.toast("Dev data", "USING FAKE DATA from devData.json", "warn");
+      UI.toast("Dev data", "Replay from devData.json is on", "warn");
       var overview = document.querySelector("#surface-overview .overview");
       if (overview) {
         var call = document.createElement("div");
         call.className = "callout warn";
         call.innerHTML =
-          "<b>USING FAKE DATA!</b> Remove <code>devData.json</code> when done.";
+          "Replay from devData.json is on. Live robot packets replace it as they arrive.";
         overview.insertBefore(call, overview.firstChild.nextSibling);
       }
       // Late XHR: only fill surfaces that have not received any messages yet

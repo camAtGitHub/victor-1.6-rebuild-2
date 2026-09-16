@@ -1,13 +1,17 @@
 /*
  * alexa state
  * 2026-07: safe onData guard (#tab-alexa)
+ * Wire: authState, uxState (animProcess Alexa::SendStatesToWebViz)
  */
 
 (function(myMethods, sendData) {
 
-  var authState;
-  var uxState;
+  var KPI_COUNT = 2;
   var hostElem = null;
+  var els = null;
+  var lastPacketAt = 0;
+  var packetCount = 0;
+  var kpiResizeBound = false;
 
   function setHost( el ) {
     if( !el ) { return; }
@@ -18,23 +22,107 @@
     }
   }
 
+  function setLiveState( state ) {
+    if( !els || !els.live ) { return; }
+    els.live.textContent = state;
+    els.live.className = 'wv-mod-live wv-mod-live--' + state;
+  }
+
+  function updateMeta() {
+    if( !els || !els.meta ) { return; }
+    els.meta.textContent = packetCount ? (packetCount + ' pkt') : '—';
+  }
+
+  function notePacket() {
+    lastPacketAt = Date.now();
+    packetCount++;
+    setLiveState( 'live' );
+    updateMeta();
+    if( els && els.empty ) {
+      els.empty.style.display = 'none';
+    }
+  }
+
+  function layoutKpiGrid() {
+    if( !els || !els.kpis ) { return; }
+    var n = KPI_COUNT;
+    var w =
+      (typeof window !== 'undefined' && window.innerWidth) ||
+      (document.documentElement && document.documentElement.clientWidth) ||
+      0;
+    var cols;
+    if( w > 0 && w < 640 ) {
+      cols = Math.min( 2, n );
+    } else if( w > 0 && w < 2400 ) {
+      cols = Math.max( 1, Math.ceil( n / 2 ) );
+    } else {
+      cols = n;
+    }
+    els.kpis.style.display = 'grid';
+    els.kpis.style.gap = '8px';
+    els.kpis.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0,1fr))';
+  }
+
+  function setKpi( name, value ) {
+    if( !els || !els.kpis ) { return; }
+    var node = els.kpis.querySelector( '[data-kpi="' + name + '"] .wv-mod-kpi-val' );
+    if( !node ) { return; }
+    if( value == null || value === '' ) {
+      node.textContent = '—';
+    } else {
+      node.textContent = String( value );
+    }
+  }
+
+  function kpiButton( name ) {
+    return '<button type="button" class="wv-mod-kpi" disabled data-kpi="' + name + '">' +
+      '<span class="wv-mod-kpi-name">' + name + '</span>' +
+      '<span class="wv-mod-kpi-val">—</span>' +
+      '</button>';
+  }
+
+  function buildDom( host ) {
+    host.innerHTML = '';
+    var root = document.createElement( 'div' );
+    root.className = 'wv-mod';
+    root.innerHTML =
+      '<header class="wv-mod-header">' +
+      '  <div class="wv-mod-title-row">' +
+      '    <h2 class="wv-mod-title">Alexa</h2>' +
+      '    <span class="wv-mod-live wv-mod-live--waiting">waiting</span>' +
+      '    <span class="wv-mod-meta">—</span>' +
+      '  </div>' +
+      '  <p class="wv-mod-sub">Auth and UX state on the animation process.</p>' +
+      '</header>' +
+      '<section class="wv-mod-kpis" aria-label="Alexa status">' +
+      kpiButton( 'authState' ) +
+      kpiButton( 'uxState' ) +
+      '</section>' +
+      '<div class="wv-mod-empty">Waiting for Alexa status.</div>';
+    host.appendChild( root );
+    els = {
+      root: root,
+      live: root.querySelector( '.wv-mod-live' ),
+      meta: root.querySelector( '.wv-mod-meta' ),
+      kpis: root.querySelector( '.wv-mod-kpis' ),
+      empty: root.querySelector( '.wv-mod-empty' )
+    };
+    layoutKpiGrid();
+    if( !kpiResizeBound ) {
+      kpiResizeBound = true;
+      window.addEventListener( 'resize', layoutKpiGrid );
+    }
+    setLiveState( 'waiting' );
+    updateMeta();
+  }
+
   myMethods.init = function(elem) {
     setHost( elem );
-    authState = $('<div></div>').appendTo(elem);
-    uxState = $('<div></div>').appendTo(elem);
+    lastPacketAt = 0;
+    packetCount = 0;
+    if( !hostElem ) { return; }
+    buildDom( hostElem );
   };
-
-  function SetAuthState(state) {
-    if( authState && authState.length ) {
-      authState.html('<span class="label">Auth State: </span> ' + $('<div/>').text(String(state)).html());
-    }
-  }
-
-  function SetUXState(state) {
-    if( uxState && uxState.length ) {
-      uxState.html('<span class="label">UX State: </span> ' + $('<div/>').text(String(state)).html());
-    }
-  }
 
   myMethods.onData = function(data, elem) {
     if( elem ) { setHost( elem ); }
@@ -42,11 +130,13 @@
       return;
     }
     try {
-      if( typeof data["authState"] !== 'undefined' ) {
-        SetAuthState(data["authState"]);
+      if( !els ) { return; }
+      notePacket();
+      if( typeof data['authState'] !== 'undefined' ) {
+        setKpi( 'authState', data['authState'] );
       }
-      if( typeof data["uxState"] !== 'undefined' ) {
-        SetUXState(data["uxState"]);
+      if( typeof data['uxState'] !== 'undefined' ) {
+        setKpi( 'uxState', data['uxState'] );
       }
     } catch( e ) {
       console.warn( 'alexa: onData failed', e );
@@ -55,14 +145,15 @@
 
   myMethods.update = function(dt, elem) {
     if( elem ) { setHost( elem ); }
+    if( lastPacketAt && (Date.now() - lastPacketAt > 3000) ) {
+      if( els && els.live && els.live.textContent === 'live' ) {
+        setLiveState( 'idle' );
+      }
+    }
   };
 
   myMethods.getStyles = function() {
-    return `
-      .label {
-        font-weight: bold;
-      }
-    `;
+    return '';
   };
 
 })(moduleMethods, moduleSendDataFunc);

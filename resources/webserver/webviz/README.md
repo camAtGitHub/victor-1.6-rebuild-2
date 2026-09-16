@@ -14,6 +14,7 @@ Modular **host shell** for WebViz. Entry page is still `../webViz.html` (served 
 | `css/tokens.css` | Design tokens (dark defaults + light overrides; light module content surface) |
 | `css/fonts.css` | Local Inter `@font-face` → `/fonts/inter-latin-*.woff2` (no Google Fonts CDN) |
 | `css/shell.css` | App grid, nav, surfaces, toasts |
+| `css/module-kit.css` | Shared `.wv-mod` chrome for stock tabs; `.module-host` stays light paper |
 | `js/config.js` | Port → module registry (engine 8888 / anim 8889) |
 | `js/socket.js` | WebSocket + reconnect + resubscribe |
 | `js/loader.js` | Sequential load of `webVizModules/*.js` IIFEs + scoped CSS |

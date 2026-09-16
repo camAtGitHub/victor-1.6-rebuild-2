@@ -10,7 +10,50 @@
 
   var faceList;
   var cubeList;
+  var emptyEl = null;
   var hostElem = null;
+
+  var liveEls = { live: null, meta: null };
+  var lastPacketAt = 0;
+  var packetCount = 0;
+  var liveState = 'waiting';
+
+  function setLiveState(state) {
+    liveState = state;
+    if( !liveEls.live ) {
+      return;
+    }
+    liveEls.live.textContent = state;
+    liveEls.live.className = 'wv-mod-live wv-mod-live--' + state;
+  }
+
+  function notePacket() {
+    lastPacketAt = Date.now();
+    packetCount += 1;
+    setLiveState('live');
+    if( liveEls.meta ) {
+      liveEls.meta.textContent = packetCount + ' pkt';
+    }
+  }
+
+  function tickLiveIdle() {
+    if( lastPacketAt && (Date.now() - lastPacketAt > 3000) && liveState === 'live' ) {
+      setLiveState('idle');
+    }
+  }
+
+  function updateEmptyState() {
+    if( !emptyEl || !emptyEl.length ) {
+      return;
+    }
+    var faceCount = (faceList && faceList.length) ? faceList.children('div').length : 0;
+    var cubeCount = (cubeList && cubeList.length) ? cubeList.children('div').length : 0;
+    if( faceCount === 0 && cubeCount === 0 ) {
+      emptyEl.removeAttr( 'hidden' );
+    } else {
+      emptyEl.attr( 'hidden', 'hidden' );
+    }
+  }
 
   function setHost( el ) {
     if( !el ) { return; }
@@ -43,9 +86,25 @@
 
   myMethods.init = function(elem) {
     setHost( elem );
+    var $mod = $('<div class="wv-mod"></div>').appendTo(elem);
+    $mod.append(
+      '<header class="wv-mod-header">' +
+        '<div class="wv-mod-title-row">' +
+          '<h2 class="wv-mod-title">Observed objects</h2>' +
+          '<span class="wv-mod-live wv-mod-live--waiting" aria-live="polite">waiting</span>' +
+          '<span class="wv-mod-meta">—</span>' +
+        '</div>' +
+        '<p class="wv-mod-sub">Faces and objects currently in view.</p>' +
+      '</header>'
+    );
+    liveEls.live = $mod.find('.wv-mod-live')[0];
+    liveEls.meta = $mod.find('.wv-mod-meta')[0];
+    setLiveState('waiting');
+    emptyEl = $('<div class="wv-mod-empty">Waiting for observed objects.</div>').appendTo($mod);
+
     var bigStyle = {class: 'bigUnicode'};
-    var faceContainer = $('<div class="tableContainer"></div>').appendTo(elem);
-    var cubeContainer = $('<div class="tableContainer"></div>').appendTo(elem);
+    var faceContainer = $('<div class="tableContainer"></div>').appendTo($mod);
+    var cubeContainer = $('<div class="tableContainer"></div>').appendTo($mod);
 
     $('<div></div>', bigStyle).appendTo(faceContainer).html(kFace + "'s");
     faceList = $('<div id="faceList"></div>').appendTo(faceContainer);
@@ -59,6 +118,8 @@
     if( !data || typeof data !== 'object' ) {
       return;
     }
+
+    notePacket();
 
     try {
       if( data["type"] == "RobotObservedFace" ) {
@@ -119,6 +180,7 @@
           delCube.remove();
         }
       }
+      updateEmptyState();
     } catch( e ) {
       console.warn( 'observedObjects: onData failed', e );
     }
@@ -126,6 +188,7 @@
 
   myMethods.update = function(dt, elem) {
     if( elem ) { setHost( elem ); }
+    tickLiveIdle();
   };
 
   myMethods.getStyles = function() {
