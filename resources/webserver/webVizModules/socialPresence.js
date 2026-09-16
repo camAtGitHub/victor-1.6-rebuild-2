@@ -5,7 +5,7 @@
  * Data contract (do not invent fields — C++ producer only):
  *   graph tick:  { time: number, graphData: [{ name: string, value: number }, ...] }
  *   info once:   { info: { events: [{ eventName: string, ... }] } }
- *     → event buttons call sendData(event object) as upstream did
+ *     → event buttons inject that indicator via sendData(event object)
  * Client-only: series visibility, window width, dump, Flot hover.
  *
  * UI: dense ops dashboard (ui-ux-pro-max: data-dense, line trend, KPI strip).
@@ -149,9 +149,9 @@
       '    <span class="sp-live" data-sp="live" aria-live="polite">waiting</span>' +
       '    <span class="sp-meta" data-sp="meta">no packets yet</span>' +
       "  </div>" +
-      '  <p class="sp-sub">RSPI is a decaying “someone here and open” score in [-1, 1]. Slice B will block Socializing below the dashed line (0). Window ' +
+      '  <p class="sp-sub">RSPI is a decaying attribute that represents someone who is here and interacting with me. Socializing is blocked when RSPI is below 0. Last ' +
       WINDOW_S +
-      " s</p>" +
+      " s.</p>" +
       "</header>" +
       '<section class="sp-kpis" data-sp="kpis" aria-label="Series values"></section>' +
       '<section class="sp-chart-wrap" aria-label="Time series chart">' +
@@ -166,15 +166,15 @@
       "  </div>" +
       '  <div class="sp-chart" data-sp="chart" role="img" aria-label="Social presence time series"></div>' +
       '  <div class="sp-tooltip" data-sp="tooltip" hidden></div>' +
-      '  <div class="sp-empty" data-sp="empty">No graph ticks this session. Open this tab on engine :8888 after vic-engine is running the estimator.</div>' +
+      '  <div class="sp-empty" data-sp="empty">Waiting for graph ticks from the engine.</div>' +
       "</section>" +
-      '<section class="sp-events-panel" aria-label="Fire-and-forget events">' +
+      '<section class="sp-events-panel" aria-label="Inject indicators">' +
       '  <div class="sp-events-head">' +
-      '    <div class="sp-panel-title">Events</div>' +
-      '    <span class="sp-panel-hint">Spoof one evidence / inhibitor (does not change HLAI until Slice B).</span>' +
+      '    <div class="sp-panel-title">Indicators</div>' +
+      '    <span class="sp-panel-hint">Inject an indicator. Up arrows raise RSPI; down arrows pull it down.</span>' +
       "  </div>" +
       '  <div class="sp-events" data-sp="events">' +
-      '    <p class="sp-events-empty" data-sp="eventsEmpty">No spoof actions yet — waiting for info.events from the estimator.</p>' +
+      '    <p class="sp-events-empty" data-sp="eventsEmpty">Waiting for the inject list from the engine.</p>' +
       "  </div>" +
       "</section>";
 
@@ -413,13 +413,13 @@
 
     layoutKpiGrid();
 
-    // Derived receptive/inhibited chip (Slice B veto preview). Not a series toggle.
+    // Derived chip: HLAI socializing is blocked when RSPI is below 0.
     var rspiNow = latestValue("RSPI");
     var recCard = document.createElement("div");
     recCard.className = "sp-kpi sp-kpi--status";
     recCard.setAttribute("role", "status");
     recCard.title =
-      "RSPI at or above veto (" + vetoThreshold + ") means receptive";
+      "Socializing is blocked when RSPI is below " + vetoThreshold;
     var recValText = "—";
     if (rspiNow != null) {
       if (rspiNow >= vetoThreshold) {
@@ -653,7 +653,6 @@
         clickable: false,
         autoHighlight: true,
         margin: { top: 8, left: 8, right: 12, bottom: 8 },
-        markings: [{ yaxis: { from: vetoThreshold, to: vetoThreshold }, color: "rgba(220,38,38,0.55)" }],
       },
       colors: SERIES_COLORS,
     };
@@ -815,19 +814,27 @@
         btn.type = "button";
         btn.className =
           "sp-event-btn" + (isInhibitor ? " sp-event-btn--inhibitor" : "");
-        btn.title = "Fire once · sendData(" + label + ")";
-        btn.setAttribute("aria-label", "Send event " + label);
-        // Icon + label primary; SEND is optional chrome that yields space (CSS)
+        btn.title =
+          (isInhibitor ? "Inject inhibitor: " : "Inject indicator: ") + label;
+        btn.setAttribute(
+          "aria-label",
+          (isInhibitor ? "Inject down " : "Inject up ") + label
+        );
+        var arrowPath = isInhibitor
+          ? "M8 3.5v9M4.5 9L8 12.5 11.5 9"
+          : "M8 12.5V3.5M4.5 7L8 3.5 11.5 7";
         btn.innerHTML =
           '<span class="sp-event-icon" aria-hidden="true">' +
           '<svg width="14" height="14" viewBox="0 0 16 16" fill="none">' +
-          '<path d="M2.5 8h9M8.5 4.5L12 8l-3.5 3.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '<path d="' +
+          arrowPath +
+          '" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>' +
           "</svg></span>" +
           '<span class="sp-event-body">' +
           '<span class="sp-event-label">' +
           escapeHtml(label) +
           "</span>" +
-          '<span class="sp-event-hint" aria-hidden="true">send</span>' +
+          '<span class="sp-event-hint" aria-hidden="true">inject</span>' +
           "</span>";
         btn.addEventListener("click", function () {
           safeSend(ev);
@@ -837,12 +844,12 @@
           btn.classList.add("sp-event-btn--sent");
           var hint = btn.querySelector(".sp-event-hint");
           if (hint) {
-            hint.textContent = "sent";
+            hint.textContent = "injected";
           }
           setTimeout(function () {
             btn.classList.remove("sp-event-btn--sent");
             if (hint) {
-              hint.textContent = "send";
+              hint.textContent = "inject";
             }
           }, 650);
         });
