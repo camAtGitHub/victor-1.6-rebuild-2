@@ -1,29 +1,33 @@
 #!/usr/bin/env bash
 # Tighter ambient laser-detector console set (companion to laser-wide-console.sh).
 # 1) Reset every Vision.LaserPointDetector slider to its C++ default.
-# 2) Overlay the few ambient-tight knobs that actually produced FoundCentroid
-#    (maxR 40, sat 2/2, 70/80). Stock 235/240 and sat 30/15 will not pass this
-#    room. See LASER-CONSOLE-SNAPSHOT.md.
+# 2) Unless --default, overlay the few ambient-tight knobs that produced
+#    FoundCentroid (maxR 40, sat 2/2, 70/80). Stock 235/240 and sat 30/15 will
+#    not pass this room. See LASER-CONSOLE-SNAPSHOT.md.
 #
 # Usage:
 #   ./tools/laser-tight-console.sh
+#   ./tools/laser-tight-console.sh --default
 #   ./tools/laser-tight-console.sh 192.168.50.189
-#   ANKI_ROBOT_HOST=192.168.50.189 ./tools/laser-tight-console.sh
+#   ANKI_ROBOT_HOST=192.168.50.189 ./tools/laser-tight-console.sh --default
 #
-# Optional: --head-down  SetHeadAngle -22 (only if DevSquawkBoxTest is active).
+# Optional: --default    C++ defaults only (no tight overlays).
+#           --head-down  SetHeadAngle -22 (only if DevSquawkBoxTest is active).
 # Do not re-run this (or the wide script) while TrackLaser is mid-confirm —
 # AutoExp=true turns AE back on.
 
 set -euo pipefail
 
 HEAD_DOWN=0
+USE_DEFAULT=0
 HOST="${ANKI_ROBOT_HOST:-192.168.50.189}"
 
 for arg in "$@"; do
   case "$arg" in
+    --default) USE_DEFAULT=1 ;;
     --head-down) HEAD_DOWN=1 ;;
     --help|-h)
-      sed -n '2,18p' "$0"
+      sed -n '2,20p' "$0"
       exit 0
       ;;
     *) HOST="$arg" ;;
@@ -107,17 +111,20 @@ setvar Laser_saturationThreshold_green 15
 setvar Laser_saturationBoundingBoxFraction 1.25
 setvar Laser_DrawDetectionsInCameraView false
 setvar LaserDetectionDebug 0
+setvar DrawMirrorModeSalientPointsFor_ms 0
 
-echo
-echo "== Tight overlays (ambient; not ship 235/240 / 30/15) =="
-setvar Laser_maxRadius_pix 40
-setvar Laser_lowThreshold_normalExposure 70
-setvar Laser_highThreshold_normalExposure 80
-setvar Laser_saturationThreshold_red 2
-setvar Laser_saturationThreshold_green 2
-setvar LaserDetectionDebug 2
-setvar Laser_DrawDetectionsInCameraView true
-setvar DrawMirrorModeSalientPointsFor_ms 2000
+if [[ "$USE_DEFAULT" -eq 0 ]]; then
+  echo
+  echo "== Tight overlays (ambient; not ship 235/240 / 30/15) =="
+  setvar Laser_maxRadius_pix 40
+  setvar Laser_lowThreshold_normalExposure 70
+  setvar Laser_highThreshold_normalExposure 80
+  setvar Laser_saturationThreshold_red 2
+  setvar Laser_saturationThreshold_green 2
+  setvar LaserDetectionDebug 2
+  setvar Laser_DrawDetectionsInCameraView true
+  setvar DrawMirrorModeSalientPointsFor_ms 2000
+fi
 
 if [[ "$HEAD_DOWN" -eq 1 ]]; then
   echo
@@ -142,7 +149,18 @@ do
   printf '  %-42s %s\n' "$k" "$(getvar "$k")"
 done
 
-cat <<EOF
+if [[ "$USE_DEFAULT" -eq 1 ]]; then
+  cat <<EOF
+
+Default set: all Laser_* sliders at C++ defaults (no tight overlays).
+  maxRadius 25, min 2, 235/240, sat 30/15, bbox 1.25, ring 2.5
+  debug 0, draw false, DrawMirrorMode 0
+
+Stock sat/brightness need TrackLaser dark AE. For ambient hits use this
+script without --default, or ./tools/laser-wide-console.sh.
+EOF
+else
+  cat <<EOF
 
 Tight set: all Laser_* sliders reset to C++ defaults, then overlays:
   maxRadius 25 → 40
@@ -152,6 +170,10 @@ Tight set: all Laser_* sliders reset to C++ defaults, then overlays:
   ring / dark-fraction / scale / stddev / dark-pair / bbox = stock
 
 If FoundCentroid dies, run ./tools/laser-wide-console.sh and step one family.
+EOF
+fi
+
+cat <<EOF
 If TrackLaser should darken the room, do not re-run this while it is active
 (AutoExp=true). darkenedGain must be ≥ 0.25 or SetAndDisableCameraControl no-ops.
 EOF

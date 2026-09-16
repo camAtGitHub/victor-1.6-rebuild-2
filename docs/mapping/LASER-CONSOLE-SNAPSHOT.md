@@ -62,7 +62,8 @@ Host scripts (HTTP `:8888`):
 
 ```
 ./tools/laser-wide-console.sh              # 70/80, maxR 4000, sat -1, ring 0
-./tools/laser-tight-console.sh             # maxR 40, minR 2, sat 2/2, bbox 1.25
+./tools/laser-tight-console.sh             # maxR 40, sat 2/2, 70/80; other Laser_* stock
+./tools/laser-tight-console.sh --default   # C++ defaults only (235/240, sat 30/15, maxR 25)
 ./tools/laser-wide-console.sh 192.168.50.189
 ```
 
