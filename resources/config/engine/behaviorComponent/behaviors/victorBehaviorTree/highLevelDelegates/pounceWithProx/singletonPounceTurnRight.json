@@ -1,12 +1,30 @@
 {
-  "behaviorID": "SingletonPounceTurnRight",  
-  "behaviorClass" : "Turn",
-  "shouldTurnClockwise": true,
-  "turnDegrees" : 20,
+  "behaviorID": "SingletonPounceTurnRight",
+  "behaviorClass": "DispatcherQueue",
 
   "wantsToBeActivatedCondition": {
-    "conditionType" : "MotionDetected",
-    "motionArea"    : "Right",
-    "motionLevel"   : "High"
-  }
+    "conditionType": "MotionDetected",
+    "motionArea": "Right",
+    "motionLevel": "High"
+  },
+
+  "behaviors": [
+    "S01TurnRight",
+    "S02Pounce"
+  ],
+
+  "anonymousBehaviors": [
+    {
+      "behaviorName": "S01TurnRight",
+      "behaviorClass": "Turn",
+      "shouldTurnClockwise": true,
+      "turnDegrees": 20
+    },
+    {
+      "behaviorName": "S02Pounce",
+      "behaviorClass": "AnimSequence",
+      "associatedActiveFeature": "NoFeature",
+      "animTriggers": ["PounceWProxForward"]
+    }
+  ]
 }

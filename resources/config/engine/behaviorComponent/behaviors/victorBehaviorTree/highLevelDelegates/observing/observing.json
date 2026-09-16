@@ -46,6 +46,14 @@
           "cooldown_random_factor": 0.5
         },
         {
+          // Side high-motion sneak-up + prox pounce. Must sit above ReactToMotion:
+          // that reaction wants any motion, so below it the L/R pounce never fires.
+          // Must sit above ObservingOffChargerHeadOnly (always-on idle).
+          // linkScope on the dispatcher so it only claims the stack when a child wants it.
+          "behavior": "SingletonPounceDispatcher",
+          "cooldown_s": 30.0
+        },
+        {
           "behavior": "ReactToMotion",
           "cooldown_s": 0.0
         },

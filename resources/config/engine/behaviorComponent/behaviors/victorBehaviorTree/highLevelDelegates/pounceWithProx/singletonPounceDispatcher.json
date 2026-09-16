@@ -1,18 +1,32 @@
 {
-  "behaviorID": "SingletonPounceDispatcher",  
-  "behaviorClass" : "DispatcherStrictPriority",
+  "behaviorID": "SingletonPounceDispatcher",
+  "behaviorClass": "DispatcherStrictPriority",
   "interruptActiveBehavior": true,
-  
+  "actAsSelector": true,
+
+  "wantsToBeActivatedCondition": {
+    "conditionType": "Compound",
+    "or": [
+      {
+        "conditionType": "MotionDetected",
+        "motionArea": "Left",
+        "motionLevel": "High"
+      },
+      {
+        "conditionType": "MotionDetected",
+        "motionArea": "Right",
+        "motionLevel": "High"
+      }
+    ]
+  },
+
   "wantsToCancelSelfCondition": {
     "conditionType": "TimerInRange",
-    "begin_s": 30.0
+    "begin_s": 8.0
   },
 
   "behaviors": [
-    "SingletonPounceTurnLeft",        // Ground motion on the side causes a quick, inaccurate, pounce
-    "SingletonPounceTurnRight",       // Ground motion on the side causes a quick, inaccurate, pounce
-    "SingletonPounceWithProx",         // Use the prox sensor to approach/pounce on a verified object 
-    // "SingletonPounceApproachWithProx", // This is currently broken for the whiskey ToF sensor
-    "Wait"
+    "SingletonPounceTurnLeft",
+    "SingletonPounceTurnRight"
   ]
 }
