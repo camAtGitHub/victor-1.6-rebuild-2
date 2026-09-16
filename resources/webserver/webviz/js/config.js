@@ -98,7 +98,7 @@
     Intents: "User intents pending / inject",
     CloudIntents: "Cloud intent stream",
     Mood: "Emotion graph & simple mood controls",
-    SocialPresence: "Social presence telemetry — RSPI & series (graphData wire)",
+    SocialPresence: "Social presence (RSPI) — occupancy + receptiveness; dashed line is HLAI socialize veto",
     NavMap: "Memory map visualization",
     ObservedObjects: "Vision-observed objects",
     VisionScheduleMediator: "Vision schedule",

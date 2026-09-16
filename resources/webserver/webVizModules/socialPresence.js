@@ -15,7 +15,16 @@
   "use strict";
 
   var WINDOW_S = 60;
-  var DEFAULT_VISIBLE = ["RSPI"];
+  var DEFAULT_VISIBLE = ["RSPI", "Quiet", "Face"];
+  var TEST_EVENT_NAMES = {
+    ExplicitPositive: true,
+    ImplicitPositive: true,
+    ExplicitInhibitor: true,
+    PowerDecayNegative: true,
+    PowerDecayPositive: true
+  };
+  var INHIBITOR_NAMES = { Sleep: true, Quiet: true, ShutUp: true };
+  var vetoThreshold = 0;
   var SERIES_COLORS = [
     "#2563eb",
     "#d97706",
@@ -95,8 +104,14 @@
     return t.toFixed(2) + " s";
   }
 
-  function colorFor(idx) {
-    return SERIES_COLORS[idx % SERIES_COLORS.length];
+  function colorFor(name, idx) {
+    if (name === "RSPI") {
+      return "#2563eb";
+    }
+    if (INHIBITOR_NAMES[name]) {
+      return "#dc2626";
+    }
+    return SERIES_COLORS[(typeof idx === "number" ? idx : 0) % SERIES_COLORS.length];
   }
 
   function latestValue(name) {
@@ -134,7 +149,7 @@
       '    <span class="sp-live" data-sp="live" aria-live="polite">waiting</span>' +
       '    <span class="sp-meta" data-sp="meta">no packets yet</span>' +
       "  </div>" +
-      '  <p class="sp-sub">Live series from engine wire <code>socialpresence</code> · window ' +
+      '  <p class="sp-sub">RSPI is a decaying “someone here and open” score in [-1, 1]. Slice B will block Socializing below the dashed line (0). Window ' +
       WINDOW_S +
       " s</p>" +
       "</header>" +
@@ -151,15 +166,15 @@
       "  </div>" +
       '  <div class="sp-chart" data-sp="chart" role="img" aria-label="Social presence time series"></div>' +
       '  <div class="sp-tooltip" data-sp="tooltip" hidden></div>' +
-      '  <div class="sp-empty" data-sp="empty">Waiting for graph packets… Subscribe is live when the engine publishes <code>socialpresence</code>.</div>' +
+      '  <div class="sp-empty" data-sp="empty">No graph ticks this session. Open this tab on engine :8888 after vic-engine is running the estimator.</div>' +
       "</section>" +
       '<section class="sp-events-panel" aria-label="Fire-and-forget events">' +
       '  <div class="sp-events-head">' +
       '    <div class="sp-panel-title">Events</div>' +
-      '    <span class="sp-panel-hint">Fire-and-forget · sendData · from <code>info.events</code></span>' +
+      '    <span class="sp-panel-hint">Spoof one evidence / inhibitor (does not change HLAI until Slice B).</span>' +
       "  </div>" +
       '  <div class="sp-events" data-sp="events">' +
-      '    <p class="sp-events-empty" data-sp="eventsEmpty">No event actions yet — waiting for <code>info.events</code>.</p>' +
+      '    <p class="sp-events-empty" data-sp="eventsEmpty">No spoof actions yet — waiting for info.events from the estimator.</p>' +
       "  </div>" +
       "</section>";
 
@@ -240,6 +255,9 @@
       return;
     }
     var n = seriesNames.length;
+    if (n > 0) {
+      n += 1; // plus derived receptive chip
+    }
     if (!n) {
       els.kpis.style.display = "grid";
       els.kpis.style.gridTemplateColumns = "";
@@ -262,6 +280,22 @@
     els.kpis.style.gap = "8px";
     els.kpis.style.gridTemplateColumns =
       "repeat(" + cols + ", minmax(0, 1fr))";
+  }
+
+  function applyDefaultVisible() {
+    var i;
+    var anyOn = false;
+    for (i = 0; i < seriesNames.length; i++) {
+      var name = seriesNames[i];
+      var on = DEFAULT_VISIBLE.indexOf(name) >= 0;
+      seriesVisible[name] = on;
+      if (on) {
+        anyOn = true;
+      }
+    }
+    if (!anyOn && seriesNames.length) {
+      seriesVisible[seriesNames[0]] = true;
+    }
   }
 
   function allSeriesVisible() {
@@ -307,27 +341,13 @@
         }
       }
       enableAllSnapshot = null;
-      // If snapshot was already all-on, fall back to defaults (RSPI / first)
+      // If snapshot was already all-on, fall back to DEFAULT_VISIBLE
       if (allSeriesVisible() && seriesNames.length > 1) {
-        for (i = 0; i < seriesNames.length; i++) {
-          seriesVisible[seriesNames[i]] = false;
-        }
-        if (seriesNames.indexOf("RSPI") >= 0) {
-          seriesVisible.RSPI = true;
-        } else {
-          seriesVisible[seriesNames[0]] = true;
-        }
+        applyDefaultVisible();
       }
     } else {
-      // No snapshot: leave only primary on
-      for (i = 0; i < seriesNames.length; i++) {
-        seriesVisible[seriesNames[i]] = false;
-      }
-      if (seriesNames.indexOf("RSPI") >= 0) {
-        seriesVisible.RSPI = true;
-      } else if (seriesNames.length) {
-        seriesVisible[seriesNames[0]] = true;
-      }
+      // No snapshot: leave only defaults on
+      applyDefaultVisible();
     }
     rebuildPlotSeries();
     renderKpisAndToggles();
@@ -393,12 +413,42 @@
 
     layoutKpiGrid();
 
+    // Derived receptive/inhibited chip (Slice B veto preview). Not a series toggle.
+    var rspiNow = latestValue("RSPI");
+    var recCard = document.createElement("div");
+    recCard.className = "sp-kpi sp-kpi--status";
+    recCard.setAttribute("role", "status");
+    recCard.title =
+      "RSPI at or above veto (" + vetoThreshold + ") means receptive";
+    var recValText = "—";
+    if (rspiNow != null) {
+      if (rspiNow >= vetoThreshold) {
+        recCard.className += " sp-kpi--receptive";
+        recValText = "yes";
+      } else {
+        recCard.className += " sp-kpi--inhibited";
+        recValText = "no";
+      }
+    }
+    var recTop = document.createElement("span");
+    recTop.className = "sp-kpi-top";
+    var recName = document.createElement("span");
+    recName.className = "sp-kpi-name";
+    recName.textContent = "receptive";
+    recTop.appendChild(recName);
+    var recValEl = document.createElement("span");
+    recValEl.className = "sp-kpi-val";
+    recValEl.textContent = recValText;
+    recCard.appendChild(recTop);
+    recCard.appendChild(recValEl);
+    els.kpis.appendChild(recCard);
+
     var i;
     for (i = 0; i < seriesNames.length; i++) {
       (function (name, idx) {
         var val = latestValue(name);
         var on = !!seriesVisible[name];
-        var col = colorFor(idx);
+        var col = colorFor(name, idx);
 
         // KPI card — toggle series visibility
         var card = document.createElement("button");
@@ -491,18 +541,15 @@
         continue;
       }
       var name = entry.name;
+      if (TEST_EVENT_NAMES[name]) {
+        continue;
+      }
       if (seriesData[name]) {
         continue; // unique names only
       }
       seriesNames.push(name);
       seriesData[name] = [];
-      // Default: show RSPI (and any name in DEFAULT_VISIBLE); others off if many
-      if (DEFAULT_VISIBLE.indexOf(name) >= 0 || seriesNames.length === 1) {
-        seriesVisible[name] = true;
-      } else {
-        // If only a few series, show all; if many, only defaults
-        seriesVisible[name] = graphDataArr.length <= 4;
-      }
+      seriesVisible[name] = DEFAULT_VISIBLE.indexOf(name) >= 0;
     }
     // Ensure at least one visible
     var anyOn = false;
@@ -532,7 +579,7 @@
     for (i = 0; i < seriesNames.length; i++) {
       var name = seriesNames[i];
       var show = !!seriesVisible[name];
-      var col = colorFor(i);
+      var col = colorFor(name, i);
       var isPrim = name === prim;
       var ser = {
         label: name,
@@ -606,6 +653,7 @@
         clickable: false,
         autoHighlight: true,
         margin: { top: 8, left: 8, right: 12, bottom: 8 },
+        markings: [{ yaxis: { from: vetoThreshold, to: vetoThreshold }, color: "rgba(220,38,38,0.55)" }],
       },
       colors: SERIES_COLORS,
     };
@@ -692,6 +740,7 @@
       var opts = chartOptions(t);
       c.getAxes().xaxis.options.min = opts.xaxis.min;
       c.getAxes().xaxis.options.max = opts.xaxis.max;
+      c.getOptions().grid.markings = opts.grid.markings;
       c.setData(plotSeries);
       c.setupGrid();
       c.draw();
@@ -718,10 +767,28 @@
       var k;
       for (k in events) {
         if (events.hasOwnProperty(k)) {
+          if (TEST_EVENT_NAMES[k]) {
+            continue;
+          }
           list.push(events[k]);
         }
       }
     }
+
+    var filtered = [];
+    var fi;
+    for (fi = 0; fi < list.length; fi++) {
+      var ev0 = list[fi];
+      if (!ev0 || typeof ev0 !== "object") {
+        continue;
+      }
+      var nm0 = typeof ev0.eventName === "string" ? ev0.eventName : "";
+      if (TEST_EVENT_NAMES[nm0]) {
+        continue;
+      }
+      filtered.push(ev0);
+    }
+    list = filtered;
 
     if (!list.length) {
       if (els.eventsEmpty) {
@@ -743,9 +810,11 @@
           typeof ev.eventName === "string"
             ? ev.eventName
             : "event " + (idx + 1);
+        var isInhibitor = ev.kind === "inhibitor" || INHIBITOR_NAMES[label];
         var btn = document.createElement("button");
         btn.type = "button";
-        btn.className = "sp-event-btn";
+        btn.className =
+          "sp-event-btn" + (isInhibitor ? " sp-event-btn--inhibitor" : "");
         btn.title = "Fire once · sendData(" + label + ")";
         btn.setAttribute("aria-label", "Send event " + label);
         // Icon + label primary; SEND is optional chrome that yields space (CSS)
@@ -805,11 +874,14 @@
       if (!g || typeof g !== "object" || typeof g.name !== "string") {
         continue;
       }
+      if (TEST_EVENT_NAMES[g.name]) {
+        continue;
+      }
       if (!seriesData[g.name]) {
         // New series mid-stream: add without dropping existing (still only names/values from wire)
         seriesNames.push(g.name);
         seriesData[g.name] = [];
-        seriesVisible[g.name] = seriesNames.length <= 4;
+        seriesVisible[g.name] = DEFAULT_VISIBLE.indexOf(g.name) >= 0;
         rebuildPlotSeries();
       }
       var numVal = parseFloat(g.value);
@@ -843,6 +915,7 @@
     packetCount = 0;
     eventsInfo = null;
     enableAllSnapshot = null;
+    vetoThreshold = 0;
     buildDom(elem);
     setLiveState("waiting");
     updateMeta();
@@ -855,6 +928,10 @@
       }
       if (data == null || typeof data !== "object") {
         return;
+      }
+
+      if (typeof data.vetoThreshold === "number" && isFinite(data.vetoThreshold)) {
+        vetoThreshold = data.vetoThreshold;
       }
 
       if (dumping) {
@@ -1003,6 +1080,14 @@
       .sp-kpi--off {
         opacity: 0.48;
       }
+      .sp-kpi--status {
+        cursor: default;
+      }
+      .sp-kpi--status:hover {
+        box-shadow: none;
+      }
+      .sp-kpi--inhibited .sp-kpi-val { color: #dc2626; }
+      .sp-kpi--receptive .sp-kpi-val { color: #059669; }
       .sp-kpi-top {
         display: flex;
         align-items: flex-start;
@@ -1314,6 +1399,26 @@
         color: #0f7a4a;
         max-width: 3.25rem;
         display: inline;
+      }
+      .sp-event-btn--inhibitor {
+        border-color: rgba(220, 38, 38, 0.45);
+      }
+      .sp-event-btn--inhibitor .sp-event-icon {
+        background: rgba(220, 38, 38, 0.1);
+        color: #dc2626;
+      }
+      .sp-event-btn--inhibitor:hover {
+        border-color: #dc2626;
+        background: linear-gradient(180deg, #ffffff 0%, #fef2f2 100%);
+        box-shadow:
+          0 1px 0 rgba(255, 255, 255, 0.95) inset,
+          0 2px 8px rgba(220, 38, 38, 0.12);
+      }
+      .sp-event-btn--inhibitor:hover .sp-event-icon {
+        background: rgba(220, 38, 38, 0.16);
+      }
+      .sp-event-btn--inhibitor:hover .sp-event-hint {
+        color: #dc2626;
       }
 
       @media (prefers-reduced-motion: reduce) {

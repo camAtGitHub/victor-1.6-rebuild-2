@@ -234,8 +234,16 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 |---|---|
 | `docs/mapping/HIGH-LEVEL.md` | Cross-cutting process + control hierarchy |
 | `docs/mapping/PROCESS-IPC.md` | Eng/anim/robot/cloud/switchboard sockets + CLAD families |
+| `docs/mapping/vector-on-robot.html` | Interactive on-robot architecture (companion → switchboard → engine → anim relay → robot → syscon); source `vector-on-robot.architecture.json` |
+| `docs/mapping/ai-component.html` | Interactive AIComponent map (AI → BC → BSM → ICozmoBehavior → BEI); source `ai-component.architecture.json` |
+| `.ua/knowledge-graph.json` | Understand-Anything **code** graph (files/functions/layers/tour); dashboard primary |
+| `.ua/domain-graph.json` | Understand-Anything **domain** graph (domains/flows/steps); sibling file, does not overwrite the code graph |
+| `.ua/graphs/{code,domain}/` | Frozen snapshots of the two graphs |
+| `.ua/COEXISTENCE.md` | How the two graphs share `.ua/` without clobbering |
 | `docs/mapping/ENGINE-ROBOT-TICK.md` | 60 ms tick: R2E → Robot → AI → actions; vision async |
 | `docs/mapping/ENGINE-BEHAVIOR-TREE.md` | Production freeplay spine: InitNormalOperation → … → HighLevelAI |
+| `docs/mapping/BEHAVIOR-GENERATOR-SPEC.md` | Generator contract: JSON keys, conditions, dispatcher child shapes, codegen, tree hooks + §18 catalog |
+| `docs/mapping/diagrams/` | Five HTML diagrams: autonomy stack, anim hook, greet sequence, Wwise, XYPlanner |
 | `docs/mapping/ENGINE-OBSERVING-AND-INTENTS.md` | Observing freeplay branch + voice/user-intent claim path |
 | `docs/mapping/ENGINE-PATH-PLANNING.md` | Drive-to-pose: PathComponent planner selection |
 | `docs/mapping/WEBVIZ-BEHAVIORS-REVIEW.md` | WebViz Behaviors/BehaviorConds review notes |
@@ -272,6 +280,8 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 | `docs/mapping/TWO-VECTOR-INTERACTIONS.md` | `kevin/rnd_multiVictor` multicast 225.0.0.37:12349 + cube landmark; ranked 2-Vector ideas |
 | `docs/mapping/EASINESS-RANKING.md` | All hunt items ranked by time-to-demo (Laser gate / TrackLaser first; singing/chirps last) |
 | `docs/mapping/TRACK-LASER-PLAN.md` | TrackLaser restore plan: Phase 1 dots (gate+console `Lasers`) then copy `db9431edc0^` class; force-run before Observing |
+| `docs/mapping/SOCIAL-PRESENCE-SLICE-A-PLAN.md` | Port leak RSPI estimator + feed existing WebViz tab; CPU: no extra vision, 10 Hz combiner, subscribe-gated JSON |
+| `docs/mapping/SOCIAL-PRESENCE-SLICE-B-PLAN.md` | HLAI Socializing AND `SocialPresence` min 0 (veto after quiet/sleep); Emotion-clone BEI; no new stack |
 | `docs/mapping/LASER-CONSOLE-SNAPSHOT.md` | 2026-09-13 live knobs that first produced FoundCentroid on `192.168.50.189` (wide, not ship) |
 | `engine/components/cubes/` | L2 cube BLE/coordinator/lights stack |
 | `animProcess/src/cozmoAnim/{animation,faceDisplay,micData,speechRecognizer,audio,…}/` | L2 anim subsystems |
@@ -325,6 +335,9 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
   `HighLevelAI` (JSON under `resources/config/.../victorBehaviorTree/`). Factory:
   `BehaviorFactory`. Intents: `UserIntentComponent` + `user_intent_map.json`.
   **Tick:** AI before ActionList (`ENGINE-ROBOT-TICK.md`).
+  **New behavior / generator contract:** `docs/mapping/BEHAVIOR-GENERATOR-SPEC.md`
+  (base JSON keys, BEI conditions, dispatcher child shapes, codegen, tree hooks).
+  **Interactive map:** `docs/mapping/ai-component.html`.
 - **Where are animations stored vs. played?** — **Played** by `vic-anim` `AnimationStreamer`
   (`animProcess/src/cozmoAnim/animation/`). Engine `PlayAnim` → anim process. Tick default
   **16 ms** (rebuild 60 fps); **33 ms** if `/data/data/rebuild/using-30-fps`. Face:
@@ -336,7 +349,7 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
   **Outputs:** `generated/clad*`. IPC map: `docs/mapping/PROCESS-IPC.md`.
 - **How do processes talk?** — Eng↔anim↔robot over Unix domain sockets; **anim relays** E2R/R2E
   (engine connects to anim, not robot). Cloud proto socket preferred; switchboard separate.
-  Details: `PROCESS-IPC.md`.
+  Details: `PROCESS-IPC.md`. Interactive map: `docs/mapping/vector-on-robot.html`.
 - **Where does the build begin, and what does `vbuild` actually run?** — `source setenv.sh` →
   `vbuild` → `project/victor/scripts/victor_build_release.sh` → `project/victor/build-victor.sh`
   (VICOS/Release/Ninja). Modules: `cmake/`. Docker: `build/`. See `project/README.md`.
@@ -372,6 +385,7 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
   retracted. Affect beats: `IDEA-affect-micro-library.md`. Voice/off-repo continuity:
   `KINETIC-FAMILIAR-VOICE-SYSTEM-PROMPT.md` + `KINETIC-FAMILIAR-SPR.md`.
 - **Deleted Anki leftovers we could restore?** — Hunt on **`kercre123/victor`**. Fun×viability: `KERCRE123-RESTORE-CANDIDATES.md`. **Easiest first:** `EASINESS-RANKING.md`. **TrackLaser plan:** `TRACK-LASER-PLAN.md` (dots first, then copy class). **Why they died:** `WHY-ANKI-DELETED.md`. **Two Vectors:** `TWO-VECTOR-INTERACTIONS.md`. Snake / RPS / CubeDrive **are on this tree**.
+- **Social Presence tab empty?** — JS is live; **no engine producer** on this tree. Slice A port: `SOCIAL-PRESENCE-SLICE-A-PLAN.md`. Slice B (HLAI reads RSPI, not a new stack): `SOCIAL-PRESENCE-SLICE-B-PLAN.md`. Execute A then B with `/do` when asked.
 - **Overheat backpack lights?** — Charger-cooldown v1 **wired**: clad + map + stock JSON + anim `if`s. Plan: `docs/mapping/OVERHEAT-BACKPACK-LIGHTS-PLAN.md`. Needs rebuild + on-robot A/B. Off-charger overheat still unwired (v1.1).
 - **CPU-hot backpack lights?** — `CpuOverheated` / `LowBatteryCpuOverheated` via OSState::GetTemperature_C() ≥ kCpuOverheatBackpackTemp_C (90). Not charger-cooldown Overheated. JSON in stock, WireOS, both example custom packs. Live `/data/data/customBackpackLights/` must get the two files + anim restart. Needs rebuild + fake-temp A/B.
 
@@ -441,6 +455,15 @@ if you ran out of context mid-folder, say so here.
 | 2026-09-11 | Grok | **/do Phases 2–3:** copied leak TrackLaser + Stats/WB/activatable-scope adapters; dropped `BehaviorObjectiveAchieved`; `trackLaser.json` + `generateBehaviorCode.py`. Live console: dark-ring fraction 1.0, MaxSurroundStdDev 80. | Phase 5 `vbuild`/flash when asked; force-run TrackLaser. No Observing hook. |
 | 2026-09-13 | Grok | First FoundCentroid streak on robot; polled knobs → `docs/mapping/LASER-CONSOLE-SNAPSHOT.md` (70/80, ring 0, sat −1, maxR 4000, VisionSystem on). | Tighten maxRadius next; head-down. Phase 5 still gated. |
 | 2026-09-12 | Grok | Observing face-games reachable: `ObservingFaceGames` anonymous `DispatcherRandom` (Snake/BlockDrop/BrickBreaker, equal weight) **above** HeadOnly in `observing.json`; 2000 s ±30% group cooldown + 60 s `TimerInRange` settle. No C++ / no BehaviorID gen. | Deploy `observing.json` + engine restart; ~60 s quiet Observing then a game. Voice `play_anygame` unchanged. |
+| 2026-09-13 | Grok | Behavior generator spec: `docs/mapping/BEHAVIOR-GENERATOR-SPEC.md` — Track A/B, base keys, modifiers, all BEI conditions, JSON-first class schemas, extra keys dump, tree hooks, intents, §18 machine catalog. No C++. | Feed §18 JSON into a generator; emit AnimSequence/dispatcher instances first. |
+| 2026-09-13 | Grok | Animator→behavior handoff: spec §13.1 + catalog `animatorHandoff` (`victor.animHandoff.v1`). Trigger+`ag_*` group+role; not Maya/Wwise. | Animation creator emits handoff JSON; behavior generator fills `animTriggers` / get-in-loop keys. |
+| 2026-09-15 | Grok | Five editorial HTML diagrams in `docs/mapping/diagrams/` (default skin; brand URL down). Autonomy stack, anim hook, greet sequence, Wwise, XYPlanner. | Open `docs/mapping/diagrams/index.html`. |
+| 2026-09-14 | Grok | Archify on-robot architecture: `docs/mapping/vector-on-robot.html` + `.architecture.json` (9 processes/sensors; anim relays E2R). Showcase 9/9. | Open the HTML locally; no more 2048px Chrome captures (compositor segfault). |
+| 2026-09-14 | Grok | Archify `engine/aiComponent`: `docs/mapping/ai-component.html` + `.architecture.json` (AI→BC→BSM→ICozmoBehavior→BEI). Showcase 9/9. | Open the HTML locally; Chrome visual-check skipped in this environment. |
+| 2026-09-14 | Grok | `/understand` + `/understand-domain --full` coexist in `.ua/`: `knowledge-graph.json` (code, 10311 nodes) and `domain-graph.json` (8 domains / 26 flows / 121 steps). Isolated `domain-work/`; snapshots under `.ua/graphs/`. Excluded root `resources/tools/lib` (not `engine/tools`). | `/understand-dashboard` to view both; optional LLM file-analyzer enrich of structural summaries. |
+| 2026-09-16 | Grok | Two Social Presence plans: `SOCIAL-PRESENCE-SLICE-A-PLAN.md` (port leak estimator, CPU: no extra vision, poll salient, 10 Hz, subscribe-gated WebViz) then `SOCIAL-PRESENCE-SLICE-B-PLAN.md` (HLAI Socializing AND RSPI min 0 veto; Emotion-clone BEI). No C++. | `/do` A first; B after A graph green. Do not vbuild until each plan’s last phase. |
+| 2026-09-16 | Grok | Slice A **owns** WebViz JS: plan Phase 4b edits `socialPresence.js` in place (veto line at 0, receptive chip, RSPI+Quiet+Face default, no leak test events). Not a new chart stack. | `/do` A includes 4b (scp JS). |
+| 2026-09-16 | Grok | **`/do` Slice A:** UIC intent callback; `SocialPresenceEstimator` RobotComponent + WebViz `socialpresence`; tab 4b (veto line, receptive chip); cvcatalog `RSPE_WebVizPeriod_s`. No `vbuild`/flash. HLAI unchanged. | Flash `vic-engine` when asked; on-robot graph checklist; then Slice B. |
 
 ---
 

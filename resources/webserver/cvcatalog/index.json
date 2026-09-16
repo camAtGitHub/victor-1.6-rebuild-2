@@ -12,6 +12,7 @@
     "vars/engine-keepaway.json",
     "vars/engine-enroll-face.json",
     "vars/engine-explore-hlai.json",
+    "vars/engine-social-presence.json",
     "vars/engine-sleep.json",
     "vars/engine-interact.json",
     "vars/engine-actions-dock.json",

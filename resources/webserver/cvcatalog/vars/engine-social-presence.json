@@ -1,0 +1,13 @@
+{
+  "vars": {
+    "RSPE_WebVizPeriod_s": {
+      "process": "engine",
+      "category": "SocialPresenceEstimator",
+      "blurb": "How often (seconds) vic-engine sends Social Presence graph ticks to WebViz when a client is subscribed to module socialpresence. Default 0.5. JSON is not built if nobody is subscribed.",
+      "detail": "CONSOLE_VAR kRSPE_WebVizPeriod_s (dump id drops the leading k) in group SocialPresenceEstimator. UpdateDependent only calls SendDataToWebViz when ANKI_DEV_CHEATS is on and elapsed time exceeds this period. SendDataToWebViz returns immediately if CreateWebVizSender(\"socialpresence\") is null, so an unsubscribed tab does not pay JSON cost. This does not change the RSPI combiner rate (that is a const 0.1 s, not a console var) or HighLevelAI.",
+      "status": "live",
+      "evidence": "engine/receptiveSocialPresenceEstimator/socialPresenceEstimator.cpp:50 CONSOLE_VAR kRSPE_WebVizPeriod_s group SocialPresenceEstimator; UpdateDependent :196–198; CreateWebVizSender in SendDataToWebViz :432–436",
+      "tags": ["webviz", "social-presence", "rspi"]
+    }
+  }
+}
