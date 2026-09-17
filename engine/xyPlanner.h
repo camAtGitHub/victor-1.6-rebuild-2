@@ -91,6 +91,9 @@ private:
   // if p corresponds to a pose in _targets, return the correspondance index. if it is not, returns _targets.size()
   Planning::GoalID FindGoalIndex(const Point2f& p) const;
 
+  // A* from p to a collision-free grid cell; empty if none
+  std::vector<Point2f> FindEscapePath(const Point2f& p) const;
+
   // Finds the nearest safe point to p. If no safe point exists, default to p
   Point2f FindNearestSafePoint(const Point2f& p) const;
 

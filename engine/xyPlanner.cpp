@@ -226,7 +226,17 @@ void XYPlanner::StartPlanner()
   // NOTE2: there seems to be a bug in the planner where using Point::IsNear is not a sufficient check for determining
   //        that the goal is safe, even if we use a known safe point for the goal. The work around, for now, is
   //        to find the nearest safe -grid- point, and then insert the true goal state after a plan has been made.
-  const Point2f plannerStart = FindNearestSafePoint( GetNearestGridPoint(_start.GetTranslation(), kPlanningResolution_mm) );
+  const Point2f gridStart = GetNearestGridPoint(_start.GetTranslation(), kPlanningResolution_mm);
+  const std::vector<Point2f> escapePath = FindEscapePath(gridStart);
+  const Point2f plannerStart = escapePath.empty() ? gridStart : escapePath.back();
+  if (escapePath.empty()) {
+    LOG_WARNING("XYPlanner.FindNearestSafePoint",
+                "Could not find any collision free point near %s",
+                gridStart.ToString().c_str());
+  } else if (escapePath.size() > 1) {
+    LOG_INFO("XYPlanner.FindNearestSafePoint", "had to move start state to %s",
+             plannerStart.ToString().c_str());
+  }
 
 #if !defined(NDEBUG)
   for (const auto& s : plannerGoals) {
@@ -251,8 +261,13 @@ void XYPlanner::StartPlanner()
 
   bool foundPath = !plan.empty();
   if (foundPath) {
-    // planner will only go to the nearest safe grid point, so add the real start and goal points
-    plan.insert(plan.begin(), _start.GetTranslation()); 
+    // Glue true start only if its disc is free. Else prepend escape (not colliding _start).
+    if (IsPointSafe(_start.GetTranslation(), kPlanningPadding_mm)) {
+      plan.insert(plan.begin(), _start.GetTranslation());
+    } else if (escapePath.size() > 1) {
+      // A* already starts at the free cell (escape.back()).
+      plan.insert(plan.begin(), escapePath.begin(), escapePath.end() - 1);
+    }
     const Point2i& plannerGoal = plan.back().CastTo<int>();
     if (goalLookup.find(plannerGoal) != goalLookup.end()) {
       plan.insert(plan.end(), goalLookup[plannerGoal]);
@@ -464,11 +479,16 @@ float XYPlanner::GetPathCollisionPenalty(const Planning::Path& path) const
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Point2f XYPlanner::FindNearestSafePoint(const Point2f& p) const
+std::vector<Point2f> XYPlanner::FindEscapePath(const Point2f& p) const
 {
   EscapeObstaclePlanner config(_map, _stopPlanner);
   AStar<Point2f, EscapeObstaclePlanner> planner( config );
-  std::vector<Point2f> plan = planner.Search({p});
+  return planner.Search({p});
+}
+
+Point2f XYPlanner::FindNearestSafePoint(const Point2f& p) const
+{
+  const std::vector<Point2f> plan = FindEscapePath(p);
 
   if (plan.empty()) {
     LOG_WARNING("XYPlanner.FindNearestSafePoint", "Could not find any collision free point near %s", p.ToString().c_str());
@@ -527,7 +547,11 @@ std::vector<Point2f> XYPlanner::GenerateWayPoints(const std::vector<Point2f>& pl
 {
   std::vector<Point2f> out;
 
-  out.push_back(_start.GetTranslation());
+  if (plan.empty()) {
+    return out;
+  }
+
+  out.push_back(plan.front());
   
   const Point2f* iter1 = &out.front();
   const Point2f* iter2 = iter1;
@@ -560,7 +584,7 @@ std::vector<Planning::PathSegment> XYPlanner::SmoothCorners(const std::vector<Po
   // for now, always start and end with a point turn the correct heading. Generating the first/last arc
   // uses different logic since heading angles are constrained, while all intermediate headings are not.
 
-  turns.emplace_back( CreatePointTurnPath(_start, pts[1]) );
+  turns.emplace_back( CreatePointTurnPath(Pose2d(_start.GetAngle(), pts[0]), pts[1]) );
 
   // middle turns
   for (int i = 1; i < pts.size() - 1; ++i) 
