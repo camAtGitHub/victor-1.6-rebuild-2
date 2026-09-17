@@ -180,10 +180,21 @@ void XYPlanner::StartPlanner()
   std::map<Point2i, Point2f> goalLookup; // we need to map grid-aligned planner goals to true targets
   if (_allowGoalChange || (_path.GetNumSegments() == 0)) {
     for (const auto& g : _targets) {
-      Point2f grid_g = GetNearestGridPoint(g.GetTranslation(), kPlanningResolution_mm);
+      const Point2f grid_g = GetNearestGridPoint(g.GetTranslation(), kPlanningResolution_mm);
       if (_map.CheckForCollisions(Ball2f(grid_g, kRobotRadius_mm + kPlanningPadding_mm))) {
-        LOG_WARNING("XYPlanner.StartPlanner", "Goal %s is in collision, skipping",
-                    grid_g.ToString().c_str());
+        const Point2f safe = FindNearestSafePoint(grid_g);
+        if (_map.CheckForCollisions(Ball2f(safe, kRobotRadius_mm + kPlanningPadding_mm))) {
+          LOG_WARNING("XYPlanner.StartPlanner", "Goal %s is in collision, skipping",
+                      grid_g.ToString().c_str());
+          continue;
+        }
+        LOG_WARNING("XYPlanner.StartPlanner.GoalEscaped", "Goal %s escaped to %s",
+                    grid_g.ToString().c_str(), safe.ToString().c_str());
+        plannerGoals.push_back(safe);
+        // Do not glue the true pose onto a clean plan if its disc still collides.
+        if (IsPointSafe(g.GetTranslation(), kPlanningPadding_mm)) {
+          goalLookup[safe.CastTo<int>()] = g.GetTranslation();
+        }
         continue;
       }
       plannerGoals.push_back( grid_g );
@@ -231,6 +242,11 @@ void XYPlanner::StartPlanner()
   auto planS = planner.Search();
   std::vector<Point2f> plan(planS.begin(), planS.end());
 
+  if (config.GetNumExpansions() > kPlanPathMaxExpansions) {
+    LOG_WARNING("XYPlanner.StartPlanner.ExpansionCap", "expansions=%zu",
+                config.GetNumExpansions());
+  }
+
   if(!plan.empty()) {
     // planner will only go to the nearest safe grid point, so add the real start and goal points
     plan.insert(plan.begin(), _start.GetTranslation()); 
@@ -263,11 +279,18 @@ void XYPlanner::StartPlanner()
   }
 
   // grab performance metrics
-  auto planTime_ms = duration_cast<std::chrono::milliseconds>(high_resolution_clock::now() - startTime);
-  LOG_INFO("XYPlanner.StartPlanner", "planning took %s ms (%zu expansions at %.2f exp/sec)",
-           std::to_string(planTime_ms.count()).c_str(),
-           config.GetNumExpansions(),
-           ((float) config.GetNumExpansions() * 1000) / (planTime_ms.count()) );
+  const auto planTime_ms =
+    duration_cast<std::chrono::milliseconds>(high_resolution_clock::now() - startTime);
+  if (planTime_ms.count() == 0) {
+    LOG_INFO("XYPlanner.StartPlanner", "planning took %s ms (%zu expansions)",
+             std::to_string(planTime_ms.count()).c_str(),
+             config.GetNumExpansions());
+  } else {
+    LOG_INFO("XYPlanner.StartPlanner", "planning took %s ms (%zu expansions at %.2f exp/sec)",
+             std::to_string(planTime_ms.count()).c_str(),
+             config.GetNumExpansions(),
+             ((float) config.GetNumExpansions() * 1000) / (planTime_ms.count()) );
+  }
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
