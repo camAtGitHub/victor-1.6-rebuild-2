@@ -318,9 +318,25 @@ Result PathComponent::Abort()
 
 void PathComponent::AbortAndSetFailure()
 {
+  // If we were only ComputingPath / Ready, the robot is not executing a path for this
+  // drive. ClearPath still marks _lastCanceledPathID, but when send==recv the robot
+  // already finished that path and will never emit another COMPLETE/INTERRUPT — waiting
+  // forever (XYPlanner Error used to be CompleteNoPlan and never hit this path).
+  const bool wasActivelyDriving =
+    (_driveToPoseStatus == ERobotDriveToPoseStatus::WaitingToBeginPath) ||
+    (_driveToPoseStatus == ERobotDriveToPoseStatus::FollowingPath);
+  const bool robotAlreadySynced =
+    (_lastSentPathID == 0) || (_lastRecvdPathID == _lastSentPathID);
+
   Result res = Abort();
   DEV_ASSERT(res == RESULT_OK, "PathComponent.Abort.FailedToAbort");
-  SetDriveToPoseStatus(ERobotDriveToPoseStatus::WaitingToCancelPathAndSetFailure);
+
+  if( !wasActivelyDriving && robotAlreadySynced ) {
+    SetDriveToPoseStatus(ERobotDriveToPoseStatus::Failed);
+  }
+  else {
+    SetDriveToPoseStatus(ERobotDriveToPoseStatus::WaitingToCancelPathAndSetFailure);
+  }
 }
 
 void PathComponent::OnPathComplete()
@@ -417,7 +433,25 @@ void PathComponent::UpdateDependent(const RobotCompMap& dependentComps)
                 "robot did not start executing path. Last send = %d, last recv = %d",
                 _lastSentPathID,
                 _lastRecvdPathID);
-      AbortAndSetFailure();
+      // send==recv means the last path already started/finished; AbortAndSetFailure would
+      // ClearPath again, reset the timer, and spam this error forever.
+      const bool robotAlreadySynced =
+        (_lastSentPathID == 0) || (_lastRecvdPathID == _lastSentPathID);
+      if( robotAlreadySynced ) {
+        if( _driveToPoseStatus == ERobotDriveToPoseStatus::WaitingToCancelPathAndSetFailure ) {
+          SetDriveToPoseStatus(ERobotDriveToPoseStatus::Failed);
+        }
+        else if( _driveToPoseStatus == ERobotDriveToPoseStatus::WaitingToCancelPath ) {
+          SetDriveToPoseStatus(ERobotDriveToPoseStatus::Ready);
+        }
+        else {
+          // WaitingToBeginPath with matching IDs is inconsistent; fail the drive.
+          SetDriveToPoseStatus(ERobotDriveToPoseStatus::Failed);
+        }
+      }
+      else {
+        AbortAndSetFailure();
+      }
     }
   }
 }

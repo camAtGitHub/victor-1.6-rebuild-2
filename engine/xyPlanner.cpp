@@ -195,10 +195,11 @@ void XYPlanner::StartPlanner()
   // convert targets to planner states
   std::vector<Point2f> plannerGoals;
   std::map<Point2i, Point2f> goalLookup; // we need to map grid-aligned planner goals to true targets
-  if (!_allowGoalChange) {
-    if (_hasPinnedGoal) {
-      AddPlannerGoal(_pinnedGoal.GetTranslation(), plannerGoals, goalLookup);
-    }
+  // Pin replaces targets only when we actually captured an end pose before Clear().
+  // Fresh plans with allowGoalChange=false and an empty path still use _targets
+  // (same as the old `_path.GetNumSegments()==0` branch).
+  if (!_allowGoalChange && _hasPinnedGoal) {
+    AddPlannerGoal(_pinnedGoal.GetTranslation(), plannerGoals, goalLookup);
   }
   else {
     for (const auto& g : _targets) {

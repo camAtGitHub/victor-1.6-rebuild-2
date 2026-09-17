@@ -479,6 +479,7 @@ if you ran out of context mid-folder, say so here.
 | 2026-09-16 | Grok | **`/do` WebViz glow-up Phases 1–7** (Phase 1 + 2–6 parallel, then 7): `.wv-mod` kit; Cpu/CpuProfile opt-in; connected JS wires; product copy; SP leak-filter gone. No C++ / no new libs. | scp + hard-refresh; on-robot smoke from plan. Skip Phase 8 HIP C++ unless asked. |
 | 2026-09-17 | Grok | XYPlanner review + live syslog (67 all-goals abort, 201 skip `(-160,-1088)`, 27 no-path; no `planning took` = INFO/`Planner` filtered). Plan `docs/mapping/XYPLANNER-DESK-FIX-PLAN.md` Phases 1–8 (escape goals, arc discs, start glue, prefix, Error status, −Y hash, one `vic-engine` flash). | `/do` the plan when asked. |
 | 2026-09-17 | Grok | `/do` XYPlanner desk-fix Phases 1–7 (goal escape, arc discs, start glue, prefix, Error+pin, Point2 hash, grep PASS). Phase 8 vbuild not run (no docker/cmake in this env). | Human `vbuild -t vic-engine` + flash + desk A/B from the plan. |
+| 2026-09-17 | Grok | Post-flash regressions: (1) navMap canvas was sibling of `.wv-mod` → below fold (glow-up); mount inside `$mod`. (2) XYPlanner `Error` → `AbortAndSetFailure` hung on already-synced path (`SentUnreceivedPath` loop / Exploring planning-idle); fail immediately + timeout escape; pin-goal falls back to `_targets`. | Human re-`vbuild -t vic-engine` + flash; hard-refresh Nav Map; desk Exploring A/B. |
 
 ---
 

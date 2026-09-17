@@ -108,6 +108,8 @@
 
   /** Module host element (#tab-navmap). Prefer over document-global selectors. */
   var hostElem = null;
+  /** Glow-up chrome root (.wv-mod). Canvas/legend must live inside this, not as siblings. */
+  var modElem = null;
   var updateBtn;
   var canvasContainer;
   var legendContainer;
@@ -179,7 +181,7 @@
    * width and keeps the viewport-locked shell from growing without bound.
    */
   function measureCanvasSize() {
-    var el = hostElem;
+    var el = modElem || hostElem;
     if( !el || !el.clientWidth || el.clientWidth < 40 ) {
       // Host hidden / not laid out yet — keep last good size
       return { w: kCanvasWidth, h: kCanvasHeight };
@@ -187,10 +189,22 @@
     var pad = 24;
     var w = Math.max( 280, Math.floor( el.clientWidth - pad ) );
     var top = 0;
-    try { top = el.getBoundingClientRect().top; } catch( e ) {}
+    try {
+      // Prefer the canvas slot (or toolbar bottom) so header chrome does not steal height.
+      var anchor = ( canvasContainer && canvasContainer[0] ) || null;
+      if( !anchor && modElem ) {
+        var tb = modElem.querySelector( '.navMapToolbar' );
+        if( tb ) {
+          top = tb.getBoundingClientRect().bottom;
+        }
+      }
+      if( !top ) {
+        top = ( anchor || el ).getBoundingClientRect().top;
+      }
+    } catch( e ) {}
     var winH = (typeof window !== 'undefined' && window.innerHeight) ? window.innerHeight : 800;
-    // Leave room for toolbar checkboxes + legend under the canvas
-    var h = Math.max( 220, Math.floor( winH - top - 200 ) );
+    // Leave room for legend under the canvas
+    var h = Math.max( 220, Math.floor( winH - top - 80 ) );
     w = Math.min( w, 1600 );
     h = Math.min( h, 1000 );
     return { w: w, h: h };
@@ -1224,6 +1238,8 @@
   function initializeSketch( elem ) {
     var $elem = asJq( elem );
     setHost( $elem );
+    // Mount under .wv-mod so min-height:100% chrome does not push the canvas below the fold.
+    var $mount = modElem ? asJq( modElem ) : $elem;
     // Avoid duplicate containers if called twice
     if( canvasContainer && canvasContainer.length ) {
       try { canvasContainer.remove(); } catch( e ) {}
@@ -1231,7 +1247,7 @@
     if( legendContainer && legendContainer.length ) {
       try { legendContainer.remove(); } catch( e2 ) {}
     }
-    canvasContainer = $('<div></div>', { id: 'navMapContainer' }).appendTo( $elem );
+    canvasContainer = $('<div></div>', { id: 'navMapContainer' }).appendTo( $mount );
     // p5 instance mode: prefer DOM node (works on 0.5–1.x); id string also ok
     var host = canvasContainer[0] || 'navMapContainer';
     try {
@@ -1242,7 +1258,7 @@
       return;
     }
 
-    legendContainer = $('<div></div>', { id: 'legendContainer' }).appendTo( $elem );
+    legendContainer = $('<div></div>', { id: 'legendContainer' }).appendTo( $mount );
     for( var idx = 0; idx < kKnownTypes.length; ++idx ) {
       legendContainer.append(
         '<span class="navMapLegendEntry" data-quadtype="' + kKnownTypes[idx] + '">' +
@@ -1250,8 +1266,8 @@
       );
     }
     if( dumpInput ) {
-      $elem.find( '#navMap-pastebin' ).remove();
-      $('<div id="navMap-pastebin"></div>').appendTo( $elem );
+      $mount.find( '#navMap-pastebin' ).remove();
+      $('<div id="navMap-pastebin"></div>').appendTo( $mount );
     }
     attachHostResizeObserver();
   }
@@ -1273,6 +1289,7 @@
     setHost( elem );
 
     var $mod = $('<div class="wv-mod"></div>').appendTo( elem );
+    modElem = $mod[0] || null;
     $mod.append(
       '<header class="wv-mod-header">' +
         '<div class="wv-mod-title-row">' +
@@ -1639,6 +1656,7 @@
         max-width: 100%;
         line-height: 0;
         overflow: hidden;
+        flex: 0 0 auto;
       }
       #navMapContainer canvas {
         display: block;
