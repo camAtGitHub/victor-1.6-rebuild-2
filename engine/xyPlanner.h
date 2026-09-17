@@ -79,13 +79,14 @@ private:
   EComputePathStatus InitializePlanner(const Pose2d& start, const std::vector<Pose2d>& targets, bool forceReplan, bool allowGoalChange);
 
   // convert a set of way points to a smooth path
-  Planning::Path BuildPath(const std::vector<Point2f>& plan) const;
+  Planning::Path BuildPath(const std::vector<Point2f>& plan, bool allowArcs = true) const;
 
   // builds a simplified list of waypoints from closed set
   std::vector<Point2f> GenerateWayPoints(const std::vector<Point2f>& plan) const;
 
   // given a set of points, generate the largest safe circumscibed arc for each turn
-  std::vector<Planning::PathSegment> SmoothCorners(const std::vector<Point2f>& pts) const;
+  std::vector<Planning::PathSegment> SmoothCorners(const std::vector<Point2f>& pts,
+                                                   bool allowArcs = true) const;
 
   // if p corresponds to a pose in _targets, return the correspondance index. if it is not, returns _targets.size()
   Planning::GoalID FindGoalIndex(const Point2f& p) const;

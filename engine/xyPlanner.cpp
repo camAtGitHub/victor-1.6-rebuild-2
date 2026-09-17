@@ -21,7 +21,9 @@
 #include "util/console/consoleInterface.h"
 #include "util/threading/threadPriority.h"
 
+#include <algorithm>
 #include <chrono>
+#include <limits>
 
 #define LOG_CHANNEL "Planner"
 
@@ -247,7 +249,8 @@ void XYPlanner::StartPlanner()
                 config.GetNumExpansions());
   }
 
-  if(!plan.empty()) {
+  bool foundPath = !plan.empty();
+  if (foundPath) {
     // planner will only go to the nearest safe grid point, so add the real start and goal points
     plan.insert(plan.begin(), _start.GetTranslation()); 
     const Point2i& plannerGoal = plan.back().CastTo<int>();
@@ -258,6 +261,18 @@ void XYPlanner::StartPlanner()
     }
 
     _path = BuildPath( plan );
+    const bool isSmoothSafe = CheckIsPathSafe(_path, _start.GetAngle().ToFloat());
+    if (!isSmoothSafe) {
+      _path = BuildPath( plan, false );
+      const bool isTurnPathSafe = CheckIsPathSafe(_path, _start.GetAngle().ToFloat());
+      if (!isTurnPathSafe) {
+        _path.Clear();
+        foundPath = false;
+      }
+    }
+  }
+
+  if (foundPath) {
     _collisionPenalty = GetPathCollisionPenalty( _path );
     // Update the selected goal target index, by checking the end pose
     //  and finding the nearest goal index matching that.
@@ -326,7 +341,10 @@ namespace {
   // for simplicity, check if arcs are safe using multiple disk checks
   inline std::vector<Ball2f> GetArcCollisionSet(const Arc& a, float padding) {
     // convert to Ball2f to get center and radius
-    Ball2f b = ArcToBall(a);
+    Ball2f b;
+    if (!ArcToBall(a, b)) {
+      return {};
+    }
 
     // calculate start and sweep angles
     Vec2f startVec   = a.start - b.GetCentroid();
@@ -334,13 +352,16 @@ namespace {
     Radians startAngle( std::atan2(startVec.y(), startVec.x()) );
     Radians sweepAngle( std::atan2(endVec.y(), endVec.x()) - startAngle );
 
-    const int nChecks = std::ceil(ABS(sweepAngle.ToFloat() * b.GetRadius()) / kRobotRadius_mm);
+    const int nChecks = std::max(1, (int)std::ceil(
+        ABS(sweepAngle.ToFloat() * b.GetRadius()) / kRobotRadius_mm));
     const float checkLen = sweepAngle.ToFloat() / nChecks;
 
     std::vector<Ball2f> retv;
     for (int i = 0; i <= nChecks; ++i) {
-      f32 rad = startAngle.ToFloat() + i*checkLen;
-      retv.emplace_back(b.GetCentroid() + Point2f(std::cos(rad), std::sin(rad))*(kRobotRadius_mm + padding), kRobotRadius_mm + padding);
+      const f32 rad = startAngle.ToFloat() + (i * checkLen);
+      const Point2f center = b.GetCentroid() +
+                             Point2f(std::cos(rad), std::sin(rad)) * b.GetRadius();
+      retv.emplace_back(center, kRobotRadius_mm + padding);
     }
 
     return retv;
@@ -351,6 +372,9 @@ namespace {
 inline float XYPlanner::GetArcPenalty(const Arc& arc, float padding) const
 {
   const auto disks = GetArcCollisionSet(arc, padding);
+  if (disks.empty()) {
+    return std::numeric_limits<float>::max();
+  }
   return std::accumulate(disks.begin(), disks.end(), 0.f, 
     [this] (float cost, const auto& disk) { return cost + _map.GetCollisionArea(disk); }
   );
@@ -360,6 +384,10 @@ inline float XYPlanner::GetArcPenalty(const Arc& arc, float padding) const
 inline bool XYPlanner::IsArcSafe(const Arc& arc, float padding) const
 {
   const auto disks = GetArcCollisionSet(arc, padding);
+  // empty disc list means ArcToBall failed; std::none_of on empty is vacuously true
+  if (disks.empty()) {
+    return false;
+  }
   return std::none_of(disks.begin(), disks.end(), [this] (const auto& disk) { return _map.CheckForCollisions(disk); });
 }
 
@@ -455,7 +483,7 @@ Point2f XYPlanner::FindNearestSafePoint(const Point2f& p) const
 //  Path Smoothing Methods
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-Planning::Path XYPlanner::BuildPath(const std::vector<Point2f>& plan) const
+Planning::Path XYPlanner::BuildPath(const std::vector<Point2f>& plan, bool allowArcs) const
 {  
   // return empty path if there are no waypoints
   if (plan.size() == 0) {
@@ -465,7 +493,7 @@ Planning::Path XYPlanner::BuildPath(const std::vector<Point2f>& plan) const
   using namespace Planning;
   Planning::Path path;
 
-  std::vector<PathSegment> turns = SmoothCorners( GenerateWayPoints(plan) );
+  std::vector<PathSegment> turns = SmoothCorners( GenerateWayPoints(plan), allowArcs );
 
   // start turn is always a point turn, don't add if it is a small turn
   if (!NEAR(turns.front().GetDef().turn.targetAngle, _start.GetAngle().ToFloat(), kPathPrecisionTolerance)) {
@@ -522,7 +550,7 @@ std::vector<Point2f> XYPlanner::GenerateWayPoints(const std::vector<Point2f>& pl
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-std::vector<Planning::PathSegment> XYPlanner::SmoothCorners(const std::vector<Point2f>& pts) const
+std::vector<Planning::PathSegment> XYPlanner::SmoothCorners(const std::vector<Point2f>& pts, bool allowArcs) const
 {
   std::vector<Planning::PathSegment> turns;
 
@@ -544,17 +572,21 @@ std::vector<Planning::PathSegment> XYPlanner::SmoothCorners(const std::vector<Po
 
     // add the first safe arc that can be constructed for the current waypoints, prioritizing inscribed arcs
     // over circumscribed arcs
-    for (const float r : arcRadii) {
-      // try inscribed arc first since it is faster, otherwise try circumscibed arc
-      if ( GetInscribedArc(pts[i-1], pts[i], pts[i+1], r, corner) ) {
-        safeArc = IsArcSafe(corner, kPlanningPadding_mm);
-      } 
-      if ( !safeArc && GetCircumscribedArc(pts[i-1], pts[i], pts[i+1], r, corner) ) {
-        safeArc = IsArcSafe(corner, kPlanningPadding_mm) &&
-                  IsLineSafe({Point2f(x_tail,y_tail), corner.start}, kPlanningPadding_mm) && 
-                  IsLineSafe({corner.end, pts[i+1]}, kPlanningPadding_mm);
+    if (allowArcs) {
+      for (const float r : arcRadii) {
+        // try inscribed arc first since it is faster, otherwise try circumscibed arc
+        if ( GetInscribedArc(pts[i-1], pts[i], pts[i+1], r, corner) ) {
+          safeArc = IsArcSafe(corner, kPlanningPadding_mm) &&
+                    IsLineSafe({Point2f(x_tail,y_tail), corner.start}, kPlanningPadding_mm) && 
+                    IsLineSafe({corner.end, pts[i+1]}, kPlanningPadding_mm);
+        } 
+        if ( !safeArc && GetCircumscribedArc(pts[i-1], pts[i], pts[i+1], r, corner) ) {
+          safeArc = IsArcSafe(corner, kPlanningPadding_mm) &&
+                    IsLineSafe({Point2f(x_tail,y_tail), corner.start}, kPlanningPadding_mm) && 
+                    IsLineSafe({corner.end, pts[i+1]}, kPlanningPadding_mm);
+        }
+        if (safeArc) { break; }
       }
-      if (safeArc) { break; }
     }
 
     turns.emplace_back( (safeArc) ? CreateArcPath(corner) : CreatePointTurnPath( {pts[i-1], pts[i], pts[i+1]} ) );

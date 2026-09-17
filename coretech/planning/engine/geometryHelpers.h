@@ -136,16 +136,21 @@ inline bool GetInscribedArc(const Point2f& p0, const Point2f& p1, const Point2f&
   return true;
 }
 
-// convert a circle defined by three points into a circle defined by a center point and a radius
-inline Ball2f ArcToBall(const Arc& a) {
+// convert a circle defined by three points into a circle defined by a center point and a radius.
+// GetIntersectionPoint (affineHyperplane.h) returns false if the chord bisectors are parallel.
+inline bool ArcToBall(const Arc& a, Ball2f& outBall) {
   // center point is intersection of perpendicular bisectors of two chords
   LineSegment chord1(a.start, a.middle);
   LineSegment chord2(a.start, a.end);
 
   Point2f center;
-  GetIntersectionPoint(chord1.GetPerpendicularBisector(), chord2.GetPerpendicularBisector(), center);
+  if (!GetIntersectionPoint(chord1.GetPerpendicularBisector(),
+                            chord2.GetPerpendicularBisector(), center)) {
+    return false;
+  }
 
-  return Ball2f(center, (a.start - center).Length());
+  outBall = Ball2f(center, (a.start - center).Length());
+  return true;
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -216,7 +221,11 @@ inline LineSegment CreateLineSegment(const Planning::PathSegment& p) {
 // Arc -> PathSegment<Arc> conversion
 inline Planning::PathSegment CreateArcPath(const Arc& a) {
   // convert to Ball2f to get center and radius
-  Ball2f b = ArcToBall(a);
+  Ball2f b;
+  if (!ArcToBall(a, b)) {
+    DEV_ASSERT(false, "CreateArcPath.InvalidArc");
+    return Planning::PathSegment();
+  }
 
   // calculate start and sweep angles
   Vec2f startVec   = a.start - b.GetCentroid();
