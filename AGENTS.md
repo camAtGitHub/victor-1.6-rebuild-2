@@ -246,6 +246,7 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 | `docs/mapping/diagrams/` | Five HTML diagrams: autonomy stack, anim hook, greet sequence, Wwise, XYPlanner |
 | `docs/mapping/ENGINE-OBSERVING-AND-INTENTS.md` | Observing freeplay branch + voice/user-intent claim path |
 | `docs/mapping/ENGINE-PATH-PLANNING.md` | Drive-to-pose: PathComponent planner selection |
+| `docs/mapping/XYPLANNER-DESK-FIX-PLAN.md` | XYPlanner desk fixes: goal escape not skip, arc discs on curve, prefix trim, Error≠arrived; `/do` then one `vic-engine` flash |
 | `docs/mapping/WEBVIZ-BEHAVIORS-REVIEW.md` | WebViz Behaviors/BehaviorConds review notes |
 | `docs/mapping/WEBVIZ-FREEPLAY-DESIGN.md` | FreePlay WebViz module design (no-C++; multi-subscribe; Ops grid §5; dual-theme) |
 | `docs/mapping/WEBVIZ-FREEPLAY-PLAN.md` | FreePlay v1 implementation plan (phased; Allowed APIs; S1–S9) — **shipped** |
@@ -380,6 +381,10 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
   `consolevarset` on init). No extra robot CPU. `/do` Phases 1–7; Phase 8 HIP C++ skip.
 - **How does drive-to-pose work?** — `ENGINE-PATH-PLANNING.md`: ≥40 mm → `XYPlanner` (threaded);
   short moves → FaceAndApproach / MinimalAngle. Robot path follower runs on `vic-robot`.
+  **Desk-fix implemented** (Phase 8 flash/A-B still needed): escape colliding snapped goals;
+  `EPlannerStatus::Error` not arrived; prefix fill; arc discs on the curve; Point2 uint32 hash.
+  Plan: `docs/mapping/XYPLANNER-DESK-FIX-PLAN.md`. Skip syslog remains only if escape fails.
+  `planning took` is INFO/`Planner` and will not appear unless the channel is on.
 - **Which parts are rebuild-specific vs. stock Anki 1.6?** — `CHANGES.md`. Observed: wirepod
   cloud, anim 16 ms, platform OTA/diagnostics notes. Upstream `docs/` = stock 1.6.
 - **Version pins** — `VERSION` = `1.6.1`; `VICTOR_COMPAT_VERSION` = `210`.
@@ -472,6 +477,8 @@ if you ran out of context mid-folder, say so here.
 | 2026-09-16 | Grok | **`/do` Slice B** on `cam_socialPresence`: BEI Has/Get + `BEIConditionType::SocialPresence` + Emotion-clone condition; HLAI socialize doors A/C/D/E AND `min: 0.0`; F still True. No QuietMode hook. No `vbuild`. | Clad emit + flash; on-robot quiet-then-face must not socialize while RSPI < 0. |
 | 2026-09-16 | Grok | **WebViz tab glow-up plan** `docs/mapping/WEBVIZ-TAB-GLOWUP-PLAN.md`: FreePlay/SP visual kit, connect JS wires (Features none→default, cubes NoTarget, mood HTML/legend, conds reorder, audio hasCallback), Cpu/CpuProfile opt-in stream, product copy. No new libs/CDN/C++ by default. | `/do` Phase 1 first (kit + Overview + CPU-safety). |
 | 2026-09-16 | Grok | **`/do` WebViz glow-up Phases 1–7** (Phase 1 + 2–6 parallel, then 7): `.wv-mod` kit; Cpu/CpuProfile opt-in; connected JS wires; product copy; SP leak-filter gone. No C++ / no new libs. | scp + hard-refresh; on-robot smoke from plan. Skip Phase 8 HIP C++ unless asked. |
+| 2026-09-17 | Grok | XYPlanner review + live syslog (67 all-goals abort, 201 skip `(-160,-1088)`, 27 no-path; no `planning took` = INFO/`Planner` filtered). Plan `docs/mapping/XYPLANNER-DESK-FIX-PLAN.md` Phases 1–8 (escape goals, arc discs, start glue, prefix, Error status, −Y hash, one `vic-engine` flash). | `/do` the plan when asked. |
+| 2026-09-17 | Grok | `/do` XYPlanner desk-fix Phases 1–6 C++ (goal escape, arc discs, start glue, prefix, Error+pin, Point2 hash). Phase 7 grep. Phase 8 vbuild/flash next. | One `vbuild -t vic-engine` + flash/A-B. |
 
 ---
 

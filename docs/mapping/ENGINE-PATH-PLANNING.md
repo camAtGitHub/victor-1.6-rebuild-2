@@ -86,6 +86,9 @@ Interface: `engine/pathPlanner.h` — `ComputePath` / `ComputeNewPathIfNeeded` /
 - Config pulls collision cost from **`MapComponent`** (`engine/navMap/mapComponent.*`).
 - Path build: waypoints → `SmoothCorners` → `Planning::Path` segments (`PST_LINE` / `PST_ARC` / `PST_POINT_TURN` in `coretech/planning/shared/path.h`).
 - Drawback (upstream + code): 2D only — start/end headings handled by point turns after smoothing, not in the search state.
+- Colliding snapped goals are **escaped** via `FindNearestSafePoint` (not dropped if a free neighbour exists). Failed search is `EPlannerStatus::Error` (not `CompleteNoPlan` / arrived).
+- `CheckIsPathSafe` fills a whole-segment prefix. Arc collision discs sit on the curve (`b.GetRadius()` offset).
+- `std::hash<Point2<T>>` packs uint32 bits (negative Y). Details: `docs/mapping/XYPLANNER-DESK-FIX-PLAN.md`.
 
 ---
 
