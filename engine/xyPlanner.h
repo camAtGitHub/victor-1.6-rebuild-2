@@ -20,6 +20,7 @@
 
 #include "util/helpers/noncopyable.h"
 
+#include <map>
 #include <thread>
 #include <condition_variable>
 
@@ -97,6 +98,11 @@ private:
   // Finds the nearest safe point to p. If no safe point exists, default to p
   Point2f FindNearestSafePoint(const Point2f& p) const;
 
+  // Snap then escape one true-space goal; skip if the escaped cell is still colliding
+  void AddPlannerGoal(const Point2f& truePose,
+                      std::vector<Point2f>& plannerGoals,
+                      std::map<Point2i, Point2f>& goalLookup) const;
+
   // get total cost of traversing the path in the current map
   float GetPathCollisionPenalty(const Planning::Path& path) const;
 
@@ -117,6 +123,8 @@ private:
   EPlannerStatus       _status;
   float                _collisionPenalty;
   bool                 _allowGoalChange;
+  Pose2d               _pinnedGoal;
+  bool                 _hasPinnedGoal = false;
 
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   // Thread Handling

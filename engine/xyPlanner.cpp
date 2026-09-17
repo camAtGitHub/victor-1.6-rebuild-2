@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <chrono>
 #include <limits>
+#include <map>
 
 #define LOG_CHANNEL "Planner"
 
@@ -146,7 +147,21 @@ EComputePathStatus XYPlanner::InitializePlanner(const Pose2d& start, const std::
              _collisionPenalty, currentPenalty);
   }
 
+  // StartPlanner cannot read _path after Clear(); pin the end when the goal must not change.
+  if (allowGoalChange) {
+    _hasPinnedGoal = false;
+  }
+  else if (_path.GetNumSegments() > 0) {
+    float x = 0.f;
+    float y = 0.f;
+    float t = 0.f;
+    _path.GetSegmentConstRef(_path.GetNumSegments() - 1).GetEndPose(x, y, t);
+    _pinnedGoal = Pose2d(Radians(t), Point2f(x, y));
+    _hasPinnedGoal = true;
+  }
+
   _path.Clear();
+  _hasValidPath = false;
   _start = start;
   _targets = targets;
   _allowGoalChange = allowGoalChange;
@@ -180,43 +195,25 @@ void XYPlanner::StartPlanner()
   // convert targets to planner states
   std::vector<Point2f> plannerGoals;
   std::map<Point2i, Point2f> goalLookup; // we need to map grid-aligned planner goals to true targets
-  if (_allowGoalChange || (_path.GetNumSegments() == 0)) {
+  if (!_allowGoalChange) {
+    if (_hasPinnedGoal) {
+      AddPlannerGoal(_pinnedGoal.GetTranslation(), plannerGoals, goalLookup);
+    }
+  }
+  else {
     for (const auto& g : _targets) {
-      const Point2f grid_g = GetNearestGridPoint(g.GetTranslation(), kPlanningResolution_mm);
-      if (_map.CheckForCollisions(Ball2f(grid_g, kRobotRadius_mm + kPlanningPadding_mm))) {
-        const Point2f safe = FindNearestSafePoint(grid_g);
-        if (_map.CheckForCollisions(Ball2f(safe, kRobotRadius_mm + kPlanningPadding_mm))) {
-          LOG_WARNING("XYPlanner.StartPlanner", "Goal %s is in collision, skipping",
-                      grid_g.ToString().c_str());
-          continue;
-        }
-        LOG_WARNING("XYPlanner.StartPlanner.GoalEscaped", "Goal %s escaped to %s",
-                    grid_g.ToString().c_str(), safe.ToString().c_str());
-        plannerGoals.push_back(safe);
-        // Do not glue the true pose onto a clean plan if its disc still collides.
-        if (IsPointSafe(g.GetTranslation(), kPlanningPadding_mm)) {
-          goalLookup[safe.CastTo<int>()] = g.GetTranslation();
-        }
-        continue;
-      }
-      plannerGoals.push_back( grid_g );
-      // grid_g should be a whole number, so cast to int here to prevent weird floating point precision issues
-      goalLookup[grid_g.CastTo<int>()] = g.GetTranslation();
+      AddPlannerGoal(g.GetTranslation(), plannerGoals, goalLookup);
     }
+  }
 
-    if (plannerGoals.empty()) {
-      LOG_WARNING("XYPlanner.StartPlanner", "All goals are in collision, aborting");
-      _status = EPlannerStatus::CompleteNoPlan;
-      _planningFailed = true;
-      _lastFailedStart = _start;
-      _lastFailedTargets = _targets;
-      return;
-    }
-  } else {
-    // no goal change, so use the end point of the last computed path
-    float x, y, t;
-    _path[_path.GetNumSegments()-1].GetEndPose(x,y,t);
-    plannerGoals.emplace_back(x,y);
+  if (plannerGoals.empty()) {
+    LOG_WARNING("XYPlanner.StartPlanner", "All goals are in collision, aborting");
+    _status = EPlannerStatus::Error;
+    _hasValidPath = false;
+    _planningFailed = true;
+    _lastFailedStart = _start;
+    _lastFailedTargets = _targets;
+    return;
   }
 
   // expand out of collision state if necessary
@@ -302,7 +299,8 @@ void XYPlanner::StartPlanner()
     _status = EPlannerStatus::CompleteWithPlan;
   } else {
     LOG_WARNING("XYPlanner.StartPlanner", "No path found!" );
-    _status = EPlannerStatus::CompleteNoPlan;
+    _status = EPlannerStatus::Error;
+    _hasValidPath = false;
     _planningFailed = true;
     _lastFailedStart = _start;
     _lastFailedTargets = _targets;
@@ -321,6 +319,33 @@ void XYPlanner::StartPlanner()
              config.GetNumExpansions(),
              ((float) config.GetNumExpansions() * 1000) / (planTime_ms.count()) );
   }
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+void XYPlanner::AddPlannerGoal(const Point2f& truePose,
+                               std::vector<Point2f>& plannerGoals,
+                               std::map<Point2i, Point2f>& goalLookup) const
+{
+  const Point2f grid_g = GetNearestGridPoint(truePose, kPlanningResolution_mm);
+  if (_map.CheckForCollisions(Ball2f(grid_g, kRobotRadius_mm + kPlanningPadding_mm))) {
+    const Point2f safe = FindNearestSafePoint(grid_g);
+    if (_map.CheckForCollisions(Ball2f(safe, kRobotRadius_mm + kPlanningPadding_mm))) {
+      LOG_WARNING("XYPlanner.StartPlanner", "Goal %s is in collision, skipping",
+                  grid_g.ToString().c_str());
+      return;
+    }
+    LOG_WARNING("XYPlanner.StartPlanner.GoalEscaped", "Goal %s escaped to %s",
+                grid_g.ToString().c_str(), safe.ToString().c_str());
+    plannerGoals.push_back(safe);
+    // Do not glue the true pose onto a clean plan if its disc still collides.
+    if (IsPointSafe(truePose, kPlanningPadding_mm)) {
+      goalLookup[safe.CastTo<int>()] = truePose;
+    }
+    return;
+  }
+  plannerGoals.push_back(grid_g);
+  // grid_g should be a whole number, so cast to int here to prevent weird floating point precision issues
+  goalLookup[grid_g.CastTo<int>()] = truePose;
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
