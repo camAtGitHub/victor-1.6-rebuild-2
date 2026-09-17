@@ -27,6 +27,8 @@
 #include "util/math/math.h"
 
 #include <cmath>
+#include <cstdint>
+#include <cstring>
 #include <functional>
 #include <numeric>
 
@@ -57,10 +59,17 @@ namespace std {
 // if type T is 32 bit or less, then we can hash with a bitshift
 template <typename T> 
 struct std::hash<Anki::Point2<T>> {
-  std::enable_if_t<sizeof(T) <= 4, s64> 
-  constexpr operator()(const Anki::Point2<T>& p) const
-  { 
-    return ((s64) p.x()) << 32 | ((s64) p.y()); 
+  std::enable_if_t<sizeof(T) <= 4, s64>
+  operator()(const Anki::Point2<T>& p) const
+  {
+    // Negative y must not sign-extend into x.
+    std::uint32_t xBits = 0;
+    std::uint32_t yBits = 0;
+    std::memcpy(&xBits, &p.x(), sizeof(T));
+    std::memcpy(&yBits, &p.y(), sizeof(T));
+    return static_cast<s64>(
+        (static_cast<std::uint64_t>(xBits) << 32) |
+        static_cast<std::uint64_t>(yBits));
   }
 };
 
