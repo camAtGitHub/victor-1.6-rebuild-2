@@ -451,9 +451,10 @@ bool XYPlanner::CheckIsPathSafe(const Planning::Path& path, float startAngle, Pl
 
   validPath.Clear();
   for (int i = 0; i < path.GetNumSegments(); ++i) {
-    // TODO VIC-4315 return the actual safe subpath. It might need splitting into smaller components if the
-    // current segment is long and only part of it is unsafe.
-    if ( !isSafe(path.GetSegmentConstRef(i)) ) { return false; }
+    const Planning::PathSegment& seg = path.GetSegmentConstRef(i);
+    // Whole-segment prefix only; no intra-segment split.
+    if ( !isSafe(seg) ) { return false; }
+    validPath.AppendSegment(seg);
   }
   return true;
 }
