@@ -1,6 +1,6 @@
 # Plan: XYPlanner desk-path fixes
 
-**Status:** Phases 1–6 implemented 2026-09-17; Phase 7 grep; Phase 8 vbuild/flash pending.  
+**Status:** Phases 1–7 landed 2026-09-17 (C++ + grep). Phase 8 vbuild/flash **not run here** (no docker/cmake/ninja). Human: `source setenv.sh && vbuild -t vic-engine` then vdeploy + desk A/B (G1–G3, C1, S1, E1).  
 **Goal:** Stop the live “Goal (…) is in collision, skipping / All goals are in collision, aborting” loop, stop pretending a failed search is “we arrived,” check curves where the body actually goes, and trim to a still-safe prefix instead of slam-stopping.  
 **Live evidence:** robot syslog — 67× `All goals are in collision, aborting`, 201× skip of snapped `(-160, -1088)`, 27× `No path found!`. All pasted cells are 32 mm grid, **−Y**. `planning took` is **absent** because it is `LOG_INFO` on channel `Planner`, which VicOS `console_filter_config.json` does not enable (`"*": false`). Warnings always reach `/var/log/messages`.  
 **Follow:** `/do` these phases in order. **One `vbuild -t vic-engine` + flash at Phase 8** (user is fine with vbuilds).  

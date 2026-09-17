@@ -478,7 +478,7 @@ if you ran out of context mid-folder, say so here.
 | 2026-09-16 | Grok | **WebViz tab glow-up plan** `docs/mapping/WEBVIZ-TAB-GLOWUP-PLAN.md`: FreePlay/SP visual kit, connect JS wires (Features none→default, cubes NoTarget, mood HTML/legend, conds reorder, audio hasCallback), Cpu/CpuProfile opt-in stream, product copy. No new libs/CDN/C++ by default. | `/do` Phase 1 first (kit + Overview + CPU-safety). |
 | 2026-09-16 | Grok | **`/do` WebViz glow-up Phases 1–7** (Phase 1 + 2–6 parallel, then 7): `.wv-mod` kit; Cpu/CpuProfile opt-in; connected JS wires; product copy; SP leak-filter gone. No C++ / no new libs. | scp + hard-refresh; on-robot smoke from plan. Skip Phase 8 HIP C++ unless asked. |
 | 2026-09-17 | Grok | XYPlanner review + live syslog (67 all-goals abort, 201 skip `(-160,-1088)`, 27 no-path; no `planning took` = INFO/`Planner` filtered). Plan `docs/mapping/XYPLANNER-DESK-FIX-PLAN.md` Phases 1–8 (escape goals, arc discs, start glue, prefix, Error status, −Y hash, one `vic-engine` flash). | `/do` the plan when asked. |
-| 2026-09-17 | Grok | `/do` XYPlanner desk-fix Phases 1–6 C++ (goal escape, arc discs, start glue, prefix, Error+pin, Point2 hash). Phase 7 grep. Phase 8 vbuild/flash next. | One `vbuild -t vic-engine` + flash/A-B. |
+| 2026-09-17 | Grok | `/do` XYPlanner desk-fix Phases 1–7 (goal escape, arc discs, start glue, prefix, Error+pin, Point2 hash, grep PASS). Phase 8 vbuild not run (no docker/cmake in this env). | Human `vbuild -t vic-engine` + flash + desk A/B from the plan. |
 
 ---
 
