@@ -9,17 +9,17 @@ namespace {
 float Clamp(float v, float lo, float hi) { return std::max(lo, std::min(v, hi)); }
 constexpr float Radius = 2.f;
 constexpr int Top = 14;
-// Original L1 serve was 53+9=62 px/s, then *1.25. Another ~33% on that
-// baseline (~103 px/s). Per-level add and rally cap scale the same way.
-// 120 Hz step is ~1.3 px at the cap; bricks are 6 px tall so it still
-// cannot tunnel a cell.
-constexpr float kSpeedScale = 1.25f * (4.f/3.f);
+// Original L1 serve was 53+9=62 px/s, then *1.25, then ~(4/3), then +50%.
+// Per-level add and rally cap scale the same way. 120 Hz step is still
+// well under brick height (6 px), so the ball cannot tunnel a cell.
+constexpr float kSpeedScale = 1.25f * (4.f/3.f) * 1.5f;
+constexpr float kLevelScale = (4.f/3.f) * 1.5f;
 constexpr float kServeSpeedLevel1 = (53.f + 9.f) * kSpeedScale;
-constexpr float kServeSpeedPerLevel = 9.f * (4.f/3.f);
-constexpr float kMaxBallSpeed = kServeSpeedLevel1 + (98.f - 62.f) * (4.f/3.f);
+constexpr float kServeSpeedPerLevel = 9.f * kLevelScale;
+constexpr float kMaxBallSpeed = kServeSpeedLevel1 + (98.f - 62.f) * kLevelScale;
 constexpr float kPaddleSpeed = 105.f * kSpeedScale;
 constexpr float kStaleSpeedLevel1 = (70.f + 5.f) * kSpeedScale;
-constexpr float kStaleSpeedPerLevel = 5.f * (4.f/3.f);
+constexpr float kStaleSpeedPerLevel = 5.f * kLevelScale;
 // Tiny bitmap font: 3 columns x 5 rows, drawn at 2x for actual face readability.
 const char* Glyph(char c) {
   switch(c) {
@@ -104,7 +104,7 @@ unsigned BrickBreakerGame::Step(float target) {
   if (_x<2.f+Radius) { _x=2.f+Radius; _vx=std::fabs(_vx); events |= LeftWall; }
   if (_x>_width-2.f-Radius) { _x=_width-2.f-Radius; _vx=-std::fabs(_vx); events |= RightWall; }
   if (_y<Top+Radius) { _y=Top+Radius; _vy=std::fabs(_vy); }
-  // 120 Hz step is ~1.3 px at cap; bricks are 6 px so this cannot skip a cell.
+  // 120 Hz step is ~1.9 px at cap; bricks are 6 px so this cannot skip a cell.
   // Reflect on the entry axis; at a corner choose the smallest penetration.
   for (auto& b : _bricks) {
     if (!b.alive || _x+Radius<=b.x || _x-Radius>=b.x+b.w ||

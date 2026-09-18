@@ -284,13 +284,14 @@ void BehaviorBlockDrop::BehaviorUpdate()
   }
 
   // - - - gravity, speeding up with level - - -
-  // ~33% faster than the previous 13-2*level curve (L1 was 11 ticks).
+  // ~50% faster than the previous 10-2*level curve (L1 was 8 ticks → 5).
   const uint32_t level = game.GetLevel();
-  unsigned int gravityPeriod = 10;
+  unsigned int gravityPeriod = 1;
   if( (2 * level) < 8 ) {
-    gravityPeriod = 10 - (2 * level);
-  } else {
-    gravityPeriod = 2;
+    gravityPeriod = ((10 - (2 * level)) * 2) / 3; // L1=5, L2=4, L3=2
+    if( gravityPeriod < 1 ) {
+      gravityPeriod = 1;
+    }
   }
 
   ++_dVars.gravityTicks;
