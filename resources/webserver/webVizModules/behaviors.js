@@ -132,54 +132,76 @@
     clearDisplay();
   }
 
+  // Visible force-run bar (stock: dropdown + Resend + Force + Show activatable + CSV).
+  // Built in init so it is not waiting on the ID-list packet and is not inside <details>.
+  function ensureForceRunControls($root) {
+    if( !$root || !$root.length ) {
+      return $();
+    }
+    var forceMount = $root.find('#behaviorForceRun');
+    if( forceMount.length == 0 ) {
+      forceMount = $('<div id="behaviorForceRun" class="wv-mod-toolbar"></div>');
+      var header = $root.find('.wv-mod-header');
+      if( header.length ) {
+        forceMount.insertAfter(header);
+      } else {
+        forceMount.prependTo($root);
+      }
+    }
+    var dropDown = $root.find('#behaviorDropdown');
+    if( dropDown.length == 0 ) {
+      dropDown = $('<select></select>', {id: 'behaviorDropdown'});
+      $("<option/>", {val: '', text:'Select a behaviorID to switch to immediately'}).appendTo(dropDown);
+      dropDown.appendTo(forceMount);
+      $('<button type="button" id="resend" class="wv-mod-btn">Resend</button>').appendTo(forceMount);
+      $('<input type="checkbox" id="presetConditions" />').appendTo(forceMount);
+      $('<label for="presetConditions">Force</label>').appendTo(forceMount);
+      $('<input type="checkbox" id="showActivatable" />').appendTo(forceMount);
+      $('<label for="showActivatable">Show activatable</label>').appendTo(forceMount);
+      $('<button type="button" id="downloadTimeBars" class="wv-mod-btn">Download as csv</button>').appendTo(forceMount);
+    }
+    dropDown.off('change.behForce').on('change.behForce', function() {
+      if( this.value ) {
+        sendBehavior(this.value, false); // just default to false so they try it normally
+      }
+    });
+    $root.find('#resend').off('click.behForce').on('click.behForce', function() {
+      var sel = $root.find('#behaviorDropdown')[0];
+      var preset = $root.find('#presetConditions').is(':checked');
+      if( sel && sel.value ) {
+        sendBehavior(sel.value, preset);
+      }
+    });
+    $root.find('#showActivatable').off('change.behForce').on('change.behForce', function() {
+      showInactive = $(this).is(':checked');
+    });
+    $root.find('#downloadTimeBars').off('click.behForce').on('click.behForce', downloadAsCsv);
+    return dropDown;
+  }
+
   function addControls(data, container) {
     if( !Array.isArray(data) ) {
       return;
     }
     data = data.slice().map(function(item) { return String(item); });
     data.sort();
-    // create if needed, then populate a dropdown with behaviorIDs,
-    // and when the user selects one, tell the engine to start that behavior
     var $root = $(container);
-    var forceMount = $root.find('#behaviorForceRun');
-    if( forceMount.length == 0 ) {
-      forceMount = $root;
+    if( $root.length == 0 && hostElem ) {
+      $root = $(hostElem);
     }
-    var toolsMount = $root.find('#behaviorVizTools');
-    if( toolsMount.length == 0 ) {
-      toolsMount = $root;
-    }
-    var dropDown = $root.find('#behaviorDropdown');
+    var dropDown = ensureForceRunControls($root);
     if( dropDown.length == 0 ) {
-      dropDown = $('<select></select>', {id: 'behaviorDropdown'}).appendTo(forceMount);
-      dropDown.change(function() {
-        if( this.value ) {
-          sendBehavior(this.value, false); // just default to false so they try it normally
-        }
-      });
-      $('<button type="button" id="resend" class="wv-mod-btn">Resend</button>').click( function() {
-        var sel = $root.find('#behaviorDropdown')[0];
-        var preset = $root.find('#presetConditions').is(':checked');
-        if( sel && sel.value ) {
-          sendBehavior(sel.value, preset);
-        }
-      }).appendTo(forceMount);
-      $('<input type="checkbox" id="presetConditions" />').appendTo(forceMount);
-      $('<label for="presetConditions">Force</label>').appendTo(forceMount);
+      return;
     }
-    if( $root.find('#showActivatable').length == 0 ) {
-      $('<input type="checkbox" id="showActivatable" />').appendTo(toolsMount)
-        .change( function() {
-          showInactive = $(this).is(':checked');
-        });
-      $('<label for="showActivatable">Show activatable</label>').appendTo(toolsMount);
-      $('<button type="button" id="downloadTimeBars" class="wv-mod-btn">Download as csv</button>').click(downloadAsCsv).appendTo(toolsMount);
-    }
+    var prev = dropDown.val() || '';
     dropDown.empty();
     $("<option/>", {val: '', text:'Select a behaviorID to switch to immediately'}).appendTo(dropDown);
     $(data).each(function() {
       $("<option/>", {val: this, text: this}).appendTo(dropDown);
     });
+    if( prev ) {
+      dropDown.val(prev);
+    }
   }
 
   var liveUpdating = true;
@@ -770,15 +792,22 @@
         '</div>' +
         '<p class="wv-mod-sub">Hover the timeline to see which behaviors were on the stack. Drag the lower strip to zoom (pauses live updates). Use the live-update control to resume.</p>' +
       '</header>' +
-      '<details>' +
-        '<summary>Force-run</summary>' +
-        '<div id="behaviorForceRun" class="wv-mod-toolbar"></div>' +
-      '</details>' +
-      '<div id="behaviorVizTools" class="wv-mod-toolbar"></div>'
+      '<div id="behaviorForceRun" class="wv-mod-toolbar">' +
+        '<select id="behaviorDropdown">' +
+          '<option value="">Select a behaviorID to switch to immediately</option>' +
+        '</select>' +
+        '<button type="button" id="resend" class="wv-mod-btn">Resend</button>' +
+        '<input type="checkbox" id="presetConditions" />' +
+        '<label for="presetConditions">Force</label>' +
+        '<input type="checkbox" id="showActivatable" />' +
+        '<label for="showActivatable">Show activatable</label>' +
+        '<button type="button" id="downloadTimeBars" class="wv-mod-btn">Download as csv</button>' +
+      '</div>'
     );
     liveEls.live = $mod.find('.wv-mod-live')[0];
     liveEls.meta = $mod.find('.wv-mod-meta')[0];
     setLiveState('waiting');
+    ensureForceRunControls($mod);
 
     activeFeatureDiv = $('<h3 id="activeFeature"></h3>').appendTo($mod);
     currentBehaviorDiv = $('<h3 id="currentBehavior"></h3>').appendTo($mod);
@@ -909,9 +938,14 @@
       return;
     }
 
-    // Force-run list: array of behavior name strings
+    // Force-run list: array of behavior name strings (engine sendToClient(list))
     if( Array.isArray(allData) ) {
       addControls( allData, elem );
+      notePacket();
+      return;
+    }
+    if( allData && Array.isArray(allData.list) ) {
+      addControls( allData.list, elem );
       notePacket();
       return;
     }
@@ -1125,8 +1159,20 @@
     return `
 
       #behaviorDropdown {
-        margin-left: 20px;
-        padding-left:20px;
+        min-width: 280px;
+        max-width: 100%;
+        flex: 1 1 280px;
+        padding: 4px 8px;
+        font-size: 12px;
+        color: var(--wv-content-text, #1a1d24);
+        background: var(--wv-content-bg, #ededed);
+        border: 1px solid var(--wv-content-line, #c5cad3);
+        border-radius: var(--wv-radius-sm, 6px);
+      }
+      #behaviorForceRun label {
+        font-size: 12px;
+        cursor: pointer;
+        user-select: none;
       }
       .node text {
         cursor: pointer;
@@ -1203,8 +1249,7 @@
       }
       #downloadTimeBars {
         padding: 5px 10px;
-        margin-right:20px;
-        float:right;
+        margin-left: auto;
       }
       #resend{
         padding: 5px 5px;

@@ -850,7 +850,15 @@
     // Multi-channel: retain each wire name only (do NOT wire-subscribe surface key alone)
     var i;
     for (i = 0; i < channels.length; i++) {
-      wireRetain(channels[i]);
+      var ch = channels[i];
+      var alreadyHeld = (state.channelRefs[ch] || 0) > 0;
+      wireRetain(ch);
+      // Stock tabs need OnWebVizSubscribed snapshots (Behaviors ID list, etc.).
+      // FreePlay may already hold the wire, so wireRetain will not subscribe —
+      // re-send subscribe so the engine snapshot reaches this tab.
+      if (!isMulti && alreadyHeld && state.socket) {
+        state.socket.subscribe(ch);
+      }
     }
     state.surfaceChannels[key] = channels;
     state.subscribed[key] = true;
