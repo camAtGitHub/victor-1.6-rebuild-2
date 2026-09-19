@@ -246,6 +246,8 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 | `docs/mapping/diagrams/` | Five HTML diagrams: autonomy stack, anim hook, greet sequence, Wwise, XYPlanner |
 | `docs/mapping/ENGINE-OBSERVING-AND-INTENTS.md` | Observing freeplay branch + voice/user-intent claim path |
 | `docs/mapping/ENGINE-PATH-PLANNING.md` | Drive-to-pose: PathComponent planner selection |
+| `docs/mapping/INTERESTING-EDGE-PAINT-PLAN.md` | Leftover OverheadEdges → `InterestingEdge` paint (default-off). Phase 1 code = A; desk log→A→C+E. `/do` then flash |
+| `docs/mapping/ENGINE-TODO-BACKLOG.md` | Ranked **Engine TODO-todos**: ~328 `engine/` comment markers → ~33 themes (S/A/B/C/D); face gaze, cliff/UM, FaceAndApproach, navMap, freeplay polish |
 | `docs/mapping/XYPLANNER-DESK-FIX-PLAN.md` | XYPlanner desk fixes: goal escape not skip, arc discs on curve, prefix trim, Error≠arrived; `/do` then one `vic-engine` flash |
 | `docs/mapping/WEBVIZ-BEHAVIORS-REVIEW.md` | WebViz Behaviors/BehaviorConds review notes |
 | `docs/mapping/WEBVIZ-FREEPLAY-DESIGN.md` | FreePlay WebViz module design (no-C++; multi-subscribe; Ops grid §5; dual-theme) |
@@ -379,6 +381,7 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
   tabs in FreePlay/SP chrome (shared `.wv-mod` kit, local CSS, no new JS libs).
   Connect existing JS wires only; Cpu/CpuProfile stream opt-in (today they
   `consolevarset` on init). No extra robot CPU. `/do` Phases 1–7; Phase 8 HIP C++ skip.
+- **InterestingEdge / leftover table lips?** — Overhead edges currently **Hough-extend `Cliff`**, they do **not** paint `InterestingEdge`. Plan: `docs/mapping/INTERESTING-EDGE-PAINT-PLAN.md`. Phase 1 **A** is the go/no-go (magenta line). C+E same sitting. Force console `OverheadEdges`. Do not change `IsCollisionType()`.
 - **How does drive-to-pose work?** — `ENGINE-PATH-PLANNING.md`: ≥40 mm → `XYPlanner` (threaded);
   short moves → FaceAndApproach / MinimalAngle. Robot path follower runs on `vic-robot`.
   **Desk-fix implemented** (Phase 8 flash/A-B still needed): escape colliding snapped goals;
@@ -398,6 +401,7 @@ Surprising, risky, dead-looking, or contradicts a nearby doc. Rebuild-vs-upstrea
 - **Social Presence tab empty?** — JS is live; **no engine producer** on this tree. Slice A port: `SOCIAL-PRESENCE-SLICE-A-PLAN.md`. Slice B (HLAI reads RSPI, not a new stack): `SOCIAL-PRESENCE-SLICE-B-PLAN.md`. Execute A then B with `/do` when asked.
 - **Overheat backpack lights?** — Charger-cooldown v1 **wired**: clad + map + stock JSON + anim `if`s. Plan: `docs/mapping/OVERHEAT-BACKPACK-LIGHTS-PLAN.md`. Needs rebuild + on-robot A/B. Off-charger overheat still unwired (v1.1).
 - **CPU-hot backpack lights?** — `CpuOverheated` / `LowBatteryCpuOverheated` via OSState::GetTemperature_C() ≥ kCpuOverheatBackpackTemp_C (90). Not charger-cooldown Overheated. JSON in stock, WireOS, both example custom packs. Live `/data/data/customBackpackLights/` must get the two files + anim restart. Needs rebuild + fake-temp A/B.
+- **Engine source TODOs ranked?** — `docs/mapping/ENGINE-TODO-BACKLOG.md` (**Engine TODO-todos**): comment harvest under `engine/` (~328 hits → ~33 themes). S-tier: face-track eye fight, cliff↔UM exit, UM recovery anim, FaceAndApproach replan spam, navMap edge/FillBorder. Not a kercre123 restore list (`EASINESS-RANKING.md`).
 
 ---
 
@@ -481,6 +485,10 @@ if you ran out of context mid-folder, say so here.
 | 2026-09-17 | Grok | `/do` XYPlanner desk-fix Phases 1–7 (goal escape, arc discs, start glue, prefix, Error+pin, Point2 hash, grep PASS). Phase 8 vbuild not run (no docker/cmake in this env). | Human `vbuild -t vic-engine` + flash + desk A/B from the plan. |
 | 2026-09-17 | Grok | Post-flash regressions: (1) navMap canvas was sibling of `.wv-mod` → below fold (glow-up); mount inside `$mod`. (2) XYPlanner `Error` → `AbortAndSetFailure` hung on already-synced path (`SentUnreceivedPath` loop / Exploring planning-idle); fail immediately + timeout escape; pin-goal falls back to `_targets`. | Human re-`vbuild -t vic-engine` + flash; hard-refresh Nav Map; desk Exploring A/B. |
 | 2026-09-18 | Grok | Restored Behaviors force-run bar (dropdown “Select a behaviorID…”, Resend, Force, Show activatable) out of collapsed `<details>`; stock tab re-subscribes if FreePlay already holds the wire so the ID list arrives. | scp `behaviors.js` + `webviz/js/app.js`; hard-refresh Behaviors. |
+| 2026-09-19 | Grok (+ 4 explore + synthesizer + 2 reviewers) | Harvested `engine/` TODO/FIXME/XXX/HACK comments; ranked **Engine TODO-todos** → `docs/mapping/ENGINE-TODO-BACKLOG.md` (~328 markers / ~33 themes; S: gaze fight, cliff/UM, FaceAndApproach, navMap). Spec PASS; quality wording fixes applied. | Pick an S-tier theme to `/make-plan` when ready; optional same hunt for `animProcess/` / `robot/`. |
+| 2026-09-19 | Grok | Plan `docs/mapping/INTERESTING-EDGE-PAINT-PLAN.md`: leftover OverheadEdges → `InterestingEdge` (default-off). Full desk A→C→D→B→E; **impl Phase 1 = A&C** (log + paint + area). Hough Cliff path untouched. No C++ / no vbuild. | `/do` Phase 1 when asked; flash only for A/C. Stop if A is empty or speckle. |
+| 2026-09-19 | Grok | Corrected Phase 1: **A is the go/no-go**; C+E same sitting, not a second feature. Plan + Quick answers updated. ADHD mode on. | `/do` Phase 1 when asked. |
+| 2026-09-19 | Grok | `/do` Phase 1 leftover InterestingEdge: `kPaintInterestingEdges` default **false**; Hough-else `InsertData` stamps; EdgeCounts log; End JSON area+counts; navMap `IE` meta; catalog. Grep PASS, anti-pattern CLEAN. No vbuild. | Flash `vic-engine` when asked; desk log-kill → **A**. Stop if leftover ~0. |
 
 ---
 

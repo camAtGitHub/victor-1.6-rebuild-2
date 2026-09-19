@@ -136,6 +136,7 @@
   var lastPacketAt = 0;
   var packetCount = 0;
   var liveState = 'waiting';
+  var lastInterestingEdgeAreaMm2 = null;
 
   function setLiveState(state) {
     liveState = state;
@@ -146,13 +147,22 @@
     liveEls.live.className = 'wv-mod-live wv-mod-live--' + state;
   }
 
+  function updateLiveMeta() {
+    if( !liveEls.meta ) {
+      return;
+    }
+    var text = packetCount + ' pkt';
+    if( typeof lastInterestingEdgeAreaMm2 === 'number' ) {
+      text += ' | IE ' + Math.round( lastInterestingEdgeAreaMm2 );
+    }
+    liveEls.meta.textContent = text;
+  }
+
   function notePacket() {
     lastPacketAt = Date.now();
     packetCount += 1;
     setLiveState('live');
-    if( liveEls.meta ) {
-      liveEls.meta.textContent = packetCount + ' pkt';
-    }
+    updateLiveMeta();
   }
 
   function tickLiveIdle() {
@@ -1559,6 +1569,11 @@
         if( robotPosition && typeof robotPosition.y === 'number' ) {
           robotPosition.y = flipY_mm( robotPosition.y );
         }
+
+        if( typeof data.interestingEdgeArea_mm2 === 'number' ) {
+          lastInterestingEdgeAreaMm2 = data.interestingEdgeArea_mm2;
+        }
+        updateLiveMeta();
 
         mapBakeDirty = true;
         viewFitPending = true; // 2D re-fit extents only

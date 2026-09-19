@@ -234,6 +234,14 @@ private:
   bool                            _vizMessageDirty;
   bool                            _gameMessageDirty;
   bool                            _webMessageDirty;
+
+  // last AddVisionOverheadEdges frame counts for WebViz End JSON
+  u32                             _lastEdgeBorderCount = 0;
+  u32                             _lastEdgeRayDropped = 0;
+  u32                             _lastEdgeValid = 0;
+  u32                             _lastEdgeCliffCount = 0;
+  bool                            _lastEdgeHoughAttempted = false;
+  bool                            _lastEdgeHoughOk = false;
   
   bool                            _isRenderEnabled;
   float                           _broadcastRate_sec = -1.0f;      // (Negative means don't send)

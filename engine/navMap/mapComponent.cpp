@@ -90,6 +90,8 @@ CONSOLE_VAR(float, kHoughMinLineLength_mm,    "MapComponent.VisualEdgeDetection"
 CONSOLE_VAR(float, kHoughMaxLineGap_mm,       "MapComponent.VisualEdgeDetection", 10.0);
 CONSOLE_VAR(float, kEdgeLineLengthToInsert_mm,"MapComponent.VisualEdgeDetection", 200.f);
 CONSOLE_VAR(float, kVisionCliffPadding_mm,    "MapComponent.VisualEdgeDetection", 20.f);
+CONSOLE_VAR(bool,  kPaintInterestingEdges,   "MapComponent.VisualEdgeDetection", false);
+CONSOLE_VAR(float, kInterestingEdgeStamp_mm, "MapComponent.VisualEdgeDetection", 16.f);
 
 CONSOLE_VAR(int,   kMaxPixelsUsedForHoughTransform, "MapComponent.VisualEdgeDetection", 160000); // 400 x 400 max size
 
@@ -278,6 +280,12 @@ MapComponent::MapComponent()
 , _vizMessageDirty(true)
 , _gameMessageDirty(true)
 , _webMessageDirty(false) // web must request it
+, _lastEdgeBorderCount(0)
+, _lastEdgeRayDropped(0)
+, _lastEdgeValid(0)
+, _lastEdgeCliffCount(0)
+, _lastEdgeHoughAttempted(false)
+, _lastEdgeHoughOk(false)
 , _isRenderEnabled(false)
 , _broadcastRate_sec(-1.0f)
 , _enableProxCollisions(true)
@@ -798,6 +806,19 @@ void MapComponent::BroadcastMapToWeb(const MapBroadcastData& mapData) const
     robotJson["qX"] = _robot->GetPose().GetRotation().GetQuaternion().x();
     robotJson["qY"] = _robot->GetPose().GetRotation().GetQuaternion().y();
     robotJson["qZ"] = _robot->GetPose().GetRotation().GetQuaternion().z();
+
+    const auto currentMap = GetCurrentMemoryMap();
+    if (currentMap) {
+      toWeb["interestingEdgeArea_mm2"] = currentMap->GetArea(
+        [](const auto& data){ return data->type == EContentType::InterestingEdge; });
+    }
+    toWeb["edgeBorder"] = (Json::UInt)_lastEdgeBorderCount;
+    toWeb["edgeRayDropped"] = (Json::UInt)_lastEdgeRayDropped;
+    toWeb["edgeValid"] = (Json::UInt)_lastEdgeValid;
+    toWeb["edgeCliffs"] = (Json::UInt)_lastEdgeCliffCount;
+    toWeb["edgeHoughAttempted"] = _lastEdgeHoughAttempted;
+    toWeb["edgeHoughOk"] = _lastEdgeHoughOk;
+
     webService->SendToWebViz(kWebVizModuleName, toWeb);
   }
 }
@@ -1548,6 +1569,14 @@ Result MapComponent::AddVisionOverheadEdges(const OverheadEdgeFrame& frameInfo)
     }
   }
 
+  const u32 borderCount = static_cast<u32>(imagePoints.size());
+  const u32 validCount = static_cast<u32>(validPoints.size());
+  const u32 rayDropped = borderCount - validCount;
+  const u32 cliffCount = static_cast<u32>(cliffNodes.size());
+  const bool houghAttempted =
+    (validPoints.size() >= kHoughAccumThreshold) && (cliffNodes.size() > 0);
+  bool houghOk = false;
+
   if(validPoints.size() >= kHoughAccumThreshold && cliffNodes.size() > 0) {
     // find the newly created cliff, and the old cliffs
     // TODO(agm) currently we set the newest cliff as the "target" cliff to extend
@@ -1569,6 +1598,7 @@ Result MapComponent::AddVisionOverheadEdges(const OverheadEdgeFrame& frameInfo)
       Pose3d refinedCliffPose;
       const bool result = RefineNewCliffPose(validPoints, newCliffNode, oldCliffNodes, refinedCliffPose);
       if(result) {
+        houghOk = true;
         auto ptr = std::const_pointer_cast<MemoryMapData_Cliff>(newCliffNode.GetSharedPtr());
         ptr->pose = refinedCliffPose; // directly edit the pose of the cliff
 
@@ -1604,11 +1634,34 @@ Result MapComponent::AddVisionOverheadEdges(const OverheadEdgeFrame& frameInfo)
         }), transformVisionCliffs); 
       }
     }
-  } else {
-    PRINT_CH_INFO("MapComponent",
-                  "MapComponent.AddVisionOverheadEdges.InvalidCliffOrPointsCount",
-                  "numCliffs=%zd numPoints=%zd",validPoints.size(), cliffNodes.size());
+  } else if (kPaintInterestingEdges && (kInterestingEdgeStamp_mm > 0.f)) {
+    // leftover border points when Hough gate does not run
+    const float half = 0.5f * kInterestingEdgeStamp_mm;
+    for (size_t i = 0; i < validPoints.size(); ++i) {
+      const Point2f& pt = validPoints[i];
+      InsertData(FastPolygon({
+        Point2f(pt.x() - half, pt.y() - half),
+        Point2f(pt.x() + half, pt.y() - half),
+        Point2f(pt.x() + half, pt.y() + half),
+        Point2f(pt.x() - half, pt.y() + half)
+      }), MemoryMapData(EContentType::InterestingEdge, frameInfo.timestamp));
+    }
   }
+
+  _lastEdgeBorderCount = borderCount;
+  _lastEdgeRayDropped = rayDropped;
+  _lastEdgeValid = validCount;
+  _lastEdgeCliffCount = cliffCount;
+  _lastEdgeHoughAttempted = houghAttempted;
+  _lastEdgeHoughOk = houghOk;
+
+  PRINT_CH_INFO("MapComponent",
+                "MapComponent.AddVisionOverheadEdges.EdgeCounts",
+                "border=%u rayDropped=%u valid=%u cliffs=%u houghAttempted=%d houghOk=%d paint=%d",
+                borderCount, rayDropped, validCount, cliffCount,
+                houghAttempted ? 1 : 0, houghOk ? 1 : 0,
+                kPaintInterestingEdges ? 1 : 0);
+
   return RESULT_OK;
 }
 

@@ -72,6 +72,36 @@
       "evidence": "engine/navMap/mapComponent.cpp:94,1648-1663",
       "status": "live",
       "tags": ["navmap", "cliff", "hough", "vision", "performance", "edges"]
+    },
+    "PaintInterestingEdges": {
+      "process": "engine",
+      "blurb": "When true, leftover overhead-edge border points that did not enter the Hough cliff-refine path are stamped into the nav map as InterestingEdge (magenta). Default false — enable only for desk lip tests.",
+      "detail": "AddVisionOverheadEdges paints only in the Hough-gate else: when valid border points are below HoughAccumThreshold and/or there are no cliff-sensor cliff nodes. Each leftover valid ground point becomes an axis-aligned square of InterestingEdgeStamp_mm. Does not change IsCollisionType, does not run when Hough gate passes (even if RefineNewCliffPose fails), and does not force VisionMode OverheadEdges — force that separately. Cells expire via VisionTimeout_ms (~120 s).",
+      "howTo": "1) Force OverheadEdges on (Vision.General.VisionModes). 2) Head down so ground plane is visible on a bare table lip. 3) Set PaintInterestingEdges true. 4) NavMap Update; look for magenta InterestingEdge and meta IE area. 5) Set false when finished (stale cells may last up to VisionTimeout_ms).",
+      "category": "MapComponent.VisualEdgeDetection",
+      "related": [
+        "InterestingEdgeStamp_mm",
+        "OverheadEdges",
+        "HoughAccumThreshold"
+      ],
+      "evidence": "engine/navMap/mapComponent.cpp:93,1551-1645",
+      "status": "live",
+      "tags": ["navmap", "cliff", "hough", "vision", "edges", "interestingEdge"]
+    },
+    "InterestingEdgeStamp_mm": {
+      "process": "engine",
+      "blurb": "Side length in millimeters of each axis-aligned InterestingEdge stamp painted for leftover overhead-edge points when PaintInterestingEdges is on (default 16). Values ≤ 0 skip inserts.",
+      "detail": "Half-side is 0.5 * this value; each leftover validPoints[i] becomes a FastPolygon square inserted via InsertData as EContentType::InterestingEdge. QuadTree cell precision is 8 mm, so 16 mm is about two cells. Larger stamps fill more magenta area and may look blobbier; smaller may under-fill thin lips. Only used when PaintInterestingEdges is true and the Hough gate does not run.",
+      "howTo": "1) Enable PaintInterestingEdges and OverheadEdges. 2) Adjust InterestingEdgeStamp_mm. 3) NavMap Update and compare magenta stamp size on the lip.",
+      "category": "MapComponent.VisualEdgeDetection",
+      "related": [
+        "PaintInterestingEdges",
+        "OverheadEdges",
+        "HoughAccumThreshold"
+      ],
+      "evidence": "engine/navMap/mapComponent.cpp:94,1615-1630",
+      "status": "live",
+      "tags": ["navmap", "cliff", "hough", "vision", "edges", "interestingEdge"]
     }
   }
 }
